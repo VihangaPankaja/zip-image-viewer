@@ -98,24 +98,9 @@ function createNode(name, nodePath, type) {
     path: nodePath,
     type,
     extension: type === 'file' ? path.extname(name).slice(1).toLowerCase() : '',
+    modifiedAt: 0,
     children: type === 'directory' ? [] : undefined
   };
-}
-
-function sortTree(node) {
-  if (node.type !== 'directory') {
-    return node;
-  }
-
-  node.children.sort((left, right) => {
-    if (left.type !== right.type) {
-      return left.type === 'directory' ? -1 : 1;
-    }
-    return left.name.localeCompare(right.name);
-  });
-
-  node.children.forEach(sortTree);
-  return node;
 }
 
 function buildTree(entries, rootName) {
@@ -124,6 +109,7 @@ function buildTree(entries, rootName) {
     path: '.',
     type: 'directory',
     parentPath: '',
+    modifiedAt: 0,
     children: []
   };
   const nodes = new Map([['.', root]]);
@@ -143,11 +129,14 @@ function buildTree(entries, rootName) {
       if (!nodes.has(nextPath)) {
         const node = createNode(name, nextPath, type);
         node.parentPath = currentPath;
+        node.modifiedAt = entry.modifiedAt || 0;
         if (type === 'file') {
           node.size = entry.size;
         }
         nodes.set(nextPath, node);
         nodes.get(currentPath).children.push(node);
+      } else if (entry.modifiedAt && nodes.get(nextPath).modifiedAt < entry.modifiedAt) {
+        nodes.get(nextPath).modifiedAt = entry.modifiedAt;
       }
 
       currentPath = nextPath;
@@ -161,7 +150,7 @@ function buildTree(entries, rootName) {
     }
   }
 
-  return { tree: sortTree(root), firstFilePath, stats: { fileCount } };
+  return { tree: root, firstFilePath, stats: { fileCount } };
 }
 
 async function removeSession(sessionId, reason = 'manual') {
@@ -441,13 +430,18 @@ app.post('/api/sessions', async (req, res) => {
 
       if (entry.type === 'Directory') {
         await mkdir(destination, { recursive: true });
-        extractedEntries.push({ relativePath, type: 'directory', size: 0 });
+        extractedEntries.push({ relativePath, type: 'directory', size: 0, modifiedAt: entry.lastModifiedDateTime?.getTime() || 0 });
         continue;
       }
 
       await mkdir(path.dirname(destination), { recursive: true });
       await pipeline(entry.stream(), createWriteStream(destination));
-      extractedEntries.push({ relativePath, type: 'file', size: entry.uncompressedSize || 0 });
+      extractedEntries.push({
+        relativePath,
+        type: 'file',
+        size: entry.uncompressedSize || 0,
+        modifiedAt: entry.lastModifiedDateTime?.getTime() || 0
+      });
     }
 
     const archiveName = path.basename(parsedUrl.pathname) || 'archive.zip';

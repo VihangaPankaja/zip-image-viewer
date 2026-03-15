@@ -21,6 +21,14 @@ const TEXT_EXTENSIONS = new Set([
 
 const FOLDER_THUMB_SIZE = 88;
 const STRIP_THUMB_SIZE = 220;
+const SORT_OPTIONS = [
+  { value: 'name-asc', label: 'Name A-Z' },
+  { value: 'name-desc', label: 'Name Z-A' },
+  { value: 'date-asc', label: 'Date oldest' },
+  { value: 'date-desc', label: 'Date newest' },
+  { value: 'natural-tail', label: 'Number tail' }
+];
+const NAME_COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base', numeric: false });
 
 function formatBytes(value) {
   if (!Number.isFinite(value) || value <= 0) return 'Unknown size';
@@ -32,6 +40,18 @@ function formatBytes(value) {
     unitIndex += 1;
   }
   return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function formatDate(value) {
+  if (!value) {
+    return 'Date unknown';
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  }).format(value);
 }
 
 function classifyNode(node) {
@@ -58,6 +78,87 @@ function buildFileUrl(sessionId, filePath, options = {}) {
   return `/api/sessions/${sessionId}/file?${params.toString()}`;
 }
 
+function getNameBase(name) {
+  return String(name || '').replace(/\.[^.]+$/, '');
+}
+
+function parseTrailingNumber(name) {
+  const baseName = getNameBase(name).trim();
+  const match = baseName.match(/^(.*?)(?:[\s._-]*\(?([0-9]+)\)?)$/);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    prefix: match[1].trim(),
+    number: Number(match[2])
+  };
+}
+
+function compareByName(left, right) {
+  return NAME_COLLATOR.compare(left.name, right.name);
+}
+
+function compareByNaturalTail(left, right) {
+  const leftTail = parseTrailingNumber(left.name);
+  const rightTail = parseTrailingNumber(right.name);
+
+  if (leftTail && rightTail) {
+    const prefixCompare = NAME_COLLATOR.compare(leftTail.prefix, rightTail.prefix);
+    if (prefixCompare !== 0) {
+      return prefixCompare;
+    }
+    if (leftTail.number !== rightTail.number) {
+      return leftTail.number - rightTail.number;
+    }
+  }
+
+  return compareByName(left, right);
+}
+
+function compareByDate(left, right, direction) {
+  const leftValue = left.modifiedAt || 0;
+  const rightValue = right.modifiedAt || 0;
+  if (leftValue !== rightValue) {
+    return direction === 'asc' ? leftValue - rightValue : rightValue - leftValue;
+  }
+  return compareByName(left, right);
+}
+
+function compareNodes(left, right, sortMode) {
+  if (left.type !== right.type) {
+    return left.type === 'directory' ? -1 : 1;
+  }
+
+  switch (sortMode) {
+    case 'name-desc':
+      return compareByName(right, left);
+    case 'date-asc':
+      return compareByDate(left, right, 'asc');
+    case 'date-desc':
+      return compareByDate(left, right, 'desc');
+    case 'natural-tail':
+      return compareByNaturalTail(left, right);
+    case 'name-asc':
+    default:
+      return compareByName(left, right);
+  }
+}
+
+function cloneAndSortTree(node, sortMode) {
+  if (node.type !== 'directory') {
+    return { ...node };
+  }
+
+  const children = node.children.map((child) => cloneAndSortTree(child, sortMode));
+  children.sort((left, right) => compareNodes(left, right, sortMode));
+
+  return {
+    ...node,
+    children
+  };
+}
+
 function flattenTree(tree) {
   const nodesByPath = new Map();
   const folderImages = new Map();
@@ -78,6 +179,25 @@ function flattenTree(tree) {
 
   walk(tree);
   return { nodesByPath, folderImages, folderPreview };
+}
+
+function getFirstFilePath(node) {
+  if (!node) {
+    return '';
+  }
+
+  if (node.type === 'file') {
+    return node.path;
+  }
+
+  for (const child of node.children) {
+    const match = getFirstFilePath(child);
+    if (match) {
+      return match;
+    }
+  }
+
+  return node.path;
 }
 
 function TreeNode({ node, selectedPath, onSelect, sessionId, folderPreview, folderImages, depth = 0 }) {
@@ -154,13 +274,21 @@ function App() {
   const [zipUrl, setZipUrl] = useState('');
   const [session, setSession] = useState(null);
   const [selectedPath, setSelectedPath] = useState('');
+  const [sortMode, setSortMode] = useState('name-asc');
   const [textPreview, setTextPreview] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [oversizePrompt, setOversizePrompt] = useState(null);
   const [slideshowOpen, setSlideshowOpen] = useState(false);
 
-  const flatData = useMemo(() => (session?.tree ? flattenTree(session.tree) : null), [session]);
+  const sortedTree = useMemo(() => {
+    if (!session?.tree) {
+      return null;
+    }
+    return cloneAndSortTree(session.tree, sortMode);
+  }, [session, sortMode]);
+
+  const flatData = useMemo(() => (sortedTree ? flattenTree(sortedTree) : null), [sortedTree]);
   const selectedNode = flatData?.nodesByPath.get(selectedPath) || null;
   const selectedKind = classifyNode(selectedNode);
   const currentFolderImages = selectedNode ? flatData?.folderImages.get(selectedNode.parentPath) || [] : [];
@@ -228,6 +356,16 @@ function App() {
   }
 
   useEffect(() => {
+    if (!flatData || !sortedTree) {
+      return;
+    }
+
+    if (!selectedPath || !flatData.nodesByPath.has(selectedPath)) {
+      setSelectedPath(getFirstFilePath(sortedTree));
+    }
+  }, [flatData, selectedPath, sortedTree]);
+
+  useEffect(() => {
     if (!selectedNode || !session || selectedKind !== 'text') {
       setTextPreview('');
       return;
@@ -269,7 +407,7 @@ function App() {
   useEffect(() => {
     function onKeyDown(event) {
       const activeTag = document.activeElement?.tagName;
-      if (activeTag === 'INPUT' || activeTag === 'TEXTAREA') {
+      if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') {
         return;
       }
 
@@ -447,18 +585,38 @@ function App() {
 
         <section className="viewer-grid">
           <aside className="sidebar-panel">
-            <div className="panel-header">
+            <div className="panel-header panel-header-stackable">
               <div className="panel-title-group">
                 <p className="panel-label">Explorer</p>
-                <h2 title={session?.tree?.name || 'No archive loaded'}>{session?.tree?.name || 'No archive loaded'}</h2>
+                <h2 title={sortedTree?.name || 'No archive loaded'}>{sortedTree?.name || 'No archive loaded'}</h2>
               </div>
-              {session ? <span className="panel-chip">{session.stats.fileCount} files</span> : null}
+              <div className="sidebar-header-actions">
+                {session ? <span className="panel-chip">{session.stats.fileCount} files</span> : null}
+                <label className="toolbar-select-shell" htmlFor="sort-mode">
+                  <span className="toolbar-label">Sort</span>
+                  <select id="sort-mode" value={sortMode} onChange={(event) => setSortMode(event.target.value)}>
+                    {SORT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <div className="sort-caption">
+              {sortMode === 'natural-tail'
+                ? 'Numeric tail mode keeps names like file 2, file 10, file 11 in number order.'
+                : sortMode.startsWith('date')
+                  ? 'Date sorting uses ZIP entry modified times when the archive provides them.'
+                  : 'Sorting affects explorer order, preview arrows, thumbnails, and slideshow navigation.'}
             </div>
 
             <div className="tree-scroll">
-              {session?.tree ? (
+              {sortedTree ? (
                 <TreeNode
-                  node={session.tree}
+                  node={sortedTree}
                   selectedPath={selectedPath}
                   sessionId={session.id}
                   folderPreview={flatData.folderPreview}
@@ -512,6 +670,7 @@ function App() {
                   <span>
                     {currentImageIndex >= 0 ? `${currentImageIndex + 1} / ${currentFolderImages.length} in folder` : 'Single image'}
                   </span>
+                  <span>{formatDate(selectedNode.modifiedAt)}</span>
                 </div>
                 <div className="image-frame">
                   <img src={selectedFileUrl} alt={selectedNode.name} />
@@ -531,7 +690,7 @@ function App() {
                     ))}
                   </div>
                 ) : null}
-                <div className="navigation-hint">Use left and right arrow keys to move through sibling images.</div>
+                <div className="navigation-hint">Use left and right arrow keys to move through sibling images in the active sort order.</div>
               </div>
             ) : null}
 
@@ -540,6 +699,7 @@ function App() {
                 <div className="preview-toolbar">
                   <span>{formatBytes(selectedNode.size)}</span>
                   <span>{selectedNode.extension.toUpperCase()} preview</span>
+                  <span>{formatDate(selectedNode.modifiedAt)}</span>
                 </div>
                 <pre>{textPreview || 'Loading file...'}</pre>
               </div>

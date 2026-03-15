@@ -288,6 +288,45 @@ a {
   flex: 0 0 auto;
 }
 
+.panel-header-stackable {
+  align-items: flex-start;
+}
+
+.sidebar-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.toolbar-select-shell {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toolbar-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.toolbar-select-shell select {
+  min-height: 2.6rem;
+  padding: 0 0.9rem;
+  border: 1px solid rgba(80, 71, 56, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 251, 245, 0.82);
+  color: var(--text);
+}
+
+.sort-caption {
+  margin: -0.15rem 0 0.85rem;
+  color: var(--muted);
+  font-size: 0.87rem;
+}
+
 .tree-scroll {
   max-height: calc(100vh - 19rem);
   overflow: auto;
@@ -550,5 +589,10 @@ a {
   .panel-header,
   .slideshow-topbar {
     flex-direction: column;
+  }
+
+  .sidebar-header-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
