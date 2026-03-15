@@ -8,7 +8,10 @@ Browse a public ZIP file through a modern web UI running from a single Docker co
 - backend downloads it into a temporary session workspace
 - ZIP contents are extracted safely and shown as a sidebar file tree
 - images open in the preview panel with left and right arrow navigation for sibling images in the same folder
+- videos such as `mp4`, `webm`, `mov`, `m4v`, and `ogv` open in an inline player with range-based streaming support
 - text-style files such as `txt`, `md`, `json`, `csv`, `js`, `ts`, `html`, and `css` open in a text preview
+- dark mode and light mode are both available from the interface toggle
+- loaded archives can be cleared directly from the app without reloading the page
 - sessions are cleaned up automatically after inactivity
 
 ## Tech Stack
@@ -55,8 +58,8 @@ docker run -p 8080:8080 vihangapankaja/zip-image-viewer:latest
 Versioned image example:
 
 ```bash
-docker pull vihangapankaja/zip-image-viewer:1.0.4
-docker run -p 8080:8080 vihangapankaja/zip-image-viewer:1.0.4
+docker pull vihangapankaja/zip-image-viewer:1.0.6
+docker run -p 8080:8080 vihangapankaja/zip-image-viewer:1.0.6
 ```
 
 Open `http://localhost:8080`.
@@ -83,5 +86,5 @@ Note: some large repositories may take longer to download and unpack, and some Z
 - `POST /api/sessions` create a browsing session from a ZIP URL
 - `GET /api/sessions/:id/tree` fetch the extracted tree for a session
 - `GET /api/sessions/:id/file?path=...` stream a file
-- `DELETE /api/sessions/:id` remove a session manually
+- `DELETE /api/sessions/:id` remove a loaded session manually
 - `GET /health` basic server health response
