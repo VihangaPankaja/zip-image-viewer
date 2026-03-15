@@ -16,16 +16,19 @@ const __dirname = path.dirname(__filename);
 const distDir = path.resolve(__dirname, '..', 'dist');
 const app = express();
 const sessionStore = new Map();
+const jobStore = new Map();
 let server;
 let isShuttingDown = false;
 
 const PORT = Number(process.env.PORT || 8080);
 const SESSION_TTL_MS = 30 * 60 * 1000;
+const JOB_TTL_MS = 30 * 60 * 1000;
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 const CONFIRM_SIZE_BYTES = 1024 * 1024 * 1024;
 const TEXT_PREVIEW_LIMIT = 2 * 1024 * 1024;
 const DOWNLOAD_PROGRESS_STEP_PERCENT = 10;
 const DOWNLOAD_PROGRESS_STEP_BYTES = 25 * 1024 * 1024;
+const EXTRACTION_PROGRESS_STEP_PERCENT = 10;
 const MAX_THUMBNAIL_SIZE = 320;
 const IMAGE_PREVIEW_PROFILES = {
   low: { size: 1280, quality: 58 },
@@ -100,6 +103,88 @@ function parseRangeHeader(rangeHeader, size) {
     start,
     end: Math.min(end, size - 1)
   };
+}
+
+function createJob(url) {
+  const job = {
+    id: crypto.randomUUID(),
+    url,
+    status: 'queued',
+    phase: 'queued',
+    downloadedBytes: 0,
+    reportedSize: 0,
+    percent: 0,
+    extractedEntries: 0,
+    totalEntries: 0,
+    message: 'Waiting to start',
+    error: '',
+    requiresConfirmation: false,
+    confirmTokenAccepted: false,
+    sessionId: '',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    subscribers: new Set(),
+    workspaceDir: '',
+    zipPath: '',
+    extractDir: '',
+    abortController: null,
+    cleanupAt: 0
+  };
+
+  jobStore.set(job.id, job);
+  return job;
+}
+
+function sanitizeJob(job) {
+  return {
+    id: job.id,
+    url: job.url,
+    status: job.status,
+    phase: job.phase,
+    downloadedBytes: job.downloadedBytes,
+    reportedSize: job.reportedSize,
+    percent: job.percent,
+    extractedEntries: job.extractedEntries,
+    totalEntries: job.totalEntries,
+    message: job.message,
+    error: job.error,
+    requiresConfirmation: job.requiresConfirmation,
+    sessionId: job.sessionId
+  };
+}
+
+function closeJob(job, terminalStatus) {
+  job.status = terminalStatus;
+  job.updatedAt = Date.now();
+  job.cleanupAt = Date.now() + JOB_TTL_MS;
+}
+
+function emitJob(job, patch = {}, eventName = 'progress') {
+  Object.assign(job, patch, { updatedAt: Date.now() });
+  const payload = JSON.stringify(sanitizeJob(job));
+  for (const res of job.subscribers) {
+    res.write(`event: ${eventName}\n`);
+    res.write(`data: ${payload}\n\n`);
+  }
+}
+
+async function cleanupJob(jobId, reason = 'cleanup') {
+  const job = jobStore.get(jobId);
+  if (!job) {
+    return;
+  }
+
+  if (job.workspaceDir) {
+    await rm(job.workspaceDir, { recursive: true, force: true }).catch(() => {});
+  }
+
+  for (const res of job.subscribers) {
+    res.end();
+  }
+
+  job.subscribers.clear();
+  jobStore.delete(jobId);
+  logEvent('info', 'job.removed', { jobId, reason });
 }
 
 app.use((req, res, next) => {
@@ -299,6 +384,18 @@ setInterval(() => {
       });
     }
   }
+
+  for (const [jobId, job] of jobStore.entries()) {
+    if (job.cleanupAt && now > job.cleanupAt) {
+      cleanupJob(jobId, 'expired').catch((error) => {
+        logEvent('error', 'job.cleanup.failed', {
+          jobId,
+          error: error.message,
+          stack: error.stack
+        });
+      });
+    }
+  }
 }, CLEANUP_INTERVAL_MS).unref();
 
 async function shutdown() {
@@ -323,6 +420,7 @@ async function shutdown() {
   }
 
   await Promise.all([...sessionStore.keys()].map((sessionId) => removeSession(sessionId, 'shutdown')));
+  await Promise.all([...jobStore.keys()].map((jobId) => cleanupJob(jobId, 'shutdown')));
   logEvent('info', 'shutdown.complete', { activeSessions: sessionStore.size });
   process.exit(0);
 }
@@ -352,49 +450,59 @@ process.on('SIGINT', () => {
 });
 
 app.get('/health', (_req, res) => {
-  res.json({ ok: true, sessions: sessionStore.size });
+  res.json({ ok: true, sessions: sessionStore.size, jobs: jobStore.size });
 });
 
-app.post('/api/sessions', async (req, res) => {
-  const { url, confirmOversize = false } = req.body || {};
+async function processSessionJob(job, confirmOversize = false) {
+  const { url } = job;
 
   if (!url) {
-    logEvent('warn', 'session.create.rejected', { reason: 'missing_url' });
-    return res.status(400).json({ error: 'ZIP URL is required.' });
+    throw new Error('ZIP URL is required.');
   }
 
   let parsedUrl;
   try {
     parsedUrl = new URL(url);
   } catch {
-    logEvent('warn', 'session.create.rejected', { url, reason: 'invalid_url' });
-    return res.status(400).json({ error: 'Enter a valid public URL.' });
+    throw new Error('Enter a valid public URL.');
   }
 
   if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-    logEvent('warn', 'session.create.rejected', { url, reason: 'unsupported_protocol' });
-    return res.status(400).json({ error: 'Only HTTP and HTTPS URLs are supported.' });
+    throw new Error('Only HTTP and HTTPS URLs are supported.');
   }
 
   const workspaceDir = await mkdtemp(path.join(os.tmpdir(), 'zip-image-viewer-'));
   const zipPath = path.join(workspaceDir, 'archive.zip');
   const extractDir = path.join(workspaceDir, 'extracted');
   await mkdir(extractDir, { recursive: true });
+  job.workspaceDir = workspaceDir;
+  job.zipPath = zipPath;
+  job.extractDir = extractDir;
+  job.abortController = new AbortController();
 
   try {
+    emitJob(job, { status: 'downloading', phase: 'downloading', message: 'Starting archive download', error: '' });
     logEvent('info', 'session.create.start', {
+      jobId: job.id,
       url,
       confirmOversize,
       workspaceDir
     });
 
-    const response = await fetch(url, { redirect: 'follow' });
+    const response = await fetch(url, { redirect: 'follow', signal: job.abortController.signal });
     if (!response.ok || !response.body) {
       throw new Error(`Download failed with status ${response.status}.`);
     }
 
     const headerSize = Number(response.headers.get('content-length')) || 0;
+    emitJob(job, {
+      reportedSize: headerSize,
+      downloadedBytes: 0,
+      percent: headerSize > 0 ? 0 : null,
+      message: headerSize > 0 ? `Downloading archive: 0 of ${formatBytes(headerSize)}` : 'Downloading archive'
+    });
     logEvent('info', 'download.start', {
+      jobId: job.id,
       url,
       reportedSize: headerSize,
       reportedSizeLabel: formatBytes(headerSize)
@@ -402,18 +510,23 @@ app.post('/api/sessions', async (req, res) => {
 
     if (headerSize > CONFIRM_SIZE_BYTES && !confirmOversize) {
       await rm(workspaceDir, { recursive: true, force: true });
+      emitJob(job, {
+        status: 'awaiting_confirmation',
+        phase: 'confirm',
+        requiresConfirmation: true,
+        reportedSize: headerSize,
+        message: `Archive is ${formatBytes(headerSize)} and needs confirmation before download.`
+      }, 'confirmation');
       logEvent('warn', 'download.confirmation.required', {
+        jobId: job.id,
         url,
         reportedSize: headerSize,
         reportedSizeLabel: formatBytes(headerSize),
         limit: CONFIRM_SIZE_BYTES,
         limitLabel: formatBytes(CONFIRM_SIZE_BYTES)
       });
-      return res.json({
-        requiresConfirmation: true,
-        reportedSize: headerSize,
-        limit: CONFIRM_SIZE_BYTES
-      });
+      closeJob(job, 'awaiting_confirmation');
+      return;
     }
 
     let downloadedBytes = 0;
@@ -426,7 +539,14 @@ app.post('/api/sessions', async (req, res) => {
         if (headerSize > 0) {
           const percent = Math.floor((downloadedBytes / headerSize) * 100);
           if (percent >= nextProgressPercent) {
+            emitJob(job, {
+              downloadedBytes,
+              reportedSize: headerSize,
+              percent: Math.min(percent, 100),
+              message: `Downloading archive: ${formatBytes(downloadedBytes)} of ${formatBytes(headerSize)}`
+            });
             logEvent('info', 'download.progress', {
+              jobId: job.id,
               url,
               downloadedBytes,
               downloadedLabel: formatBytes(downloadedBytes),
@@ -437,7 +557,14 @@ app.post('/api/sessions', async (req, res) => {
             nextProgressPercent += DOWNLOAD_PROGRESS_STEP_PERCENT;
           }
         } else if (downloadedBytes >= nextProgressBytes) {
+          emitJob(job, {
+            downloadedBytes,
+            reportedSize: 0,
+            percent: null,
+            message: `Downloading archive: ${formatBytes(downloadedBytes)} received`
+          });
           logEvent('info', 'download.progress', {
+            jobId: job.id,
             url,
             downloadedBytes,
             downloadedLabel: formatBytes(downloadedBytes)
@@ -457,7 +584,14 @@ app.post('/api/sessions', async (req, res) => {
 
     try {
       await pipeline(Readable.fromWeb(response.body), guard, createWriteStream(zipPath));
+      emitJob(job, {
+        downloadedBytes,
+        reportedSize: headerSize,
+        percent: 100,
+        message: 'Archive download complete. Preparing extraction...'
+      });
       logEvent('info', 'download.complete', {
+        jobId: job.id,
         url,
         downloadedBytes,
         downloadedLabel: formatBytes(downloadedBytes),
@@ -466,18 +600,25 @@ app.post('/api/sessions', async (req, res) => {
     } catch (error) {
       if (error.code === 'OVERSIZE_CONFIRM') {
         await rm(workspaceDir, { recursive: true, force: true });
+        emitJob(job, {
+          status: 'awaiting_confirmation',
+          phase: 'confirm',
+          requiresConfirmation: true,
+          reportedSize: downloadedBytes,
+          downloadedBytes,
+          percent: null,
+          message: `Archive exceeded ${formatBytes(CONFIRM_SIZE_BYTES)} and needs confirmation to continue.`
+        }, 'confirmation');
         logEvent('warn', 'download.confirmation.required', {
+          jobId: job.id,
           url,
           reportedSize: downloadedBytes,
           reportedSizeLabel: formatBytes(downloadedBytes),
           limit: CONFIRM_SIZE_BYTES,
           limitLabel: formatBytes(CONFIRM_SIZE_BYTES)
         });
-        return res.json({
-          requiresConfirmation: true,
-          reportedSize: downloadedBytes,
-          limit: CONFIRM_SIZE_BYTES
-        });
+        closeJob(job, 'awaiting_confirmation');
+        return;
       }
       throw error;
     }
@@ -485,7 +626,17 @@ app.post('/api/sessions', async (req, res) => {
     const directory = await unzipper.Open.file(zipPath);
     const extractedEntries = [];
     const extractRootPath = path.resolve(extractDir);
+    let nextExtractPercent = EXTRACTION_PROGRESS_STEP_PERCENT;
+    emitJob(job, {
+      status: 'extracting',
+      phase: 'extracting',
+      totalEntries: directory.files.length,
+      extractedEntries: 0,
+      percent: 0,
+      message: `Extracting archive: 0 of ${directory.files.length} entries`
+    });
     logEvent('info', 'extract.start', {
+      jobId: job.id,
       url,
       entryCount: directory.files.length,
       extractDir
@@ -503,6 +654,16 @@ app.post('/api/sessions', async (req, res) => {
       if (entry.type === 'Directory') {
         await mkdir(destination, { recursive: true });
         extractedEntries.push({ relativePath, type: 'directory', size: 0, modifiedAt: entry.lastModifiedDateTime?.getTime() || 0 });
+        const extractPercent = Math.floor((extractedEntries.length / directory.files.length) * 100);
+        if (extractPercent >= nextExtractPercent) {
+          emitJob(job, {
+            extractedEntries: extractedEntries.length,
+            totalEntries: directory.files.length,
+            percent: Math.min(extractPercent, 100),
+            message: `Extracting archive: ${extractedEntries.length} of ${directory.files.length} entries`
+          });
+          nextExtractPercent += EXTRACTION_PROGRESS_STEP_PERCENT;
+        }
         continue;
       }
 
@@ -514,6 +675,17 @@ app.post('/api/sessions', async (req, res) => {
         size: entry.uncompressedSize || 0,
         modifiedAt: entry.lastModifiedDateTime?.getTime() || 0
       });
+
+      const extractPercent = Math.floor((extractedEntries.length / directory.files.length) * 100);
+      if (extractPercent >= nextExtractPercent) {
+        emitJob(job, {
+          extractedEntries: extractedEntries.length,
+          totalEntries: directory.files.length,
+          percent: Math.min(extractPercent, 100),
+          message: `Extracting archive: ${extractedEntries.length} of ${directory.files.length} entries`
+        });
+        nextExtractPercent += EXTRACTION_PROGRESS_STEP_PERCENT;
+      }
     }
 
     const archiveName = path.basename(parsedUrl.pathname) || 'archive.zip';
@@ -523,6 +695,7 @@ app.post('/api/sessions', async (req, res) => {
     const directoryCount = extractedEntries.length - stats.fileCount;
 
     logEvent('info', 'extract.complete', {
+      jobId: job.id,
       url,
       entryCount: extractedEntries.length,
       fileCount: stats.fileCount,
@@ -541,27 +714,139 @@ app.post('/api/sessions', async (req, res) => {
     });
 
     logEvent('info', 'session.create.complete', {
+      jobId: job.id,
       sessionId,
       url,
       fileCount: stats.fileCount,
       firstFilePath
     });
 
-    return res.json({
-      id: sessionId,
-      tree,
-      firstFilePath,
-      stats
-    });
+    emitJob(job, {
+      status: 'ready',
+      phase: 'ready',
+      sessionId,
+      percent: 100,
+      message: 'Archive is ready to browse.',
+      requiresConfirmation: false
+    }, 'ready');
+    closeJob(job, 'ready');
   } catch (error) {
     await rm(workspaceDir, { recursive: true, force: true });
     logEvent('error', 'session.create.failed', {
+      jobId: job.id,
       url,
       error: error.message,
       stack: error.stack
     });
-    return res.status(400).json({ error: error.message || 'Could not process this ZIP file.' });
+
+    if (error.name === 'AbortError') {
+      emitJob(job, {
+        status: 'cancelled',
+        phase: 'cancelled',
+        error: '',
+        message: 'Archive loading was cancelled.'
+      }, 'cancelled');
+      closeJob(job, 'cancelled');
+      return;
+    }
+
+    emitJob(job, {
+      status: 'error',
+      phase: 'error',
+      error: error.message || 'Could not process this ZIP file.',
+      message: error.message || 'Could not process this ZIP file.'
+    }, 'error');
+    closeJob(job, 'error');
   }
+}
+
+app.post('/api/sessions', async (req, res) => {
+  const { url, confirmOversize = false } = req.body || {};
+  if (!url) {
+    return res.status(400).json({ error: 'ZIP URL is required.' });
+  }
+  const job = createJob(url);
+
+  emitJob(job, { message: 'Queued archive request' });
+  processSessionJob(job, confirmOversize).catch((error) => {
+    logEvent('error', 'job.process.unhandled', {
+      jobId: job.id,
+      error: error.message,
+      stack: error.stack
+    });
+  });
+
+  return res.status(202).json({ jobId: job.id, ...sanitizeJob(job) });
+});
+
+app.get('/api/session-jobs/:id', (req, res) => {
+  const job = jobStore.get(req.params.id);
+  if (!job) {
+    return res.status(404).json({ error: 'Job not found.' });
+  }
+
+  return res.json(sanitizeJob(job));
+});
+
+app.get('/api/session-jobs/:id/events', (req, res) => {
+  const job = jobStore.get(req.params.id);
+  if (!job) {
+    return res.status(404).json({ error: 'Job not found.' });
+  }
+
+  res.setHeader('content-type', 'text/event-stream');
+  res.setHeader('cache-control', 'no-cache, no-transform');
+  res.setHeader('connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  job.subscribers.add(res);
+  res.write(`event: progress\n`);
+  res.write(`data: ${JSON.stringify(sanitizeJob(job))}\n\n`);
+
+  req.on('close', () => {
+    job.subscribers.delete(res);
+  });
+});
+
+app.post('/api/session-jobs/:id/confirm', (req, res) => {
+  const job = jobStore.get(req.params.id);
+  if (!job) {
+    return res.status(404).json({ error: 'Job not found.' });
+  }
+
+  if (!job.requiresConfirmation) {
+    return res.status(400).json({ error: 'This job does not need confirmation.' });
+  }
+
+  job.requiresConfirmation = false;
+  job.cleanupAt = 0;
+  processSessionJob(job, true).catch((error) => {
+    logEvent('error', 'job.confirm.unhandled', {
+      jobId: job.id,
+      error: error.message,
+      stack: error.stack
+    });
+  });
+
+  return res.json(sanitizeJob(job));
+});
+
+app.delete('/api/session-jobs/:id', async (req, res) => {
+  const job = jobStore.get(req.params.id);
+  if (!job) {
+    return res.status(404).json({ error: 'Job not found.' });
+  }
+
+  job.abortController?.abort();
+  emitJob(job, {
+    status: 'cancelled',
+    phase: 'cancelled',
+    error: '',
+    message: 'Archive loading was cancelled.'
+  }, 'cancelled');
+  closeJob(job, 'cancelled');
+  await cleanupJob(job.id, 'cancelled');
+  return res.status(204).end();
 });
 
 app.get('/api/sessions/:id/tree', (req, res) => {
