@@ -67,6 +67,41 @@ function shouldPreserveOriginalPreview(contentType) {
   return contentType === 'image/svg+xml' || contentType === 'image/gif';
 }
 
+function parseRangeHeader(rangeHeader, size) {
+  if (!rangeHeader || !rangeHeader.startsWith('bytes=')) {
+    return null;
+  }
+
+  const [rawStart, rawEnd] = rangeHeader.replace('bytes=', '').split('-');
+  if (rawStart.includes(',') || rawEnd?.includes(',')) {
+    return null;
+  }
+
+  let start;
+  let end;
+
+  if (rawStart === '') {
+    const suffixLength = Number(rawEnd);
+    if (!Number.isInteger(suffixLength) || suffixLength <= 0) {
+      return 'invalid';
+    }
+    start = Math.max(size - suffixLength, 0);
+    end = size - 1;
+  } else {
+    start = Number(rawStart);
+    end = rawEnd === '' ? size - 1 : Number(rawEnd);
+  }
+
+  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || start >= size) {
+    return 'invalid';
+  }
+
+  return {
+    start,
+    end: Math.min(end, size - 1)
+  };
+}
+
 app.use((req, res, next) => {
   const isTrackedRequest = req.path === '/health' || req.path.startsWith('/api');
   if (!isTrackedRequest) {
@@ -603,6 +638,7 @@ app.get('/api/sessions/:id/file', async (req, res) => {
   const wantsImagePreview = req.query.imagePreview === '1';
   const previewQuality = String(req.query.quality || 'balanced');
   const contentType = mime.lookup(targetPath) || 'application/octet-stream';
+  const rangeHeader = req.headers.range;
   logEvent('info', 'session.file.read', {
     sessionId: session.id,
     path: normalizedPath,
@@ -668,7 +704,24 @@ app.get('/api/sessions/:id/file', async (req, res) => {
     }
   }
 
+  res.setHeader('accept-ranges', 'bytes');
   res.type(contentType);
+
+  const range = parseRangeHeader(rangeHeader, fileStats.size);
+  if (range === 'invalid') {
+    res.setHeader('content-range', `bytes */${fileStats.size}`);
+    return res.status(416).end();
+  }
+
+  if (range) {
+    const contentLength = range.end - range.start + 1;
+    res.status(206);
+    res.setHeader('content-range', `bytes ${range.start}-${range.end}/${fileStats.size}`);
+    res.setHeader('content-length', String(contentLength));
+    return createReadStream(targetPath, { start: range.start, end: range.end }).pipe(res);
+  }
+
+  res.setHeader('content-length', String(fileStats.size));
 
   return createReadStream(targetPath).pipe(res);
 });
