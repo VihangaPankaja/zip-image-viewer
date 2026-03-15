@@ -69,7 +69,6 @@ Open `http://localhost:8080`.
 - public `http` and `https` ZIP URLs are supported
 - if the ZIP is larger than `1 GB`, the app asks whether to continue
 - extracted files are stored only in temporary server session folders
-- archive creation now runs as an async background job with live progress updates over SSE
 - unsupported binary files can still be opened as raw files
 
 ## Sample Public ZIP URLs
@@ -84,12 +83,8 @@ Note: some large repositories may take longer to download and unpack, and some Z
 
 ## API Endpoints
 
-- `POST /api/sessions` start an async archive job from a ZIP URL
-- `GET /api/session-jobs/:id` fetch current archive job state
-- `GET /api/session-jobs/:id/events` subscribe to live archive progress events
-- `POST /api/session-jobs/:id/confirm` continue an oversized archive job
-- `DELETE /api/session-jobs/:id` cancel an active archive job
-- `GET /api/sessions/:id/tree` fetch the extracted tree for a ready session
+- `POST /api/sessions` create a browsing session from a ZIP URL
+- `GET /api/sessions/:id/tree` fetch the extracted tree for a session
 - `GET /api/sessions/:id/file?path=...` stream a file
 - `DELETE /api/sessions/:id` remove a loaded session manually
 - `GET /health` basic server health response

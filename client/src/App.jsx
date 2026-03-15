@@ -249,26 +249,6 @@ function getWrappedPath(items, currentIndex, delta) {
   return items[nextIndex] || '';
 }
 
-function formatProgressMessage(job) {
-  if (!job) {
-    return '';
-  }
-
-  if (job.message) {
-    return job.message;
-  }
-
-  if (job.phase === 'downloading' && job.reportedSize > 0) {
-    return `Downloading archive: ${formatBytes(job.downloadedBytes)} of ${formatBytes(job.reportedSize)}`;
-  }
-
-  if (job.phase === 'extracting') {
-    return `Extracting archive: ${job.extractedEntries || 0} of ${job.totalEntries || 0} entries`;
-  }
-
-  return 'Working on archive...';
-}
-
 function TreeNode({ node, selectedPath, onSelect, sessionId, folderPreview, folderImages, depth = 0 }) {
   const [open, setOpen] = useState(depth < 2);
   const isDirectory = node.type === 'directory';
@@ -358,10 +338,8 @@ function App() {
   const [error, setError] = useState('');
   const [oversizePrompt, setOversizePrompt] = useState(null);
   const [slideshowOpen, setSlideshowOpen] = useState(false);
-  const [activeJob, setActiveJob] = useState(null);
   const textPreviewCacheRef = useRef(new Map());
   const imagePreviewCacheRef = useRef(new Map());
-  const eventSourceRef = useRef(null);
 
   const sortedTree = useMemo(() => {
     if (!session?.tree) {
@@ -464,102 +442,6 @@ function App() {
     return request;
   }
 
-  async function hydrateSession(sessionId, nextUrl) {
-    const response = await fetch(`/api/sessions/${sessionId}/tree`);
-    const payload = await response.json();
-
-    if (!response.ok) {
-      throw new Error(payload.error || 'Could not open ZIP URL.');
-    }
-
-    if (session?.id) {
-      fetch(`/api/sessions/${session.id}`, { method: 'DELETE' }).catch(() => {});
-    }
-
-    setSession(payload);
-    setZipUrl(nextUrl);
-    setSelectedPath(payload.firstFilePath || payload.tree.path);
-    setTextPreview('');
-    setSelectedImageSrc('');
-    textPreviewCacheRef.current.clear();
-    clearImagePreviewCache();
-  }
-
-  function attachJobEvents(jobId, nextUrl) {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-    }
-
-    const source = new EventSource(`/api/session-jobs/${jobId}/events`);
-    eventSourceRef.current = source;
-
-    const handleSnapshot = async (event) => {
-      const payload = JSON.parse(event.data);
-      setActiveJob(payload);
-
-      if (payload.status === 'awaiting_confirmation') {
-        setOversizePrompt({ jobId: payload.id, reportedSize: payload.reportedSize, limit: 1024 * 1024 * 1024 });
-        setIsLoading(false);
-        return;
-      }
-
-      if (payload.status === 'ready' && payload.sessionId) {
-        source.close();
-        eventSourceRef.current = null;
-        setOversizePrompt(null);
-        setActiveJob(null);
-        await hydrateSession(payload.sessionId, nextUrl);
-        setIsLoading(false);
-        return;
-      }
-
-      if (payload.status === 'error') {
-        source.close();
-        eventSourceRef.current = null;
-        setActiveJob(null);
-        setError(payload.error || 'Could not process this ZIP file.');
-        setIsLoading(false);
-        return;
-      }
-
-      if (payload.status === 'cancelled') {
-        source.close();
-        eventSourceRef.current = null;
-        setActiveJob(null);
-        setIsLoading(false);
-      }
-    };
-
-    source.addEventListener('progress', (event) => {
-      handleSnapshot(event).catch((jobError) => {
-        setError(jobError.message);
-        setIsLoading(false);
-      });
-    });
-
-    source.addEventListener('confirmation', (event) => {
-      handleSnapshot(event).catch((jobError) => {
-        setError(jobError.message);
-        setIsLoading(false);
-      });
-    });
-
-    source.addEventListener('ready', (event) => {
-      handleSnapshot(event).catch((jobError) => {
-        setError(jobError.message);
-        setIsLoading(false);
-      });
-    });
-
-    source.addEventListener('error', () => {
-      setError('Progress connection was interrupted.');
-      setIsLoading(false);
-      setActiveJob(null);
-      source.close();
-      eventSourceRef.current = null;
-    });
-  }
-
   async function loadSession(url, confirmOversize = false) {
     setIsLoading(true);
     setError('');
@@ -578,16 +460,27 @@ function App() {
       if (!response.ok) {
         throw new Error(payload.error || 'Could not open ZIP URL.');
       }
-      setActiveJob(payload);
-      attachJobEvents(payload.jobId, url);
+
+      if (payload.requiresConfirmation) {
+        setOversizePrompt(payload);
+        return;
+      }
+
+      if (session?.id) {
+        fetch(`/api/sessions/${session.id}`, { method: 'DELETE' }).catch(() => {});
+      }
+
+      setSession(payload);
+      setZipUrl(url);
+      setSelectedPath(payload.firstFilePath || payload.tree.path);
+      setTextPreview('');
+      setSelectedImageSrc('');
+      textPreviewCacheRef.current.clear();
+      clearImagePreviewCache();
     } catch (requestError) {
       setError(requestError.message);
-      setActiveJob(null);
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
     } finally {
+      setIsLoading(false);
     }
   }
 
@@ -683,20 +576,13 @@ function App() {
 
   useEffect(() => {
     return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
       clearImagePreviewCache();
       textPreviewCacheRef.current.clear();
       if (session?.id) {
         fetch(`/api/sessions/${session.id}`, { method: 'DELETE', keepalive: true }).catch(() => {});
       }
-      if (activeJob?.id) {
-        fetch(`/api/session-jobs/${activeJob.id}`, { method: 'DELETE', keepalive: true }).catch(() => {});
-      }
     };
-  }, [activeJob, session]);
+  }, [session]);
 
   useEffect(() => {
     function onKeyDown(event) {
@@ -890,30 +776,9 @@ function App() {
             </label>
 
             <button className="primary-button" type="submit" disabled={isLoading}>
-              {activeJob ? 'Loading archive...' : isLoading ? 'Opening archive...' : 'Open archive'}
+              {isLoading ? 'Opening archive...' : 'Open archive'}
             </button>
           </form>
-
-          {activeJob ? (
-            <div className="progress-card" aria-live="polite">
-              <div className="progress-card-head">
-                <strong>{activeJob.phase === 'extracting' ? 'Preparing archive' : 'Downloading archive'}</strong>
-                <span>{activeJob.percent == null ? 'Live' : `${Math.max(0, Math.min(100, activeJob.percent))}%`}</span>
-              </div>
-              <div className={`progress-bar-shell ${activeJob.percent == null ? 'indeterminate' : ''}`}>
-                <div
-                  className="progress-bar-fill"
-                  style={activeJob.percent == null ? undefined : { width: `${Math.max(3, Math.min(100, activeJob.percent))}%` }}
-                />
-              </div>
-              <div className="progress-meta-row">
-                <span>{formatProgressMessage(activeJob)}</span>
-                <button className="ghost-button compact-button" type="button" onClick={() => clearArchive(true)}>
-                  Cancel load
-                </button>
-              </div>
-            </div>
-          ) : null}
 
           <div className="status-row">
             <div className="status-pill">Port 8080 ready</div>
@@ -936,18 +801,7 @@ function App() {
                 <button className="ghost-button" type="button" onClick={() => setOversizePrompt(null)}>
                   Cancel
                 </button>
-                <button
-                  className="primary-button"
-                  type="button"
-                  onClick={async () => {
-                    if (!oversizePrompt?.jobId) {
-                      return;
-                    }
-                    setIsLoading(true);
-                    setOversizePrompt(null);
-                    await fetch(`/api/session-jobs/${oversizePrompt.jobId}/confirm`, { method: 'POST' }).catch(() => {});
-                  }}
-                >
+                <button className="primary-button" type="button" onClick={() => loadSession(zipUrl, true)}>
                   Proceed download
                 </button>
               </div>
