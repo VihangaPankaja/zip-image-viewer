@@ -322,6 +322,12 @@ function TreeNode({ node, selectedPath, onSelect, sessionId, folderPreview, fold
 function App() {
   const [zipUrl, setZipUrl] = useState('');
   const [session, setSession] = useState(null);
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === 'undefined') {
+      return 'dark';
+    }
+    return window.localStorage.getItem('zip-image-viewer-theme') || 'dark';
+  });
   const [selectedPath, setSelectedPath] = useState('');
   const [sortMode, setSortMode] = useState('name-asc');
   const [previewQuality, setPreviewQuality] = useState('balanced');
@@ -468,6 +474,11 @@ function App() {
     }
     await loadSession(zipUrl.trim(), false);
   }
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem('zip-image-viewer-theme', theme);
+  }, [theme]);
 
   useEffect(() => {
     if (!flatData || !sortedTree) {
@@ -719,13 +730,18 @@ function App() {
 
       <main className="workspace">
         <section className="hero-panel">
-          <div>
-            <p className="eyebrow">ZIP image and file explorer</p>
-            <h1>Archive Atlas</h1>
-            <p className="hero-copy">
-              Paste a public ZIP URL, let the server unpack it, then browse the folder structure with a fast viewer and
-              image-first navigation.
-            </p>
+          <div className="hero-topbar">
+            <div>
+              <p className="eyebrow">ZIP image and file explorer</p>
+              <h1>Archive Atlas</h1>
+              <p className="hero-copy">
+                Paste a public ZIP URL, let the server unpack it, then browse the folder structure with a fast viewer and
+                image-first navigation.
+              </p>
+            </div>
+            <button className="ghost-button theme-toggle" type="button" onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}>
+              {theme === 'dark' ? 'Switch to light' : 'Switch to dark'}
+            </button>
           </div>
 
           <form className="url-form" onSubmit={handleSubmit}>
