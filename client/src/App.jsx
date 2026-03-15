@@ -404,15 +404,8 @@ function App() {
 
   async function clearArchive(removeRemoteSession = true) {
     const activeSessionId = session?.id;
-    const activeJobId = activeJob?.id;
-
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
 
     setSession(null);
-    setActiveJob(null);
     setSelectedPath('');
     setTextPreview('');
     setSelectedImageSrc('');
@@ -424,10 +417,6 @@ function App() {
 
     if (removeRemoteSession && activeSessionId) {
       await fetch(`/api/sessions/${activeSessionId}`, { method: 'DELETE' }).catch(() => {});
-    }
-
-    if (activeJobId) {
-      await fetch(`/api/session-jobs/${activeJobId}`, { method: 'DELETE' }).catch(() => {});
     }
   }
 
