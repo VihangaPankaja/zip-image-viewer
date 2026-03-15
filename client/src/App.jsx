@@ -209,6 +209,24 @@ function getFirstFilePath(node) {
   return node.path;
 }
 
+function getThumbnailWindow(items, currentPath, radius = 2) {
+  if (items.length <= radius * 2 + 1) {
+    return items;
+  }
+
+  const currentIndex = items.findIndex((item) => item.path === currentPath);
+  if (currentIndex === -1) {
+    return items.slice(0, radius * 2 + 1);
+  }
+
+  const visible = [];
+  for (let offset = -radius; offset <= radius; offset += 1) {
+    const index = (currentIndex + offset + items.length) % items.length;
+    visible.push(items[index]);
+  }
+  return visible;
+}
+
 function TreeNode({ node, selectedPath, onSelect, sessionId, folderPreview, folderImages, depth = 0 }) {
   const [open, setOpen] = useState(depth < 2);
   const isDirectory = node.type === 'directory';
@@ -285,6 +303,7 @@ function App() {
   const [selectedPath, setSelectedPath] = useState('');
   const [sortMode, setSortMode] = useState('name-asc');
   const [previewQuality, setPreviewQuality] = useState('balanced');
+  const [thumbnailStripExpanded, setThumbnailStripExpanded] = useState(false);
   const [textPreview, setTextPreview] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -322,12 +341,16 @@ function App() {
     previewUrl: buildFileUrl(session?.id, imagePath, { imagePreview: true, quality: previewQuality }),
     thumbnailUrl: buildFileUrl(session?.id, imagePath, { thumbnail: true, size: STRIP_THUMB_SIZE })
   }));
+  const visibleThumbnailItems = thumbnailStripExpanded
+    ? currentFolderImageItems
+    : getThumbnailWindow(currentFolderImageItems, selectedPath, 2);
 
   async function loadSession(url, confirmOversize = false) {
     setIsLoading(true);
     setError('');
     setOversizePrompt(null);
     setSlideshowOpen(false);
+    setThumbnailStripExpanded(false);
 
     try {
       const response = await fetch('/api/sessions', {
@@ -701,18 +724,33 @@ function App() {
                   <img src={selectedImagePreviewUrl} alt={selectedNode.name} />
                 </div>
                 {currentFolderImageItems.length > 1 ? (
-                  <div className="thumbnail-strip" role="list" aria-label="Folder images">
-                    {currentFolderImageItems.map((item) => (
-                      <button
-                        key={item.path}
-                        type="button"
-                        className={`thumbnail-card ${item.path === selectedPath ? 'active' : ''}`}
-                        onClick={() => setSelectedPath(item.path)}
-                      >
-                        <img src={item.thumbnailUrl} alt={item.name} loading="lazy" />
-                        <span>{item.name}</span>
+                  <div className={`thumbnail-strip-shell ${thumbnailStripExpanded ? 'expanded' : 'collapsed'}`}>
+                    <div className="thumbnail-strip-header">
+                      <div>
+                        <strong>Folder thumbnails</strong>
+                        <div className="thumbnail-strip-copy">
+                          {thumbnailStripExpanded
+                            ? `Showing all ${currentFolderImageItems.length} sibling images.`
+                            : 'Showing nearby images around the current selection.'}
+                        </div>
+                      </div>
+                      <button className="ghost-button" type="button" onClick={() => setThumbnailStripExpanded((current) => !current)}>
+                        {thumbnailStripExpanded ? 'Collapse strip' : 'Expand strip'}
                       </button>
-                    ))}
+                    </div>
+                    <div className={`thumbnail-strip ${thumbnailStripExpanded ? 'expanded' : 'collapsed'}`} role="list" aria-label="Folder images">
+                      {visibleThumbnailItems.map((item) => (
+                        <button
+                          key={item.path}
+                          type="button"
+                          className={`thumbnail-card ${item.path === selectedPath ? 'active' : ''}`}
+                          onClick={() => setSelectedPath(item.path)}
+                        >
+                          <img src={item.thumbnailUrl} alt={item.name} loading="lazy" />
+                          <span>{item.name}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 ) : null}
                 <div className="navigation-hint">Use left and right arrow keys to move through sibling images in the active sort order.</div>
