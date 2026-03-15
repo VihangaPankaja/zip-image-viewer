@@ -38,11 +38,25 @@ npm run dev
 
 ## Production Run With Docker
 
-Build and run:
+Build and run locally:
 
 ```bash
 docker build -t zip-image-viewer .
 docker run -p 8080:8080 zip-image-viewer
+```
+
+Use the published Docker Hub image:
+
+```bash
+docker pull vihangapankaja/zip-image-viewer:latest
+docker run -p 8080:8080 vihangapankaja/zip-image-viewer:latest
+```
+
+Versioned image example:
+
+```bash
+docker pull vihangapankaja/zip-image-viewer:1.0.1
+docker run -p 8080:8080 vihangapankaja/zip-image-viewer:1.0.1
 ```
 
 Open `http://localhost:8080`.
