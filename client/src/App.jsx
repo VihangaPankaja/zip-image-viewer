@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp', 'avif']);
@@ -227,6 +227,10 @@ function getThumbnailWindow(items, currentPath, radius = 2) {
   return visible;
 }
 
+function getImageCacheKey(sessionId, imagePath, quality) {
+  return `${sessionId}:${imagePath}:${quality}`;
+}
+
 function TreeNode({ node, selectedPath, onSelect, sessionId, folderPreview, folderImages, depth = 0 }) {
   const [open, setOpen] = useState(depth < 2);
   const isDirectory = node.type === 'directory';
@@ -305,10 +309,13 @@ function App() {
   const [previewQuality, setPreviewQuality] = useState('balanced');
   const [thumbnailStripExpanded, setThumbnailStripExpanded] = useState(false);
   const [textPreview, setTextPreview] = useState('');
+  const [selectedImageSrc, setSelectedImageSrc] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [oversizePrompt, setOversizePrompt] = useState(null);
   const [slideshowOpen, setSlideshowOpen] = useState(false);
+  const textPreviewCacheRef = useRef(new Map());
+  const imagePreviewCacheRef = useRef(new Map());
 
   const sortedTree = useMemo(() => {
     if (!session?.tree) {
@@ -345,6 +352,50 @@ function App() {
     ? currentFolderImageItems
     : getThumbnailWindow(currentFolderImageItems, selectedPath, 2);
 
+  function clearImagePreviewCache() {
+    imagePreviewCacheRef.current.forEach((value) => {
+      if (value?.objectUrl) {
+        URL.revokeObjectURL(value.objectUrl);
+      }
+    });
+    imagePreviewCacheRef.current.clear();
+  }
+
+  async function loadImagePreview(imagePath, quality) {
+    if (!session?.id || !imagePath) {
+      return '';
+    }
+
+    const cacheKey = getImageCacheKey(session.id, imagePath, quality);
+    const existing = imagePreviewCacheRef.current.get(cacheKey);
+
+    if (existing?.objectUrl) {
+      return existing.objectUrl;
+    }
+
+    if (existing?.promise) {
+      return existing.promise;
+    }
+
+    const request = fetch(buildFileUrl(session.id, imagePath, { imagePreview: true, quality }))
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error('Could not load image preview.');
+        }
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        imagePreviewCacheRef.current.set(cacheKey, { objectUrl, touchedAt: Date.now() });
+        return objectUrl;
+      })
+      .catch((error) => {
+        imagePreviewCacheRef.current.delete(cacheKey);
+        throw error;
+      });
+
+    imagePreviewCacheRef.current.set(cacheKey, { promise: request, touchedAt: Date.now() });
+    return request;
+  }
+
   async function loadSession(url, confirmOversize = false) {
     setIsLoading(true);
     setError('');
@@ -377,6 +428,9 @@ function App() {
       setZipUrl(url);
       setSelectedPath(payload.firstFilePath || payload.tree.path);
       setTextPreview('');
+      setSelectedImageSrc('');
+      textPreviewCacheRef.current.clear();
+      clearImagePreviewCache();
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -410,14 +464,24 @@ function App() {
     }
 
     let cancelled = false;
+    const cacheKey = `${session.id}:${selectedNode.path}`;
 
     async function fetchTextPreview() {
       try {
+        const cached = textPreviewCacheRef.current.get(cacheKey);
+        if (cached) {
+          if (!cancelled) {
+            setTextPreview(cached);
+          }
+          return;
+        }
+
         const response = await fetch(selectedPreviewUrl);
         if (!response.ok) {
           throw new Error('Could not read this file.');
         }
         const content = await response.text();
+        textPreviewCacheRef.current.set(cacheKey, content);
         if (!cancelled) {
           setTextPreview(content);
         }
@@ -435,7 +499,34 @@ function App() {
   }, [selectedKind, selectedNode, selectedPreviewUrl, session]);
 
   useEffect(() => {
+    if (!selectedNode || !session || selectedKind !== 'image') {
+      setSelectedImageSrc('');
+      return;
+    }
+
+    let cancelled = false;
+
+    loadImagePreview(selectedNode.path, previewQuality)
+      .then((objectUrl) => {
+        if (!cancelled) {
+          setSelectedImageSrc(objectUrl);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSelectedImageSrc(selectedImagePreviewUrl);
+        }
+      });
+
     return () => {
+      cancelled = true;
+    };
+  }, [previewQuality, selectedImagePreviewUrl, selectedKind, selectedNode, session]);
+
+  useEffect(() => {
+    return () => {
+      clearImagePreviewCache();
+      textPreviewCacheRef.current.clear();
       if (session?.id) {
         fetch(`/api/sessions/${session.id}`, { method: 'DELETE', keepalive: true }).catch(() => {});
       }
@@ -491,17 +582,14 @@ function App() {
     ].filter(Boolean);
 
     const preloaders = preloadTargets.map((imagePath) => {
-      const img = new Image();
-      img.src = buildFileUrl(session.id, imagePath, { thumbnail: true, size: STRIP_THUMB_SIZE });
-      return img;
+      loadImagePreview(imagePath, previewQuality).catch(() => '');
+      return imagePath;
     });
 
     return () => {
-      preloaders.forEach((img) => {
-        img.src = '';
-      });
+      preloaders.forEach(() => {});
     };
-  }, [currentFolderImages, currentImageIndex, selectedKind, session]);
+  }, [currentFolderImages, currentImageIndex, previewQuality, selectedKind, session]);
 
   useEffect(() => {
     if (!slideshowOpen) {
@@ -546,7 +634,7 @@ function App() {
                 >
                   {'<'}
                 </button>
-                <img src={selectedImagePreviewUrl} alt={selectedNode.name} />
+                <img src={selectedImageSrc || selectedImagePreviewUrl} alt={selectedNode.name} />
                 <button
                   className="nav-button"
                   type="button"
@@ -721,7 +809,7 @@ function App() {
                   <span>{formatDate(selectedNode.modifiedAt)}</span>
                 </div>
                 <div className="image-frame">
-                  <img src={selectedImagePreviewUrl} alt={selectedNode.name} />
+                  <img src={selectedImageSrc || selectedImagePreviewUrl} alt={selectedNode.name} />
                 </div>
                 {currentFolderImageItems.length > 1 ? (
                   <div className={`thumbnail-strip-shell ${thumbnailStripExpanded ? 'expanded' : 'collapsed'}`}>
