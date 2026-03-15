@@ -451,8 +451,13 @@ a {
 
 .preview-toolbar {
   justify-content: space-between;
+  align-items: end;
   padding: 0.2rem 0;
   font-size: 0.95rem;
+}
+
+.preview-panel .toolbar-select-shell {
+  min-width: 10rem;
 }
 
 .image-frame {

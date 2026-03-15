@@ -28,6 +28,11 @@ const SORT_OPTIONS = [
   { value: 'date-desc', label: 'Date newest' },
   { value: 'natural-tail', label: 'Number tail' }
 ];
+const PREVIEW_QUALITY_OPTIONS = [
+  { value: 'low', label: 'Low preview' },
+  { value: 'balanced', label: 'Balanced preview' },
+  { value: 'high', label: 'High preview' }
+];
 const NAME_COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base', numeric: false });
 
 function formatBytes(value) {
@@ -73,6 +78,10 @@ function buildFileUrl(sessionId, filePath, options = {}) {
   if (options.thumbnail) {
     params.set('thumbnail', '1');
     params.set('size', String(options.size || STRIP_THUMB_SIZE));
+  }
+  if (options.imagePreview) {
+    params.set('imagePreview', '1');
+    params.set('quality', options.quality || 'balanced');
   }
 
   return `/api/sessions/${sessionId}/file?${params.toString()}`;
@@ -275,6 +284,7 @@ function App() {
   const [session, setSession] = useState(null);
   const [selectedPath, setSelectedPath] = useState('');
   const [sortMode, setSortMode] = useState('name-asc');
+  const [previewQuality, setPreviewQuality] = useState('balanced');
   const [textPreview, setTextPreview] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -297,6 +307,10 @@ function App() {
     session && selectedNode && selectedNode.type === 'file'
       ? buildFileUrl(session.id, selectedNode.path)
       : '';
+  const selectedImagePreviewUrl =
+    session && selectedNode && selectedNode.type === 'file' && selectedKind === 'image'
+      ? buildFileUrl(session.id, selectedNode.path, { imagePreview: true, quality: previewQuality })
+      : '';
   const selectedPreviewUrl =
     session && selectedNode && selectedNode.type === 'file'
       ? buildFileUrl(session.id, selectedNode.path, { previewText: true })
@@ -305,6 +319,7 @@ function App() {
     path: imagePath,
     name: flatData?.nodesByPath.get(imagePath)?.name || imagePath.split('/').at(-1) || imagePath,
     url: buildFileUrl(session?.id, imagePath),
+    previewUrl: buildFileUrl(session?.id, imagePath, { imagePreview: true, quality: previewQuality }),
     thumbnailUrl: buildFileUrl(session?.id, imagePath, { thumbnail: true, size: STRIP_THUMB_SIZE })
   }));
 
@@ -508,7 +523,7 @@ function App() {
                 >
                   {'<'}
                 </button>
-                <img src={selectedFileUrl} alt={selectedNode.name} />
+                <img src={selectedImagePreviewUrl} alt={selectedNode.name} />
                 <button
                   className="nav-button"
                   type="button"
@@ -670,10 +685,20 @@ function App() {
                   <span>
                     {currentImageIndex >= 0 ? `${currentImageIndex + 1} / ${currentFolderImages.length} in folder` : 'Single image'}
                   </span>
+                  <label className="toolbar-select-shell" htmlFor="preview-quality">
+                    <span className="toolbar-label">Preview quality</span>
+                    <select id="preview-quality" value={previewQuality} onChange={(event) => setPreviewQuality(event.target.value)}>
+                      {PREVIEW_QUALITY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <span>{formatDate(selectedNode.modifiedAt)}</span>
                 </div>
                 <div className="image-frame">
-                  <img src={selectedFileUrl} alt={selectedNode.name} />
+                  <img src={selectedImagePreviewUrl} alt={selectedNode.name} />
                 </div>
                 {currentFolderImageItems.length > 1 ? (
                   <div className="thumbnail-strip" role="list" aria-label="Folder images">

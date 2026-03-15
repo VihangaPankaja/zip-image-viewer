@@ -27,6 +27,11 @@ const TEXT_PREVIEW_LIMIT = 2 * 1024 * 1024;
 const DOWNLOAD_PROGRESS_STEP_PERCENT = 10;
 const DOWNLOAD_PROGRESS_STEP_BYTES = 25 * 1024 * 1024;
 const MAX_THUMBNAIL_SIZE = 320;
+const IMAGE_PREVIEW_PROFILES = {
+  low: { size: 1280, quality: 58 },
+  balanced: { size: 1920, quality: 72 },
+  high: { size: 2560, quality: 82 }
+};
 
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(distDir));
@@ -56,6 +61,10 @@ function classifyMimeType(contentType) {
     return 'text';
   }
   return 'binary';
+}
+
+function shouldPreserveOriginalPreview(contentType) {
+  return contentType === 'image/svg+xml' || contentType === 'image/gif';
 }
 
 app.use((req, res, next) => {
@@ -212,6 +221,34 @@ async function ensureThumbnail(session, normalizedPath, targetPath, size) {
   }
 
   return thumbnailPath;
+}
+
+async function ensureImagePreview(session, normalizedPath, targetPath, profileName) {
+  const profile = IMAGE_PREVIEW_PROFILES[profileName] || IMAGE_PREVIEW_PROFILES.balanced;
+  const hash = crypto.createHash('sha1').update(`${normalizedPath}:${profileName}:${profile.size}:${profile.quality}`).digest('hex');
+  const previewDir = path.join(session.workspaceDir, 'previews');
+  const previewPath = path.join(previewDir, `${hash}.jpg`);
+
+  await mkdir(previewDir, { recursive: true });
+
+  const existing = await stat(previewPath).catch(() => null);
+  if (!existing) {
+    await sharp(targetPath)
+      .rotate()
+      .resize({ width: profile.size, height: profile.size, fit: 'inside', withoutEnlargement: true })
+      .flatten({ background: '#f7f3eb' })
+      .jpeg({ quality: profile.quality, mozjpeg: true, chromaSubsampling: '4:2:0' })
+      .toFile(previewPath);
+
+    logEvent('info', 'session.image_preview.generated', {
+      sessionId: session.id,
+      path: normalizedPath,
+      profile: profileName,
+      previewPath
+    });
+  }
+
+  return previewPath;
 }
 
 setInterval(() => {
@@ -563,12 +600,16 @@ app.get('/api/sessions/:id/file', async (req, res) => {
 
   const wantsPreview = req.query.preview === '1';
   const wantsThumbnail = req.query.thumbnail === '1';
+  const wantsImagePreview = req.query.imagePreview === '1';
+  const previewQuality = String(req.query.quality || 'balanced');
   const contentType = mime.lookup(targetPath) || 'application/octet-stream';
   logEvent('info', 'session.file.read', {
     sessionId: session.id,
     path: normalizedPath,
     preview: wantsPreview,
     thumbnail: wantsThumbnail,
+    imagePreview: wantsImagePreview,
+    previewQuality,
     size: fileStats.size,
     sizeLabel: formatBytes(fileStats.size),
     contentType
@@ -594,6 +635,32 @@ app.get('/api/sessions/:id/file', async (req, res) => {
       logEvent('warn', 'session.thumbnail.failed', {
         sessionId: session.id,
         path: normalizedPath,
+        error: error.message
+      });
+      res.type(contentType);
+      return createReadStream(targetPath).pipe(res);
+    }
+  }
+
+  if (wantsImagePreview) {
+    if (classifyMimeType(contentType) !== 'image') {
+      return res.status(400).json({ error: 'Image preview is only available for image files.' });
+    }
+
+    if (shouldPreserveOriginalPreview(contentType)) {
+      res.type(contentType);
+      return createReadStream(targetPath).pipe(res);
+    }
+
+    try {
+      const previewPath = await ensureImagePreview(session, normalizedPath, targetPath, previewQuality);
+      res.type('image/jpeg');
+      return createReadStream(previewPath).pipe(res);
+    } catch (error) {
+      logEvent('warn', 'session.image_preview.failed', {
+        sessionId: session.id,
+        path: normalizedPath,
+        quality: previewQuality,
         error: error.message
       });
       res.type(contentType);
