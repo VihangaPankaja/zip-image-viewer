@@ -58,8 +58,8 @@ docker run -p 8080:8080 vihangapankaja/zip-image-viewer:latest
 Versioned image example:
 
 ```bash
-docker pull vihangapankaja/zip-image-viewer:1.0.6
-docker run -p 8080:8080 vihangapankaja/zip-image-viewer:1.0.6
+docker pull vihangapankaja/zip-image-viewer:1.0.9
+docker run -p 8080:8080 vihangapankaja/zip-image-viewer:1.0.9
 ```
 
 Open `http://localhost:8080`.
