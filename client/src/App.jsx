@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp', 'avif']);
+const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov', 'm4v', 'ogv']);
 const TEXT_EXTENSIONS = new Set([
   'txt',
   'md',
@@ -62,8 +63,16 @@ function formatDate(value) {
 function classifyNode(node) {
   if (!node || node.type === 'directory') return 'directory';
   if (IMAGE_EXTENSIONS.has(node.extension)) return 'image';
+  if (VIDEO_EXTENSIONS.has(node.extension)) return 'video';
   if (TEXT_EXTENSIONS.has(node.extension)) return 'text';
   return 'binary';
+}
+
+function getNodeBadge(node) {
+  const kind = classifyNode(node);
+  if (kind === 'image') return 'IMG';
+  if (kind === 'video') return 'VID';
+  return 'FILE';
 }
 
 function buildFileUrl(sessionId, filePath, options = {}) {
@@ -303,7 +312,7 @@ function TreeNode({ node, selectedPath, onSelect, sessionId, folderPreview, fold
       onClick={() => onSelect(node)}
     >
       <span className="tree-caret" />
-      <span className="tree-icon">{classifyNode(node) === 'image' ? 'IMG' : 'FILE'}</span>
+      <span className="tree-icon">{getNodeBadge(node)}</span>
       <span className="tree-label">{node.name}</span>
       <span className="tree-meta">{node.extension || '--'}</span>
     </button>
@@ -905,6 +914,22 @@ function App() {
                   <span>{formatDate(selectedNode.modifiedAt)}</span>
                 </div>
                 <pre>{textPreview || 'Loading file...'}</pre>
+              </div>
+            ) : null}
+
+            {selectedNode?.type === 'file' && selectedKind === 'video' ? (
+              <div className="preview-stage">
+                <div className="preview-toolbar">
+                  <span>{formatBytes(selectedNode.size)}</span>
+                  <span>{selectedNode.extension.toUpperCase()} stream preview</span>
+                  <span>{formatDate(selectedNode.modifiedAt)}</span>
+                </div>
+                <div className="image-frame media-frame">
+                  <video className="video-player" src={selectedFileUrl} controls preload="metadata">
+                    Your browser cannot play this video inline.
+                  </video>
+                </div>
+                <div className="navigation-hint">Video playback streams from the extracted file and supports browser seeking when the server serves ranges.</div>
               </div>
             ) : null}
 
