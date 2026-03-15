@@ -40,6 +40,7 @@ function classifyNode(node) {
 function flattenTree(tree) {
   const nodesByPath = new Map();
   const folderImages = new Map();
+  const folderPreview = new Map();
 
   function walk(node) {
     nodesByPath.set(node.path, node);
@@ -49,18 +50,21 @@ function flattenTree(tree) {
         node.path,
         imageChildren.map((child) => child.path)
       );
+      folderPreview.set(node.path, imageChildren[0]?.path || '');
       node.children.forEach(walk);
     }
   }
 
   walk(tree);
-  return { nodesByPath, folderImages };
+  return { nodesByPath, folderImages, folderPreview };
 }
 
-function TreeNode({ node, selectedPath, onSelect, depth = 0 }) {
+function TreeNode({ node, selectedPath, onSelect, sessionId, folderPreview, folderImages, depth = 0 }) {
   const [open, setOpen] = useState(depth < 2);
   const isDirectory = node.type === 'directory';
   const isSelected = node.path === selectedPath;
+  const previewPath = sessionId ? folderPreview.get(node.path) : '';
+  const previewCount = folderImages.get(node.path)?.length || 0;
 
   if (isDirectory) {
     return (
@@ -75,14 +79,34 @@ function TreeNode({ node, selectedPath, onSelect, depth = 0 }) {
           }}
         >
           <span className="tree-caret">{open ? 'v' : '>'}</span>
-          <span className="tree-icon">[]</span>
+          <span className="tree-icon folder-icon-shell">
+            {previewPath ? (
+              <img
+                className="folder-thumb"
+                src={`/api/sessions/${sessionId}/file?path=${encodeURIComponent(previewPath)}`}
+                alt=""
+                loading="lazy"
+              />
+            ) : (
+              '[]'
+            )}
+          </span>
           <span className="tree-label">{node.name}</span>
-          <span className="tree-meta">{node.children.length}</span>
+          <span className="tree-meta">{previewCount > 0 ? `${previewCount} img` : node.children.length}</span>
         </button>
         {open ? (
           <div>
             {node.children.map((child) => (
-              <TreeNode key={child.path} node={child} selectedPath={selectedPath} onSelect={onSelect} depth={depth + 1} />
+              <TreeNode
+                key={child.path}
+                node={child}
+                selectedPath={selectedPath}
+                onSelect={onSelect}
+                sessionId={sessionId}
+                folderPreview={folderPreview}
+                folderImages={folderImages}
+                depth={depth + 1}
+              />
             ))}
           </div>
         ) : null}
@@ -128,6 +152,11 @@ function App() {
     session && selectedNode && selectedNode.type === 'file'
       ? `/api/sessions/${session.id}/file?path=${encodeURIComponent(selectedNode.path)}&preview=1`
       : '';
+  const currentFolderImageItems = currentFolderImages.map((imagePath) => ({
+    path: imagePath,
+    name: flatData?.nodesByPath.get(imagePath)?.name || imagePath.split('/').at(-1) || imagePath,
+    url: `/api/sessions/${session?.id}/file?path=${encodeURIComponent(imagePath)}`
+  }));
 
   async function loadSession(url, confirmOversize = false) {
     setIsLoading(true);
@@ -252,6 +281,30 @@ function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [currentFolderImages, currentImageIndex]);
 
+  useEffect(() => {
+    if (!session || selectedKind !== 'image' || currentImageIndex === -1) {
+      return;
+    }
+
+    const preloadTargets = [
+      currentFolderImages[currentImageIndex + 1] || currentFolderImages[0],
+      currentFolderImages[currentImageIndex - 1] || currentFolderImages[currentFolderImages.length - 1],
+      currentFolderImages[currentImageIndex + 2] || ''
+    ].filter(Boolean);
+
+    const preloaders = preloadTargets.map((imagePath) => {
+      const img = new Image();
+      img.src = `/api/sessions/${session.id}/file?path=${encodeURIComponent(imagePath)}`;
+      return img;
+    });
+
+    return () => {
+      preloaders.forEach((img) => {
+        img.src = '';
+      });
+    };
+  }, [currentFolderImages, currentImageIndex, selectedKind, session]);
+
   return (
     <div className="app-shell">
       <div className="backdrop backdrop-one" />
@@ -325,6 +378,9 @@ function App() {
                 <TreeNode
                   node={session.tree}
                   selectedPath={selectedPath}
+                  sessionId={session.id}
+                  folderPreview={flatData.folderPreview}
+                  folderImages={flatData.folderImages}
                   onSelect={(node) => {
                     if (node.type === 'file') {
                       setSelectedPath(node.path);
@@ -378,6 +434,21 @@ function App() {
                 <div className="image-frame">
                   <img src={selectedFileUrl} alt={selectedNode.name} />
                 </div>
+                {currentFolderImageItems.length > 1 ? (
+                  <div className="thumbnail-strip" role="list" aria-label="Folder images">
+                    {currentFolderImageItems.map((item) => (
+                      <button
+                        key={item.path}
+                        type="button"
+                        className={`thumbnail-card ${item.path === selectedPath ? 'active' : ''}`}
+                        onClick={() => setSelectedPath(item.path)}
+                      >
+                        <img src={item.url} alt={item.name} loading="lazy" />
+                        <span>{item.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
                 <div className="navigation-hint">Use left and right arrow keys to move through sibling images.</div>
               </div>
             ) : null}

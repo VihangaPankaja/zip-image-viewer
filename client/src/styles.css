@@ -318,6 +318,17 @@ a {
   letter-spacing: 0.08em;
 }
 
+.folder-icon-shell {
+  overflow: hidden;
+  padding: 0;
+}
+
+.folder-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .tree-label {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -338,6 +349,43 @@ a {
   display: grid;
   gap: 1rem;
   min-height: 100%;
+}
+
+.thumbnail-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 0.75rem;
+}
+
+.thumbnail-card {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.45rem;
+  border: 1px solid rgba(80, 71, 56, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 251, 245, 0.76);
+  text-align: left;
+}
+
+.thumbnail-card.active {
+  border-color: rgba(15, 106, 100, 0.34);
+  background: rgba(15, 106, 100, 0.12);
+}
+
+.thumbnail-card img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 12px;
+  background: rgba(80, 71, 56, 0.08);
+}
+
+.thumbnail-card span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
 .preview-toolbar {
