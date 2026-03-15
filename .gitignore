@@ -1,4 +1,17 @@
 node_modules/
 dist/
 sessions/
+
+# logs
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# local env
+.env
+.env.*
+
+# editor and OS files
+.DS_Store
+Thumbs.db
