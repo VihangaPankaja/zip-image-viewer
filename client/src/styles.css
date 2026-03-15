@@ -393,6 +393,13 @@ input::placeholder {
   background: linear-gradient(135deg, color-mix(in srgb, var(--surface-amber) 90%, transparent), color-mix(in srgb, var(--surface-highlight) 42%, transparent));
 }
 
+.compact-button {
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+}
+
 .status-row,
 .message-actions,
 .sidebar-header-actions,

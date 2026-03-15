@@ -380,6 +380,24 @@ function App() {
   const previousImageName = flatData?.nodesByPath.get(previousImagePath)?.name || '';
   const nextImageName = flatData?.nodesByPath.get(nextImagePath)?.name || '';
 
+  async function clearArchive(removeRemoteSession = true) {
+    const activeSessionId = session?.id;
+
+    setSession(null);
+    setSelectedPath('');
+    setTextPreview('');
+    setSelectedImageSrc('');
+    setOversizePrompt(null);
+    setSlideshowOpen(false);
+    setThumbnailStripExpanded(false);
+    textPreviewCacheRef.current.clear();
+    clearImagePreviewCache();
+
+    if (removeRemoteSession && activeSessionId) {
+      await fetch(`/api/sessions/${activeSessionId}`, { method: 'DELETE' }).catch(() => {});
+    }
+  }
+
   function clearImagePreviewCache() {
     imagePreviewCacheRef.current.forEach((value) => {
       if (value?.objectUrl) {
@@ -766,6 +784,11 @@ function App() {
             <div className="status-pill">Port 8080 ready</div>
             <div className="status-pill">1 GB prompt threshold</div>
             <div className="status-pill">Auto-cleanup enabled</div>
+            {session ? (
+              <button className="ghost-button compact-button" type="button" onClick={() => clearArchive(true)}>
+                Clear opened archive
+              </button>
+            ) : null}
           </div>
 
           {error ? <div className="message-card error">{error}</div> : null}
