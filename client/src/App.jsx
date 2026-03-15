@@ -231,6 +231,15 @@ function getImageCacheKey(sessionId, imagePath, quality) {
   return `${sessionId}:${imagePath}:${quality}`;
 }
 
+function getWrappedPath(items, currentIndex, delta) {
+  if (!items.length || currentIndex === -1) {
+    return '';
+  }
+
+  const nextIndex = (currentIndex + delta + items.length) % items.length;
+  return items[nextIndex] || '';
+}
+
 function TreeNode({ node, selectedPath, onSelect, sessionId, folderPreview, folderImages, depth = 0 }) {
   const [open, setOpen] = useState(depth < 2);
   const isDirectory = node.type === 'directory';
@@ -351,6 +360,10 @@ function App() {
   const visibleThumbnailItems = thumbnailStripExpanded
     ? currentFolderImageItems
     : getThumbnailWindow(currentFolderImageItems, selectedPath, 2);
+  const previousImagePath = getWrappedPath(currentFolderImages, currentImageIndex, -1);
+  const nextImagePath = getWrappedPath(currentFolderImages, currentImageIndex, 1);
+  const previousImageName = flatData?.nodesByPath.get(previousImagePath)?.name || '';
+  const nextImageName = flatData?.nodesByPath.get(nextImagePath)?.name || '';
 
   function clearImagePreviewCache() {
     imagePreviewCacheRef.current.forEach((value) => {
@@ -548,27 +561,45 @@ function App() {
       }
 
       if (event.key === 'ArrowRight') {
-        const nextPath = currentFolderImages[currentImageIndex + 1] || currentFolderImages[0];
+        const nextPath = nextImagePath;
         if (nextPath) {
+          event.preventDefault();
           setSelectedPath(nextPath);
         }
       }
 
       if (event.key === 'ArrowLeft') {
-        const prevPath = currentFolderImages[currentImageIndex - 1] || currentFolderImages[currentFolderImages.length - 1];
+        const prevPath = previousImagePath;
         if (prevPath) {
+          event.preventDefault();
           setSelectedPath(prevPath);
         }
       }
 
+      if (slideshowOpen && event.key === 'Home' && currentFolderImages[0]) {
+        event.preventDefault();
+        setSelectedPath(currentFolderImages[0]);
+      }
+
+      if (slideshowOpen && event.key === 'End' && currentFolderImages[currentFolderImages.length - 1]) {
+        event.preventDefault();
+        setSelectedPath(currentFolderImages[currentFolderImages.length - 1]);
+      }
+
+      if (!slideshowOpen && selectedKind === 'image' && (event.key === 'Enter' || event.key.toLowerCase() === 'f')) {
+        event.preventDefault();
+        setSlideshowOpen(true);
+      }
+
       if (event.key === 'Escape') {
+        event.preventDefault();
         setSlideshowOpen(false);
       }
     }
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [currentFolderImages, currentImageIndex]);
+  }, [currentFolderImages, currentImageIndex, nextImagePath, previousImagePath, selectedKind, slideshowOpen]);
 
   useEffect(() => {
     if (!session || selectedKind !== 'image' || currentImageIndex === -1) {
@@ -619,10 +650,23 @@ function App() {
                 <div className="panel-title-group">
                   <p className="panel-label">Folder slideshow</p>
                   <h2 title={selectedNode.name}>{selectedNode.name}</h2>
+                  <div className="slideshow-meta">
+                    <span>{currentImageIndex + 1} / {currentFolderImages.length}</span>
+                    <span>{formatBytes(selectedNode.size)}</span>
+                    <span>{formatDate(selectedNode.modifiedAt)}</span>
+                  </div>
                 </div>
-                <button className="ghost-button" type="button" onClick={() => setSlideshowOpen(false)}>
-                  Close
-                </button>
+                <div className="slideshow-actions">
+                  <button className="ghost-button" type="button" onClick={() => setSelectedPath(currentFolderImages[0])}>
+                    First
+                  </button>
+                  <button className="ghost-button" type="button" onClick={() => setSelectedPath(currentFolderImages[currentFolderImages.length - 1])}>
+                    Last
+                  </button>
+                  <button className="ghost-button" type="button" onClick={() => setSlideshowOpen(false)}>
+                    Close
+                  </button>
+                </div>
               </div>
 
               <div className="slideshow-body">
@@ -630,21 +674,29 @@ function App() {
                   className="nav-button"
                   type="button"
                   aria-label="Previous image"
-                  onClick={() => setSelectedPath(currentFolderImages[currentImageIndex - 1] || currentFolderImages[currentFolderImages.length - 1])}
+                  onClick={() => setSelectedPath(previousImagePath)}
                 >
                   {'<'}
                 </button>
-                <img src={selectedImageSrc || selectedImagePreviewUrl} alt={selectedNode.name} />
+                <div className="slideshow-stage">
+                  <img src={selectedImageSrc || selectedImagePreviewUrl} alt={selectedNode.name} />
+                </div>
                 <button
                   className="nav-button"
                   type="button"
                   aria-label="Next image"
-                  onClick={() => setSelectedPath(currentFolderImages[currentImageIndex + 1] || currentFolderImages[0])}
+                  onClick={() => setSelectedPath(nextImagePath)}
                 >
                   {'>'}
                 </button>
               </div>
-              <div className="navigation-hint">Fullscreen slideshow. Use left and right arrow keys to move, or press Escape to close.</div>
+              <div className="slideshow-footer">
+                <div className="slideshow-neighbors">
+                  <span>Prev: {previousImageName || 'None'}</span>
+                  <span>Next: {nextImageName || 'None'}</span>
+                </div>
+                <div className="navigation-hint">Arrow keys move, Home/End jump, Enter or F opens slideshow, Escape closes it.</div>
+              </div>
             </div>
           </div>,
           document.body
