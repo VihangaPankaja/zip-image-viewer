@@ -380,6 +380,7 @@ function App() {
                   {'>'}
                 </button>
               </div>
+              <div className="navigation-hint">Fullscreen slideshow. Use left and right arrow keys to move, or press Escape to close.</div>
             </div>
           </div>,
           document.body

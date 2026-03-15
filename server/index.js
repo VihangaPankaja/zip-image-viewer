@@ -16,6 +16,8 @@ const __dirname = path.dirname(__filename);
 const distDir = path.resolve(__dirname, '..', 'dist');
 const app = express();
 const sessionStore = new Map();
+let server;
+let isShuttingDown = false;
 
 const PORT = Number(process.env.PORT || 8080);
 const SESSION_TTL_MS = 30 * 60 * 1000;
@@ -239,22 +241,51 @@ setInterval(() => {
 }, CLEANUP_INTERVAL_MS).unref();
 
 async function shutdown() {
+  if (isShuttingDown) {
+    logEvent('warn', 'shutdown.duplicate_signal_ignored');
+    return;
+  }
+
+  isShuttingDown = true;
   logEvent('info', 'shutdown.start', { activeSessions: sessionStore.size });
+  if (server) {
+    await new Promise((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
+    logEvent('info', 'server.stopped_accepting_requests');
+  }
+
   await Promise.all([...sessionStore.keys()].map((sessionId) => removeSession(sessionId, 'shutdown')));
-  logEvent('info', 'shutdown.complete');
+  logEvent('info', 'shutdown.complete', { activeSessions: sessionStore.size });
   process.exit(0);
 }
 
 process.on('SIGTERM', () => {
+  logEvent('info', 'signal.received', { signal: 'SIGTERM' });
   shutdown().catch((error) => {
-    console.error(error);
+    logEvent('error', 'shutdown.failed', {
+      signal: 'SIGTERM',
+      error: error.message,
+      stack: error.stack
+    });
     process.exit(1);
   });
 });
 
 process.on('SIGINT', () => {
+  logEvent('info', 'signal.received', { signal: 'SIGINT' });
   shutdown().catch((error) => {
-    console.error(error);
+    logEvent('error', 'shutdown.failed', {
+      signal: 'SIGINT',
+      error: error.message,
+      stack: error.stack
+    });
     process.exit(1);
   });
 });
@@ -599,7 +630,7 @@ app.get(/.*/, (_req, res) => {
   res.sendFile(path.join(distDir, 'index.html'));
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+server = app.listen(PORT, '0.0.0.0', () => {
   logEvent('info', 'server.started', {
     url: `http://0.0.0.0:${PORT}`,
     sessionTtlMs: SESSION_TTL_MS,

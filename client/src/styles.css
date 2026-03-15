@@ -266,6 +266,10 @@ a {
   padding: 0.3rem 0 1rem;
 }
 
+.panel-header > * {
+  min-width: 0;
+}
+
 .panel-title-group {
   min-width: 0;
   flex: 1 1 auto;
@@ -273,8 +277,15 @@ a {
 
 .panel-title-group h2,
 .slideshow-topbar h2 {
+  display: block;
+  max-width: 100%;
+  white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.panel-chip {
+  flex: 0 0 auto;
 }
 
 .tree-scroll {
@@ -444,17 +455,18 @@ a {
   inset: 0;
   z-index: 9999;
   display: grid;
-  place-items: center;
-  padding: 1.5rem;
+  place-items: stretch;
+  padding: 0;
   background: rgba(20, 22, 21, 0.7);
   backdrop-filter: blur(14px);
 }
 
 .slideshow-card {
-  width: min(1200px, 100%);
-  max-height: 92vh;
-  padding: 1rem;
-  border-radius: 28px;
+  width: 100vw;
+  height: 100vh;
+  max-height: none;
+  padding: 1.25rem;
+  border-radius: 0;
   background: rgba(251, 247, 240, 0.95);
 }
 
@@ -471,7 +483,7 @@ a {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 1rem;
-  min-height: 0;
+  min-height: calc(100vh - 7rem);
 }
 
 .nav-button {
@@ -521,6 +533,10 @@ a {
   .preview-panel,
   .slideshow-card {
     padding: 0.9rem;
+  }
+
+  .slideshow-card {
+    border-radius: 0;
   }
 
   .tree-row {
