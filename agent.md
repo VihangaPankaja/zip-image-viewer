@@ -27,3 +27,5 @@ npm start
 - Do not commit `node_modules/`, `dist/`, or `sessions/`
 - Keep changes focused and preserve existing app structure
 - Follow the current plain, minimal style unless asked for a redesign
+- Bump the app version in `package.json` and `package-lock.json` before opening a PR to `master`
+- For multi-step feature work, create a commit after each major implementation step
