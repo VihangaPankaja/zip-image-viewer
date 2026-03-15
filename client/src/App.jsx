@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp', 'avif']);
 const TEXT_EXTENSIONS = new Set([
@@ -18,6 +19,9 @@ const TEXT_EXTENSIONS = new Set([
   'css'
 ]);
 
+const FOLDER_THUMB_SIZE = 88;
+const STRIP_THUMB_SIZE = 220;
+
 function formatBytes(value) {
   if (!Number.isFinite(value) || value <= 0) return 'Unknown size';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -35,6 +39,23 @@ function classifyNode(node) {
   if (IMAGE_EXTENSIONS.has(node.extension)) return 'image';
   if (TEXT_EXTENSIONS.has(node.extension)) return 'text';
   return 'binary';
+}
+
+function buildFileUrl(sessionId, filePath, options = {}) {
+  if (!sessionId || !filePath) {
+    return '';
+  }
+
+  const params = new URLSearchParams({ path: filePath });
+  if (options.previewText) {
+    params.set('preview', '1');
+  }
+  if (options.thumbnail) {
+    params.set('thumbnail', '1');
+    params.set('size', String(options.size || STRIP_THUMB_SIZE));
+  }
+
+  return `/api/sessions/${sessionId}/file?${params.toString()}`;
 }
 
 function flattenTree(tree) {
@@ -83,7 +104,7 @@ function TreeNode({ node, selectedPath, onSelect, sessionId, folderPreview, fold
             {previewPath ? (
               <img
                 className="folder-thumb"
-                src={`/api/sessions/${sessionId}/file?path=${encodeURIComponent(previewPath)}`}
+                src={buildFileUrl(sessionId, previewPath, { thumbnail: true, size: FOLDER_THUMB_SIZE })}
                 alt=""
                 loading="lazy"
               />
@@ -146,16 +167,17 @@ function App() {
   const currentImageIndex = selectedNode ? currentFolderImages.indexOf(selectedNode.path) : -1;
   const selectedFileUrl =
     session && selectedNode && selectedNode.type === 'file'
-      ? `/api/sessions/${session.id}/file?path=${encodeURIComponent(selectedNode.path)}`
+      ? buildFileUrl(session.id, selectedNode.path)
       : '';
   const selectedPreviewUrl =
     session && selectedNode && selectedNode.type === 'file'
-      ? `/api/sessions/${session.id}/file?path=${encodeURIComponent(selectedNode.path)}&preview=1`
+      ? buildFileUrl(session.id, selectedNode.path, { previewText: true })
       : '';
   const currentFolderImageItems = currentFolderImages.map((imagePath) => ({
     path: imagePath,
     name: flatData?.nodesByPath.get(imagePath)?.name || imagePath.split('/').at(-1) || imagePath,
-    url: `/api/sessions/${session?.id}/file?path=${encodeURIComponent(imagePath)}`
+    url: buildFileUrl(session?.id, imagePath),
+    thumbnailUrl: buildFileUrl(session?.id, imagePath, { thumbnail: true, size: STRIP_THUMB_SIZE })
   }));
 
   async function loadSession(url, confirmOversize = false) {
@@ -294,7 +316,7 @@ function App() {
 
     const preloaders = preloadTargets.map((imagePath) => {
       const img = new Image();
-      img.src = `/api/sessions/${session.id}/file?path=${encodeURIComponent(imagePath)}`;
+      img.src = buildFileUrl(session.id, imagePath, { thumbnail: true, size: STRIP_THUMB_SIZE });
       return img;
     });
 
@@ -304,6 +326,65 @@ function App() {
       });
     };
   }, [currentFolderImages, currentImageIndex, selectedKind, session]);
+
+  useEffect(() => {
+    if (!slideshowOpen) {
+      return undefined;
+    }
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [slideshowOpen]);
+
+  const slideshowModal =
+    slideshowOpen && selectedKind === 'image' && selectedNode
+      ? createPortal(
+          <div className="slideshow-overlay" onClick={() => setSlideshowOpen(false)}>
+            <div
+              className="slideshow-card"
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Slideshow for ${selectedNode.name}`}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="slideshow-topbar">
+                <div className="panel-title-group">
+                  <p className="panel-label">Folder slideshow</p>
+                  <h2 title={selectedNode.name}>{selectedNode.name}</h2>
+                </div>
+                <button className="ghost-button" type="button" onClick={() => setSlideshowOpen(false)}>
+                  Close
+                </button>
+              </div>
+
+              <div className="slideshow-body">
+                <button
+                  className="nav-button"
+                  type="button"
+                  aria-label="Previous image"
+                  onClick={() => setSelectedPath(currentFolderImages[currentImageIndex - 1] || currentFolderImages[currentFolderImages.length - 1])}
+                >
+                  {'<'}
+                </button>
+                <img src={selectedFileUrl} alt={selectedNode.name} />
+                <button
+                  className="nav-button"
+                  type="button"
+                  aria-label="Next image"
+                  onClick={() => setSelectedPath(currentFolderImages[currentImageIndex + 1] || currentFolderImages[0])}
+                >
+                  {'>'}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+      : null;
 
   return (
     <div className="app-shell">
@@ -366,9 +447,9 @@ function App() {
         <section className="viewer-grid">
           <aside className="sidebar-panel">
             <div className="panel-header">
-              <div>
+              <div className="panel-title-group">
                 <p className="panel-label">Explorer</p>
-                <h2>{session?.tree?.name || 'No archive loaded'}</h2>
+                <h2 title={session?.tree?.name || 'No archive loaded'}>{session?.tree?.name || 'No archive loaded'}</h2>
               </div>
               {session ? <span className="panel-chip">{session.stats.fileCount} files</span> : null}
             </div>
@@ -398,9 +479,9 @@ function App() {
 
           <section className="preview-panel">
             <div className="panel-header">
-              <div>
+              <div className="panel-title-group">
                 <p className="panel-label">Preview</p>
-                <h2>{selectedNode?.name || 'Select a file'}</h2>
+                <h2 title={selectedNode?.name || 'Select a file'}>{selectedNode?.name || 'Select a file'}</h2>
               </div>
               {selectedNode?.type === 'file' ? (
                 <div className="panel-actions">
@@ -443,7 +524,7 @@ function App() {
                         className={`thumbnail-card ${item.path === selectedPath ? 'active' : ''}`}
                         onClick={() => setSelectedPath(item.path)}
                       >
-                        <img src={item.url} alt={item.name} loading="lazy" />
+                        <img src={item.thumbnailUrl} alt={item.name} loading="lazy" />
                         <span>{item.name}</span>
                       </button>
                     ))}
@@ -472,40 +553,7 @@ function App() {
           </section>
         </section>
       </main>
-
-      {slideshowOpen && selectedKind === 'image' ? (
-        <div className="slideshow-overlay" onClick={() => setSlideshowOpen(false)}>
-          <div className="slideshow-card" onClick={(event) => event.stopPropagation()}>
-            <div className="slideshow-topbar">
-              <div>
-                <p className="panel-label">Folder slideshow</p>
-                <h2>{selectedNode.name}</h2>
-              </div>
-              <button className="ghost-button" type="button" onClick={() => setSlideshowOpen(false)}>
-                Close
-              </button>
-            </div>
-
-            <div className="slideshow-body">
-              <button
-                className="nav-button"
-                type="button"
-                onClick={() => setSelectedPath(currentFolderImages[currentImageIndex - 1] || currentFolderImages[currentFolderImages.length - 1])}
-              >
-                {'<'}
-              </button>
-              <img src={selectedFileUrl} alt={selectedNode.name} />
-              <button
-                className="nav-button"
-                type="button"
-                onClick={() => setSelectedPath(currentFolderImages[currentImageIndex + 1] || currentFolderImages[0])}
-              >
-                {'>'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {slideshowModal}
     </div>
   );
 }

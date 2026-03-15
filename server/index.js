@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import mime from 'mime-types';
+import sharp from 'sharp';
 import unzipper from 'unzipper';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -23,6 +24,7 @@ const CONFIRM_SIZE_BYTES = 1024 * 1024 * 1024;
 const TEXT_PREVIEW_LIMIT = 2 * 1024 * 1024;
 const DOWNLOAD_PROGRESS_STEP_PERCENT = 10;
 const DOWNLOAD_PROGRESS_STEP_BYTES = 25 * 1024 * 1024;
+const MAX_THUMBNAIL_SIZE = 320;
 
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(distDir));
@@ -42,6 +44,16 @@ function formatBytes(bytes) {
   const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
   const value = bytes / 1024 ** exponent;
   return `${value >= 10 || exponent === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[exponent]}`;
+}
+
+function classifyMimeType(contentType) {
+  if (String(contentType).startsWith('image/')) {
+    return 'image';
+  }
+  if (String(contentType).startsWith('text/') || contentType === 'application/json') {
+    return 'text';
+  }
+  return 'binary';
 }
 
 app.use((req, res, next) => {
@@ -182,6 +194,33 @@ async function readPreviewChunk(targetPath) {
   } finally {
     await fileHandle.close();
   }
+}
+
+async function ensureThumbnail(session, normalizedPath, targetPath, size) {
+  const safeSize = Math.max(48, Math.min(Number(size) || 220, MAX_THUMBNAIL_SIZE));
+  const hash = crypto.createHash('sha1').update(`${normalizedPath}:${safeSize}`).digest('hex');
+  const thumbnailDir = path.join(session.workspaceDir, 'thumbnails');
+  const thumbnailPath = path.join(thumbnailDir, `${hash}.jpg`);
+
+  await mkdir(thumbnailDir, { recursive: true });
+
+  const existing = await stat(thumbnailPath).catch(() => null);
+  if (!existing) {
+    await sharp(targetPath)
+      .rotate()
+      .resize({ width: safeSize, height: safeSize, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 55, mozjpeg: true })
+      .toFile(thumbnailPath);
+
+    logEvent('info', 'session.thumbnail.generated', {
+      sessionId: session.id,
+      path: normalizedPath,
+      size: safeSize,
+      thumbnailPath
+    });
+  }
+
+  return thumbnailPath;
 }
 
 setInterval(() => {
@@ -498,22 +537,46 @@ app.get('/api/sessions/:id/file', async (req, res) => {
   }
 
   const wantsPreview = req.query.preview === '1';
+  const wantsThumbnail = req.query.thumbnail === '1';
   const contentType = mime.lookup(targetPath) || 'application/octet-stream';
   logEvent('info', 'session.file.read', {
     sessionId: session.id,
     path: normalizedPath,
     preview: wantsPreview,
+    thumbnail: wantsThumbnail,
     size: fileStats.size,
     sizeLabel: formatBytes(fileStats.size),
     contentType
   });
   res.setHeader('cache-control', 'no-store');
-  res.type(contentType);
 
   if (wantsPreview) {
+    res.type(contentType);
     const previewBuffer = await readPreviewChunk(targetPath);
     return res.send(previewBuffer);
   }
+
+  if (wantsThumbnail) {
+    if (classifyMimeType(contentType) !== 'image') {
+      return res.status(400).json({ error: 'Thumbnail preview is only available for image files.' });
+    }
+
+    try {
+      const thumbnailPath = await ensureThumbnail(session, normalizedPath, targetPath, req.query.size);
+      res.type('image/jpeg');
+      return createReadStream(thumbnailPath).pipe(res);
+    } catch (error) {
+      logEvent('warn', 'session.thumbnail.failed', {
+        sessionId: session.id,
+        path: normalizedPath,
+        error: error.message
+      });
+      res.type(contentType);
+      return createReadStream(targetPath).pipe(res);
+    }
+  }
+
+  res.type(contentType);
 
   return createReadStream(targetPath).pipe(res);
 });

@@ -266,6 +266,17 @@ a {
   padding: 0.3rem 0 1rem;
 }
 
+.panel-title-group {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.panel-title-group h2,
+.slideshow-topbar h2 {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .tree-scroll {
   max-height: calc(100vh - 19rem);
   overflow: auto;
@@ -431,6 +442,7 @@ a {
 .slideshow-overlay {
   position: fixed;
   inset: 0;
+  z-index: 9999;
   display: grid;
   place-items: center;
   padding: 1.5rem;
