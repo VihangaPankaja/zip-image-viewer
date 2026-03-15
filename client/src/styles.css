@@ -495,25 +495,6 @@ input::placeholder {
   margin-bottom: 18px;
 }
 
-.sidebar-panel,
-.preview-panel {
-  min-height: 640px;
-  border-radius: var(--radius-lg);
-  background: var(--panel-gradient);
-}
-
-.sidebar-panel {
-  padding: 22px;
-}
-
-.preview-panel {
-  display: flex;
-  flex-direction: column;
-  padding: 22px;
-  background: var(--preview-gradient);
-}
-
-.panel-header,
 .panel-header-stackable {
   margin-bottom: 12px;
 }
