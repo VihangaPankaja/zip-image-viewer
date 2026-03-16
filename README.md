@@ -11,6 +11,7 @@ Browse a public ZIP file through a modern web UI running from a single Docker co
 - videos such as `mp4`, `webm`, `mov`, `m4v`, and `ogv` open in an inline player with range-based streaming support
 - text-style files such as `txt`, `md`, `json`, `csv`, `js`, `ts`, `html`, and `css` open in a text preview
 - dark mode and light mode are both available from the interface toggle
+- archive loading shows real-time download and extraction progress in the hero panel
 - loaded archives can be cleared directly from the app without reloading the page
 - sessions are cleaned up automatically after inactivity
 
