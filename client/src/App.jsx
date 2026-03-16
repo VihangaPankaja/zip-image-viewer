@@ -27,12 +27,17 @@ const SORT_OPTIONS = [
   { value: 'name-desc', label: 'Name Z-A' },
   { value: 'date-asc', label: 'Date oldest' },
   { value: 'date-desc', label: 'Date newest' },
-  { value: 'natural-tail', label: 'Number tail' }
+  { value: 'natural-tail', label: 'Number trail' }
 ];
 const PREVIEW_QUALITY_OPTIONS = [
   { value: 'low', label: 'Low preview' },
   { value: 'balanced', label: 'Balanced preview' },
   { value: 'high', label: 'High preview' }
+];
+const SLIDESHOW_FIT_OPTIONS = [
+  { value: 'best-fit', label: 'Best fit' },
+  { value: 'fit-width', label: 'Fit width' },
+  { value: 'fit-height', label: 'Fit height' }
 ];
 const NAME_COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base', numeric: false });
 
@@ -357,7 +362,7 @@ function App() {
     return window.localStorage.getItem('zip-image-viewer-theme') || 'dark';
   });
   const [selectedPath, setSelectedPath] = useState('');
-  const [sortMode, setSortMode] = useState('name-asc');
+  const [sortMode, setSortMode] = useState('natural-tail');
   const [previewQuality, setPreviewQuality] = useState('balanced');
   const [thumbnailStripExpanded, setThumbnailStripExpanded] = useState(false);
   const [textPreview, setTextPreview] = useState('');
@@ -366,6 +371,8 @@ function App() {
   const [error, setError] = useState('');
   const [oversizePrompt, setOversizePrompt] = useState(null);
   const [slideshowOpen, setSlideshowOpen] = useState(false);
+  const [slideshowFitMode, setSlideshowFitMode] = useState('best-fit');
+  const [slideshowChromeHidden, setSlideshowChromeHidden] = useState(false);
   const [activeJob, setActiveJob] = useState(null);
   const textPreviewCacheRef = useRef(new Map());
   const imagePreviewCacheRef = useRef(new Map());
@@ -922,6 +929,7 @@ function App() {
 
   useEffect(() => {
     if (!slideshowOpen) {
+      setSlideshowChromeHidden(false);
       return undefined;
     }
 
@@ -936,51 +944,74 @@ function App() {
   const slideshowModal =
     slideshowOpen && selectedKind === 'image' && selectedNode
       ? createPortal(
-          <div className="slideshow-overlay" onClick={() => setSlideshowOpen(false)}>
+          <div className={`slideshow-overlay ${slideshowChromeHidden ? 'chrome-hidden' : ''}`}>
             <div
-              className="slideshow-card"
+              className="slideshow-viewport"
               role="dialog"
               aria-modal="true"
               aria-label={`Slideshow for ${selectedNode.name}`}
-              onClick={(event) => event.stopPropagation()}
             >
-              <div className="slideshow-topbar">
-                <div className="panel-title-group">
-                  <p className="panel-label">Folder slideshow</p>
-                  <h2 title={selectedNode.name}>{selectedNode.name}</h2>
-                  <div className="slideshow-meta">
-                    <span>{currentImageIndex + 1} / {currentFolderImages.length}</span>
-                    <span>{formatBytes(selectedNode.size)}</span>
-                    <span>{formatDate(selectedNode.modifiedAt)}</span>
+              <div className={`slideshow-stage slideshow-fit-${slideshowFitMode}`} onDoubleClick={() => setSlideshowChromeHidden((current) => !current)}>
+                <img src={selectedImageSrc || selectedImagePreviewUrl} alt={selectedNode.name} />
+              </div>
+
+              <div className="slideshow-floating slideshow-floating-top">
+                <div className="slideshow-info-card">
+                  <div className="panel-title-group">
+                    <p className="panel-label">Folder slideshow</p>
+                    <h2 title={selectedNode.name}>{selectedNode.name}</h2>
+                    <div className="slideshow-meta">
+                      <span>{currentImageIndex + 1} / {currentFolderImages.length}</span>
+                      <span>{formatBytes(selectedNode.size)}</span>
+                      <span>{formatDate(selectedNode.modifiedAt)}</span>
+                    </div>
                   </div>
                 </div>
-                <div className="slideshow-actions">
-                  <button className="ghost-button" type="button" onClick={() => setSelectedPath(currentFolderImages[0])}>
-                    First
-                  </button>
-                  <button className="ghost-button" type="button" onClick={() => setSelectedPath(currentFolderImages[currentFolderImages.length - 1])}>
-                    Last
-                  </button>
-                  <button className="ghost-button" type="button" onClick={() => setSlideshowOpen(false)}>
-                    Close
-                  </button>
+
+                <div className="slideshow-controls-card">
+                  <label className="toolbar-select-shell slideshow-fit-shell" htmlFor="slideshow-fit-mode">
+                    <span className="toolbar-label">Fit mode</span>
+                    <select
+                      id="slideshow-fit-mode"
+                      value={slideshowFitMode}
+                      onChange={(event) => setSlideshowFitMode(event.target.value)}
+                    >
+                      {SLIDESHOW_FIT_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <div className="slideshow-actions">
+                    <button className="ghost-button" type="button" onClick={() => setSelectedPath(currentFolderImages[0])}>
+                      First
+                    </button>
+                    <button className="ghost-button" type="button" onClick={() => setSelectedPath(currentFolderImages[currentFolderImages.length - 1])}>
+                      Last
+                    </button>
+                    <button className="ghost-button" type="button" onClick={() => setSlideshowChromeHidden(true)}>
+                      Hide UI
+                    </button>
+                    <button className="ghost-button" type="button" onClick={() => setSlideshowOpen(false)}>
+                      Close
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div className="slideshow-body">
+              <div className="slideshow-floating slideshow-floating-nav" aria-hidden={slideshowChromeHidden}>
                 <button
-                  className="nav-button"
+                  className="nav-button nav-button-left"
                   type="button"
                   aria-label="Previous image"
                   onClick={() => setSelectedPath(previousImagePath)}
                 >
                   {'<'}
                 </button>
-                <div className="slideshow-stage">
-                  <img src={selectedImageSrc || selectedImagePreviewUrl} alt={selectedNode.name} />
-                </div>
                 <button
-                  className="nav-button"
+                  className="nav-button nav-button-right"
                   type="button"
                   aria-label="Next image"
                   onClick={() => setSelectedPath(nextImagePath)}
@@ -988,13 +1019,24 @@ function App() {
                   {'>'}
                 </button>
               </div>
-              <div className="slideshow-footer">
-                <div className="slideshow-neighbors">
-                  <span>Prev: {previousImageName || 'None'}</span>
-                  <span>Next: {nextImageName || 'None'}</span>
+
+              <div className="slideshow-floating slideshow-floating-bottom">
+                <div className="slideshow-neighbors-card">
+                  <div className="slideshow-neighbors">
+                    <span>Prev: {previousImageName || 'None'}</span>
+                    <span>Next: {nextImageName || 'None'}</span>
+                  </div>
+                  <div className="navigation-hint">
+                    Arrow keys move, Home/End jump, F opens slideshow, Escape closes it, and double-click toggles the overlay.
+                  </div>
                 </div>
-                <div className="navigation-hint">Arrow keys move, Home/End jump, Enter or F opens slideshow, Escape closes it.</div>
               </div>
+
+              {slideshowChromeHidden ? (
+                <button className="slideshow-reveal-button" type="button" onClick={() => setSlideshowChromeHidden(false)}>
+                  Show UI
+                </button>
+              ) : null}
             </div>
           </div>,
           document.body
@@ -1103,29 +1145,29 @@ function App() {
 
         <section className="viewer-grid">
           <aside className="sidebar-panel">
-            <div className="panel-header panel-header-stackable">
-              <div className="panel-title-group">
+            <div className="panel-header panel-header-stackable explorer-header">
+              <div className="panel-title-group explorer-title-group">
                 <p className="panel-label">Explorer</p>
                 <h2 title={sortedTree?.name || 'No archive loaded'}>{sortedTree?.name || 'No archive loaded'}</h2>
               </div>
               <div className="sidebar-header-actions">
                 {session ? <span className="panel-chip">{session.stats.fileCount} files</span> : null}
-                <label className="toolbar-select-shell" htmlFor="sort-mode">
-                  <span className="toolbar-label">Sort</span>
-                  <select id="sort-mode" value={sortMode} onChange={(event) => setSortMode(event.target.value)}>
-                    {SORT_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
               </div>
+              <label className="toolbar-select-shell toolbar-select-shell-wide explorer-sort-shell" htmlFor="sort-mode">
+                <span className="toolbar-label">Sort</span>
+                <select id="sort-mode" value={sortMode} onChange={(event) => setSortMode(event.target.value)}>
+                  {SORT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
 
             <div className="sort-caption">
               {sortMode === 'natural-tail'
-                ? 'Numeric tail mode keeps names like file 2, file 10, file 11 in number order.'
+                ? 'Number trail mode keeps names like file 2, file 10, file 11 in number order.'
                 : sortMode.startsWith('date')
                   ? 'Date sorting uses ZIP entry modified times when the archive provides them.'
                   : 'Sorting affects explorer order, preview arrows, thumbnails, and slideshow navigation.'}
