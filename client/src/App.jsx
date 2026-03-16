@@ -269,6 +269,14 @@ function formatProgressMessage(job) {
   return 'Working on archive...';
 }
 
+function wait(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function isTerminalJobStatus(status) {
+  return status === 'ready' || status === 'error' || status === 'cancelled';
+}
+
 function TreeNode({ node, selectedPath, onSelect, sessionId, folderPreview, folderImages, depth = 0 }) {
   const [open, setOpen] = useState(depth < 2);
   const isDirectory = node.type === 'directory';
@@ -362,6 +370,10 @@ function App() {
   const textPreviewCacheRef = useRef(new Map());
   const imagePreviewCacheRef = useRef(new Map());
   const eventSourceRef = useRef(null);
+  const jobPollTimeoutRef = useRef(null);
+  const latestSessionIdRef = useRef('');
+  const latestJobIdRef = useRef('');
+  const hydrationRef = useRef({ sessionId: '', promise: null });
 
   const sortedTree = useMemo(() => {
     if (!session?.tree) {
@@ -402,15 +414,21 @@ function App() {
   const previousImageName = flatData?.nodesByPath.get(previousImagePath)?.name || '';
   const nextImageName = flatData?.nodesByPath.get(nextImagePath)?.name || '';
 
-  async function clearArchive(removeRemoteSession = true) {
-    const activeSessionId = session?.id;
-    const activeJobId = activeJob?.id;
-
+  function closeJobEvents() {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
+  }
 
+  function stopJobPolling() {
+    if (jobPollTimeoutRef.current) {
+      window.clearTimeout(jobPollTimeoutRef.current);
+      jobPollTimeoutRef.current = null;
+    }
+  }
+
+  function resetArchiveView() {
     setSession(null);
     setActiveJob(null);
     setSelectedPath('');
@@ -419,8 +437,21 @@ function App() {
     setOversizePrompt(null);
     setSlideshowOpen(false);
     setThumbnailStripExpanded(false);
+    setIsLoading(false);
     textPreviewCacheRef.current.clear();
     clearImagePreviewCache();
+  }
+
+  async function clearArchive(removeRemoteSession = true) {
+    const activeSessionId = latestSessionIdRef.current;
+    const activeJobId = latestJobIdRef.current;
+
+    closeJobEvents();
+    stopJobPolling();
+    latestSessionIdRef.current = '';
+    latestJobIdRef.current = '';
+    hydrationRef.current = { sessionId: '', promise: null };
+    resetArchiveView();
 
     if (removeRemoteSession && activeSessionId) {
       await fetch(`/api/sessions/${activeSessionId}`, { method: 'DELETE' }).catch(() => {});
@@ -476,69 +507,151 @@ function App() {
   }
 
   async function hydrateSession(sessionId, nextUrl) {
-    const response = await fetch(`/api/sessions/${sessionId}/tree`);
-    const payload = await response.json();
-
-    if (!response.ok) {
-      throw new Error(payload.error || 'Could not open ZIP URL.');
+    if (!sessionId) {
+      return null;
     }
 
-    if (session?.id) {
-      fetch(`/api/sessions/${session.id}`, { method: 'DELETE' }).catch(() => {});
+    if (hydrationRef.current.sessionId === sessionId && hydrationRef.current.promise) {
+      return hydrationRef.current.promise;
     }
 
-    setSession(payload);
-    setZipUrl(nextUrl);
-    setSelectedPath(payload.firstFilePath || payload.tree.path);
-    setTextPreview('');
-    setSelectedImageSrc('');
-    textPreviewCacheRef.current.clear();
-    clearImagePreviewCache();
+    const previousSessionId = latestSessionIdRef.current;
+    const request = (async () => {
+      let lastError = null;
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const response = await fetch(`/api/sessions/${sessionId}/tree`);
+        const payload = await response.json().catch(() => ({}));
+
+        if (response.ok) {
+          if (previousSessionId && previousSessionId !== sessionId) {
+            fetch(`/api/sessions/${previousSessionId}`, { method: 'DELETE' }).catch(() => {});
+          }
+
+          latestSessionIdRef.current = payload.id;
+          setSession(payload);
+          setZipUrl(nextUrl);
+          setSelectedPath(payload.firstFilePath || payload.tree.path);
+          setTextPreview('');
+          setSelectedImageSrc('');
+          setOversizePrompt(null);
+          setError('');
+          textPreviewCacheRef.current.clear();
+          clearImagePreviewCache();
+          return payload;
+        }
+
+        lastError = new Error(payload.error || 'Could not open ZIP URL.');
+        if (response.status !== 404 || attempt === 2) {
+          throw lastError;
+        }
+
+        await wait(250 * (attempt + 1));
+      }
+
+      throw lastError || new Error('Could not open ZIP URL.');
+    })();
+
+    hydrationRef.current = { sessionId, promise: request };
+
+    try {
+      return await request;
+    } finally {
+      if (hydrationRef.current.sessionId === sessionId) {
+        hydrationRef.current = { sessionId: '', promise: null };
+      }
+    }
+  }
+
+  async function handleJobSnapshot(payload, nextUrl) {
+    latestJobIdRef.current = payload?.id || '';
+    setActiveJob(payload);
+
+    if (payload?.sessionId) {
+      await hydrateSession(payload.sessionId, nextUrl);
+    }
+
+    if (payload.status === 'awaiting_confirmation') {
+      setOversizePrompt({ jobId: payload.id, reportedSize: payload.reportedSize, limit: 1024 * 1024 * 1024 });
+      setIsLoading(false);
+      return;
+    }
+
+    if (payload.status === 'ready') {
+      closeJobEvents();
+      stopJobPolling();
+      latestJobIdRef.current = '';
+      setOversizePrompt(null);
+      setActiveJob(null);
+      setIsLoading(false);
+      return;
+    }
+
+    if (payload.status === 'error') {
+      closeJobEvents();
+      stopJobPolling();
+      latestJobIdRef.current = '';
+      setActiveJob(null);
+      setError(payload.error || 'Could not process this ZIP file.');
+      setIsLoading(false);
+      return;
+    }
+
+    if (payload.status === 'cancelled') {
+      closeJobEvents();
+      stopJobPolling();
+      latestJobIdRef.current = '';
+      setActiveJob(null);
+      setIsLoading(false);
+    }
+  }
+
+  function startJobPolling(jobId, nextUrl) {
+    stopJobPolling();
+
+    async function poll() {
+      if (!jobId || latestJobIdRef.current !== jobId) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/session-jobs/${jobId}`);
+
+        if (response.status === 404) {
+          stopJobPolling();
+          if (!latestSessionIdRef.current) {
+            setActiveJob(null);
+            setIsLoading(false);
+            setError('Archive loading was interrupted before the UI could refresh.');
+          }
+          return;
+        }
+
+        const payload = await response.json();
+        await handleJobSnapshot(payload, nextUrl);
+
+        if (!isTerminalJobStatus(payload.status) && latestJobIdRef.current === jobId) {
+          jobPollTimeoutRef.current = window.setTimeout(poll, 1500);
+        }
+      } catch {
+        if (latestJobIdRef.current === jobId) {
+          jobPollTimeoutRef.current = window.setTimeout(poll, 2000);
+        }
+      }
+    }
+
+    jobPollTimeoutRef.current = window.setTimeout(poll, 1500);
   }
 
   function attachJobEvents(jobId, nextUrl) {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-    }
+    closeJobEvents();
 
     const source = new EventSource(`/api/session-jobs/${jobId}/events`);
     eventSourceRef.current = source;
 
     const handleSnapshot = async (event) => {
       const payload = JSON.parse(event.data);
-      setActiveJob(payload);
-
-      if (payload.status === 'awaiting_confirmation') {
-        setOversizePrompt({ jobId: payload.id, reportedSize: payload.reportedSize, limit: 1024 * 1024 * 1024 });
-        setIsLoading(false);
-        return;
-      }
-
-      if (payload.status === 'ready' && payload.sessionId) {
-        source.close();
-        eventSourceRef.current = null;
-        setOversizePrompt(null);
-        setActiveJob(null);
-        await hydrateSession(payload.sessionId, nextUrl);
-        setIsLoading(false);
-        return;
-      }
-
-      if (payload.status === 'error') {
-        source.close();
-        eventSourceRef.current = null;
-        setActiveJob(null);
-        setError(payload.error || 'Could not process this ZIP file.');
-        setIsLoading(false);
-        return;
-      }
-
-      if (payload.status === 'cancelled') {
-        source.close();
-        eventSourceRef.current = null;
-        setActiveJob(null);
-        setIsLoading(false);
-      }
+      await handleJobSnapshot(payload, nextUrl);
     };
 
     source.addEventListener('progress', (event) => {
@@ -562,12 +675,28 @@ function App() {
       });
     });
 
+    source.addEventListener('job-error', (event) => {
+      handleSnapshot(event).catch((jobError) => {
+        setError(jobError.message);
+        setIsLoading(false);
+      });
+    });
+
+    source.addEventListener('cancelled', (event) => {
+      handleSnapshot(event).catch((jobError) => {
+        setError(jobError.message);
+        setIsLoading(false);
+      });
+    });
+
     source.addEventListener('error', () => {
-      setError('Progress connection was interrupted.');
-      setIsLoading(false);
-      setActiveJob(null);
-      source.close();
-      eventSourceRef.current = null;
+      if (source.readyState === EventSource.CLOSED) {
+        closeJobEvents();
+        return;
+      }
+
+      closeJobEvents();
+      startJobPolling(jobId, nextUrl);
     });
   }
 
@@ -589,16 +718,16 @@ function App() {
       if (!response.ok) {
         throw new Error(payload.error || 'Could not open ZIP URL.');
       }
+      latestJobIdRef.current = payload.jobId;
       setActiveJob(payload);
+      startJobPolling(payload.jobId, url);
       attachJobEvents(payload.jobId, url);
     } catch (requestError) {
       setError(requestError.message);
+      latestJobIdRef.current = '';
       setActiveJob(null);
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
-    } finally {
+      stopJobPolling();
+      closeJobEvents();
     }
   }
 
@@ -693,21 +822,27 @@ function App() {
   }, [previewQuality, selectedImagePreviewUrl, selectedKind, selectedNode, session]);
 
   useEffect(() => {
+    latestSessionIdRef.current = session?.id || '';
+  }, [session]);
+
+  useEffect(() => {
+    latestJobIdRef.current = activeJob?.id || '';
+  }, [activeJob]);
+
+  useEffect(() => {
     return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
+      closeJobEvents();
+      stopJobPolling();
       clearImagePreviewCache();
       textPreviewCacheRef.current.clear();
-      if (session?.id) {
-        fetch(`/api/sessions/${session.id}`, { method: 'DELETE', keepalive: true }).catch(() => {});
+      if (latestSessionIdRef.current) {
+        fetch(`/api/sessions/${latestSessionIdRef.current}`, { method: 'DELETE', keepalive: true }).catch(() => {});
       }
-      if (activeJob?.id) {
-        fetch(`/api/session-jobs/${activeJob.id}`, { method: 'DELETE', keepalive: true }).catch(() => {});
+      if (latestJobIdRef.current) {
+        fetch(`/api/session-jobs/${latestJobIdRef.current}`, { method: 'DELETE', keepalive: true }).catch(() => {});
       }
     };
-  }, [activeJob, session]);
+  }, []);
 
   useEffect(() => {
     function onKeyDown(event) {
