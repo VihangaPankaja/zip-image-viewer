@@ -450,12 +450,70 @@ input::placeholder {
   background: linear-gradient(135deg, var(--accent-warning-bg), color-mix(in srgb, var(--bg-panel-strong) 88%, transparent));
 }
 
+.message-card.progress-card {
+  display: grid;
+  gap: 14px;
+  border-color: color-mix(in srgb, var(--accent) 26%, var(--border));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--surface-highlight) 82%, transparent), color-mix(in srgb, var(--bg-panel-strong) 88%, transparent));
+}
+
 .message-card.warning,
 .message-card.error {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+}
+
+.progress-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.progress-card-header strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 1rem;
+}
+
+.progress-copy {
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.progress-meta {
+  color: var(--accent-warm);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.progress-bar-shell {
+  position: relative;
+  overflow: hidden;
+  height: 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border) 92%, transparent);
+  background: color-mix(in srgb, var(--bg-inset) 82%, transparent);
+}
+
+.progress-bar-fill {
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-warm));
+  box-shadow: 0 0 24px color-mix(in srgb, var(--accent) 26%, transparent);
+  transition: width 220ms ease;
+}
+
+.progress-bar-shell.indeterminate .progress-bar-fill {
+  width: 35%;
+  animation: indeterminate-progress 1.2s ease-in-out infinite;
+}
+
+.progress-detail-line {
+  font-size: 0.92rem;
 }
 
 .viewer-grid {
@@ -934,6 +992,7 @@ input::placeholder {
   .hero-topbar,
   .panel-header,
   .panel-header-stackable,
+  .progress-card-header,
   .thumbnail-strip-header,
   .slideshow-topbar,
   .slideshow-footer {
@@ -1059,5 +1118,17 @@ input::placeholder {
   }
   to {
     transform: translate3d(-20px, -26px, 0) scale(1.06);
+  }
+}
+
+@keyframes indeterminate-progress {
+  0% {
+    transform: translateX(-120%);
+  }
+  50% {
+    transform: translateX(40%);
+  }
+  100% {
+    transform: translateX(220%);
   }
 }

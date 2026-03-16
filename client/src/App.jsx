@@ -249,6 +249,32 @@ function getWrappedPath(items, currentIndex, delta) {
   return items[nextIndex] || '';
 }
 
+function getJobStatusLabel(job) {
+  if (!job) {
+    return 'Idle';
+  }
+
+  if (job.phase === 'downloading') return 'Downloading';
+  if (job.phase === 'extracting') return 'Extracting';
+  if (job.phase === 'confirm') return 'Needs confirmation';
+  if (job.phase === 'ready') return 'Loading explorer';
+  if (job.phase === 'cancelled') return 'Cancelled';
+  if (job.phase === 'error') return 'Error';
+  return 'Queued';
+}
+
+function getLoadingLabel(job) {
+  if (!job) {
+    return 'Opening archive...';
+  }
+
+  if (job.phase === 'downloading') return 'Downloading archive...';
+  if (job.phase === 'extracting') return 'Extracting archive...';
+  if (job.phase === 'ready') return 'Loading files...';
+  if (job.phase === 'confirm') return 'Awaiting confirmation...';
+  return 'Opening archive...';
+}
+
 function TreeNode({ node, selectedPath, onSelect, sessionId, folderPreview, folderImages, depth = 0 }) {
   const [open, setOpen] = useState(depth < 2);
   const isDirectory = node.type === 'directory';
@@ -335,11 +361,17 @@ function App() {
   const [textPreview, setTextPreview] = useState('');
   const [selectedImageSrc, setSelectedImageSrc] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [jobState, setJobState] = useState(null);
   const [error, setError] = useState('');
   const [oversizePrompt, setOversizePrompt] = useState(null);
   const [slideshowOpen, setSlideshowOpen] = useState(false);
   const textPreviewCacheRef = useRef(new Map());
   const imagePreviewCacheRef = useRef(new Map());
+  const jobStreamRef = useRef(null);
+  const activeJobIdRef = useRef('');
+  const activeSessionIdRef = useRef('');
+  const loadRequestRef = useRef(0);
+  const readySessionFetchRef = useRef('');
 
   const sortedTree = useMemo(() => {
     if (!session?.tree) {
@@ -379,10 +411,22 @@ function App() {
   const nextImagePath = getWrappedPath(currentFolderImages, currentImageIndex, 1);
   const previousImageName = flatData?.nodesByPath.get(previousImagePath)?.name || '';
   const nextImageName = flatData?.nodesByPath.get(nextImagePath)?.name || '';
+  const progressPercent = typeof jobState?.percent === 'number' ? Math.max(0, Math.min(jobState.percent, 100)) : null;
+  const progressLabel = getJobStatusLabel(jobState);
+  const progressDetails = jobState?.phase === 'downloading'
+    ? `${formatBytes(jobState.downloadedBytes)}${jobState.reportedSize > 0 ? ` / ${formatBytes(jobState.reportedSize)}` : ''}`
+    : jobState?.phase === 'extracting'
+      ? `${jobState.extractedEntries} / ${jobState.totalEntries || '?'} entries`
+      : '';
 
-  async function clearArchive(removeRemoteSession = true) {
-    const activeSessionId = session?.id;
+  function closeJobStream() {
+    if (jobStreamRef.current) {
+      jobStreamRef.current.close();
+      jobStreamRef.current = null;
+    }
+  }
 
+  function resetLocalArchiveState() {
     setSession(null);
     setSelectedPath('');
     setTextPreview('');
@@ -392,9 +436,175 @@ function App() {
     setThumbnailStripExpanded(false);
     textPreviewCacheRef.current.clear();
     clearImagePreviewCache();
+  }
 
-    if (removeRemoteSession && activeSessionId) {
-      await fetch(`/api/sessions/${activeSessionId}`, { method: 'DELETE' }).catch(() => {});
+  async function removeRemoteSession(sessionId, fetchOptions = {}) {
+    if (!sessionId) {
+      return;
+    }
+
+    await fetch(`/api/sessions/${sessionId}`, { method: 'DELETE', ...fetchOptions }).catch(() => {});
+  }
+
+  async function removeRemoteJob(jobId, fetchOptions = {}) {
+    if (!jobId) {
+      return;
+    }
+
+    await fetch(`/api/session-jobs/${jobId}`, { method: 'DELETE', ...fetchOptions }).catch(() => {});
+  }
+
+  async function finalizeSessionLoad(sessionId, requestId) {
+    const response = await fetch(`/api/sessions/${sessionId}/tree`);
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || 'Could not load the extracted archive.');
+    }
+
+    if (requestId !== loadRequestRef.current) {
+      return;
+    }
+
+    activeSessionIdRef.current = payload.id;
+    activeJobIdRef.current = '';
+    readySessionFetchRef.current = '';
+    setSession(payload);
+    setSelectedPath(payload.firstFilePath || payload.tree.path);
+    setTextPreview('');
+    setSelectedImageSrc('');
+    textPreviewCacheRef.current.clear();
+    clearImagePreviewCache();
+    setOversizePrompt(null);
+    setJobState(null);
+    setIsLoading(false);
+    closeJobStream();
+  }
+
+  async function applyJobUpdate(job, requestId) {
+    if (requestId !== loadRequestRef.current) {
+      return;
+    }
+
+    activeJobIdRef.current = job.id || '';
+    setJobState(job);
+
+    if (job.status === 'awaiting_confirmation' || job.requiresConfirmation) {
+      readySessionFetchRef.current = '';
+      setOversizePrompt(job);
+      setError('');
+      setIsLoading(false);
+      return;
+    }
+
+    setOversizePrompt(null);
+
+    if (job.status === 'ready' && job.sessionId) {
+      if (readySessionFetchRef.current === job.sessionId) {
+        return;
+      }
+
+      readySessionFetchRef.current = job.sessionId;
+      setIsLoading(true);
+      setJobState({ ...job, message: 'Archive download finished. Loading files into the explorer...' });
+      await finalizeSessionLoad(job.sessionId, requestId);
+      return;
+    }
+
+    if (job.status === 'error') {
+      readySessionFetchRef.current = '';
+      closeJobStream();
+      setIsLoading(false);
+      setOversizePrompt(null);
+      setError(job.error || job.message || 'Could not process this ZIP file.');
+      return;
+    }
+
+    if (job.status === 'cancelled') {
+      readySessionFetchRef.current = '';
+      closeJobStream();
+      setIsLoading(false);
+      setJobState(null);
+      setOversizePrompt(null);
+      return;
+    }
+
+    setIsLoading(true);
+  }
+
+  function subscribeToJob(jobId, requestId) {
+    closeJobStream();
+    const eventSource = new EventSource(`/api/session-jobs/${jobId}/events`);
+    jobStreamRef.current = eventSource;
+
+    const handleEvent = async (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        await applyJobUpdate(payload, requestId);
+      } catch (streamError) {
+        if (requestId !== loadRequestRef.current) {
+          return;
+        }
+
+        closeJobStream();
+        setIsLoading(false);
+        setError(streamError.message || 'Could not update archive progress.');
+      }
+    };
+
+    ['progress', 'confirmation', 'ready', 'error', 'cancelled'].forEach((eventName) => {
+      eventSource.addEventListener(eventName, handleEvent);
+    });
+
+    eventSource.onerror = async () => {
+      if (jobStreamRef.current !== eventSource || requestId !== loadRequestRef.current) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/session-jobs/${jobId}`);
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload.error || 'Lost archive progress updates.');
+        }
+
+        await applyJobUpdate(payload, requestId);
+
+        if (payload.status === 'ready' || payload.status === 'error' || payload.status === 'cancelled') {
+          closeJobStream();
+        }
+      } catch (requestError) {
+        if (requestId !== loadRequestRef.current) {
+          return;
+        }
+
+        closeJobStream();
+        setIsLoading(false);
+        setError(requestError.message || 'Lost archive progress updates.');
+      }
+    };
+  }
+
+  async function clearArchive(shouldRemoveRemoteSession = true) {
+    const activeSessionId = activeSessionIdRef.current;
+    const activeJobId = activeJobIdRef.current;
+
+    loadRequestRef.current += 1;
+    readySessionFetchRef.current = '';
+    closeJobStream();
+    activeSessionIdRef.current = '';
+    activeJobIdRef.current = '';
+    setIsLoading(false);
+    setJobState(null);
+    resetLocalArchiveState();
+
+    if (activeJobId) {
+      await removeRemoteJob(activeJobId);
+    }
+
+    if (shouldRemoveRemoteSession && activeSessionId) {
+      await removeRemoteSession(activeSessionId);
     }
   }
 
@@ -442,18 +652,35 @@ function App() {
     return request;
   }
 
-  async function loadSession(url, confirmOversize = false) {
+  async function loadSession(url) {
+    const requestId = loadRequestRef.current + 1;
+    loadRequestRef.current = requestId;
+    readySessionFetchRef.current = '';
+    const previousSessionId = activeSessionIdRef.current;
+    const previousJobId = activeJobIdRef.current;
+
+    closeJobStream();
+    activeSessionIdRef.current = '';
+    activeJobIdRef.current = '';
     setIsLoading(true);
     setError('');
+    setJobState(null);
     setOversizePrompt(null);
     setSlideshowOpen(false);
     setThumbnailStripExpanded(false);
+    setTextPreview('');
+    setSelectedImageSrc('');
+    resetLocalArchiveState();
+    setZipUrl(url);
 
     try {
+      await removeRemoteJob(previousJobId);
+      await removeRemoteSession(previousSessionId);
+
       const response = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ url, confirmOversize })
+        body: JSON.stringify({ url })
       });
       const payload = await response.json();
 
@@ -461,25 +688,53 @@ function App() {
         throw new Error(payload.error || 'Could not open ZIP URL.');
       }
 
-      if (payload.requiresConfirmation) {
-        setOversizePrompt(payload);
+      if (requestId !== loadRequestRef.current) {
         return;
       }
 
-      if (session?.id) {
-        fetch(`/api/sessions/${session.id}`, { method: 'DELETE' }).catch(() => {});
+      activeJobIdRef.current = payload.jobId;
+      setJobState(payload);
+      subscribeToJob(payload.jobId, requestId);
+    } catch (requestError) {
+      if (requestId !== loadRequestRef.current) {
+        return;
       }
 
-      setSession(payload);
-      setZipUrl(url);
-      setSelectedPath(payload.firstFilePath || payload.tree.path);
-      setTextPreview('');
-      setSelectedImageSrc('');
-      textPreviewCacheRef.current.clear();
-      clearImagePreviewCache();
+      setError(requestError.message);
+      setIsLoading(false);
+    }
+  }
+
+  async function confirmOversizeDownload() {
+    const activeJobId = oversizePrompt?.id || activeJobIdRef.current;
+    if (!activeJobId) {
+      setError('The pending download could not be resumed. Start the archive again.');
+      return;
+    }
+
+    setError('');
+    setIsLoading(true);
+    setOversizePrompt(null);
+
+    try {
+      const response = await fetch(`/api/session-jobs/${activeJobId}/confirm`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' }
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error || 'Could not continue the archive download.');
+      }
+
+      activeJobIdRef.current = payload.id || activeJobId;
+      setJobState(payload);
+
+      if (!jobStreamRef.current) {
+        subscribeToJob(activeJobIdRef.current, loadRequestRef.current);
+      }
     } catch (requestError) {
       setError(requestError.message);
-    } finally {
       setIsLoading(false);
     }
   }
@@ -490,7 +745,7 @@ function App() {
       setError('Paste a public ZIP URL to start browsing.');
       return;
     }
-    await loadSession(zipUrl.trim(), false);
+    await loadSession(zipUrl.trim());
   }
 
   useEffect(() => {
@@ -576,13 +831,19 @@ function App() {
 
   useEffect(() => {
     return () => {
+      closeJobStream();
       clearImagePreviewCache();
       textPreviewCacheRef.current.clear();
-      if (session?.id) {
-        fetch(`/api/sessions/${session.id}`, { method: 'DELETE', keepalive: true }).catch(() => {});
+
+      if (activeJobIdRef.current) {
+        fetch(`/api/session-jobs/${activeJobIdRef.current}`, { method: 'DELETE', keepalive: true }).catch(() => {});
+      }
+
+      if (activeSessionIdRef.current) {
+        fetch(`/api/sessions/${activeSessionIdRef.current}`, { method: 'DELETE', keepalive: true }).catch(() => {});
       }
     };
-  }, [session]);
+  }, []);
 
   useEffect(() => {
     function onKeyDown(event) {
@@ -776,7 +1037,7 @@ function App() {
             </label>
 
             <button className="primary-button" type="submit" disabled={isLoading}>
-              {isLoading ? 'Opening archive...' : 'Open archive'}
+              {isLoading ? getLoadingLabel(jobState) : 'Open archive'}
             </button>
           </form>
 
@@ -784,12 +1045,29 @@ function App() {
             <div className="status-pill">Port 8080 ready</div>
             <div className="status-pill">1 GB prompt threshold</div>
             <div className="status-pill">Auto-cleanup enabled</div>
+            {jobState ? <div className="status-pill">{progressLabel}</div> : null}
             {session ? (
               <button className="ghost-button compact-button" type="button" onClick={() => clearArchive(true)}>
                 Clear opened archive
               </button>
             ) : null}
           </div>
+
+          {jobState ? (
+            <div className="message-card progress-card">
+              <div className="progress-card-header">
+                <div>
+                  <strong>{progressLabel}</strong>
+                  <div className="progress-copy">{jobState.message || 'Preparing archive request...'}</div>
+                </div>
+                <div className="progress-meta">{progressPercent !== null ? `${progressPercent}%` : progressDetails || 'Working'}</div>
+              </div>
+              <div className={`progress-bar-shell ${progressPercent === null ? 'indeterminate' : ''}`} aria-hidden="true">
+                <div className="progress-bar-fill" style={progressPercent !== null ? { width: `${progressPercent}%` } : undefined} />
+              </div>
+              {progressDetails ? <div className="progress-copy progress-detail-line">{progressDetails}</div> : null}
+            </div>
+          ) : null}
 
           {error ? <div className="message-card error">{error}</div> : null}
           {oversizePrompt ? (
@@ -798,10 +1076,10 @@ function App() {
                 This archive reports {formatBytes(oversizePrompt.reportedSize)}. Continue downloading anyway?
               </div>
               <div className="message-actions">
-                <button className="ghost-button" type="button" onClick={() => setOversizePrompt(null)}>
+                <button className="ghost-button" type="button" onClick={() => clearArchive(false)}>
                   Cancel
                 </button>
-                <button className="primary-button" type="button" onClick={() => loadSession(zipUrl, true)}>
+                <button className="primary-button" type="button" onClick={confirmOversizeDownload}>
                   Proceed download
                 </button>
               </div>
