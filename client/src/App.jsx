@@ -365,6 +365,7 @@ function App() {
   const [error, setError] = useState('');
   const [oversizePrompt, setOversizePrompt] = useState(null);
   const [slideshowOpen, setSlideshowOpen] = useState(false);
+  const [activeJob, setActiveJob] = useState(null);
   const textPreviewCacheRef = useRef(new Map());
   const imagePreviewCacheRef = useRef(new Map());
   const jobStreamRef = useRef(null);
@@ -428,6 +429,7 @@ function App() {
 
   function resetLocalArchiveState() {
     setSession(null);
+    setActiveJob(null);
     setSelectedPath('');
     setTextPreview('');
     setSelectedImageSrc('');
@@ -605,6 +607,10 @@ function App() {
 
     if (shouldRemoveRemoteSession && activeSessionId) {
       await removeRemoteSession(activeSessionId);
+    }
+
+    if (activeJobId) {
+      await fetch(`/api/session-jobs/${activeJobId}`, { method: 'DELETE' }).catch(() => {});
     }
   }
 
@@ -842,6 +848,9 @@ function App() {
       if (activeSessionIdRef.current) {
         fetch(`/api/sessions/${activeSessionIdRef.current}`, { method: 'DELETE', keepalive: true }).catch(() => {});
       }
+      if (activeJob?.id) {
+        fetch(`/api/session-jobs/${activeJob.id}`, { method: 'DELETE', keepalive: true }).catch(() => {});
+      }
     };
   }, []);
 
@@ -1040,6 +1049,27 @@ function App() {
               {isLoading ? getLoadingLabel(jobState) : 'Open archive'}
             </button>
           </form>
+
+          {activeJob ? (
+            <div className="progress-card" aria-live="polite">
+              <div className="progress-card-head">
+                <strong>{activeJob.phase === 'extracting' ? 'Preparing archive' : 'Downloading archive'}</strong>
+                <span>{activeJob.percent == null ? 'Live' : `${Math.max(0, Math.min(100, activeJob.percent))}%`}</span>
+              </div>
+              <div className={`progress-bar-shell ${activeJob.percent == null ? 'indeterminate' : ''}`}>
+                <div
+                  className="progress-bar-fill"
+                  style={activeJob.percent == null ? undefined : { width: `${Math.max(3, Math.min(100, activeJob.percent))}%` }}
+                />
+              </div>
+              <div className="progress-meta-row">
+                <span>{formatProgressMessage(activeJob)}</span>
+                <button className="ghost-button compact-button" type="button" onClick={() => clearArchive(true)}>
+                  Cancel load
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           <div className="status-row">
             <div className="status-pill">Port 8080 ready</div>

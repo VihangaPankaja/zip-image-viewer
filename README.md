@@ -11,6 +11,7 @@ Browse a public ZIP file through a modern web UI running from a single Docker co
 - videos such as `mp4`, `webm`, `mov`, `m4v`, and `ogv` open in an inline player with range-based streaming support
 - text-style files such as `txt`, `md`, `json`, `csv`, `js`, `ts`, `html`, and `css` open in a text preview
 - dark mode and light mode are both available from the interface toggle
+- archive loading shows real-time download and extraction progress in the hero panel
 - loaded archives can be cleared directly from the app without reloading the page
 - sessions are cleaned up automatically after inactivity
 
@@ -58,8 +59,8 @@ docker run -p 8080:8080 vihangapankaja/zip-image-viewer:latest
 Versioned image example:
 
 ```bash
-docker pull vihangapankaja/zip-image-viewer:1.0.9
-docker run -p 8080:8080 vihangapankaja/zip-image-viewer:1.0.9
+docker pull vihangapankaja/zip-image-viewer:1.0.6
+docker run -p 8080:8080 vihangapankaja/zip-image-viewer:1.0.6
 ```
 
 Open `http://localhost:8080`.
@@ -69,6 +70,7 @@ Open `http://localhost:8080`.
 - public `http` and `https` ZIP URLs are supported
 - if the ZIP is larger than `1 GB`, the app asks whether to continue
 - extracted files are stored only in temporary server session folders
+- archive creation now runs as an async background job with live progress updates over SSE
 - unsupported binary files can still be opened as raw files
 
 ## Sample Public ZIP URLs
@@ -83,8 +85,12 @@ Note: some large repositories may take longer to download and unpack, and some Z
 
 ## API Endpoints
 
-- `POST /api/sessions` create a browsing session from a ZIP URL
-- `GET /api/sessions/:id/tree` fetch the extracted tree for a session
+- `POST /api/sessions` start an async archive job from a ZIP URL
+- `GET /api/session-jobs/:id` fetch current archive job state
+- `GET /api/session-jobs/:id/events` subscribe to live archive progress events
+- `POST /api/session-jobs/:id/confirm` continue an oversized archive job
+- `DELETE /api/session-jobs/:id` cancel an active archive job
+- `GET /api/sessions/:id/tree` fetch the extracted tree for a ready session
 - `GET /api/sessions/:id/file?path=...` stream a file
 - `DELETE /api/sessions/:id` remove a loaded session manually
 - `GET /health` basic server health response
