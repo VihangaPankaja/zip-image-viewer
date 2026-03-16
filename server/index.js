@@ -165,7 +165,18 @@ function emitJob(job, patch = {}, eventName = 'progress') {
   for (const res of job.subscribers) {
     res.write(`event: ${eventName}\n`);
     res.write(`data: ${payload}\n\n`);
+    if (isTerminalJobStatus(job.status)) {
+      res.end();
+    }
   }
+
+  if (isTerminalJobStatus(job.status)) {
+    job.subscribers.clear();
+  }
+}
+
+function isTerminalJobStatus(status) {
+  return status === 'ready' || status === 'error' || status === 'cancelled';
 }
 
 async function cleanupJob(jobId, reason = 'cleanup') {
@@ -174,7 +185,7 @@ async function cleanupJob(jobId, reason = 'cleanup') {
     return;
   }
 
-  if (job.workspaceDir) {
+  if (job.workspaceDir && !job.sessionId) {
     await rm(job.workspaceDir, { recursive: true, force: true }).catch(() => {});
   }
 
@@ -721,6 +732,10 @@ async function processSessionJob(job, confirmOversize = false) {
       firstFilePath
     });
 
+    job.workspaceDir = '';
+    job.extractDir = '';
+    job.zipPath = '';
+
     emitJob(job, {
       status: 'ready',
       phase: 'ready',
@@ -755,7 +770,7 @@ async function processSessionJob(job, confirmOversize = false) {
       phase: 'error',
       error: error.message || 'Could not process this ZIP file.',
       message: error.message || 'Could not process this ZIP file.'
-    }, 'error');
+    }, 'job-error');
     closeJob(job, 'error');
   }
 }
@@ -797,9 +812,11 @@ app.get('/api/session-jobs/:id/events', (req, res) => {
   res.setHeader('content-type', 'text/event-stream');
   res.setHeader('cache-control', 'no-cache, no-transform');
   res.setHeader('connection', 'keep-alive');
+  res.setHeader('x-accel-buffering', 'no');
   res.flushHeaders?.();
 
   job.subscribers.add(res);
+  res.write('retry: 1500\n\n');
   res.write(`event: progress\n`);
   res.write(`data: ${JSON.stringify(sanitizeJob(job))}\n\n`);
 
