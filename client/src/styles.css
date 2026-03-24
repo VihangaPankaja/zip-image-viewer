@@ -344,6 +344,76 @@ input::placeholder {
   padding-right: 52px;
 }
 
+.custom-dropdown-shell {
+  position: relative;
+}
+
+.custom-dropdown-trigger {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--bg-panel-strong) 82%, transparent);
+  color: var(--text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+}
+
+.custom-dropdown-trigger:hover,
+.custom-dropdown-trigger.open {
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--surface-highlight) 62%, var(--bg-panel-strong));
+}
+
+.custom-dropdown-trigger:focus {
+  border-color: color-mix(in srgb, var(--accent) 64%, white 12%);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent);
+  outline: none;
+}
+
+.custom-dropdown-caret {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.custom-dropdown-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-panel-strong) 94%, transparent);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+.custom-dropdown-option {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.custom-dropdown-option:last-child {
+  border-bottom: none;
+}
+
+.custom-dropdown-option:hover,
+.custom-dropdown-option.active {
+  background: color-mix(in srgb, var(--surface-highlight) 76%, transparent);
+}
+
 .toolbar-select-shell-wide {
   width: 100%;
 }
@@ -493,10 +563,10 @@ input::placeholder {
 
 .progress-bar-fill {
   height: 100%;
-  min-width: 3%;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--accent), var(--accent-warm));
   box-shadow: 0 0 20px color-mix(in srgb, var(--accent) 30%, transparent);
+  transition: width 120ms linear;
 }
 
 .progress-bar-shell.indeterminate .progress-bar-fill {
@@ -508,6 +578,31 @@ input::placeholder {
   margin-top: 12px;
   color: var(--text-muted);
   font-size: 0.92rem;
+}
+
+.progress-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.progress-stat-cell {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-panel-strong) 76%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progress-stat-label {
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
 .viewer-grid {

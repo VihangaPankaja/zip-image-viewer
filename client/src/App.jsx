@@ -53,6 +53,24 @@ function formatBytes(value) {
   return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
+function formatTransferBytes(value) {
+  if (!Number.isFinite(value) || value < 0) return '--';
+  if (value === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let size = value;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function formatSpeed(bytesPerSec) {
+  if (!Number.isFinite(bytesPerSec) || bytesPerSec <= 0) return '--';
+  return `${formatTransferBytes(bytesPerSec)}/s`;
+}
+
 function formatDate(value) {
   if (!value) {
     return 'Date unknown';
@@ -264,7 +282,11 @@ function formatProgressMessage(job) {
   }
 
   if (job.phase === 'downloading' && job.reportedSize > 0) {
-    return `Downloading archive: ${formatBytes(job.downloadedBytes)} of ${formatBytes(job.reportedSize)}`;
+    return `Downloading archive: ${formatTransferBytes(job.downloadedBytes)} of ${formatTransferBytes(job.reportedSize)}`;
+  }
+
+  if (job.phase === 'downloading') {
+    return `Downloading archive: ${formatTransferBytes(job.downloadedBytes)} received`;
   }
 
   if (job.phase === 'extracting') {
@@ -352,6 +374,74 @@ function TreeNode({ node, selectedPath, onSelect, sessionId, folderPreview, fold
   );
 }
 
+function CustomDropdown({ id, label, value, options, onChange, className = '' }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+  const activeOption = options.find((option) => option.value === value) || options[0] || null;
+
+  useEffect(() => {
+    function onPointerDown(event) {
+      if (!rootRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    }
+
+    function onEscape(event) {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    }
+
+    window.addEventListener('mousedown', onPointerDown);
+    window.addEventListener('keydown', onEscape);
+
+    return () => {
+      window.removeEventListener('mousedown', onPointerDown);
+      window.removeEventListener('keydown', onEscape);
+    };
+  }, []);
+
+  return (
+    <div ref={rootRef} className={`toolbar-select-shell custom-dropdown-shell ${className}`.trim()}>
+      <span className="toolbar-label">{label}</span>
+      <button
+        type="button"
+        id={id}
+        className={`custom-dropdown-trigger ${open ? 'open' : ''}`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span>{activeOption?.label || 'Select'}</span>
+        <span className="custom-dropdown-caret">{open ? '^' : 'v'}</span>
+      </button>
+
+      {open ? (
+        <div className="custom-dropdown-menu" role="listbox" aria-labelledby={id}>
+          {options.map((option) => {
+            const isActive = option.value === value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={isActive}
+                className={`custom-dropdown-option ${isActive ? 'active' : ''}`}
+                onClick={() => {
+                  onChange(option.value);
+                  setOpen(false);
+                }}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function App() {
   const [zipUrl, setZipUrl] = useState('');
   const [session, setSession] = useState(null);
@@ -374,6 +464,7 @@ function App() {
   const [slideshowFitMode, setSlideshowFitMode] = useState('best-fit');
   const [slideshowChromeHidden, setSlideshowChromeHidden] = useState(false);
   const [activeJob, setActiveJob] = useState(null);
+  const [optimisticProgress, setOptimisticProgress] = useState(null);
   const textPreviewCacheRef = useRef(new Map());
   const imagePreviewCacheRef = useRef(new Map());
   const eventSourceRef = useRef(null);
@@ -381,6 +472,15 @@ function App() {
   const latestSessionIdRef = useRef('');
   const latestJobIdRef = useRef('');
   const hydrationRef = useRef({ sessionId: '', promise: null });
+  const optimisticProgressRef = useRef({
+    timer: null,
+    baselineTime: 0,
+    baselineBytes: 0,
+    targetBytes: 0,
+    reportedSize: 0,
+    speed: 0,
+    phase: ''
+  });
 
   const sortedTree = useMemo(() => {
     if (!session?.tree) {
@@ -428,6 +528,64 @@ function App() {
     }
   }
 
+  function stopOptimisticProgress() {
+    if (optimisticProgressRef.current.timer) {
+      window.clearInterval(optimisticProgressRef.current.timer);
+      optimisticProgressRef.current.timer = null;
+    }
+    optimisticProgressRef.current = {
+      timer: null,
+      baselineTime: 0,
+      baselineBytes: 0,
+      targetBytes: 0,
+      reportedSize: 0,
+      speed: 0,
+      phase: ''
+    };
+    setOptimisticProgress(null);
+  }
+
+  function startOptimisticProgressFromJob(job) {
+    if (!job || job.phase !== 'downloading') {
+      stopOptimisticProgress();
+      return;
+    }
+
+    const now = Date.now();
+    const baselineBytes = Math.max(0, Number(job.downloadedBytes) || 0);
+    const speed = Math.max(0, Number(job.downloadSpeedBytesPerSec) || 0);
+    const targetBytes = baselineBytes + speed;
+
+    optimisticProgressRef.current.baselineTime = now;
+    optimisticProgressRef.current.baselineBytes = baselineBytes;
+    optimisticProgressRef.current.targetBytes = targetBytes;
+    optimisticProgressRef.current.reportedSize = Math.max(0, Number(job.reportedSize) || 0);
+    optimisticProgressRef.current.speed = speed;
+    optimisticProgressRef.current.phase = job.phase;
+    setOptimisticProgress({ downloadedBytes: baselineBytes, percent: job.percent });
+
+    if (optimisticProgressRef.current.timer) {
+      return;
+    }
+
+    optimisticProgressRef.current.timer = window.setInterval(() => {
+      const state = optimisticProgressRef.current;
+      if (state.phase !== 'downloading') {
+        return;
+      }
+
+      const elapsed = Math.min(1000, Math.max(0, Date.now() - state.baselineTime));
+      const progress = elapsed / 1000;
+      const estimatedBytes = state.baselineBytes + (state.targetBytes - state.baselineBytes) * progress;
+      const downloadedBytes = Math.max(state.baselineBytes, estimatedBytes);
+      const percent =
+        state.reportedSize > 0
+          ? Math.min(100, Math.max(0, Math.floor((downloadedBytes / state.reportedSize) * 100)))
+          : null;
+      setOptimisticProgress({ downloadedBytes, percent });
+    }, 100);
+  }
+
   function stopJobPolling() {
     if (jobPollTimeoutRef.current) {
       window.clearTimeout(jobPollTimeoutRef.current);
@@ -438,6 +596,7 @@ function App() {
   function resetArchiveView() {
     setSession(null);
     setActiveJob(null);
+    stopOptimisticProgress();
     setSelectedPath('');
     setTextPreview('');
     setSelectedImageSrc('');
@@ -573,6 +732,12 @@ function App() {
   async function handleJobSnapshot(payload, nextUrl) {
     latestJobIdRef.current = payload?.id || '';
     setActiveJob(payload);
+
+    if (payload?.phase === 'downloading' && !isTerminalJobStatus(payload.status)) {
+      startOptimisticProgressFromJob(payload);
+    } else {
+      stopOptimisticProgress();
+    }
 
     if (payload?.sessionId) {
       await hydrateSession(payload.sessionId, nextUrl);
@@ -840,6 +1005,7 @@ function App() {
     return () => {
       closeJobEvents();
       stopJobPolling();
+      stopOptimisticProgress();
       clearImagePreviewCache();
       textPreviewCacheRef.current.clear();
       if (latestSessionIdRef.current) {
@@ -853,8 +1019,14 @@ function App() {
 
   useEffect(() => {
     function onKeyDown(event) {
-      const activeTag = document.activeElement?.tagName;
-      if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') {
+      const activeElement = document.activeElement;
+      const activeTag = activeElement?.tagName;
+      if (
+        activeTag === 'INPUT' ||
+        activeTag === 'TEXTAREA' ||
+        activeTag === 'SELECT' ||
+        activeElement?.closest?.('.custom-dropdown-shell')
+      ) {
         return;
       }
 
@@ -969,20 +1141,14 @@ function App() {
                 </div>
 
                 <div className="slideshow-controls-card">
-                  <label className="toolbar-select-shell slideshow-fit-shell" htmlFor="slideshow-fit-mode">
-                    <span className="toolbar-label">Fit mode</span>
-                    <select
-                      id="slideshow-fit-mode"
-                      value={slideshowFitMode}
-                      onChange={(event) => setSlideshowFitMode(event.target.value)}
-                    >
-                      {SLIDESHOW_FIT_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <CustomDropdown
+                    id="slideshow-fit-mode"
+                    label="Fit mode"
+                    value={slideshowFitMode}
+                    options={SLIDESHOW_FIT_OPTIONS}
+                    onChange={setSlideshowFitMode}
+                    className="slideshow-fit-shell"
+                  />
 
                   <div className="slideshow-actions">
                     <button className="ghost-button" type="button" onClick={() => setSelectedPath(currentFolderImages[0])}>
@@ -1043,6 +1209,24 @@ function App() {
         )
       : null;
 
+  const visualDownloadedBytes =
+    activeJob?.phase === 'downloading' && optimisticProgress
+      ? optimisticProgress.downloadedBytes
+      : Math.max(0, Number(activeJob?.downloadedBytes) || 0);
+  const visualPercent =
+    activeJob?.phase === 'downloading' && optimisticProgress
+      ? optimisticProgress.percent
+      : activeJob?.percent;
+  const visualPercentLabel =
+    visualPercent == null ? 'Live' : `${Math.max(0, Math.min(100, Math.floor(visualPercent)))}%`;
+  const visualProgressWidth =
+    visualPercent == null ? undefined : `${Math.max(0, Math.min(100, visualPercent))}%`;
+  const transferLabel =
+    activeJob?.reportedSize > 0
+      ? `${formatTransferBytes(visualDownloadedBytes)} / ${formatTransferBytes(activeJob.reportedSize)}`
+      : `${formatTransferBytes(visualDownloadedBytes)} downloaded`;
+  const speedLabel = formatSpeed(activeJob?.downloadSpeedBytesPerSec);
+
   return (
     <div className="app-shell">
       <div className="backdrop backdrop-one" />
@@ -1086,13 +1270,23 @@ function App() {
             <div className="progress-card" aria-live="polite">
               <div className="progress-card-head">
                 <strong>{activeJob.phase === 'extracting' ? 'Preparing archive' : 'Downloading archive'}</strong>
-                <span>{activeJob.percent == null ? 'Live' : `${Math.max(0, Math.min(100, activeJob.percent))}%`}</span>
+                <span>{visualPercentLabel}</span>
               </div>
-              <div className={`progress-bar-shell ${activeJob.percent == null ? 'indeterminate' : ''}`}>
+              <div className={`progress-bar-shell ${visualPercent == null ? 'indeterminate' : ''}`}>
                 <div
                   className="progress-bar-fill"
-                  style={activeJob.percent == null ? undefined : { width: `${Math.max(3, Math.min(100, activeJob.percent))}%` }}
+                  style={visualPercent == null ? undefined : { width: visualProgressWidth }}
                 />
+              </div>
+              <div className="progress-stats-grid">
+                <div className="progress-stat-cell">
+                  <span className="progress-stat-label">Transferred</span>
+                  <strong>{transferLabel}</strong>
+                </div>
+                <div className="progress-stat-cell">
+                  <span className="progress-stat-label">Speed</span>
+                  <strong>{speedLabel}</strong>
+                </div>
               </div>
               <div className="progress-meta-row">
                 <span>{formatProgressMessage(activeJob)}</span>
@@ -1153,16 +1347,14 @@ function App() {
               <div className="sidebar-header-actions">
                 {session ? <span className="panel-chip">{session.stats.fileCount} files</span> : null}
               </div>
-              <label className="toolbar-select-shell toolbar-select-shell-wide explorer-sort-shell" htmlFor="sort-mode">
-                <span className="toolbar-label">Sort</span>
-                <select id="sort-mode" value={sortMode} onChange={(event) => setSortMode(event.target.value)}>
-                  {SORT_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <CustomDropdown
+                id="sort-mode"
+                label="Sort"
+                value={sortMode}
+                options={SORT_OPTIONS}
+                onChange={setSortMode}
+                className="toolbar-select-shell-wide explorer-sort-shell"
+              />
             </div>
 
             <div className="sort-caption">
@@ -1230,16 +1422,13 @@ function App() {
                   <span>
                     {currentImageIndex >= 0 ? `${currentImageIndex + 1} / ${currentFolderImages.length} in folder` : 'Single image'}
                   </span>
-                  <label className="toolbar-select-shell" htmlFor="preview-quality">
-                    <span className="toolbar-label">Preview quality</span>
-                    <select id="preview-quality" value={previewQuality} onChange={(event) => setPreviewQuality(event.target.value)}>
-                      {PREVIEW_QUALITY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <CustomDropdown
+                    id="preview-quality"
+                    label="Preview quality"
+                    value={previewQuality}
+                    options={PREVIEW_QUALITY_OPTIONS}
+                    onChange={setPreviewQuality}
+                  />
                   <span>{formatDate(selectedNode.modifiedAt)}</span>
                 </div>
                 <div className="image-frame">
