@@ -18,6 +18,10 @@
 ```bash
 npm install
 npm run dev
+npm run lint
+npm run typecheck
+npm run format
+npm run format:check
 npm run build
 npm start
 ```
@@ -29,3 +33,5 @@ npm start
 - Follow the current plain, minimal style unless asked for a redesign
 - Bump the app version in `package.json` and `package-lock.json` before opening a PR to `master`
 - For multi-step feature work, create a commit after each major implementation step
+- Before each major commit, run `npm run format`, `npm run lint`, `npm run typecheck`, and `npm run build`
+- Keep formatter, lint, and typecheck configurations current with repo scripts

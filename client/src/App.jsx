@@ -1,49 +1,61 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
-const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp', 'avif']);
-const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov', 'm4v', 'ogv']);
+const IMAGE_EXTENSIONS = new Set([
+  "jpg",
+  "jpeg",
+  "png",
+  "webp",
+  "gif",
+  "svg",
+  "bmp",
+  "avif",
+]);
+const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v", "ogv"]);
 const TEXT_EXTENSIONS = new Set([
-  'txt',
-  'md',
-  'json',
-  'csv',
-  'log',
-  'xml',
-  'yml',
-  'yaml',
-  'js',
-  'jsx',
-  'ts',
-  'tsx',
-  'html',
-  'css'
+  "txt",
+  "md",
+  "json",
+  "csv",
+  "log",
+  "xml",
+  "yml",
+  "yaml",
+  "js",
+  "jsx",
+  "ts",
+  "tsx",
+  "html",
+  "css",
 ]);
 
 const FOLDER_THUMB_SIZE = 88;
 const STRIP_THUMB_SIZE = 220;
 const SORT_OPTIONS = [
-  { value: 'name-asc', label: 'Name A-Z' },
-  { value: 'name-desc', label: 'Name Z-A' },
-  { value: 'date-asc', label: 'Date oldest' },
-  { value: 'date-desc', label: 'Date newest' },
-  { value: 'natural-tail', label: 'Number trail' }
+  { value: "name-asc", label: "Name A-Z" },
+  { value: "name-desc", label: "Name Z-A" },
+  { value: "date-asc", label: "Date oldest" },
+  { value: "date-desc", label: "Date newest" },
+  { value: "natural-tail", label: "Number trail" },
 ];
 const PREVIEW_QUALITY_OPTIONS = [
-  { value: 'low', label: 'Low preview' },
-  { value: 'balanced', label: 'Balanced preview' },
-  { value: 'high', label: 'High preview' }
+  { value: "low", label: "Low preview" },
+  { value: "balanced", label: "Balanced preview" },
+  { value: "high", label: "High preview" },
 ];
 const SLIDESHOW_FIT_OPTIONS = [
-  { value: 'best-fit', label: 'Best fit' },
-  { value: 'fit-width', label: 'Fit width' },
-  { value: 'fit-height', label: 'Fit height' }
+  { value: "best-fit", label: "Best fit" },
+  { value: "fit-width", label: "Fit width" },
+  { value: "fit-height", label: "Fit height" },
 ];
-const NAME_COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base', numeric: false });
+const NAME_COLLATOR = new Intl.Collator(undefined, {
+  sensitivity: "base",
+  numeric: false,
+});
 
 function formatBytes(value) {
-  if (!Number.isFinite(value) || value <= 0) return 'Unknown size';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  if (!Number.isFinite(value) || value <= 0) return "Unknown size";
+  const units = ["B", "KB", "MB", "GB", "TB"];
   let size = value;
   let unitIndex = 0;
   while (size >= 1024 && unitIndex < units.length - 1) {
@@ -54,9 +66,9 @@ function formatBytes(value) {
 }
 
 function formatTransferBytes(value) {
-  if (!Number.isFinite(value) || value < 0) return '--';
-  if (value === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  if (!Number.isFinite(value) || value < 0) return "--";
+  if (value === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
   let size = value;
   let unitIndex = 0;
   while (size >= 1024 && unitIndex < units.length - 1) {
@@ -67,60 +79,60 @@ function formatTransferBytes(value) {
 }
 
 function formatSpeed(bytesPerSec) {
-  if (!Number.isFinite(bytesPerSec) || bytesPerSec <= 0) return '--';
+  if (!Number.isFinite(bytesPerSec) || bytesPerSec <= 0) return "--";
   return `${formatTransferBytes(bytesPerSec)}/s`;
 }
 
 function formatDate(value) {
   if (!value) {
-    return 'Date unknown';
+    return "Date unknown";
   }
 
   return new Intl.DateTimeFormat(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
+    year: "numeric",
+    month: "short",
+    day: "numeric",
   }).format(value);
 }
 
 function classifyNode(node) {
-  if (!node || node.type === 'directory') return 'directory';
-  if (IMAGE_EXTENSIONS.has(node.extension)) return 'image';
-  if (VIDEO_EXTENSIONS.has(node.extension)) return 'video';
-  if (TEXT_EXTENSIONS.has(node.extension)) return 'text';
-  return 'binary';
+  if (!node || node.type === "directory") return "directory";
+  if (IMAGE_EXTENSIONS.has(node.extension)) return "image";
+  if (VIDEO_EXTENSIONS.has(node.extension)) return "video";
+  if (TEXT_EXTENSIONS.has(node.extension)) return "text";
+  return "binary";
 }
 
 function getNodeBadge(node) {
   const kind = classifyNode(node);
-  if (kind === 'image') return 'IMG';
-  if (kind === 'video') return 'VID';
-  return 'FILE';
+  if (kind === "image") return "IMG";
+  if (kind === "video") return "VID";
+  return "FILE";
 }
 
 function buildFileUrl(sessionId, filePath, options = {}) {
   if (!sessionId || !filePath) {
-    return '';
+    return "";
   }
 
   const params = new URLSearchParams({ path: filePath });
   if (options.previewText) {
-    params.set('preview', '1');
+    params.set("preview", "1");
   }
   if (options.thumbnail) {
-    params.set('thumbnail', '1');
-    params.set('size', String(options.size || STRIP_THUMB_SIZE));
+    params.set("thumbnail", "1");
+    params.set("size", String(options.size || STRIP_THUMB_SIZE));
   }
   if (options.imagePreview) {
-    params.set('imagePreview', '1');
-    params.set('quality', options.quality || 'balanced');
+    params.set("imagePreview", "1");
+    params.set("quality", options.quality || "balanced");
   }
 
   return `/api/sessions/${sessionId}/file?${params.toString()}`;
 }
 
 function getNameBase(name) {
-  return String(name || '').replace(/\.[^.]+$/, '');
+  return String(name || "").replace(/\.[^.]+$/, "");
 }
 
 function parseTrailingNumber(name) {
@@ -132,7 +144,7 @@ function parseTrailingNumber(name) {
 
   return {
     prefix: match[1].trim(),
-    number: Number(match[2])
+    number: Number(match[2]),
   };
 }
 
@@ -145,7 +157,10 @@ function compareByNaturalTail(left, right) {
   const rightTail = parseTrailingNumber(right.name);
 
   if (leftTail && rightTail) {
-    const prefixCompare = NAME_COLLATOR.compare(leftTail.prefix, rightTail.prefix);
+    const prefixCompare = NAME_COLLATOR.compare(
+      leftTail.prefix,
+      rightTail.prefix,
+    );
     if (prefixCompare !== 0) {
       return prefixCompare;
     }
@@ -161,42 +176,46 @@ function compareByDate(left, right, direction) {
   const leftValue = left.modifiedAt || 0;
   const rightValue = right.modifiedAt || 0;
   if (leftValue !== rightValue) {
-    return direction === 'asc' ? leftValue - rightValue : rightValue - leftValue;
+    return direction === "asc"
+      ? leftValue - rightValue
+      : rightValue - leftValue;
   }
   return compareByName(left, right);
 }
 
 function compareNodes(left, right, sortMode) {
   if (left.type !== right.type) {
-    return left.type === 'directory' ? -1 : 1;
+    return left.type === "directory" ? -1 : 1;
   }
 
   switch (sortMode) {
-    case 'name-desc':
+    case "name-desc":
       return compareByName(right, left);
-    case 'date-asc':
-      return compareByDate(left, right, 'asc');
-    case 'date-desc':
-      return compareByDate(left, right, 'desc');
-    case 'natural-tail':
+    case "date-asc":
+      return compareByDate(left, right, "asc");
+    case "date-desc":
+      return compareByDate(left, right, "desc");
+    case "natural-tail":
       return compareByNaturalTail(left, right);
-    case 'name-asc':
+    case "name-asc":
     default:
       return compareByName(left, right);
   }
 }
 
 function cloneAndSortTree(node, sortMode) {
-  if (node.type !== 'directory') {
+  if (node.type !== "directory") {
     return { ...node };
   }
 
-  const children = node.children.map((child) => cloneAndSortTree(child, sortMode));
+  const children = node.children.map((child) =>
+    cloneAndSortTree(child, sortMode),
+  );
   children.sort((left, right) => compareNodes(left, right, sortMode));
 
   return {
     ...node,
-    children
+    children,
   };
 }
 
@@ -207,13 +226,15 @@ function flattenTree(tree) {
 
   function walk(node) {
     nodesByPath.set(node.path, node);
-    if (node.type === 'directory') {
-      const imageChildren = node.children.filter((child) => classifyNode(child) === 'image');
+    if (node.type === "directory") {
+      const imageChildren = node.children.filter(
+        (child) => classifyNode(child) === "image",
+      );
       folderImages.set(
         node.path,
-        imageChildren.map((child) => child.path)
+        imageChildren.map((child) => child.path),
       );
-      folderPreview.set(node.path, imageChildren[0]?.path || '');
+      folderPreview.set(node.path, imageChildren[0]?.path || "");
       node.children.forEach(walk);
     }
   }
@@ -224,10 +245,10 @@ function flattenTree(tree) {
 
 function getFirstFilePath(node) {
   if (!node) {
-    return '';
+    return "";
   }
 
-  if (node.type === 'file') {
+  if (node.type === "file") {
     return node.path;
   }
 
@@ -265,35 +286,35 @@ function getImageCacheKey(sessionId, imagePath, quality) {
 
 function getWrappedPath(items, currentIndex, delta) {
   if (!items.length || currentIndex === -1) {
-    return '';
+    return "";
   }
 
   const nextIndex = (currentIndex + delta + items.length) % items.length;
-  return items[nextIndex] || '';
+  return items[nextIndex] || "";
 }
 
 function formatProgressMessage(job) {
   if (!job) {
-    return '';
+    return "";
   }
 
   if (job.message) {
     return job.message;
   }
 
-  if (job.phase === 'downloading' && job.reportedSize > 0) {
+  if (job.phase === "downloading" && job.reportedSize > 0) {
     return `Downloading archive: ${formatTransferBytes(job.downloadedBytes)} of ${formatTransferBytes(job.reportedSize)}`;
   }
 
-  if (job.phase === 'downloading') {
+  if (job.phase === "downloading") {
     return `Downloading archive: ${formatTransferBytes(job.downloadedBytes)} received`;
   }
 
-  if (job.phase === 'extracting') {
+  if (job.phase === "extracting") {
     return `Extracting archive: ${job.extractedEntries || 0} of ${job.totalEntries || 0} entries`;
   }
 
-  return 'Working on archive...';
+  return "Working on archive...";
 }
 
 function wait(ms) {
@@ -301,14 +322,22 @@ function wait(ms) {
 }
 
 function isTerminalJobStatus(status) {
-  return status === 'ready' || status === 'error' || status === 'cancelled';
+  return status === "ready" || status === "error" || status === "cancelled";
 }
 
-function TreeNode({ node, selectedPath, onSelect, sessionId, folderPreview, folderImages, depth = 0 }) {
+function TreeNode({
+  node,
+  selectedPath,
+  onSelect,
+  sessionId,
+  folderPreview,
+  folderImages,
+  depth = 0,
+}) {
   const [open, setOpen] = useState(depth < 2);
-  const isDirectory = node.type === 'directory';
+  const isDirectory = node.type === "directory";
   const isSelected = node.path === selectedPath;
-  const previewPath = sessionId ? folderPreview.get(node.path) : '';
+  const previewPath = sessionId ? folderPreview.get(node.path) : "";
   const previewCount = folderImages.get(node.path)?.length || 0;
 
   if (isDirectory) {
@@ -316,28 +345,33 @@ function TreeNode({ node, selectedPath, onSelect, sessionId, folderPreview, fold
       <div className="tree-node">
         <button
           type="button"
-          className={`tree-row tree-folder ${isSelected ? 'selected' : ''}`}
-          style={{ '--depth': depth }}
+          className={`tree-row tree-folder ${isSelected ? "selected" : ""}`}
+          style={{ "--depth": depth }}
           onClick={() => {
             setOpen((current) => !current);
             onSelect(node);
           }}
         >
-          <span className="tree-caret">{open ? 'v' : '>'}</span>
+          <span className="tree-caret">{open ? "v" : ">"}</span>
           <span className="tree-icon folder-icon-shell">
             {previewPath ? (
               <img
                 className="folder-thumb"
-                src={buildFileUrl(sessionId, previewPath, { thumbnail: true, size: FOLDER_THUMB_SIZE })}
+                src={buildFileUrl(sessionId, previewPath, {
+                  thumbnail: true,
+                  size: FOLDER_THUMB_SIZE,
+                })}
                 alt=""
                 loading="lazy"
               />
             ) : (
-              '[]'
+              "[]"
             )}
           </span>
           <span className="tree-label">{node.name}</span>
-          <span className="tree-meta">{previewCount > 0 ? `${previewCount} img` : node.children.length}</span>
+          <span className="tree-meta">
+            {previewCount > 0 ? `${previewCount} img` : node.children.length}
+          </span>
         </button>
         {open ? (
           <div>
@@ -362,22 +396,30 @@ function TreeNode({ node, selectedPath, onSelect, sessionId, folderPreview, fold
   return (
     <button
       type="button"
-      className={`tree-row tree-file ${isSelected ? 'selected' : ''}`}
-      style={{ '--depth': depth }}
+      className={`tree-row tree-file ${isSelected ? "selected" : ""}`}
+      style={{ "--depth": depth }}
       onClick={() => onSelect(node)}
     >
       <span className="tree-caret" />
       <span className="tree-icon">{getNodeBadge(node)}</span>
       <span className="tree-label">{node.name}</span>
-      <span className="tree-meta">{node.extension || '--'}</span>
+      <span className="tree-meta">{node.extension || "--"}</span>
     </button>
   );
 }
 
-function CustomDropdown({ id, label, value, options, onChange, className = '' }) {
+function CustomDropdown({
+  id,
+  label,
+  value,
+  options,
+  onChange,
+  className = "",
+}) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
-  const activeOption = options.find((option) => option.value === value) || options[0] || null;
+  const activeOption =
+    options.find((option) => option.value === value) || options[0] || null;
 
   useEffect(() => {
     function onPointerDown(event) {
@@ -387,37 +429,44 @@ function CustomDropdown({ id, label, value, options, onChange, className = '' })
     }
 
     function onEscape(event) {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         setOpen(false);
       }
     }
 
-    window.addEventListener('mousedown', onPointerDown);
-    window.addEventListener('keydown', onEscape);
+    window.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("keydown", onEscape);
 
     return () => {
-      window.removeEventListener('mousedown', onPointerDown);
-      window.removeEventListener('keydown', onEscape);
+      window.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("keydown", onEscape);
     };
   }, []);
 
   return (
-    <div ref={rootRef} className={`toolbar-select-shell custom-dropdown-shell ${className}`.trim()}>
+    <div
+      ref={rootRef}
+      className={`toolbar-select-shell custom-dropdown-shell ${className}`.trim()}
+    >
       <span className="toolbar-label">{label}</span>
       <button
         type="button"
         id={id}
-        className={`custom-dropdown-trigger ${open ? 'open' : ''}`}
+        className={`custom-dropdown-trigger ${open ? "open" : ""}`}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
-        <span>{activeOption?.label || 'Select'}</span>
-        <span className="custom-dropdown-caret">{open ? '^' : 'v'}</span>
+        <span>{activeOption?.label || "Select"}</span>
+        <span className="custom-dropdown-caret">{open ? "^" : "v"}</span>
       </button>
 
       {open ? (
-        <div className="custom-dropdown-menu" role="listbox" aria-labelledby={id}>
+        <div
+          className="custom-dropdown-menu"
+          role="listbox"
+          aria-labelledby={id}
+        >
           {options.map((option) => {
             const isActive = option.value === value;
             return (
@@ -426,7 +475,7 @@ function CustomDropdown({ id, label, value, options, onChange, className = '' })
                 type="button"
                 role="option"
                 aria-selected={isActive}
-                className={`custom-dropdown-option ${isActive ? 'active' : ''}`}
+                className={`custom-dropdown-option ${isActive ? "active" : ""}`}
                 onClick={() => {
                   onChange(option.value);
                   setOpen(false);
@@ -443,25 +492,25 @@ function CustomDropdown({ id, label, value, options, onChange, className = '' })
 }
 
 function App() {
-  const [zipUrl, setZipUrl] = useState('');
+  const [zipUrl, setZipUrl] = useState("");
   const [session, setSession] = useState(null);
   const [theme, setTheme] = useState(() => {
-    if (typeof window === 'undefined') {
-      return 'dark';
+    if (typeof window === "undefined") {
+      return "dark";
     }
-    return window.localStorage.getItem('zip-image-viewer-theme') || 'dark';
+    return window.localStorage.getItem("zip-image-viewer-theme") || "dark";
   });
-  const [selectedPath, setSelectedPath] = useState('');
-  const [sortMode, setSortMode] = useState('natural-tail');
-  const [previewQuality, setPreviewQuality] = useState('balanced');
+  const [selectedPath, setSelectedPath] = useState("");
+  const [sortMode, setSortMode] = useState("natural-tail");
+  const [previewQuality, setPreviewQuality] = useState("balanced");
   const [thumbnailStripExpanded, setThumbnailStripExpanded] = useState(false);
-  const [textPreview, setTextPreview] = useState('');
-  const [selectedImageSrc, setSelectedImageSrc] = useState('');
+  const [textPreview, setTextPreview] = useState("");
+  const [selectedImageSrc, setSelectedImageSrc] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [oversizePrompt, setOversizePrompt] = useState(null);
   const [slideshowOpen, setSlideshowOpen] = useState(false);
-  const [slideshowFitMode, setSlideshowFitMode] = useState('best-fit');
+  const [slideshowFitMode, setSlideshowFitMode] = useState("best-fit");
   const [slideshowChromeHidden, setSlideshowChromeHidden] = useState(false);
   const [activeJob, setActiveJob] = useState(null);
   const [optimisticProgress, setOptimisticProgress] = useState(null);
@@ -469,9 +518,9 @@ function App() {
   const imagePreviewCacheRef = useRef(new Map());
   const eventSourceRef = useRef(null);
   const jobPollTimeoutRef = useRef(null);
-  const latestSessionIdRef = useRef('');
-  const latestJobIdRef = useRef('');
-  const hydrationRef = useRef({ sessionId: '', promise: null });
+  const latestSessionIdRef = useRef("");
+  const latestJobIdRef = useRef("");
+  const hydrationRef = useRef({ sessionId: "", promise: null });
   const optimisticProgressRef = useRef({
     timer: null,
     baselineTime: 0,
@@ -479,7 +528,7 @@ function App() {
     targetBytes: 0,
     reportedSize: 0,
     speed: 0,
-    phase: ''
+    phase: "",
   });
 
   const sortedTree = useMemo(() => {
@@ -489,37 +538,68 @@ function App() {
     return cloneAndSortTree(session.tree, sortMode);
   }, [session, sortMode]);
 
-  const flatData = useMemo(() => (sortedTree ? flattenTree(sortedTree) : null), [sortedTree]);
+  const flatData = useMemo(
+    () => (sortedTree ? flattenTree(sortedTree) : null),
+    [sortedTree],
+  );
   const selectedNode = flatData?.nodesByPath.get(selectedPath) || null;
   const selectedKind = classifyNode(selectedNode);
-  const currentFolderImages = selectedNode ? flatData?.folderImages.get(selectedNode.parentPath) || [] : [];
-  const currentImageIndex = selectedNode ? currentFolderImages.indexOf(selectedNode.path) : -1;
+  const currentFolderImages = selectedNode
+    ? flatData?.folderImages.get(selectedNode.parentPath) || []
+    : [];
+  const currentImageIndex = selectedNode
+    ? currentFolderImages.indexOf(selectedNode.path)
+    : -1;
   const selectedFileUrl =
-    session && selectedNode && selectedNode.type === 'file'
+    session && selectedNode && selectedNode.type === "file"
       ? buildFileUrl(session.id, selectedNode.path)
-      : '';
+      : "";
   const selectedImagePreviewUrl =
-    session && selectedNode && selectedNode.type === 'file' && selectedKind === 'image'
-      ? buildFileUrl(session.id, selectedNode.path, { imagePreview: true, quality: previewQuality })
-      : '';
+    session &&
+    selectedNode &&
+    selectedNode.type === "file" &&
+    selectedKind === "image"
+      ? buildFileUrl(session.id, selectedNode.path, {
+          imagePreview: true,
+          quality: previewQuality,
+        })
+      : "";
   const selectedPreviewUrl =
-    session && selectedNode && selectedNode.type === 'file'
+    session && selectedNode && selectedNode.type === "file"
       ? buildFileUrl(session.id, selectedNode.path, { previewText: true })
-      : '';
+      : "";
   const currentFolderImageItems = currentFolderImages.map((imagePath) => ({
     path: imagePath,
-    name: flatData?.nodesByPath.get(imagePath)?.name || imagePath.split('/').at(-1) || imagePath,
+    name:
+      flatData?.nodesByPath.get(imagePath)?.name ||
+      imagePath.split("/").at(-1) ||
+      imagePath,
     url: buildFileUrl(session?.id, imagePath),
-    previewUrl: buildFileUrl(session?.id, imagePath, { imagePreview: true, quality: previewQuality }),
-    thumbnailUrl: buildFileUrl(session?.id, imagePath, { thumbnail: true, size: STRIP_THUMB_SIZE })
+    previewUrl: buildFileUrl(session?.id, imagePath, {
+      imagePreview: true,
+      quality: previewQuality,
+    }),
+    thumbnailUrl: buildFileUrl(session?.id, imagePath, {
+      thumbnail: true,
+      size: STRIP_THUMB_SIZE,
+    }),
   }));
   const visibleThumbnailItems = thumbnailStripExpanded
     ? currentFolderImageItems
     : getThumbnailWindow(currentFolderImageItems, selectedPath, 2);
-  const previousImagePath = getWrappedPath(currentFolderImages, currentImageIndex, -1);
-  const nextImagePath = getWrappedPath(currentFolderImages, currentImageIndex, 1);
-  const previousImageName = flatData?.nodesByPath.get(previousImagePath)?.name || '';
-  const nextImageName = flatData?.nodesByPath.get(nextImagePath)?.name || '';
+  const previousImagePath = getWrappedPath(
+    currentFolderImages,
+    currentImageIndex,
+    -1,
+  );
+  const nextImagePath = getWrappedPath(
+    currentFolderImages,
+    currentImageIndex,
+    1,
+  );
+  const previousImageName =
+    flatData?.nodesByPath.get(previousImagePath)?.name || "";
+  const nextImageName = flatData?.nodesByPath.get(nextImagePath)?.name || "";
 
   function closeJobEvents() {
     if (eventSourceRef.current) {
@@ -540,13 +620,13 @@ function App() {
       targetBytes: 0,
       reportedSize: 0,
       speed: 0,
-      phase: ''
+      phase: "",
     };
     setOptimisticProgress(null);
   }
 
   function startOptimisticProgressFromJob(job) {
-    if (!job || job.phase !== 'downloading') {
+    if (!job || job.phase !== "downloading") {
       stopOptimisticProgress();
       return;
     }
@@ -559,10 +639,16 @@ function App() {
     optimisticProgressRef.current.baselineTime = now;
     optimisticProgressRef.current.baselineBytes = baselineBytes;
     optimisticProgressRef.current.targetBytes = targetBytes;
-    optimisticProgressRef.current.reportedSize = Math.max(0, Number(job.reportedSize) || 0);
+    optimisticProgressRef.current.reportedSize = Math.max(
+      0,
+      Number(job.reportedSize) || 0,
+    );
     optimisticProgressRef.current.speed = speed;
     optimisticProgressRef.current.phase = job.phase;
-    setOptimisticProgress({ downloadedBytes: baselineBytes, percent: job.percent });
+    setOptimisticProgress({
+      downloadedBytes: baselineBytes,
+      percent: job.percent,
+    });
 
     if (optimisticProgressRef.current.timer) {
       return;
@@ -570,17 +656,28 @@ function App() {
 
     optimisticProgressRef.current.timer = window.setInterval(() => {
       const state = optimisticProgressRef.current;
-      if (state.phase !== 'downloading') {
+      if (state.phase !== "downloading") {
         return;
       }
 
-      const elapsed = Math.min(1000, Math.max(0, Date.now() - state.baselineTime));
+      const elapsed = Math.min(
+        1000,
+        Math.max(0, Date.now() - state.baselineTime),
+      );
       const progress = elapsed / 1000;
-      const estimatedBytes = state.baselineBytes + (state.targetBytes - state.baselineBytes) * progress;
+      const estimatedBytes =
+        state.baselineBytes +
+        (state.targetBytes - state.baselineBytes) * progress;
       const downloadedBytes = Math.max(state.baselineBytes, estimatedBytes);
       const percent =
         state.reportedSize > 0
-          ? Math.min(100, Math.max(0, Math.floor((downloadedBytes / state.reportedSize) * 100)))
+          ? Math.min(
+              100,
+              Math.max(
+                0,
+                Math.floor((downloadedBytes / state.reportedSize) * 100),
+              ),
+            )
           : null;
       setOptimisticProgress({ downloadedBytes, percent });
     }, 100);
@@ -597,9 +694,9 @@ function App() {
     setSession(null);
     setActiveJob(null);
     stopOptimisticProgress();
-    setSelectedPath('');
-    setTextPreview('');
-    setSelectedImageSrc('');
+    setSelectedPath("");
+    setTextPreview("");
+    setSelectedImageSrc("");
     setOversizePrompt(null);
     setSlideshowOpen(false);
     setThumbnailStripExpanded(false);
@@ -614,17 +711,21 @@ function App() {
 
     closeJobEvents();
     stopJobPolling();
-    latestSessionIdRef.current = '';
-    latestJobIdRef.current = '';
-    hydrationRef.current = { sessionId: '', promise: null };
+    latestSessionIdRef.current = "";
+    latestJobIdRef.current = "";
+    hydrationRef.current = { sessionId: "", promise: null };
     resetArchiveView();
 
     if (removeRemoteSession && activeSessionId) {
-      await fetch(`/api/sessions/${activeSessionId}`, { method: 'DELETE' }).catch(() => {});
+      await fetch(`/api/sessions/${activeSessionId}`, {
+        method: "DELETE",
+      }).catch(() => {});
     }
 
     if (activeJobId) {
-      await fetch(`/api/session-jobs/${activeJobId}`, { method: 'DELETE' }).catch(() => {});
+      await fetch(`/api/session-jobs/${activeJobId}`, {
+        method: "DELETE",
+      }).catch(() => {});
     }
   }
 
@@ -639,7 +740,7 @@ function App() {
 
   async function loadImagePreview(imagePath, quality) {
     if (!session?.id || !imagePath) {
-      return '';
+      return "";
     }
 
     const cacheKey = getImageCacheKey(session.id, imagePath, quality);
@@ -653,14 +754,19 @@ function App() {
       return existing.promise;
     }
 
-    const request = fetch(buildFileUrl(session.id, imagePath, { imagePreview: true, quality }))
+    const request = fetch(
+      buildFileUrl(session.id, imagePath, { imagePreview: true, quality }),
+    )
       .then(async (response) => {
         if (!response.ok) {
-          throw new Error('Could not load image preview.');
+          throw new Error("Could not load image preview.");
         }
         const blob = await response.blob();
         const objectUrl = URL.createObjectURL(blob);
-        imagePreviewCacheRef.current.set(cacheKey, { objectUrl, touchedAt: Date.now() });
+        imagePreviewCacheRef.current.set(cacheKey, {
+          objectUrl,
+          touchedAt: Date.now(),
+        });
         return objectUrl;
       })
       .catch((error) => {
@@ -668,7 +774,10 @@ function App() {
         throw error;
       });
 
-    imagePreviewCacheRef.current.set(cacheKey, { promise: request, touchedAt: Date.now() });
+    imagePreviewCacheRef.current.set(cacheKey, {
+      promise: request,
+      touchedAt: Date.now(),
+    });
     return request;
   }
 
@@ -677,7 +786,10 @@ function App() {
       return null;
     }
 
-    if (hydrationRef.current.sessionId === sessionId && hydrationRef.current.promise) {
+    if (
+      hydrationRef.current.sessionId === sessionId &&
+      hydrationRef.current.promise
+    ) {
       return hydrationRef.current.promise;
     }
 
@@ -691,23 +803,25 @@ function App() {
 
         if (response.ok) {
           if (previousSessionId && previousSessionId !== sessionId) {
-            fetch(`/api/sessions/${previousSessionId}`, { method: 'DELETE' }).catch(() => {});
+            fetch(`/api/sessions/${previousSessionId}`, {
+              method: "DELETE",
+            }).catch(() => {});
           }
 
           latestSessionIdRef.current = payload.id;
           setSession(payload);
           setZipUrl(nextUrl);
           setSelectedPath(payload.firstFilePath || payload.tree.path);
-          setTextPreview('');
-          setSelectedImageSrc('');
+          setTextPreview("");
+          setSelectedImageSrc("");
           setOversizePrompt(null);
-          setError('');
+          setError("");
           textPreviewCacheRef.current.clear();
           clearImagePreviewCache();
           return payload;
         }
 
-        lastError = new Error(payload.error || 'Could not open ZIP URL.');
+        lastError = new Error(payload.error || "Could not open ZIP URL.");
         if (response.status !== 404 || attempt === 2) {
           throw lastError;
         }
@@ -715,7 +829,7 @@ function App() {
         await wait(250 * (attempt + 1));
       }
 
-      throw lastError || new Error('Could not open ZIP URL.');
+      throw lastError || new Error("Could not open ZIP URL.");
     })();
 
     hydrationRef.current = { sessionId, promise: request };
@@ -724,16 +838,19 @@ function App() {
       return await request;
     } finally {
       if (hydrationRef.current.sessionId === sessionId) {
-        hydrationRef.current = { sessionId: '', promise: null };
+        hydrationRef.current = { sessionId: "", promise: null };
       }
     }
   }
 
   async function handleJobSnapshot(payload, nextUrl) {
-    latestJobIdRef.current = payload?.id || '';
+    latestJobIdRef.current = payload?.id || "";
     setActiveJob(payload);
 
-    if (payload?.phase === 'downloading' && !isTerminalJobStatus(payload.status)) {
+    if (
+      payload?.phase === "downloading" &&
+      !isTerminalJobStatus(payload.status)
+    ) {
       startOptimisticProgressFromJob(payload);
     } else {
       stopOptimisticProgress();
@@ -743,36 +860,40 @@ function App() {
       await hydrateSession(payload.sessionId, nextUrl);
     }
 
-    if (payload.status === 'awaiting_confirmation') {
-      setOversizePrompt({ jobId: payload.id, reportedSize: payload.reportedSize, limit: 1024 * 1024 * 1024 });
+    if (payload.status === "awaiting_confirmation") {
+      setOversizePrompt({
+        jobId: payload.id,
+        reportedSize: payload.reportedSize,
+        limit: 1024 * 1024 * 1024,
+      });
       setIsLoading(false);
       return;
     }
 
-    if (payload.status === 'ready') {
+    if (payload.status === "ready") {
       closeJobEvents();
       stopJobPolling();
-      latestJobIdRef.current = '';
+      latestJobIdRef.current = "";
       setOversizePrompt(null);
       setActiveJob(null);
       setIsLoading(false);
       return;
     }
 
-    if (payload.status === 'error') {
+    if (payload.status === "error") {
       closeJobEvents();
       stopJobPolling();
-      latestJobIdRef.current = '';
+      latestJobIdRef.current = "";
       setActiveJob(null);
-      setError(payload.error || 'Could not process this ZIP file.');
+      setError(payload.error || "Could not process this ZIP file.");
       setIsLoading(false);
       return;
     }
 
-    if (payload.status === 'cancelled') {
+    if (payload.status === "cancelled") {
       closeJobEvents();
       stopJobPolling();
-      latestJobIdRef.current = '';
+      latestJobIdRef.current = "";
       setActiveJob(null);
       setIsLoading(false);
     }
@@ -794,7 +915,9 @@ function App() {
           if (!latestSessionIdRef.current) {
             setActiveJob(null);
             setIsLoading(false);
-            setError('Archive loading was interrupted before the UI could refresh.');
+            setError(
+              "Archive loading was interrupted before the UI could refresh.",
+            );
           }
           return;
         }
@@ -802,7 +925,10 @@ function App() {
         const payload = await response.json();
         await handleJobSnapshot(payload, nextUrl);
 
-        if (!isTerminalJobStatus(payload.status) && latestJobIdRef.current === jobId) {
+        if (
+          !isTerminalJobStatus(payload.status) &&
+          latestJobIdRef.current === jobId
+        ) {
           jobPollTimeoutRef.current = window.setTimeout(poll, 1500);
         }
       } catch {
@@ -826,42 +952,42 @@ function App() {
       await handleJobSnapshot(payload, nextUrl);
     };
 
-    source.addEventListener('progress', (event) => {
+    source.addEventListener("progress", (event) => {
       handleSnapshot(event).catch((jobError) => {
         setError(jobError.message);
         setIsLoading(false);
       });
     });
 
-    source.addEventListener('confirmation', (event) => {
+    source.addEventListener("confirmation", (event) => {
       handleSnapshot(event).catch((jobError) => {
         setError(jobError.message);
         setIsLoading(false);
       });
     });
 
-    source.addEventListener('ready', (event) => {
+    source.addEventListener("ready", (event) => {
       handleSnapshot(event).catch((jobError) => {
         setError(jobError.message);
         setIsLoading(false);
       });
     });
 
-    source.addEventListener('job-error', (event) => {
+    source.addEventListener("job-error", (event) => {
       handleSnapshot(event).catch((jobError) => {
         setError(jobError.message);
         setIsLoading(false);
       });
     });
 
-    source.addEventListener('cancelled', (event) => {
+    source.addEventListener("cancelled", (event) => {
       handleSnapshot(event).catch((jobError) => {
         setError(jobError.message);
         setIsLoading(false);
       });
     });
 
-    source.addEventListener('error', () => {
+    source.addEventListener("error", () => {
       if (source.readyState === EventSource.CLOSED) {
         closeJobEvents();
         return;
@@ -874,21 +1000,21 @@ function App() {
 
   async function loadSession(url, confirmOversize = false) {
     setIsLoading(true);
-    setError('');
+    setError("");
     setOversizePrompt(null);
     setSlideshowOpen(false);
     setThumbnailStripExpanded(false);
 
     try {
-      const response = await fetch('/api/sessions', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ url, confirmOversize })
+      const response = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url, confirmOversize }),
       });
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload.error || 'Could not open ZIP URL.');
+        throw new Error(payload.error || "Could not open ZIP URL.");
       }
       latestJobIdRef.current = payload.jobId;
       setActiveJob(payload);
@@ -896,7 +1022,7 @@ function App() {
       attachJobEvents(payload.jobId, url);
     } catch (requestError) {
       setError(requestError.message);
-      latestJobIdRef.current = '';
+      latestJobIdRef.current = "";
       setActiveJob(null);
       stopJobPolling();
       closeJobEvents();
@@ -906,7 +1032,7 @@ function App() {
   async function handleSubmit(event) {
     event.preventDefault();
     if (!zipUrl.trim()) {
-      setError('Paste a public ZIP URL to start browsing.');
+      setError("Paste a public ZIP URL to start browsing.");
       return;
     }
     await loadSession(zipUrl.trim(), false);
@@ -914,7 +1040,7 @@ function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    window.localStorage.setItem('zip-image-viewer-theme', theme);
+    window.localStorage.setItem("zip-image-viewer-theme", theme);
   }, [theme]);
 
   useEffect(() => {
@@ -928,8 +1054,8 @@ function App() {
   }, [flatData, selectedPath, sortedTree]);
 
   useEffect(() => {
-    if (!selectedNode || !session || selectedKind !== 'text') {
-      setTextPreview('');
+    if (!selectedNode || !session || selectedKind !== "text") {
+      setTextPreview("");
       return;
     }
 
@@ -948,7 +1074,7 @@ function App() {
 
         const response = await fetch(selectedPreviewUrl);
         if (!response.ok) {
-          throw new Error('Could not read this file.');
+          throw new Error("Could not read this file.");
         }
         const content = await response.text();
         textPreviewCacheRef.current.set(cacheKey, content);
@@ -969,8 +1095,8 @@ function App() {
   }, [selectedKind, selectedNode, selectedPreviewUrl, session]);
 
   useEffect(() => {
-    if (!selectedNode || !session || selectedKind !== 'image') {
-      setSelectedImageSrc('');
+    if (!selectedNode || !session || selectedKind !== "image") {
+      setSelectedImageSrc("");
       return;
     }
 
@@ -991,14 +1117,20 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [previewQuality, selectedImagePreviewUrl, selectedKind, selectedNode, session]);
+  }, [
+    previewQuality,
+    selectedImagePreviewUrl,
+    selectedKind,
+    selectedNode,
+    session,
+  ]);
 
   useEffect(() => {
-    latestSessionIdRef.current = session?.id || '';
+    latestSessionIdRef.current = session?.id || "";
   }, [session]);
 
   useEffect(() => {
-    latestJobIdRef.current = activeJob?.id || '';
+    latestJobIdRef.current = activeJob?.id || "";
   }, [activeJob]);
 
   useEffect(() => {
@@ -1009,10 +1141,16 @@ function App() {
       clearImagePreviewCache();
       textPreviewCacheRef.current.clear();
       if (latestSessionIdRef.current) {
-        fetch(`/api/sessions/${latestSessionIdRef.current}`, { method: 'DELETE', keepalive: true }).catch(() => {});
+        fetch(`/api/sessions/${latestSessionIdRef.current}`, {
+          method: "DELETE",
+          keepalive: true,
+        }).catch(() => {});
       }
       if (latestJobIdRef.current) {
-        fetch(`/api/session-jobs/${latestJobIdRef.current}`, { method: 'DELETE', keepalive: true }).catch(() => {});
+        fetch(`/api/session-jobs/${latestJobIdRef.current}`, {
+          method: "DELETE",
+          keepalive: true,
+        }).catch(() => {});
       }
     };
   }, []);
@@ -1022,22 +1160,22 @@ function App() {
       const activeElement = document.activeElement;
       const activeTag = activeElement?.tagName;
       if (
-        activeTag === 'INPUT' ||
-        activeTag === 'TEXTAREA' ||
-        activeTag === 'SELECT' ||
-        activeElement?.closest?.('.custom-dropdown-shell')
+        activeTag === "INPUT" ||
+        activeTag === "TEXTAREA" ||
+        activeTag === "SELECT" ||
+        activeElement?.closest?.(".custom-dropdown-shell")
       ) {
         return;
       }
 
       if (currentImageIndex === -1) {
-        if (event.key === 'Escape') {
+        if (event.key === "Escape") {
           setSlideshowOpen(false);
         }
         return;
       }
 
-      if (event.key === 'ArrowRight') {
+      if (event.key === "ArrowRight") {
         const nextPath = nextImagePath;
         if (nextPath) {
           event.preventDefault();
@@ -1045,7 +1183,7 @@ function App() {
         }
       }
 
-      if (event.key === 'ArrowLeft') {
+      if (event.key === "ArrowLeft") {
         const prevPath = previousImagePath;
         if (prevPath) {
           event.preventDefault();
@@ -1053,51 +1191,73 @@ function App() {
         }
       }
 
-      if (slideshowOpen && event.key === 'Home' && currentFolderImages[0]) {
+      if (slideshowOpen && event.key === "Home" && currentFolderImages[0]) {
         event.preventDefault();
         setSelectedPath(currentFolderImages[0]);
       }
 
-      if (slideshowOpen && event.key === 'End' && currentFolderImages[currentFolderImages.length - 1]) {
+      if (
+        slideshowOpen &&
+        event.key === "End" &&
+        currentFolderImages[currentFolderImages.length - 1]
+      ) {
         event.preventDefault();
         setSelectedPath(currentFolderImages[currentFolderImages.length - 1]);
       }
 
-      if (!slideshowOpen && selectedKind === 'image' && (event.key === 'Enter' || event.key.toLowerCase() === 'f')) {
+      if (
+        !slideshowOpen &&
+        selectedKind === "image" &&
+        (event.key === "Enter" || event.key.toLowerCase() === "f")
+      ) {
         event.preventDefault();
         setSlideshowOpen(true);
       }
 
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         event.preventDefault();
         setSlideshowOpen(false);
       }
     }
 
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [currentFolderImages, currentImageIndex, nextImagePath, previousImagePath, selectedKind, slideshowOpen]);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    currentFolderImages,
+    currentImageIndex,
+    nextImagePath,
+    previousImagePath,
+    selectedKind,
+    slideshowOpen,
+  ]);
 
   useEffect(() => {
-    if (!session || selectedKind !== 'image' || currentImageIndex === -1) {
+    if (!session || selectedKind !== "image" || currentImageIndex === -1) {
       return;
     }
 
     const preloadTargets = [
       currentFolderImages[currentImageIndex + 1] || currentFolderImages[0],
-      currentFolderImages[currentImageIndex - 1] || currentFolderImages[currentFolderImages.length - 1],
-      currentFolderImages[currentImageIndex + 2] || ''
+      currentFolderImages[currentImageIndex - 1] ||
+        currentFolderImages[currentFolderImages.length - 1],
+      currentFolderImages[currentImageIndex + 2] || "",
     ].filter(Boolean);
 
     const preloaders = preloadTargets.map((imagePath) => {
-      loadImagePreview(imagePath, previewQuality).catch(() => '');
+      loadImagePreview(imagePath, previewQuality).catch(() => "");
       return imagePath;
     });
 
     return () => {
       preloaders.forEach(() => {});
     };
-  }, [currentFolderImages, currentImageIndex, previewQuality, selectedKind, session]);
+  }, [
+    currentFolderImages,
+    currentImageIndex,
+    previewQuality,
+    selectedKind,
+    session,
+  ]);
 
   useEffect(() => {
     if (!slideshowOpen) {
@@ -1106,7 +1266,7 @@ function App() {
     }
 
     const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    document.body.style.overflow = "hidden";
 
     return () => {
       document.body.style.overflow = originalOverflow;
@@ -1114,17 +1274,27 @@ function App() {
   }, [slideshowOpen]);
 
   const slideshowModal =
-    slideshowOpen && selectedKind === 'image' && selectedNode
+    slideshowOpen && selectedKind === "image" && selectedNode
       ? createPortal(
-          <div className={`slideshow-overlay ${slideshowChromeHidden ? 'chrome-hidden' : ''}`}>
+          <div
+            className={`slideshow-overlay ${slideshowChromeHidden ? "chrome-hidden" : ""}`}
+          >
             <div
               className="slideshow-viewport"
               role="dialog"
               aria-modal="true"
               aria-label={`Slideshow for ${selectedNode.name}`}
             >
-              <div className={`slideshow-stage slideshow-fit-${slideshowFitMode}`} onDoubleClick={() => setSlideshowChromeHidden((current) => !current)}>
-                <img src={selectedImageSrc || selectedImagePreviewUrl} alt={selectedNode.name} />
+              <div
+                className={`slideshow-stage slideshow-fit-${slideshowFitMode}`}
+                onDoubleClick={() =>
+                  setSlideshowChromeHidden((current) => !current)
+                }
+              >
+                <img
+                  src={selectedImageSrc || selectedImagePreviewUrl}
+                  alt={selectedNode.name}
+                />
               </div>
 
               <div className="slideshow-floating slideshow-floating-top">
@@ -1133,7 +1303,9 @@ function App() {
                     <p className="panel-label">Folder slideshow</p>
                     <h2 title={selectedNode.name}>{selectedNode.name}</h2>
                     <div className="slideshow-meta">
-                      <span>{currentImageIndex + 1} / {currentFolderImages.length}</span>
+                      <span>
+                        {currentImageIndex + 1} / {currentFolderImages.length}
+                      </span>
                       <span>{formatBytes(selectedNode.size)}</span>
                       <span>{formatDate(selectedNode.modifiedAt)}</span>
                     </div>
@@ -1151,30 +1323,53 @@ function App() {
                   />
 
                   <div className="slideshow-actions">
-                    <button className="ghost-button" type="button" onClick={() => setSelectedPath(currentFolderImages[0])}>
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={() => setSelectedPath(currentFolderImages[0])}
+                    >
                       First
                     </button>
-                    <button className="ghost-button" type="button" onClick={() => setSelectedPath(currentFolderImages[currentFolderImages.length - 1])}>
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={() =>
+                        setSelectedPath(
+                          currentFolderImages[currentFolderImages.length - 1],
+                        )
+                      }
+                    >
                       Last
                     </button>
-                    <button className="ghost-button" type="button" onClick={() => setSlideshowChromeHidden(true)}>
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={() => setSlideshowChromeHidden(true)}
+                    >
                       Hide UI
                     </button>
-                    <button className="ghost-button" type="button" onClick={() => setSlideshowOpen(false)}>
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={() => setSlideshowOpen(false)}
+                    >
                       Close
                     </button>
                   </div>
                 </div>
               </div>
 
-              <div className="slideshow-floating slideshow-floating-nav" aria-hidden={slideshowChromeHidden}>
+              <div
+                className="slideshow-floating slideshow-floating-nav"
+                aria-hidden={slideshowChromeHidden}
+              >
                 <button
                   className="nav-button nav-button-left"
                   type="button"
                   aria-label="Previous image"
                   onClick={() => setSelectedPath(previousImagePath)}
                 >
-                  {'<'}
+                  {"<"}
                 </button>
                 <button
                   className="nav-button nav-button-right"
@@ -1182,45 +1377,54 @@ function App() {
                   aria-label="Next image"
                   onClick={() => setSelectedPath(nextImagePath)}
                 >
-                  {'>'}
+                  {">"}
                 </button>
               </div>
 
               <div className="slideshow-floating slideshow-floating-bottom">
                 <div className="slideshow-neighbors-card">
                   <div className="slideshow-neighbors">
-                    <span>Prev: {previousImageName || 'None'}</span>
-                    <span>Next: {nextImageName || 'None'}</span>
+                    <span>Prev: {previousImageName || "None"}</span>
+                    <span>Next: {nextImageName || "None"}</span>
                   </div>
                   <div className="navigation-hint">
-                    Arrow keys move, Home/End jump, F opens slideshow, Escape closes it, and double-click toggles the overlay.
+                    Arrow keys move, Home/End jump, F opens slideshow, Escape
+                    closes it, and double-click toggles the overlay.
                   </div>
                 </div>
               </div>
 
               {slideshowChromeHidden ? (
-                <button className="slideshow-reveal-button" type="button" onClick={() => setSlideshowChromeHidden(false)}>
+                <button
+                  className="slideshow-reveal-button"
+                  type="button"
+                  onClick={() => setSlideshowChromeHidden(false)}
+                >
                   Show UI
                 </button>
               ) : null}
             </div>
           </div>,
-          document.body
+          document.body,
         )
       : null;
 
   const visualDownloadedBytes =
-    activeJob?.phase === 'downloading' && optimisticProgress
+    activeJob?.phase === "downloading" && optimisticProgress
       ? optimisticProgress.downloadedBytes
       : Math.max(0, Number(activeJob?.downloadedBytes) || 0);
   const visualPercent =
-    activeJob?.phase === 'downloading' && optimisticProgress
+    activeJob?.phase === "downloading" && optimisticProgress
       ? optimisticProgress.percent
       : activeJob?.percent;
   const visualPercentLabel =
-    visualPercent == null ? 'Live' : `${Math.max(0, Math.min(100, Math.floor(visualPercent)))}%`;
+    visualPercent == null
+      ? "Live"
+      : `${Math.max(0, Math.min(100, Math.floor(visualPercent)))}%`;
   const visualProgressWidth =
-    visualPercent == null ? undefined : `${Math.max(0, Math.min(100, visualPercent))}%`;
+    visualPercent == null
+      ? undefined
+      : `${Math.max(0, Math.min(100, visualPercent))}%`;
   const transferLabel =
     activeJob?.reportedSize > 0
       ? `${formatTransferBytes(visualDownloadedBytes)} / ${formatTransferBytes(activeJob.reportedSize)}`
@@ -1239,12 +1443,19 @@ function App() {
               <p className="eyebrow">ZIP image and file explorer</p>
               <h1>Archive Atlas</h1>
               <p className="hero-copy">
-                Paste a public ZIP URL, let the server unpack it, then browse the folder structure with a fast viewer and
-                image-first navigation.
+                Paste a public ZIP URL, let the server unpack it, then browse
+                the folder structure with a fast viewer and image-first
+                navigation.
               </p>
             </div>
-            <button className="ghost-button theme-toggle" type="button" onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}>
-              {theme === 'dark' ? 'Switch to light' : 'Switch to dark'}
+            <button
+              className="ghost-button theme-toggle"
+              type="button"
+              onClick={() =>
+                setTheme((current) => (current === "dark" ? "light" : "dark"))
+              }
+            >
+              {theme === "dark" ? "Switch to light" : "Switch to dark"}
             </button>
           </div>
 
@@ -1261,21 +1472,39 @@ function App() {
               />
             </label>
 
-            <button className="primary-button" type="submit" disabled={isLoading}>
-              {activeJob ? 'Loading archive...' : isLoading ? 'Opening archive...' : 'Open archive'}
+            <button
+              className="primary-button"
+              type="submit"
+              disabled={isLoading}
+            >
+              {activeJob
+                ? "Loading archive..."
+                : isLoading
+                  ? "Opening archive..."
+                  : "Open archive"}
             </button>
           </form>
 
           {activeJob ? (
             <div className="progress-card" aria-live="polite">
               <div className="progress-card-head">
-                <strong>{activeJob.phase === 'extracting' ? 'Preparing archive' : 'Downloading archive'}</strong>
+                <strong>
+                  {activeJob.phase === "extracting"
+                    ? "Preparing archive"
+                    : "Downloading archive"}
+                </strong>
                 <span>{visualPercentLabel}</span>
               </div>
-              <div className={`progress-bar-shell ${visualPercent == null ? 'indeterminate' : ''}`}>
+              <div
+                className={`progress-bar-shell ${visualPercent == null ? "indeterminate" : ""}`}
+              >
                 <div
                   className="progress-bar-fill"
-                  style={visualPercent == null ? undefined : { width: visualProgressWidth }}
+                  style={
+                    visualPercent == null
+                      ? undefined
+                      : { width: visualProgressWidth }
+                  }
                 />
               </div>
               <div className="progress-stats-grid">
@@ -1290,7 +1519,11 @@ function App() {
               </div>
               <div className="progress-meta-row">
                 <span>{formatProgressMessage(activeJob)}</span>
-                <button className="ghost-button compact-button" type="button" onClick={() => clearArchive(true)}>
+                <button
+                  className="ghost-button compact-button"
+                  type="button"
+                  onClick={() => clearArchive(true)}
+                >
                   Cancel load
                 </button>
               </div>
@@ -1302,7 +1535,11 @@ function App() {
             <div className="status-pill">1 GB prompt threshold</div>
             <div className="status-pill">Auto-cleanup enabled</div>
             {session ? (
-              <button className="ghost-button compact-button" type="button" onClick={() => clearArchive(true)}>
+              <button
+                className="ghost-button compact-button"
+                type="button"
+                onClick={() => clearArchive(true)}
+              >
                 Clear opened archive
               </button>
             ) : null}
@@ -1312,10 +1549,15 @@ function App() {
           {oversizePrompt ? (
             <div className="message-card warning">
               <div>
-                This archive reports {formatBytes(oversizePrompt.reportedSize)}. Continue downloading anyway?
+                This archive reports {formatBytes(oversizePrompt.reportedSize)}.
+                Continue downloading anyway?
               </div>
               <div className="message-actions">
-                <button className="ghost-button" type="button" onClick={() => setOversizePrompt(null)}>
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={() => setOversizePrompt(null)}
+                >
                   Cancel
                 </button>
                 <button
@@ -1327,7 +1569,10 @@ function App() {
                     }
                     setIsLoading(true);
                     setOversizePrompt(null);
-                    await fetch(`/api/session-jobs/${oversizePrompt.jobId}/confirm`, { method: 'POST' }).catch(() => {});
+                    await fetch(
+                      `/api/session-jobs/${oversizePrompt.jobId}/confirm`,
+                      { method: "POST" },
+                    ).catch(() => {});
                   }}
                 >
                   Proceed download
@@ -1342,10 +1587,16 @@ function App() {
             <div className="panel-header panel-header-stackable explorer-header">
               <div className="panel-title-group explorer-title-group">
                 <p className="panel-label">Explorer</p>
-                <h2 title={sortedTree?.name || 'No archive loaded'}>{sortedTree?.name || 'No archive loaded'}</h2>
+                <h2 title={sortedTree?.name || "No archive loaded"}>
+                  {sortedTree?.name || "No archive loaded"}
+                </h2>
               </div>
               <div className="sidebar-header-actions">
-                {session ? <span className="panel-chip">{session.stats.fileCount} files</span> : null}
+                {session ? (
+                  <span className="panel-chip">
+                    {session.stats.fileCount} files
+                  </span>
+                ) : null}
               </div>
               <CustomDropdown
                 id="sort-mode"
@@ -1358,11 +1609,11 @@ function App() {
             </div>
 
             <div className="sort-caption">
-              {sortMode === 'natural-tail'
-                ? 'Number trail mode keeps names like file 2, file 10, file 11 in number order.'
-                : sortMode.startsWith('date')
-                  ? 'Date sorting uses ZIP entry modified times when the archive provides them.'
-                  : 'Sorting affects explorer order, preview arrows, thumbnails, and slideshow navigation.'}
+              {sortMode === "natural-tail"
+                ? "Number trail mode keeps names like file 2, file 10, file 11 in number order."
+                : sortMode.startsWith("date")
+                  ? "Date sorting uses ZIP entry modified times when the archive provides them."
+                  : "Sorting affects explorer order, preview arrows, thumbnails, and slideshow navigation."}
             </div>
 
             <div className="tree-scroll">
@@ -1374,7 +1625,7 @@ function App() {
                   folderPreview={flatData.folderPreview}
                   folderImages={flatData.folderImages}
                   onSelect={(node) => {
-                    if (node.type === 'file') {
+                    if (node.type === "file") {
                       setSelectedPath(node.path);
                     }
                   }}
@@ -1382,7 +1633,10 @@ function App() {
               ) : (
                 <div className="empty-card">
                   <strong>Ready to unpack</strong>
-                  <p>Load a ZIP URL to inspect folders, preview images, and move across image sets with arrow keys.</p>
+                  <p>
+                    Load a ZIP URL to inspect folders, preview images, and move
+                    across image sets with arrow keys.
+                  </p>
                 </div>
               )}
             </div>
@@ -1392,35 +1646,51 @@ function App() {
             <div className="panel-header">
               <div className="panel-title-group">
                 <p className="panel-label">Preview</p>
-                <h2 title={selectedNode?.name || 'Select a file'}>{selectedNode?.name || 'Select a file'}</h2>
+                <h2 title={selectedNode?.name || "Select a file"}>
+                  {selectedNode?.name || "Select a file"}
+                </h2>
               </div>
-              {selectedNode?.type === 'file' ? (
+              {selectedNode?.type === "file" ? (
                 <div className="panel-actions">
-                  {selectedKind === 'image' ? (
-                    <button className="ghost-button" type="button" onClick={() => setSlideshowOpen(true)}>
+                  {selectedKind === "image" ? (
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={() => setSlideshowOpen(true)}
+                    >
                       Slideshow
                     </button>
                   ) : null}
-                  <a className="ghost-button inline-link" href={selectedFileUrl} target="_blank" rel="noreferrer">
+                  <a
+                    className="ghost-button inline-link"
+                    href={selectedFileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
                     Open raw
                   </a>
                 </div>
               ) : null}
             </div>
 
-            {!selectedNode || selectedNode.type !== 'file' ? (
+            {!selectedNode || selectedNode.type !== "file" ? (
               <div className="empty-card preview-empty">
                 <strong>Nothing selected</strong>
-                <p>Choose a file from the sidebar to start previewing its contents.</p>
+                <p>
+                  Choose a file from the sidebar to start previewing its
+                  contents.
+                </p>
               </div>
             ) : null}
 
-            {selectedNode?.type === 'file' && selectedKind === 'image' ? (
+            {selectedNode?.type === "file" && selectedKind === "image" ? (
               <div className="preview-stage">
                 <div className="preview-toolbar">
                   <span>{formatBytes(selectedNode.size)}</span>
                   <span>
-                    {currentImageIndex >= 0 ? `${currentImageIndex + 1} / ${currentFolderImages.length} in folder` : 'Single image'}
+                    {currentImageIndex >= 0
+                      ? `${currentImageIndex + 1} / ${currentFolderImages.length} in folder`
+                      : "Single image"}
                   </span>
                   <CustomDropdown
                     id="preview-quality"
@@ -1432,73 +1702,110 @@ function App() {
                   <span>{formatDate(selectedNode.modifiedAt)}</span>
                 </div>
                 <div className="image-frame">
-                  <img src={selectedImageSrc || selectedImagePreviewUrl} alt={selectedNode.name} />
+                  <img
+                    src={selectedImageSrc || selectedImagePreviewUrl}
+                    alt={selectedNode.name}
+                  />
                 </div>
                 {currentFolderImageItems.length > 1 ? (
-                  <div className={`thumbnail-strip-shell ${thumbnailStripExpanded ? 'expanded' : 'collapsed'}`}>
+                  <div
+                    className={`thumbnail-strip-shell ${thumbnailStripExpanded ? "expanded" : "collapsed"}`}
+                  >
                     <div className="thumbnail-strip-header">
                       <div>
                         <strong>Folder thumbnails</strong>
                         <div className="thumbnail-strip-copy">
                           {thumbnailStripExpanded
                             ? `Showing all ${currentFolderImageItems.length} sibling images.`
-                            : 'Showing nearby images around the current selection.'}
+                            : "Showing nearby images around the current selection."}
                         </div>
                       </div>
-                      <button className="ghost-button" type="button" onClick={() => setThumbnailStripExpanded((current) => !current)}>
-                        {thumbnailStripExpanded ? 'Collapse strip' : 'Expand strip'}
+                      <button
+                        className="ghost-button"
+                        type="button"
+                        onClick={() =>
+                          setThumbnailStripExpanded((current) => !current)
+                        }
+                      >
+                        {thumbnailStripExpanded
+                          ? "Collapse strip"
+                          : "Expand strip"}
                       </button>
                     </div>
-                    <div className={`thumbnail-strip ${thumbnailStripExpanded ? 'expanded' : 'collapsed'}`} role="list" aria-label="Folder images">
+                    <div
+                      className={`thumbnail-strip ${thumbnailStripExpanded ? "expanded" : "collapsed"}`}
+                      role="list"
+                      aria-label="Folder images"
+                    >
                       {visibleThumbnailItems.map((item) => (
                         <button
                           key={item.path}
                           type="button"
-                          className={`thumbnail-card ${item.path === selectedPath ? 'active' : ''}`}
+                          className={`thumbnail-card ${item.path === selectedPath ? "active" : ""}`}
                           onClick={() => setSelectedPath(item.path)}
                         >
-                          <img src={item.thumbnailUrl} alt={item.name} loading="lazy" />
+                          <img
+                            src={item.thumbnailUrl}
+                            alt={item.name}
+                            loading="lazy"
+                          />
                           <span>{item.name}</span>
                         </button>
                       ))}
                     </div>
                   </div>
                 ) : null}
-                <div className="navigation-hint">Use left and right arrow keys to move through sibling images in the active sort order.</div>
+                <div className="navigation-hint">
+                  Use left and right arrow keys to move through sibling images
+                  in the active sort order.
+                </div>
               </div>
             ) : null}
 
-            {selectedNode?.type === 'file' && selectedKind === 'text' ? (
+            {selectedNode?.type === "file" && selectedKind === "text" ? (
               <div className="text-preview">
                 <div className="preview-toolbar">
                   <span>{formatBytes(selectedNode.size)}</span>
                   <span>{selectedNode.extension.toUpperCase()} preview</span>
                   <span>{formatDate(selectedNode.modifiedAt)}</span>
                 </div>
-                <pre>{textPreview || 'Loading file...'}</pre>
+                <pre>{textPreview || "Loading file..."}</pre>
               </div>
             ) : null}
 
-            {selectedNode?.type === 'file' && selectedKind === 'video' ? (
+            {selectedNode?.type === "file" && selectedKind === "video" ? (
               <div className="preview-stage">
                 <div className="preview-toolbar">
                   <span>{formatBytes(selectedNode.size)}</span>
-                  <span>{selectedNode.extension.toUpperCase()} stream preview</span>
+                  <span>
+                    {selectedNode.extension.toUpperCase()} stream preview
+                  </span>
                   <span>{formatDate(selectedNode.modifiedAt)}</span>
                 </div>
                 <div className="image-frame media-frame">
-                  <video className="video-player" src={selectedFileUrl} controls preload="metadata">
+                  <video
+                    className="video-player"
+                    src={selectedFileUrl}
+                    controls
+                    preload="metadata"
+                  >
                     Your browser cannot play this video inline.
                   </video>
                 </div>
-                <div className="navigation-hint">Video playback streams from the extracted file and supports browser seeking when the server serves ranges.</div>
+                <div className="navigation-hint">
+                  Video playback streams from the extracted file and supports
+                  browser seeking when the server serves ranges.
+                </div>
               </div>
             ) : null}
 
-            {selectedNode?.type === 'file' && selectedKind === 'binary' ? (
+            {selectedNode?.type === "file" && selectedKind === "binary" ? (
               <div className="empty-card preview-empty">
                 <strong>Binary file</strong>
-                <p>This file type does not have an inline preview yet. Open the raw file in a new tab or download it.</p>
+                <p>
+                  This file type does not have an inline preview yet. Open the
+                  raw file in a new tab or download it.
+                </p>
               </div>
             ) : null}
           </section>

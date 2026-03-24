@@ -1,17 +1,17 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig({
-  root: 'client',
+  root: "client",
   plugins: [react()],
   build: {
-    outDir: '../dist',
-    emptyOutDir: true
+    outDir: "../dist",
+    emptyOutDir: true,
   },
   server: {
     port: 5173,
     proxy: {
-      '/api': 'http://localhost:8080'
-    }
-  }
+      "/api": "http://localhost:8080",
+    },
+  },
 });

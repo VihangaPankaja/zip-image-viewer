@@ -1,19 +1,19 @@
-import express from 'express';
-import { createReadStream, createWriteStream } from 'node:fs';
-import { mkdtemp, mkdir, open, rm, stat } from 'node:fs/promises';
-import path from 'node:path';
-import { Readable, Transform } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
-import { fileURLToPath } from 'node:url';
-import os from 'node:os';
-import crypto from 'node:crypto';
-import mime from 'mime-types';
-import sharp from 'sharp';
-import unzipper from 'unzipper';
+import express from "express";
+import { createReadStream, createWriteStream } from "node:fs";
+import { mkdtemp, mkdir, open, rm, stat } from "node:fs/promises";
+import path from "node:path";
+import { Readable, Transform } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import { fileURLToPath } from "node:url";
+import os from "node:os";
+import crypto from "node:crypto";
+import mime from "mime-types";
+import sharp from "sharp";
+import unzipper from "unzipper";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const distDir = path.resolve(__dirname, '..', 'dist');
+const distDir = path.resolve(__dirname, "..", "dist");
 const app = express();
 const sessionStore = new Map();
 const jobStore = new Map();
@@ -31,75 +31,96 @@ const MAX_THUMBNAIL_SIZE = 320;
 const IMAGE_PREVIEW_PROFILES = {
   low: { size: 1280, quality: 58 },
   balanced: { size: 1920, quality: 72 },
-  high: { size: 2560, quality: 82 }
+  high: { size: 2560, quality: 82 },
 };
 
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: "1mb" }));
 app.use(express.static(distDir));
 
 function logEvent(level, event, details = {}) {
-  const logger = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
-  const payload = Object.keys(details).length ? ` ${JSON.stringify(details)}` : '';
-  logger(`[${new Date().toISOString()}] [${level.toUpperCase()}] ${event}${payload}`);
+  const logger =
+    level === "error"
+      ? console.error
+      : level === "warn"
+        ? console.warn
+        : console.log;
+  const payload = Object.keys(details).length
+    ? ` ${JSON.stringify(details)}`
+    : "";
+  logger(
+    `[${new Date().toISOString()}] [${level.toUpperCase()}] ${event}${payload}`,
+  );
 }
 
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) {
-    return '0 B';
+    return "0 B";
   }
 
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const exponent = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    units.length - 1,
+  );
   const value = bytes / 1024 ** exponent;
   return `${value >= 10 || exponent === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[exponent]}`;
 }
 
 function classifyMimeType(contentType) {
-  if (String(contentType).startsWith('image/')) {
-    return 'image';
+  if (String(contentType).startsWith("image/")) {
+    return "image";
   }
-  if (String(contentType).startsWith('text/') || contentType === 'application/json') {
-    return 'text';
+  if (
+    String(contentType).startsWith("text/") ||
+    contentType === "application/json"
+  ) {
+    return "text";
   }
-  return 'binary';
+  return "binary";
 }
 
 function shouldPreserveOriginalPreview(contentType) {
-  return contentType === 'image/svg+xml' || contentType === 'image/gif';
+  return contentType === "image/svg+xml" || contentType === "image/gif";
 }
 
 function parseRangeHeader(rangeHeader, size) {
-  if (!rangeHeader || !rangeHeader.startsWith('bytes=')) {
+  if (!rangeHeader || !rangeHeader.startsWith("bytes=")) {
     return null;
   }
 
-  const [rawStart, rawEnd] = rangeHeader.replace('bytes=', '').split('-');
-  if (rawStart.includes(',') || rawEnd?.includes(',')) {
+  const [rawStart, rawEnd] = rangeHeader.replace("bytes=", "").split("-");
+  if (rawStart.includes(",") || rawEnd?.includes(",")) {
     return null;
   }
 
   let start;
   let end;
 
-  if (rawStart === '') {
+  if (rawStart === "") {
     const suffixLength = Number(rawEnd);
     if (!Number.isInteger(suffixLength) || suffixLength <= 0) {
-      return 'invalid';
+      return "invalid";
     }
     start = Math.max(size - suffixLength, 0);
     end = size - 1;
   } else {
     start = Number(rawStart);
-    end = rawEnd === '' ? size - 1 : Number(rawEnd);
+    end = rawEnd === "" ? size - 1 : Number(rawEnd);
   }
 
-  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || start >= size) {
-    return 'invalid';
+  if (
+    !Number.isInteger(start) ||
+    !Number.isInteger(end) ||
+    start < 0 ||
+    end < start ||
+    start >= size
+  ) {
+    return "invalid";
   }
 
   return {
     start,
-    end: Math.min(end, size - 1)
+    end: Math.min(end, size - 1),
   };
 }
 
@@ -107,27 +128,27 @@ function createJob(url) {
   const job = {
     id: crypto.randomUUID(),
     url,
-    status: 'queued',
-    phase: 'queued',
+    status: "queued",
+    phase: "queued",
     downloadedBytes: 0,
     reportedSize: 0,
     percent: 0,
     extractedEntries: 0,
     totalEntries: 0,
     downloadSpeedBytesPerSec: 0,
-    message: 'Waiting to start',
-    error: '',
+    message: "Waiting to start",
+    error: "",
     requiresConfirmation: false,
     confirmTokenAccepted: false,
-    sessionId: '',
+    sessionId: "",
     createdAt: Date.now(),
     updatedAt: Date.now(),
     subscribers: new Set(),
-    workspaceDir: '',
-    zipPath: '',
-    extractDir: '',
+    workspaceDir: "",
+    zipPath: "",
+    extractDir: "",
     abortController: null,
-    cleanupAt: 0
+    cleanupAt: 0,
   };
 
   jobStore.set(job.id, job);
@@ -150,7 +171,7 @@ function sanitizeJob(job) {
     error: job.error,
     requiresConfirmation: job.requiresConfirmation,
     sessionId: job.sessionId,
-    updatedAt: job.updatedAt
+    updatedAt: job.updatedAt,
   };
 }
 
@@ -160,7 +181,7 @@ function closeJob(job, terminalStatus) {
   job.cleanupAt = Date.now() + JOB_TTL_MS;
 }
 
-function emitJob(job, patch = {}, eventName = 'progress') {
+function emitJob(job, patch = {}, eventName = "progress") {
   Object.assign(job, patch, { updatedAt: Date.now() });
   const payload = JSON.stringify(sanitizeJob(job));
   for (const res of job.subscribers) {
@@ -177,17 +198,19 @@ function emitJob(job, patch = {}, eventName = 'progress') {
 }
 
 function isTerminalJobStatus(status) {
-  return status === 'ready' || status === 'error' || status === 'cancelled';
+  return status === "ready" || status === "error" || status === "cancelled";
 }
 
-async function cleanupJob(jobId, reason = 'cleanup') {
+async function cleanupJob(jobId, reason = "cleanup") {
   const job = jobStore.get(jobId);
   if (!job) {
     return;
   }
 
   if (job.workspaceDir && !job.sessionId) {
-    await rm(job.workspaceDir, { recursive: true, force: true }).catch(() => {});
+    await rm(job.workspaceDir, { recursive: true, force: true }).catch(
+      () => {},
+    );
   }
 
   for (const res of job.subscribers) {
@@ -196,28 +219,29 @@ async function cleanupJob(jobId, reason = 'cleanup') {
 
   job.subscribers.clear();
   jobStore.delete(jobId);
-  logEvent('info', 'job.removed', { jobId, reason });
+  logEvent("info", "job.removed", { jobId, reason });
 }
 
 app.use((req, res, next) => {
-  const isTrackedRequest = req.path === '/health' || req.path.startsWith('/api');
+  const isTrackedRequest =
+    req.path === "/health" || req.path.startsWith("/api");
   if (!isTrackedRequest) {
     return next();
   }
 
   const startedAt = Date.now();
-  logEvent('info', 'request.start', {
+  logEvent("info", "request.start", {
     method: req.method,
     path: req.originalUrl,
-    ip: req.ip
+    ip: req.ip,
   });
 
-  res.on('finish', () => {
-    logEvent('info', 'request.finish', {
+  res.on("finish", () => {
+    logEvent("info", "request.finish", {
       method: req.method,
       path: req.originalUrl,
       statusCode: res.statusCode,
-      durationMs: Date.now() - startedAt
+      durationMs: Date.now() - startedAt,
     });
   });
 
@@ -225,9 +249,16 @@ app.use((req, res, next) => {
 });
 
 function sanitizeEntryPath(entryPath) {
-  const normalized = path.posix.normalize(String(entryPath || '').replace(/\\/g, '/'));
-  const cleaned = normalized.replace(/^\/+/, '').replace(/\/+$/, '');
-  if (!cleaned || cleaned === '.' || cleaned.startsWith('../') || cleaned.includes('/../')) {
+  const normalized = path.posix.normalize(
+    String(entryPath || "").replace(/\\/g, "/"),
+  );
+  const cleaned = normalized.replace(/^\/+/, "").replace(/\/+$/, "");
+  if (
+    !cleaned ||
+    cleaned === "." ||
+    cleaned.startsWith("../") ||
+    cleaned.includes("/../")
+  ) {
     throw new Error(`Unsafe entry path: ${entryPath}`);
   }
   return cleaned;
@@ -238,52 +269,55 @@ function createNode(name, nodePath, type) {
     name,
     path: nodePath,
     type,
-    extension: type === 'file' ? path.extname(name).slice(1).toLowerCase() : '',
+    extension: type === "file" ? path.extname(name).slice(1).toLowerCase() : "",
     modifiedAt: 0,
-    children: type === 'directory' ? [] : undefined
+    children: type === "directory" ? [] : undefined,
   };
 }
 
 function buildTree(entries, rootName) {
   const root = {
     name: rootName,
-    path: '.',
-    type: 'directory',
-    parentPath: '',
+    path: ".",
+    type: "directory",
+    parentPath: "",
     modifiedAt: 0,
-    children: []
+    children: [],
   };
-  const nodes = new Map([['.', root]]);
-  let firstFilePath = '';
+  const nodes = new Map([[".", root]]);
+  let firstFilePath = "";
   let fileCount = 0;
 
   for (const entry of entries) {
-    const parts = entry.relativePath.split('/').filter(Boolean);
-    let currentPath = '.';
+    const parts = entry.relativePath.split("/").filter(Boolean);
+    let currentPath = ".";
 
     for (let index = 0; index < parts.length; index += 1) {
       const name = parts[index];
-      const nextPath = currentPath === '.' ? name : `${currentPath}/${name}`;
+      const nextPath = currentPath === "." ? name : `${currentPath}/${name}`;
       const isLeaf = index === parts.length - 1;
-      const type = isLeaf && entry.type === 'file' ? 'file' : 'directory';
+      const type = isLeaf && entry.type === "file" ? "file" : "directory";
 
       if (!nodes.has(nextPath)) {
         const node = createNode(name, nextPath, type);
         node.parentPath = currentPath;
         node.modifiedAt = entry.modifiedAt || 0;
-        if (type === 'file') {
+        if (type === "file") {
           node.size = entry.size;
         }
         nodes.set(nextPath, node);
         nodes.get(currentPath).children.push(node);
-      } else if (entry.modifiedAt && nodes.get(nextPath).modifiedAt < entry.modifiedAt) {
+      } else if (
+        entry.modifiedAt &&
+        nodes.get(nextPath).modifiedAt < entry.modifiedAt
+      ) {
         nodes.get(nextPath).modifiedAt = entry.modifiedAt;
       }
 
       currentPath = nextPath;
     }
 
-    if (entry.type === 'file') {
+    if (entry.type === "file") {
       fileCount += 1;
       if (!firstFilePath) {
         firstFilePath = entry.relativePath;
@@ -294,7 +328,7 @@ function buildTree(entries, rootName) {
   return { tree: root, firstFilePath, stats: { fileCount } };
 }
 
-async function removeSession(sessionId, reason = 'manual') {
+async function removeSession(sessionId, reason = "manual") {
   const session = sessionStore.get(sessionId);
   if (!session) {
     return;
@@ -302,10 +336,10 @@ async function removeSession(sessionId, reason = 'manual') {
 
   sessionStore.delete(sessionId);
   await rm(session.workspaceDir, { recursive: true, force: true });
-  logEvent('info', 'session.removed', {
+  logEvent("info", "session.removed", {
     sessionId,
     reason,
-    workspaceDir: session.workspaceDir
+    workspaceDir: session.workspaceDir,
   });
 }
 
@@ -318,10 +352,15 @@ function touchSession(sessionId) {
 }
 
 async function readPreviewChunk(targetPath) {
-  const fileHandle = await open(targetPath, 'r');
+  const fileHandle = await open(targetPath, "r");
   try {
     const buffer = Buffer.alloc(TEXT_PREVIEW_LIMIT);
-    const { bytesRead } = await fileHandle.read(buffer, 0, TEXT_PREVIEW_LIMIT, 0);
+    const { bytesRead } = await fileHandle.read(
+      buffer,
+      0,
+      TEXT_PREVIEW_LIMIT,
+      0,
+    );
     return buffer.subarray(0, bytesRead);
   } finally {
     await fileHandle.close();
@@ -329,9 +368,15 @@ async function readPreviewChunk(targetPath) {
 }
 
 async function ensureThumbnail(session, normalizedPath, targetPath, size) {
-  const safeSize = Math.max(48, Math.min(Number(size) || 220, MAX_THUMBNAIL_SIZE));
-  const hash = crypto.createHash('sha1').update(`${normalizedPath}:${safeSize}`).digest('hex');
-  const thumbnailDir = path.join(session.workspaceDir, 'thumbnails');
+  const safeSize = Math.max(
+    48,
+    Math.min(Number(size) || 220, MAX_THUMBNAIL_SIZE),
+  );
+  const hash = crypto
+    .createHash("sha1")
+    .update(`${normalizedPath}:${safeSize}`)
+    .digest("hex");
+  const thumbnailDir = path.join(session.workspaceDir, "thumbnails");
   const thumbnailPath = path.join(thumbnailDir, `${hash}.jpg`);
 
   await mkdir(thumbnailDir, { recursive: true });
@@ -340,25 +385,41 @@ async function ensureThumbnail(session, normalizedPath, targetPath, size) {
   if (!existing) {
     await sharp(targetPath)
       .rotate()
-      .resize({ width: safeSize, height: safeSize, fit: 'inside', withoutEnlargement: true })
+      .resize({
+        width: safeSize,
+        height: safeSize,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
       .jpeg({ quality: 55, mozjpeg: true })
       .toFile(thumbnailPath);
 
-    logEvent('info', 'session.thumbnail.generated', {
+    logEvent("info", "session.thumbnail.generated", {
       sessionId: session.id,
       path: normalizedPath,
       size: safeSize,
-      thumbnailPath
+      thumbnailPath,
     });
   }
 
   return thumbnailPath;
 }
 
-async function ensureImagePreview(session, normalizedPath, targetPath, profileName) {
-  const profile = IMAGE_PREVIEW_PROFILES[profileName] || IMAGE_PREVIEW_PROFILES.balanced;
-  const hash = crypto.createHash('sha1').update(`${normalizedPath}:${profileName}:${profile.size}:${profile.quality}`).digest('hex');
-  const previewDir = path.join(session.workspaceDir, 'previews');
+async function ensureImagePreview(
+  session,
+  normalizedPath,
+  targetPath,
+  profileName,
+) {
+  const profile =
+    IMAGE_PREVIEW_PROFILES[profileName] || IMAGE_PREVIEW_PROFILES.balanced;
+  const hash = crypto
+    .createHash("sha1")
+    .update(
+      `${normalizedPath}:${profileName}:${profile.size}:${profile.quality}`,
+    )
+    .digest("hex");
+  const previewDir = path.join(session.workspaceDir, "previews");
   const previewPath = path.join(previewDir, `${hash}.jpg`);
 
   await mkdir(previewDir, { recursive: true });
@@ -367,16 +428,25 @@ async function ensureImagePreview(session, normalizedPath, targetPath, profileNa
   if (!existing) {
     await sharp(targetPath)
       .rotate()
-      .resize({ width: profile.size, height: profile.size, fit: 'inside', withoutEnlargement: true })
-      .flatten({ background: '#f7f3eb' })
-      .jpeg({ quality: profile.quality, mozjpeg: true, chromaSubsampling: '4:2:0' })
+      .resize({
+        width: profile.size,
+        height: profile.size,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .flatten({ background: "#f7f3eb" })
+      .jpeg({
+        quality: profile.quality,
+        mozjpeg: true,
+        chromaSubsampling: "4:2:0",
+      })
       .toFile(previewPath);
 
-    logEvent('info', 'session.image_preview.generated', {
+    logEvent("info", "session.image_preview.generated", {
       sessionId: session.id,
       path: normalizedPath,
       profile: profileName,
-      previewPath
+      previewPath,
     });
   }
 
@@ -387,11 +457,11 @@ setInterval(() => {
   const now = Date.now();
   for (const [sessionId, session] of sessionStore.entries()) {
     if (now - session.lastAccessedAt > SESSION_TTL_MS) {
-      removeSession(sessionId, 'expired').catch((error) => {
-        logEvent('error', 'session.cleanup.failed', {
+      removeSession(sessionId, "expired").catch((error) => {
+        logEvent("error", "session.cleanup.failed", {
           sessionId,
           error: error.message,
-          stack: error.stack
+          stack: error.stack,
         });
       });
     }
@@ -399,11 +469,11 @@ setInterval(() => {
 
   for (const [jobId, job] of jobStore.entries()) {
     if (job.cleanupAt && now > job.cleanupAt) {
-      cleanupJob(jobId, 'expired').catch((error) => {
-        logEvent('error', 'job.cleanup.failed', {
+      cleanupJob(jobId, "expired").catch((error) => {
+        logEvent("error", "job.cleanup.failed", {
           jobId,
           error: error.message,
-          stack: error.stack
+          stack: error.stack,
         });
       });
     }
@@ -412,12 +482,12 @@ setInterval(() => {
 
 async function shutdown() {
   if (isShuttingDown) {
-    logEvent('warn', 'shutdown.duplicate_signal_ignored');
+    logEvent("warn", "shutdown.duplicate_signal_ignored");
     return;
   }
 
   isShuttingDown = true;
-  logEvent('info', 'shutdown.start', { activeSessions: sessionStore.size });
+  logEvent("info", "shutdown.start", { activeSessions: sessionStore.size });
   if (server) {
     await new Promise((resolve, reject) => {
       server.close((error) => {
@@ -428,40 +498,46 @@ async function shutdown() {
         resolve();
       });
     });
-    logEvent('info', 'server.stopped_accepting_requests');
+    logEvent("info", "server.stopped_accepting_requests");
   }
 
-  await Promise.all([...sessionStore.keys()].map((sessionId) => removeSession(sessionId, 'shutdown')));
-  await Promise.all([...jobStore.keys()].map((jobId) => cleanupJob(jobId, 'shutdown')));
-  logEvent('info', 'shutdown.complete', { activeSessions: sessionStore.size });
+  await Promise.all(
+    [...sessionStore.keys()].map((sessionId) =>
+      removeSession(sessionId, "shutdown"),
+    ),
+  );
+  await Promise.all(
+    [...jobStore.keys()].map((jobId) => cleanupJob(jobId, "shutdown")),
+  );
+  logEvent("info", "shutdown.complete", { activeSessions: sessionStore.size });
   process.exit(0);
 }
 
-process.on('SIGTERM', () => {
-  logEvent('info', 'signal.received', { signal: 'SIGTERM' });
+process.on("SIGTERM", () => {
+  logEvent("info", "signal.received", { signal: "SIGTERM" });
   shutdown().catch((error) => {
-    logEvent('error', 'shutdown.failed', {
-      signal: 'SIGTERM',
+    logEvent("error", "shutdown.failed", {
+      signal: "SIGTERM",
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
     });
     process.exit(1);
   });
 });
 
-process.on('SIGINT', () => {
-  logEvent('info', 'signal.received', { signal: 'SIGINT' });
+process.on("SIGINT", () => {
+  logEvent("info", "signal.received", { signal: "SIGINT" });
   shutdown().catch((error) => {
-    logEvent('error', 'shutdown.failed', {
-      signal: 'SIGINT',
+    logEvent("error", "shutdown.failed", {
+      signal: "SIGINT",
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
     });
     process.exit(1);
   });
 });
 
-app.get('/health', (_req, res) => {
+app.get("/health", (_req, res) => {
   res.json({ ok: true, sessions: sessionStore.size, jobs: jobStore.size });
 });
 
@@ -469,23 +545,25 @@ async function processSessionJob(job, confirmOversize = false) {
   const { url } = job;
 
   if (!url) {
-    throw new Error('ZIP URL is required.');
+    throw new Error("ZIP URL is required.");
   }
 
   let parsedUrl;
   try {
     parsedUrl = new URL(url);
   } catch {
-    throw new Error('Enter a valid public URL.');
+    throw new Error("Enter a valid public URL.");
   }
 
-  if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-    throw new Error('Only HTTP and HTTPS URLs are supported.');
+  if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+    throw new Error("Only HTTP and HTTPS URLs are supported.");
   }
 
-  const workspaceDir = await mkdtemp(path.join(os.tmpdir(), 'zip-image-viewer-'));
-  const zipPath = path.join(workspaceDir, 'archive.zip');
-  const extractDir = path.join(workspaceDir, 'extracted');
+  const workspaceDir = await mkdtemp(
+    path.join(os.tmpdir(), "zip-image-viewer-"),
+  );
+  const zipPath = path.join(workspaceDir, "archive.zip");
+  const extractDir = path.join(workspaceDir, "extracted");
   await mkdir(extractDir, { recursive: true });
   job.workspaceDir = workspaceDir;
   job.zipPath = zipPath;
@@ -493,53 +571,68 @@ async function processSessionJob(job, confirmOversize = false) {
   job.abortController = new AbortController();
 
   try {
-    emitJob(job, { status: 'downloading', phase: 'downloading', message: 'Starting archive download', error: '' });
-    logEvent('info', 'session.create.start', {
+    emitJob(job, {
+      status: "downloading",
+      phase: "downloading",
+      message: "Starting archive download",
+      error: "",
+    });
+    logEvent("info", "session.create.start", {
       jobId: job.id,
       url,
       confirmOversize,
-      workspaceDir
+      workspaceDir,
     });
 
-    const response = await fetch(url, { redirect: 'follow', signal: job.abortController.signal });
+    const response = await fetch(url, {
+      redirect: "follow",
+      signal: job.abortController.signal,
+    });
     if (!response.ok || !response.body) {
       throw new Error(`Download failed with status ${response.status}.`);
     }
 
-    const headerSize = Number(response.headers.get('content-length')) || 0;
+    const headerSize = Number(response.headers.get("content-length")) || 0;
     emitJob(job, {
       reportedSize: headerSize,
       downloadedBytes: 0,
       percent: headerSize > 0 ? 0 : null,
       downloadSpeedBytesPerSec: 0,
-      message: headerSize > 0 ? `Downloading archive: 0 of ${formatBytes(headerSize)}` : 'Downloading archive'
+      message:
+        headerSize > 0
+          ? `Downloading archive: 0 of ${formatBytes(headerSize)}`
+          : "Downloading archive",
     });
-    logEvent('info', 'download.start', {
+    logEvent("info", "download.start", {
       jobId: job.id,
       url,
       reportedSize: headerSize,
-      reportedSizeLabel: formatBytes(headerSize)
+      reportedSizeLabel: formatBytes(headerSize),
     });
 
     if (headerSize > CONFIRM_SIZE_BYTES && !confirmOversize) {
       await rm(workspaceDir, { recursive: true, force: true });
-      emitJob(job, {
-        status: 'awaiting_confirmation',
-        phase: 'confirm',
-        requiresConfirmation: true,
-        reportedSize: headerSize,
-        downloadSpeedBytesPerSec: 0,
-        message: `Archive is ${formatBytes(headerSize)} and needs confirmation before download.`
-      }, 'confirmation');
-      logEvent('warn', 'download.confirmation.required', {
+      emitJob(
+        job,
+        {
+          status: "awaiting_confirmation",
+          phase: "confirm",
+          requiresConfirmation: true,
+          reportedSize: headerSize,
+          downloadSpeedBytesPerSec: 0,
+          message: `Archive is ${formatBytes(headerSize)} and needs confirmation before download.`,
+        },
+        "confirmation",
+      );
+      logEvent("warn", "download.confirmation.required", {
         jobId: job.id,
         url,
         reportedSize: headerSize,
         reportedSizeLabel: formatBytes(headerSize),
         limit: CONFIRM_SIZE_BYTES,
-        limitLabel: formatBytes(CONFIRM_SIZE_BYTES)
+        limitLabel: formatBytes(CONFIRM_SIZE_BYTES),
       });
-      closeJob(job, 'awaiting_confirmation');
+      closeJob(job, "awaiting_confirmation");
       return;
     }
 
@@ -554,8 +647,14 @@ async function processSessionJob(job, confirmOversize = false) {
         return;
       }
 
-      const speed = Math.max(0, Math.round((downloadWindowBytes * 1000) / elapsedMs));
-      const percent = headerSize > 0 ? Math.floor((downloadedBytes / headerSize) * 100) : null;
+      const speed = Math.max(
+        0,
+        Math.round((downloadWindowBytes * 1000) / elapsedMs),
+      );
+      const percent =
+        headerSize > 0
+          ? Math.floor((downloadedBytes / headerSize) * 100)
+          : null;
       emitJob(job, {
         downloadedBytes,
         reportedSize: headerSize,
@@ -564,10 +663,10 @@ async function processSessionJob(job, confirmOversize = false) {
         message:
           headerSize > 0
             ? `Downloading archive: ${formatBytes(downloadedBytes)} of ${formatBytes(headerSize)}`
-            : `Downloading archive: ${formatBytes(downloadedBytes)} received`
+            : `Downloading archive: ${formatBytes(downloadedBytes)} received`,
       });
 
-      logEvent('info', 'download.progress', {
+      logEvent("info", "download.progress", {
         jobId: job.id,
         url,
         downloadedBytes,
@@ -576,7 +675,7 @@ async function processSessionJob(job, confirmOversize = false) {
         totalLabel: formatBytes(headerSize),
         speedBytesPerSec: speed,
         speedLabel: `${formatBytes(speed)}/s`,
-        percent: percent == null ? null : Math.min(percent, 100)
+        percent: percent == null ? null : Math.min(percent, 100),
       });
 
       lastDownloadEmitAt = now;
@@ -590,54 +689,62 @@ async function processSessionJob(job, confirmOversize = false) {
         emitDownloadProgress(false);
 
         if (!confirmOversize && downloadedBytes > CONFIRM_SIZE_BYTES) {
-          const error = new Error('Archive exceeds 1 GB.');
-          error.code = 'OVERSIZE_CONFIRM';
+          const error = new Error("Archive exceeds 1 GB.");
+          error.code = "OVERSIZE_CONFIRM";
           callback(error);
           return;
         }
         callback(null, chunk);
-      }
+      },
     });
 
     try {
-      await pipeline(Readable.fromWeb(response.body), guard, createWriteStream(zipPath));
+      await pipeline(
+        Readable.fromWeb(response.body),
+        guard,
+        createWriteStream(zipPath),
+      );
       emitDownloadProgress(true);
       emitJob(job, {
         downloadedBytes,
         reportedSize: headerSize,
         percent: 100,
         downloadSpeedBytesPerSec: 0,
-        message: 'Archive download complete. Preparing extraction...'
+        message: "Archive download complete. Preparing extraction...",
       });
-      logEvent('info', 'download.complete', {
+      logEvent("info", "download.complete", {
         jobId: job.id,
         url,
         downloadedBytes,
         downloadedLabel: formatBytes(downloadedBytes),
-        zipPath
+        zipPath,
       });
     } catch (error) {
-      if (error.code === 'OVERSIZE_CONFIRM') {
+      if (error.code === "OVERSIZE_CONFIRM") {
         await rm(workspaceDir, { recursive: true, force: true });
-        emitJob(job, {
-          status: 'awaiting_confirmation',
-          phase: 'confirm',
-          requiresConfirmation: true,
-          reportedSize: downloadedBytes,
-          downloadedBytes,
-          percent: null,
-          downloadSpeedBytesPerSec: 0,
-          message: `Archive exceeded ${formatBytes(CONFIRM_SIZE_BYTES)} and needs confirmation to continue.`
-        }, 'confirmation');
-        logEvent('warn', 'download.confirmation.required', {
+        emitJob(
+          job,
+          {
+            status: "awaiting_confirmation",
+            phase: "confirm",
+            requiresConfirmation: true,
+            reportedSize: downloadedBytes,
+            downloadedBytes,
+            percent: null,
+            downloadSpeedBytesPerSec: 0,
+            message: `Archive exceeded ${formatBytes(CONFIRM_SIZE_BYTES)} and needs confirmation to continue.`,
+          },
+          "confirmation",
+        );
+        logEvent("warn", "download.confirmation.required", {
           jobId: job.id,
           url,
           reportedSize: downloadedBytes,
           reportedSizeLabel: formatBytes(downloadedBytes),
           limit: CONFIRM_SIZE_BYTES,
-          limitLabel: formatBytes(CONFIRM_SIZE_BYTES)
+          limitLabel: formatBytes(CONFIRM_SIZE_BYTES),
         });
-        closeJob(job, 'awaiting_confirmation');
+        closeJob(job, "awaiting_confirmation");
         return;
       }
       throw error;
@@ -655,31 +762,33 @@ async function processSessionJob(job, confirmOversize = false) {
       }
 
       const safeTotal = Math.max(1, directory.files.length);
-      const extractPercent = Math.floor((extractedEntries.length / safeTotal) * 100);
+      const extractPercent = Math.floor(
+        (extractedEntries.length / safeTotal) * 100,
+      );
       emitJob(job, {
         extractedEntries: extractedEntries.length,
         totalEntries: directory.files.length,
         percent: Math.min(extractPercent, 100),
         downloadSpeedBytesPerSec: 0,
-        message: `Extracting archive: ${extractedEntries.length} of ${directory.files.length} entries`
+        message: `Extracting archive: ${extractedEntries.length} of ${directory.files.length} entries`,
       });
       lastExtractEmitAt = now;
     }
 
     emitJob(job, {
-      status: 'extracting',
-      phase: 'extracting',
+      status: "extracting",
+      phase: "extracting",
       totalEntries: directory.files.length,
       extractedEntries: 0,
       percent: 0,
       downloadSpeedBytesPerSec: 0,
-      message: `Extracting archive: 0 of ${directory.files.length} entries`
+      message: `Extracting archive: 0 of ${directory.files.length} entries`,
     });
-    logEvent('info', 'extract.start', {
+    logEvent("info", "extract.start", {
       jobId: job.id,
       url,
       entryCount: directory.files.length,
-      extractDir
+      extractDir,
     });
 
     for (const entry of directory.files) {
@@ -687,13 +796,21 @@ async function processSessionJob(job, confirmOversize = false) {
       const destination = path.join(extractDir, relativePath);
       const resolved = path.resolve(destination);
 
-      if (!resolved.startsWith(`${extractRootPath}${path.sep}`) && resolved !== extractRootPath) {
-        throw new Error('Archive contains invalid file paths.');
+      if (
+        !resolved.startsWith(`${extractRootPath}${path.sep}`) &&
+        resolved !== extractRootPath
+      ) {
+        throw new Error("Archive contains invalid file paths.");
       }
 
-      if (entry.type === 'Directory') {
+      if (entry.type === "Directory") {
         await mkdir(destination, { recursive: true });
-        extractedEntries.push({ relativePath, type: 'directory', size: 0, modifiedAt: entry.lastModifiedDateTime?.getTime() || 0 });
+        extractedEntries.push({
+          relativePath,
+          type: "directory",
+          size: 0,
+          modifiedAt: entry.lastModifiedDateTime?.getTime() || 0,
+        });
         emitExtractionProgress(false);
         continue;
       }
@@ -702,9 +819,9 @@ async function processSessionJob(job, confirmOversize = false) {
       await pipeline(entry.stream(), createWriteStream(destination));
       extractedEntries.push({
         relativePath,
-        type: 'file',
+        type: "file",
         size: entry.uncompressedSize || 0,
-        modifiedAt: entry.lastModifiedDateTime?.getTime() || 0
+        modifiedAt: entry.lastModifiedDateTime?.getTime() || 0,
       });
 
       emitExtractionProgress(false);
@@ -712,19 +829,22 @@ async function processSessionJob(job, confirmOversize = false) {
 
     emitExtractionProgress(true);
 
-    const archiveName = path.basename(parsedUrl.pathname) || 'archive.zip';
-    const rootName = archiveName.replace(/\.zip$/i, '') || archiveName;
-    const { tree, firstFilePath, stats } = buildTree(extractedEntries, rootName);
+    const archiveName = path.basename(parsedUrl.pathname) || "archive.zip";
+    const rootName = archiveName.replace(/\.zip$/i, "") || archiveName;
+    const { tree, firstFilePath, stats } = buildTree(
+      extractedEntries,
+      rootName,
+    );
     const sessionId = crypto.randomUUID();
     const directoryCount = extractedEntries.length - stats.fileCount;
 
-    logEvent('info', 'extract.complete', {
+    logEvent("info", "extract.complete", {
       jobId: job.id,
       url,
       entryCount: extractedEntries.length,
       fileCount: stats.fileCount,
       directoryCount,
-      firstFilePath
+      firstFilePath,
     });
 
     sessionStore.set(sessionId, {
@@ -734,231 +854,258 @@ async function processSessionJob(job, confirmOversize = false) {
       tree,
       firstFilePath,
       stats,
-      lastAccessedAt: Date.now()
+      lastAccessedAt: Date.now(),
     });
 
-    logEvent('info', 'session.create.complete', {
+    logEvent("info", "session.create.complete", {
       jobId: job.id,
       sessionId,
       url,
       fileCount: stats.fileCount,
-      firstFilePath
+      firstFilePath,
     });
 
-    job.workspaceDir = '';
-    job.extractDir = '';
-    job.zipPath = '';
+    job.workspaceDir = "";
+    job.extractDir = "";
+    job.zipPath = "";
 
-    emitJob(job, {
-      status: 'ready',
-      phase: 'ready',
-      sessionId,
-      percent: 100,
-      downloadSpeedBytesPerSec: 0,
-      message: 'Archive is ready to browse.',
-      requiresConfirmation: false
-    }, 'ready');
-    closeJob(job, 'ready');
+    emitJob(
+      job,
+      {
+        status: "ready",
+        phase: "ready",
+        sessionId,
+        percent: 100,
+        downloadSpeedBytesPerSec: 0,
+        message: "Archive is ready to browse.",
+        requiresConfirmation: false,
+      },
+      "ready",
+    );
+    closeJob(job, "ready");
   } catch (error) {
     await rm(workspaceDir, { recursive: true, force: true });
-    logEvent('error', 'session.create.failed', {
+    logEvent("error", "session.create.failed", {
       jobId: job.id,
       url,
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
     });
 
-    if (error.name === 'AbortError') {
-      emitJob(job, {
-        status: 'cancelled',
-        phase: 'cancelled',
-        error: '',
-        downloadSpeedBytesPerSec: 0,
-        message: 'Archive loading was cancelled.'
-      }, 'cancelled');
-      closeJob(job, 'cancelled');
+    if (error.name === "AbortError") {
+      emitJob(
+        job,
+        {
+          status: "cancelled",
+          phase: "cancelled",
+          error: "",
+          downloadSpeedBytesPerSec: 0,
+          message: "Archive loading was cancelled.",
+        },
+        "cancelled",
+      );
+      closeJob(job, "cancelled");
       return;
     }
 
-    emitJob(job, {
-      status: 'error',
-      phase: 'error',
-      error: error.message || 'Could not process this ZIP file.',
-      downloadSpeedBytesPerSec: 0,
-      message: error.message || 'Could not process this ZIP file.'
-    }, 'job-error');
-    closeJob(job, 'error');
+    emitJob(
+      job,
+      {
+        status: "error",
+        phase: "error",
+        error: error.message || "Could not process this ZIP file.",
+        downloadSpeedBytesPerSec: 0,
+        message: error.message || "Could not process this ZIP file.",
+      },
+      "job-error",
+    );
+    closeJob(job, "error");
   }
 }
 
-app.post('/api/sessions', async (req, res) => {
+app.post("/api/sessions", async (req, res) => {
   const { url, confirmOversize = false } = req.body || {};
   if (!url) {
-    return res.status(400).json({ error: 'ZIP URL is required.' });
+    return res.status(400).json({ error: "ZIP URL is required." });
   }
   const job = createJob(url);
 
-  emitJob(job, { message: 'Queued archive request' });
+  emitJob(job, { message: "Queued archive request" });
   processSessionJob(job, confirmOversize).catch((error) => {
-    logEvent('error', 'job.process.unhandled', {
+    logEvent("error", "job.process.unhandled", {
       jobId: job.id,
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
     });
   });
 
   return res.status(202).json({ jobId: job.id, ...sanitizeJob(job) });
 });
 
-app.get('/api/session-jobs/:id', (req, res) => {
+app.get("/api/session-jobs/:id", (req, res) => {
   const job = jobStore.get(req.params.id);
   if (!job) {
-    return res.status(404).json({ error: 'Job not found.' });
+    return res.status(404).json({ error: "Job not found." });
   }
 
   return res.json(sanitizeJob(job));
 });
 
-app.get('/api/session-jobs/:id/events', (req, res) => {
+app.get("/api/session-jobs/:id/events", (req, res) => {
   const job = jobStore.get(req.params.id);
   if (!job) {
-    return res.status(404).json({ error: 'Job not found.' });
+    return res.status(404).json({ error: "Job not found." });
   }
 
-  res.setHeader('content-type', 'text/event-stream');
-  res.setHeader('cache-control', 'no-cache, no-transform');
-  res.setHeader('connection', 'keep-alive');
-  res.setHeader('x-accel-buffering', 'no');
+  res.setHeader("content-type", "text/event-stream");
+  res.setHeader("cache-control", "no-cache, no-transform");
+  res.setHeader("connection", "keep-alive");
+  res.setHeader("x-accel-buffering", "no");
   res.flushHeaders?.();
 
   job.subscribers.add(res);
-  res.write('retry: 1500\n\n');
+  res.write("retry: 1500\n\n");
   res.write(`event: progress\n`);
   res.write(`data: ${JSON.stringify(sanitizeJob(job))}\n\n`);
 
-  req.on('close', () => {
+  req.on("close", () => {
     job.subscribers.delete(res);
   });
 });
 
-app.post('/api/session-jobs/:id/confirm', (req, res) => {
+app.post("/api/session-jobs/:id/confirm", (req, res) => {
   const job = jobStore.get(req.params.id);
   if (!job) {
-    return res.status(404).json({ error: 'Job not found.' });
+    return res.status(404).json({ error: "Job not found." });
   }
 
   if (!job.requiresConfirmation) {
-    return res.status(400).json({ error: 'This job does not need confirmation.' });
+    return res
+      .status(400)
+      .json({ error: "This job does not need confirmation." });
   }
 
   job.requiresConfirmation = false;
   job.cleanupAt = 0;
   processSessionJob(job, true).catch((error) => {
-    logEvent('error', 'job.confirm.unhandled', {
+    logEvent("error", "job.confirm.unhandled", {
       jobId: job.id,
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
     });
   });
 
   return res.json(sanitizeJob(job));
 });
 
-app.delete('/api/session-jobs/:id', async (req, res) => {
+app.delete("/api/session-jobs/:id", async (req, res) => {
   const job = jobStore.get(req.params.id);
   if (!job) {
-    return res.status(404).json({ error: 'Job not found.' });
+    return res.status(404).json({ error: "Job not found." });
   }
 
   job.abortController?.abort();
-  emitJob(job, {
-    status: 'cancelled',
-    phase: 'cancelled',
-    error: '',
-    downloadSpeedBytesPerSec: 0,
-    message: 'Archive loading was cancelled.'
-  }, 'cancelled');
-  closeJob(job, 'cancelled');
-  await cleanupJob(job.id, 'cancelled');
+  emitJob(
+    job,
+    {
+      status: "cancelled",
+      phase: "cancelled",
+      error: "",
+      downloadSpeedBytesPerSec: 0,
+      message: "Archive loading was cancelled.",
+    },
+    "cancelled",
+  );
+  closeJob(job, "cancelled");
+  await cleanupJob(job.id, "cancelled");
   return res.status(204).end();
 });
 
-app.get('/api/sessions/:id/tree', (req, res) => {
+app.get("/api/sessions/:id/tree", (req, res) => {
   const session = touchSession(req.params.id);
   if (!session) {
-    logEvent('warn', 'session.tree.missing', { sessionId: req.params.id });
-    return res.status(404).json({ error: 'Session not found or already cleaned up.' });
+    logEvent("warn", "session.tree.missing", { sessionId: req.params.id });
+    return res
+      .status(404)
+      .json({ error: "Session not found or already cleaned up." });
   }
 
-  logEvent('info', 'session.tree.read', {
+  logEvent("info", "session.tree.read", {
     sessionId: session.id,
-    fileCount: session.stats.fileCount
+    fileCount: session.stats.fileCount,
   });
 
   return res.json({
     id: session.id,
     tree: session.tree,
     firstFilePath: session.firstFilePath,
-    stats: session.stats
+    stats: session.stats,
   });
 });
 
-app.get('/api/sessions/:id/file', async (req, res) => {
+app.get("/api/sessions/:id/file", async (req, res) => {
   const session = touchSession(req.params.id);
   if (!session) {
-    logEvent('warn', 'session.file.missing', { sessionId: req.params.id });
-    return res.status(404).json({ error: 'Session not found or already cleaned up.' });
+    logEvent("warn", "session.file.missing", { sessionId: req.params.id });
+    return res
+      .status(404)
+      .json({ error: "Session not found or already cleaned up." });
   }
 
-  const requestedPath = String(req.query.path || '');
-  if (!requestedPath || requestedPath === '.') {
-    logEvent('warn', 'session.file.rejected', {
+  const requestedPath = String(req.query.path || "");
+  if (!requestedPath || requestedPath === ".") {
+    logEvent("warn", "session.file.rejected", {
       sessionId: session.id,
-      reason: 'missing_path'
+      reason: "missing_path",
     });
-    return res.status(400).json({ error: 'File path is required.' });
+    return res.status(400).json({ error: "File path is required." });
   }
 
   let normalizedPath;
   try {
     normalizedPath = sanitizeEntryPath(requestedPath);
   } catch (error) {
-    logEvent('warn', 'session.file.rejected', {
+    logEvent("warn", "session.file.rejected", {
       sessionId: session.id,
       requestedPath,
-      reason: error.message
+      reason: error.message,
     });
     return res.status(400).json({ error: error.message });
   }
 
-  const targetPath = path.resolve(path.join(session.extractDir, normalizedPath));
+  const targetPath = path.resolve(
+    path.join(session.extractDir, normalizedPath),
+  );
   const rootPath = path.resolve(session.extractDir);
 
-  if (!targetPath.startsWith(`${rootPath}${path.sep}`) && targetPath !== rootPath) {
-    logEvent('warn', 'session.file.rejected', {
+  if (
+    !targetPath.startsWith(`${rootPath}${path.sep}`) &&
+    targetPath !== rootPath
+  ) {
+    logEvent("warn", "session.file.rejected", {
       sessionId: session.id,
       requestedPath,
-      reason: 'invalid_path'
+      reason: "invalid_path",
     });
-    return res.status(400).json({ error: 'Invalid file path.' });
+    return res.status(400).json({ error: "Invalid file path." });
   }
 
   const fileStats = await stat(targetPath).catch(() => null);
   if (!fileStats || !fileStats.isFile()) {
-    logEvent('warn', 'session.file.missing', {
+    logEvent("warn", "session.file.missing", {
       sessionId: session.id,
-      requestedPath: normalizedPath
+      requestedPath: normalizedPath,
     });
-    return res.status(404).json({ error: 'File not found.' });
+    return res.status(404).json({ error: "File not found." });
   }
 
-  const wantsPreview = req.query.preview === '1';
-  const wantsThumbnail = req.query.thumbnail === '1';
-  const wantsImagePreview = req.query.imagePreview === '1';
-  const previewQuality = String(req.query.quality || 'balanced');
-  const contentType = mime.lookup(targetPath) || 'application/octet-stream';
+  const wantsPreview = req.query.preview === "1";
+  const wantsThumbnail = req.query.thumbnail === "1";
+  const wantsImagePreview = req.query.imagePreview === "1";
+  const previewQuality = String(req.query.quality || "balanced");
+  const contentType = mime.lookup(targetPath) || "application/octet-stream";
   const rangeHeader = req.headers.range;
-  logEvent('info', 'session.file.read', {
+  logEvent("info", "session.file.read", {
     sessionId: session.id,
     path: normalizedPath,
     preview: wantsPreview,
@@ -967,9 +1114,9 @@ app.get('/api/sessions/:id/file', async (req, res) => {
     previewQuality,
     size: fileStats.size,
     sizeLabel: formatBytes(fileStats.size),
-    contentType
+    contentType,
   });
-  res.setHeader('cache-control', 'no-store');
+  res.setHeader("cache-control", "no-store");
 
   if (wantsPreview) {
     res.type(contentType);
@@ -978,19 +1125,28 @@ app.get('/api/sessions/:id/file', async (req, res) => {
   }
 
   if (wantsThumbnail) {
-    if (classifyMimeType(contentType) !== 'image') {
-      return res.status(400).json({ error: 'Thumbnail preview is only available for image files.' });
+    if (classifyMimeType(contentType) !== "image") {
+      return res
+        .status(400)
+        .json({
+          error: "Thumbnail preview is only available for image files.",
+        });
     }
 
     try {
-      const thumbnailPath = await ensureThumbnail(session, normalizedPath, targetPath, req.query.size);
-      res.type('image/jpeg');
+      const thumbnailPath = await ensureThumbnail(
+        session,
+        normalizedPath,
+        targetPath,
+        req.query.size,
+      );
+      res.type("image/jpeg");
       return createReadStream(thumbnailPath).pipe(res);
     } catch (error) {
-      logEvent('warn', 'session.thumbnail.failed', {
+      logEvent("warn", "session.thumbnail.failed", {
         sessionId: session.id,
         path: normalizedPath,
-        error: error.message
+        error: error.message,
       });
       res.type(contentType);
       return createReadStream(targetPath).pipe(res);
@@ -998,8 +1154,10 @@ app.get('/api/sessions/:id/file', async (req, res) => {
   }
 
   if (wantsImagePreview) {
-    if (classifyMimeType(contentType) !== 'image') {
-      return res.status(400).json({ error: 'Image preview is only available for image files.' });
+    if (classifyMimeType(contentType) !== "image") {
+      return res
+        .status(400)
+        .json({ error: "Image preview is only available for image files." });
     }
 
     if (shouldPreserveOriginalPreview(contentType)) {
@@ -1008,65 +1166,76 @@ app.get('/api/sessions/:id/file', async (req, res) => {
     }
 
     try {
-      const previewPath = await ensureImagePreview(session, normalizedPath, targetPath, previewQuality);
-      res.type('image/jpeg');
+      const previewPath = await ensureImagePreview(
+        session,
+        normalizedPath,
+        targetPath,
+        previewQuality,
+      );
+      res.type("image/jpeg");
       return createReadStream(previewPath).pipe(res);
     } catch (error) {
-      logEvent('warn', 'session.image_preview.failed', {
+      logEvent("warn", "session.image_preview.failed", {
         sessionId: session.id,
         path: normalizedPath,
         quality: previewQuality,
-        error: error.message
+        error: error.message,
       });
       res.type(contentType);
       return createReadStream(targetPath).pipe(res);
     }
   }
 
-  res.setHeader('accept-ranges', 'bytes');
+  res.setHeader("accept-ranges", "bytes");
   res.type(contentType);
 
   const range = parseRangeHeader(rangeHeader, fileStats.size);
-  if (range === 'invalid') {
-    res.setHeader('content-range', `bytes */${fileStats.size}`);
+  if (range === "invalid") {
+    res.setHeader("content-range", `bytes */${fileStats.size}`);
     return res.status(416).end();
   }
 
   if (range) {
     const contentLength = range.end - range.start + 1;
     res.status(206);
-    res.setHeader('content-range', `bytes ${range.start}-${range.end}/${fileStats.size}`);
-    res.setHeader('content-length', String(contentLength));
-    return createReadStream(targetPath, { start: range.start, end: range.end }).pipe(res);
+    res.setHeader(
+      "content-range",
+      `bytes ${range.start}-${range.end}/${fileStats.size}`,
+    );
+    res.setHeader("content-length", String(contentLength));
+    return createReadStream(targetPath, {
+      start: range.start,
+      end: range.end,
+    }).pipe(res);
   }
 
-  res.setHeader('content-length', String(fileStats.size));
+  res.setHeader("content-length", String(fileStats.size));
 
   return createReadStream(targetPath).pipe(res);
 });
 
-app.delete('/api/sessions/:id', async (req, res) => {
+app.delete("/api/sessions/:id", async (req, res) => {
   if (!sessionStore.has(req.params.id)) {
-    logEvent('warn', 'session.delete.missing', { sessionId: req.params.id });
-    return res.status(404).json({ error: 'Session not found.' });
+    logEvent("warn", "session.delete.missing", { sessionId: req.params.id });
+    return res.status(404).json({ error: "Session not found." });
   }
 
-  await removeSession(req.params.id, 'manual');
+  await removeSession(req.params.id, "manual");
   return res.status(204).end();
 });
 
-app.use('/api', (_req, res) => {
-  res.status(404).json({ error: 'Not found.' });
+app.use("/api", (_req, res) => {
+  res.status(404).json({ error: "Not found." });
 });
 
 app.get(/.*/, (_req, res) => {
-  res.sendFile(path.join(distDir, 'index.html'));
+  res.sendFile(path.join(distDir, "index.html"));
 });
 
-server = app.listen(PORT, '0.0.0.0', () => {
-  logEvent('info', 'server.started', {
+server = app.listen(PORT, "0.0.0.0", () => {
+  logEvent("info", "server.started", {
     url: `http://0.0.0.0:${PORT}`,
     sessionTtlMs: SESSION_TTL_MS,
-    cleanupIntervalMs: CLEANUP_INTERVAL_MS
+    cleanupIntervalMs: CLEANUP_INTERVAL_MS,
   });
 });

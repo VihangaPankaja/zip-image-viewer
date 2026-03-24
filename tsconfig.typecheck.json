@@ -11,5 +11,10 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["client/src/**/*.js", "server/**/*.js", "vite.config.js", "eslint.config.js"]
+  "include": [
+    "client/src/**/*.js",
+    "server/**/*.js",
+    "vite.config.js",
+    "eslint.config.js"
+  ]
 }
