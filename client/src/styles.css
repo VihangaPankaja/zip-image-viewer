@@ -1,5 +1,5 @@
 :root,
-html[data-theme='dark'] {
+html[data-theme="dark"] {
   color-scheme: dark;
   --font-sans: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", "SFMono-Regular", "Consolas", monospace;
@@ -29,12 +29,33 @@ html[data-theme='dark'] {
   --accent-warning-bg: rgba(255, 190, 99, 0.14);
   --pill-bg: rgba(10, 32, 41, 0.72);
   --pill-border: rgba(121, 210, 196, 0.2);
-  --hero-gradient: radial-gradient(circle at top left, rgba(88, 214, 200, 0.16), transparent 42%),
-    radial-gradient(circle at top right, rgba(255, 183, 77, 0.14), transparent 38%),
+  --hero-gradient:
+    radial-gradient(
+      circle at top left,
+      rgba(88, 214, 200, 0.16),
+      transparent 42%
+    ),
+    radial-gradient(
+      circle at top right,
+      rgba(255, 183, 77, 0.14),
+      transparent 38%
+    ),
     linear-gradient(135deg, rgba(8, 19, 27, 0.96), rgba(13, 34, 45, 0.88));
-  --panel-gradient: linear-gradient(180deg, rgba(15, 36, 47, 0.82), rgba(8, 22, 31, 0.9));
-  --preview-gradient: linear-gradient(180deg, rgba(13, 36, 49, 0.68), rgba(8, 19, 27, 0.94));
-  --slideshow-gradient: linear-gradient(180deg, rgba(8, 24, 33, 0.94), rgba(4, 13, 19, 0.98));
+  --panel-gradient: linear-gradient(
+    180deg,
+    rgba(15, 36, 47, 0.82),
+    rgba(8, 22, 31, 0.9)
+  );
+  --preview-gradient: linear-gradient(
+    180deg,
+    rgba(13, 36, 49, 0.68),
+    rgba(8, 19, 27, 0.94)
+  );
+  --slideshow-gradient: linear-gradient(
+    180deg,
+    rgba(8, 24, 33, 0.94),
+    rgba(4, 13, 19, 0.98)
+  );
   --backdrop-a: rgba(62, 182, 170, 0.18);
   --backdrop-b: rgba(255, 181, 85, 0.14);
   --thumb-shadow: 0 14px 34px rgba(0, 0, 0, 0.26);
@@ -45,7 +66,7 @@ html[data-theme='dark'] {
   --transition: 180ms ease;
 }
 
-html[data-theme='light'] {
+html[data-theme="light"] {
   color-scheme: light;
   --bg: #f2ece1;
   --bg-elevated: rgba(255, 251, 244, 0.84);
@@ -73,12 +94,37 @@ html[data-theme='light'] {
   --accent-warning-bg: rgba(191, 125, 39, 0.1);
   --pill-bg: rgba(255, 250, 243, 0.92);
   --pill-border: rgba(38, 100, 95, 0.14);
-  --hero-gradient: radial-gradient(circle at top left, rgba(24, 138, 132, 0.13), transparent 40%),
-    radial-gradient(circle at top right, rgba(191, 125, 39, 0.12), transparent 38%),
-    linear-gradient(135deg, rgba(255, 250, 244, 0.96), rgba(245, 238, 228, 0.94));
-  --panel-gradient: linear-gradient(180deg, rgba(255, 251, 246, 0.94), rgba(244, 238, 228, 0.92));
-  --preview-gradient: linear-gradient(180deg, rgba(250, 247, 241, 0.92), rgba(240, 234, 224, 0.96));
-  --slideshow-gradient: linear-gradient(180deg, rgba(251, 247, 240, 0.98), rgba(241, 234, 224, 0.98));
+  --hero-gradient:
+    radial-gradient(
+      circle at top left,
+      rgba(24, 138, 132, 0.13),
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at top right,
+      rgba(191, 125, 39, 0.12),
+      transparent 38%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(255, 250, 244, 0.96),
+      rgba(245, 238, 228, 0.94)
+    );
+  --panel-gradient: linear-gradient(
+    180deg,
+    rgba(255, 251, 246, 0.94),
+    rgba(244, 238, 228, 0.92)
+  );
+  --preview-gradient: linear-gradient(
+    180deg,
+    rgba(250, 247, 241, 0.92),
+    rgba(240, 234, 224, 0.96)
+  );
+  --slideshow-gradient: linear-gradient(
+    180deg,
+    rgba(251, 247, 240, 0.98),
+    rgba(241, 234, 224, 0.98)
+  );
   --backdrop-a: rgba(24, 138, 132, 0.13);
   --backdrop-b: rgba(191, 125, 39, 0.12);
   --thumb-shadow: 0 12px 26px rgba(89, 76, 51, 0.14);
@@ -116,7 +162,8 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
   background-size: 120px 120px;
   opacity: 0.08;
@@ -140,8 +187,13 @@ button,
 a,
 input,
 select {
-  transition: border-color var(--transition), background-color var(--transition), color var(--transition),
-    transform var(--transition), box-shadow var(--transition), opacity var(--transition);
+  transition:
+    border-color var(--transition),
+    background-color var(--transition),
+    color var(--transition),
+    transform var(--transition),
+    box-shadow var(--transition),
+    opacity var(--transition);
 }
 
 a {
@@ -254,7 +306,12 @@ input::placeholder {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(125deg, transparent 0%, rgba(255, 255, 255, 0.05) 44%, transparent 72%);
+  background: linear-gradient(
+    125deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.05) 44%,
+    transparent 72%
+  );
   transform: translateX(-28%);
   pointer-events: none;
 }
@@ -344,6 +401,80 @@ input::placeholder {
   padding-right: 52px;
 }
 
+.custom-dropdown-shell {
+  position: relative;
+}
+
+.custom-dropdown-trigger {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--bg-panel-strong) 82%, transparent);
+  color: var(--text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+}
+
+.custom-dropdown-trigger:hover,
+.custom-dropdown-trigger.open {
+  border-color: var(--border-strong);
+  background: color-mix(
+    in srgb,
+    var(--surface-highlight) 62%,
+    var(--bg-panel-strong)
+  );
+}
+
+.custom-dropdown-trigger:focus {
+  border-color: color-mix(in srgb, var(--accent) 64%, white 12%);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent);
+  outline: none;
+}
+
+.custom-dropdown-caret {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.custom-dropdown-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-panel-strong) 94%, transparent);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+.custom-dropdown-option {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.custom-dropdown-option:last-child {
+  border-bottom: none;
+}
+
+.custom-dropdown-option:hover,
+.custom-dropdown-option.active {
+  background: color-mix(in srgb, var(--surface-highlight) 76%, transparent);
+}
+
 .toolbar-select-shell-wide {
   width: 100%;
 }
@@ -365,13 +496,19 @@ input::placeholder {
 
 .primary-button {
   color: #122127;
-  background: linear-gradient(135deg, var(--accent-warm-strong), var(--accent-warm));
-  box-shadow: 0 14px 30px color-mix(in srgb, var(--accent-warm) 24%, transparent);
+  background: linear-gradient(
+    135deg,
+    var(--accent-warm-strong),
+    var(--accent-warm)
+  );
+  box-shadow: 0 14px 30px
+    color-mix(in srgb, var(--accent-warm) 24%, transparent);
 }
 
 .primary-button:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 18px 34px color-mix(in srgb, var(--accent-warm) 30%, transparent);
+  box-shadow: 0 18px 34px
+    color-mix(in srgb, var(--accent-warm) 30%, transparent);
 }
 
 .ghost-button,
@@ -385,7 +522,11 @@ input::placeholder {
 .ghost-button:hover:not(:disabled),
 .inline-link:hover {
   border-color: var(--border-strong);
-  background: color-mix(in srgb, var(--surface-highlight) 72%, var(--bg-panel-strong));
+  background: color-mix(
+    in srgb,
+    var(--surface-highlight) 72%,
+    var(--bg-panel-strong)
+  );
   transform: translateY(-1px);
 }
 
@@ -393,7 +534,11 @@ input::placeholder {
   min-width: 158px;
   white-space: nowrap;
   border-color: var(--border-amber);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--surface-amber) 90%, transparent), color-mix(in srgb, var(--surface-highlight) 42%, transparent));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--surface-amber) 90%, transparent),
+    color-mix(in srgb, var(--surface-highlight) 42%, transparent)
+  );
 }
 
 .compact-button {
@@ -446,12 +591,20 @@ input::placeholder {
 
 .message-card.error {
   border-color: color-mix(in srgb, var(--accent-danger) 40%, transparent);
-  background: linear-gradient(135deg, var(--accent-danger-bg), color-mix(in srgb, var(--bg-panel-strong) 88%, transparent));
+  background: linear-gradient(
+    135deg,
+    var(--accent-danger-bg),
+    color-mix(in srgb, var(--bg-panel-strong) 88%, transparent)
+  );
 }
 
 .message-card.warning {
   border-color: var(--border-amber);
-  background: linear-gradient(135deg, var(--accent-warning-bg), color-mix(in srgb, var(--bg-panel-strong) 88%, transparent));
+  background: linear-gradient(
+    135deg,
+    var(--accent-warning-bg),
+    color-mix(in srgb, var(--bg-panel-strong) 88%, transparent)
+  );
 }
 
 .message-card.warning,
@@ -467,7 +620,11 @@ input::placeholder {
   padding: 16px 18px;
   border: 1px solid var(--border-strong);
   border-radius: 20px;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--surface-highlight) 82%, transparent), color-mix(in srgb, var(--bg-panel-strong) 88%, transparent));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--surface-highlight) 82%, transparent),
+    color-mix(in srgb, var(--bg-panel-strong) 88%, transparent)
+  );
 }
 
 .progress-card-head,
@@ -493,10 +650,10 @@ input::placeholder {
 
 .progress-bar-fill {
   height: 100%;
-  min-width: 3%;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--accent), var(--accent-warm));
   box-shadow: 0 0 20px color-mix(in srgb, var(--accent) 30%, transparent);
+  transition: width 120ms linear;
 }
 
 .progress-bar-shell.indeterminate .progress-bar-fill {
@@ -508,6 +665,31 @@ input::placeholder {
   margin-top: 12px;
   color: var(--text-muted);
   font-size: 0.92rem;
+}
+
+.progress-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.progress-stat-cell {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-panel-strong) 76%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progress-stat-label {
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
 .viewer-grid {
@@ -628,7 +810,11 @@ input::placeholder {
 
 .tree-row.selected {
   border-color: color-mix(in srgb, var(--accent) 48%, transparent);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--surface-highlight) 92%, transparent), color-mix(in srgb, var(--surface-amber) 36%, transparent));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--surface-highlight) 92%, transparent),
+    color-mix(in srgb, var(--surface-amber) 36%, transparent)
+  );
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
@@ -754,7 +940,11 @@ input::placeholder {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 50% 10%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 48%);
+  background: radial-gradient(
+    circle at 50% 10%,
+    color-mix(in srgb, var(--accent) 10%, transparent),
+    transparent 48%
+  );
   pointer-events: none;
 }
 
@@ -835,7 +1025,11 @@ input::placeholder {
 
 .thumbnail-card.active {
   border-color: color-mix(in srgb, var(--accent) 56%, transparent);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-highlight) 86%, transparent), color-mix(in srgb, var(--bg-inset) 80%, transparent));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-highlight) 86%, transparent),
+    color-mix(in srgb, var(--bg-inset) 80%, transparent)
+  );
 }
 
 .thumbnail-card img {
@@ -895,7 +1089,9 @@ input::placeholder {
 .slideshow-floating {
   position: absolute;
   z-index: 2;
-  transition: opacity var(--transition), transform var(--transition);
+  transition:
+    opacity var(--transition),
+    transform var(--transition);
 }
 
 .slideshow-overlay.chrome-hidden .slideshow-floating {
@@ -1011,7 +1207,11 @@ input::placeholder {
 }
 
 .nav-button:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--surface-highlight) 88%, var(--bg-panel-strong));
+  background: color-mix(
+    in srgb,
+    var(--surface-highlight) 88%,
+    var(--bg-panel-strong)
+  );
   transform: translateY(-50%) scale(1.03);
 }
 
