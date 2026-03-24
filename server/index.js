@@ -26,9 +26,7 @@ const JOB_TTL_MS = 30 * 60 * 1000;
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 const CONFIRM_SIZE_BYTES = 1024 * 1024 * 1024;
 const TEXT_PREVIEW_LIMIT = 2 * 1024 * 1024;
-const DOWNLOAD_PROGRESS_STEP_PERCENT = 10;
-const DOWNLOAD_PROGRESS_STEP_BYTES = 25 * 1024 * 1024;
-const EXTRACTION_PROGRESS_STEP_PERCENT = 10;
+const PROGRESS_EMIT_INTERVAL_MS = 1000;
 const MAX_THUMBNAIL_SIZE = 320;
 const IMAGE_PREVIEW_PROFILES = {
   low: { size: 1280, quality: 58 },
@@ -116,6 +114,7 @@ function createJob(url) {
     percent: 0,
     extractedEntries: 0,
     totalEntries: 0,
+    downloadSpeedBytesPerSec: 0,
     message: 'Waiting to start',
     error: '',
     requiresConfirmation: false,
@@ -146,10 +145,12 @@ function sanitizeJob(job) {
     percent: job.percent,
     extractedEntries: job.extractedEntries,
     totalEntries: job.totalEntries,
+    downloadSpeedBytesPerSec: job.downloadSpeedBytesPerSec,
     message: job.message,
     error: job.error,
     requiresConfirmation: job.requiresConfirmation,
-    sessionId: job.sessionId
+    sessionId: job.sessionId,
+    updatedAt: job.updatedAt
   };
 }
 
@@ -510,6 +511,7 @@ async function processSessionJob(job, confirmOversize = false) {
       reportedSize: headerSize,
       downloadedBytes: 0,
       percent: headerSize > 0 ? 0 : null,
+      downloadSpeedBytesPerSec: 0,
       message: headerSize > 0 ? `Downloading archive: 0 of ${formatBytes(headerSize)}` : 'Downloading archive'
     });
     logEvent('info', 'download.start', {
@@ -526,6 +528,7 @@ async function processSessionJob(job, confirmOversize = false) {
         phase: 'confirm',
         requiresConfirmation: true,
         reportedSize: headerSize,
+        downloadSpeedBytesPerSec: 0,
         message: `Archive is ${formatBytes(headerSize)} and needs confirmation before download.`
       }, 'confirmation');
       logEvent('warn', 'download.confirmation.required', {
@@ -541,47 +544,50 @@ async function processSessionJob(job, confirmOversize = false) {
     }
 
     let downloadedBytes = 0;
-    let nextProgressPercent = DOWNLOAD_PROGRESS_STEP_PERCENT;
-    let nextProgressBytes = DOWNLOAD_PROGRESS_STEP_BYTES;
+    let downloadWindowBytes = 0;
+    let lastDownloadEmitAt = Date.now();
+
+    function emitDownloadProgress(force = false) {
+      const now = Date.now();
+      const elapsedMs = Math.max(1, now - lastDownloadEmitAt);
+      if (!force && elapsedMs < PROGRESS_EMIT_INTERVAL_MS) {
+        return;
+      }
+
+      const speed = Math.max(0, Math.round((downloadWindowBytes * 1000) / elapsedMs));
+      const percent = headerSize > 0 ? Math.floor((downloadedBytes / headerSize) * 100) : null;
+      emitJob(job, {
+        downloadedBytes,
+        reportedSize: headerSize,
+        percent: percent == null ? null : Math.min(percent, 100),
+        downloadSpeedBytesPerSec: speed,
+        message:
+          headerSize > 0
+            ? `Downloading archive: ${formatBytes(downloadedBytes)} of ${formatBytes(headerSize)}`
+            : `Downloading archive: ${formatBytes(downloadedBytes)} received`
+      });
+
+      logEvent('info', 'download.progress', {
+        jobId: job.id,
+        url,
+        downloadedBytes,
+        downloadedLabel: formatBytes(downloadedBytes),
+        totalBytes: headerSize,
+        totalLabel: formatBytes(headerSize),
+        speedBytesPerSec: speed,
+        speedLabel: `${formatBytes(speed)}/s`,
+        percent: percent == null ? null : Math.min(percent, 100)
+      });
+
+      lastDownloadEmitAt = now;
+      downloadWindowBytes = 0;
+    }
+
     const guard = new Transform({
       transform(chunk, _encoding, callback) {
         downloadedBytes += chunk.length;
-
-        if (headerSize > 0) {
-          const percent = Math.floor((downloadedBytes / headerSize) * 100);
-          if (percent >= nextProgressPercent) {
-            emitJob(job, {
-              downloadedBytes,
-              reportedSize: headerSize,
-              percent: Math.min(percent, 100),
-              message: `Downloading archive: ${formatBytes(downloadedBytes)} of ${formatBytes(headerSize)}`
-            });
-            logEvent('info', 'download.progress', {
-              jobId: job.id,
-              url,
-              downloadedBytes,
-              downloadedLabel: formatBytes(downloadedBytes),
-              totalBytes: headerSize,
-              totalLabel: formatBytes(headerSize),
-              percent: Math.min(percent, 100)
-            });
-            nextProgressPercent += DOWNLOAD_PROGRESS_STEP_PERCENT;
-          }
-        } else if (downloadedBytes >= nextProgressBytes) {
-          emitJob(job, {
-            downloadedBytes,
-            reportedSize: 0,
-            percent: null,
-            message: `Downloading archive: ${formatBytes(downloadedBytes)} received`
-          });
-          logEvent('info', 'download.progress', {
-            jobId: job.id,
-            url,
-            downloadedBytes,
-            downloadedLabel: formatBytes(downloadedBytes)
-          });
-          nextProgressBytes += DOWNLOAD_PROGRESS_STEP_BYTES;
-        }
+        downloadWindowBytes += chunk.length;
+        emitDownloadProgress(false);
 
         if (!confirmOversize && downloadedBytes > CONFIRM_SIZE_BYTES) {
           const error = new Error('Archive exceeds 1 GB.');
@@ -595,10 +601,12 @@ async function processSessionJob(job, confirmOversize = false) {
 
     try {
       await pipeline(Readable.fromWeb(response.body), guard, createWriteStream(zipPath));
+      emitDownloadProgress(true);
       emitJob(job, {
         downloadedBytes,
         reportedSize: headerSize,
         percent: 100,
+        downloadSpeedBytesPerSec: 0,
         message: 'Archive download complete. Preparing extraction...'
       });
       logEvent('info', 'download.complete', {
@@ -618,6 +626,7 @@ async function processSessionJob(job, confirmOversize = false) {
           reportedSize: downloadedBytes,
           downloadedBytes,
           percent: null,
+          downloadSpeedBytesPerSec: 0,
           message: `Archive exceeded ${formatBytes(CONFIRM_SIZE_BYTES)} and needs confirmation to continue.`
         }, 'confirmation');
         logEvent('warn', 'download.confirmation.required', {
@@ -637,13 +646,33 @@ async function processSessionJob(job, confirmOversize = false) {
     const directory = await unzipper.Open.file(zipPath);
     const extractedEntries = [];
     const extractRootPath = path.resolve(extractDir);
-    let nextExtractPercent = EXTRACTION_PROGRESS_STEP_PERCENT;
+    let lastExtractEmitAt = Date.now();
+
+    function emitExtractionProgress(force = false) {
+      const now = Date.now();
+      if (!force && now - lastExtractEmitAt < PROGRESS_EMIT_INTERVAL_MS) {
+        return;
+      }
+
+      const safeTotal = Math.max(1, directory.files.length);
+      const extractPercent = Math.floor((extractedEntries.length / safeTotal) * 100);
+      emitJob(job, {
+        extractedEntries: extractedEntries.length,
+        totalEntries: directory.files.length,
+        percent: Math.min(extractPercent, 100),
+        downloadSpeedBytesPerSec: 0,
+        message: `Extracting archive: ${extractedEntries.length} of ${directory.files.length} entries`
+      });
+      lastExtractEmitAt = now;
+    }
+
     emitJob(job, {
       status: 'extracting',
       phase: 'extracting',
       totalEntries: directory.files.length,
       extractedEntries: 0,
       percent: 0,
+      downloadSpeedBytesPerSec: 0,
       message: `Extracting archive: 0 of ${directory.files.length} entries`
     });
     logEvent('info', 'extract.start', {
@@ -665,16 +694,7 @@ async function processSessionJob(job, confirmOversize = false) {
       if (entry.type === 'Directory') {
         await mkdir(destination, { recursive: true });
         extractedEntries.push({ relativePath, type: 'directory', size: 0, modifiedAt: entry.lastModifiedDateTime?.getTime() || 0 });
-        const extractPercent = Math.floor((extractedEntries.length / directory.files.length) * 100);
-        if (extractPercent >= nextExtractPercent) {
-          emitJob(job, {
-            extractedEntries: extractedEntries.length,
-            totalEntries: directory.files.length,
-            percent: Math.min(extractPercent, 100),
-            message: `Extracting archive: ${extractedEntries.length} of ${directory.files.length} entries`
-          });
-          nextExtractPercent += EXTRACTION_PROGRESS_STEP_PERCENT;
-        }
+        emitExtractionProgress(false);
         continue;
       }
 
@@ -687,17 +707,10 @@ async function processSessionJob(job, confirmOversize = false) {
         modifiedAt: entry.lastModifiedDateTime?.getTime() || 0
       });
 
-      const extractPercent = Math.floor((extractedEntries.length / directory.files.length) * 100);
-      if (extractPercent >= nextExtractPercent) {
-        emitJob(job, {
-          extractedEntries: extractedEntries.length,
-          totalEntries: directory.files.length,
-          percent: Math.min(extractPercent, 100),
-          message: `Extracting archive: ${extractedEntries.length} of ${directory.files.length} entries`
-        });
-        nextExtractPercent += EXTRACTION_PROGRESS_STEP_PERCENT;
-      }
+      emitExtractionProgress(false);
     }
+
+    emitExtractionProgress(true);
 
     const archiveName = path.basename(parsedUrl.pathname) || 'archive.zip';
     const rootName = archiveName.replace(/\.zip$/i, '') || archiveName;
@@ -741,6 +754,7 @@ async function processSessionJob(job, confirmOversize = false) {
       phase: 'ready',
       sessionId,
       percent: 100,
+      downloadSpeedBytesPerSec: 0,
       message: 'Archive is ready to browse.',
       requiresConfirmation: false
     }, 'ready');
@@ -759,6 +773,7 @@ async function processSessionJob(job, confirmOversize = false) {
         status: 'cancelled',
         phase: 'cancelled',
         error: '',
+        downloadSpeedBytesPerSec: 0,
         message: 'Archive loading was cancelled.'
       }, 'cancelled');
       closeJob(job, 'cancelled');
@@ -769,6 +784,7 @@ async function processSessionJob(job, confirmOversize = false) {
       status: 'error',
       phase: 'error',
       error: error.message || 'Could not process this ZIP file.',
+      downloadSpeedBytesPerSec: 0,
       message: error.message || 'Could not process this ZIP file.'
     }, 'job-error');
     closeJob(job, 'error');
@@ -859,6 +875,7 @@ app.delete('/api/session-jobs/:id', async (req, res) => {
     status: 'cancelled',
     phase: 'cancelled',
     error: '',
+    downloadSpeedBytesPerSec: 0,
     message: 'Archive loading was cancelled.'
   }, 'cancelled');
   closeJob(job, 'cancelled');
