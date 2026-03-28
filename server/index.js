@@ -28,6 +28,17 @@ const CONFIRM_SIZE_BYTES = 1024 * 1024 * 1024;
 const TEXT_PREVIEW_LIMIT = 2 * 1024 * 1024;
 const PROGRESS_EMIT_INTERVAL_MS = 1000;
 const MAX_THUMBNAIL_SIZE = 320;
+const DEFAULT_DOWNLOAD_SETTINGS = {
+  threadMode: "auto",
+  threadCount: 3,
+  enableMultithread: true,
+  enableResume: true,
+  maxRetries: 3,
+};
+const MAX_THREAD_COUNT = 8;
+const MAX_RETRIES = 8;
+const RETRY_BASE_DELAY_MS = 1200;
+const STALL_THRESHOLD_MS = 4000;
 const IMAGE_PREVIEW_PROFILES = {
   low: { size: 1280, quality: 58 },
   balanced: { size: 1920, quality: 72 },
@@ -64,6 +75,115 @@ function formatBytes(bytes) {
   );
   const value = bytes / 1024 ** exponent;
   return `${value >= 10 || exponent === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[exponent]}`;
+}
+
+function sleepWithSignal(ms, signal) {
+  if (!Number.isFinite(ms) || ms <= 0) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, ms);
+    function onAbort() {
+      clearTimeout(timer);
+      reject(Object.assign(new Error("Aborted"), { name: "AbortError" }));
+    }
+
+    if (signal?.aborted) {
+      onAbort();
+      return;
+    }
+
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+function parseContentRangeTotal(headerValue) {
+  if (!headerValue) {
+    return 0;
+  }
+
+  const match = String(headerValue).match(/\/([0-9]+)$/);
+  return match ? Number(match[1]) || 0 : 0;
+}
+
+function sanitizeThreadMode(value) {
+  if (value === "single" || value === "segmented" || value === "auto") {
+    return value;
+  }
+  return DEFAULT_DOWNLOAD_SETTINGS.threadMode;
+}
+
+function normalizeDownloadSettings(input) {
+  const source = input && typeof input === "object" ? input : {};
+  const threadCount = Math.max(
+    1,
+    Math.min(
+      MAX_THREAD_COUNT,
+      Number.parseInt(source.threadCount, 10) ||
+        DEFAULT_DOWNLOAD_SETTINGS.threadCount,
+    ),
+  );
+  const maxRetries = Math.max(
+    0,
+    Math.min(
+      MAX_RETRIES,
+      Number.parseInt(source.maxRetries, 10) ||
+        DEFAULT_DOWNLOAD_SETTINGS.maxRetries,
+    ),
+  );
+
+  return {
+    threadMode: sanitizeThreadMode(source.threadMode),
+    threadCount,
+    enableMultithread:
+      source.enableMultithread == null
+        ? DEFAULT_DOWNLOAD_SETTINGS.enableMultithread
+        : Boolean(source.enableMultithread),
+    enableResume:
+      source.enableResume == null
+        ? DEFAULT_DOWNLOAD_SETTINGS.enableResume
+        : Boolean(source.enableResume),
+    maxRetries,
+  };
+}
+
+async function fetchRemoteMetadata(url, signal) {
+  const headers = {
+    "cache-control": "no-cache",
+  };
+
+  try {
+    const response = await fetch(url, {
+      method: "HEAD",
+      redirect: "follow",
+      signal,
+      headers,
+    });
+
+    if (!response.ok) {
+      return {
+        size: 0,
+        acceptRanges: false,
+        etag: "",
+        lastModified: "",
+      };
+    }
+
+    return {
+      size: Number(response.headers.get("content-length")) || 0,
+      acceptRanges: /bytes/i.test(response.headers.get("accept-ranges") || ""),
+      etag: response.headers.get("etag") || "",
+      lastModified: response.headers.get("last-modified") || "",
+    };
+  } catch {
+    return {
+      size: 0,
+      acceptRanges: false,
+      etag: "",
+      lastModified: "",
+    };
+  }
 }
 
 function classifyMimeType(contentType) {
@@ -124,7 +244,7 @@ function parseRangeHeader(rangeHeader, size) {
   };
 }
 
-function createJob(url) {
+function createJob(url, downloadSettings = DEFAULT_DOWNLOAD_SETTINGS) {
   const job = {
     id: crypto.randomUUID(),
     url,
@@ -136,6 +256,17 @@ function createJob(url) {
     extractedEntries: 0,
     totalEntries: 0,
     downloadSpeedBytesPerSec: 0,
+    averageSpeedBytesPerSec: 0,
+    etaSeconds: null,
+    isStalled: false,
+    stallDurationMs: 0,
+    retryCount: 0,
+    maxRetries: DEFAULT_DOWNLOAD_SETTINGS.maxRetries,
+    canResume: false,
+    threadMode: DEFAULT_DOWNLOAD_SETTINGS.threadMode,
+    threadCount: DEFAULT_DOWNLOAD_SETTINGS.threadCount,
+    enableMultithread: DEFAULT_DOWNLOAD_SETTINGS.enableMultithread,
+    enableResume: DEFAULT_DOWNLOAD_SETTINGS.enableResume,
     message: "Waiting to start",
     error: "",
     requiresConfirmation: false,
@@ -149,6 +280,7 @@ function createJob(url) {
     extractDir: "",
     abortController: null,
     cleanupAt: 0,
+    downloadSettings: normalizeDownloadSettings(downloadSettings),
   };
 
   jobStore.set(job.id, job);
@@ -167,6 +299,17 @@ function sanitizeJob(job) {
     extractedEntries: job.extractedEntries,
     totalEntries: job.totalEntries,
     downloadSpeedBytesPerSec: job.downloadSpeedBytesPerSec,
+    averageSpeedBytesPerSec: job.averageSpeedBytesPerSec,
+    etaSeconds: job.etaSeconds,
+    isStalled: job.isStalled,
+    stallDurationMs: job.stallDurationMs,
+    retryCount: job.retryCount,
+    maxRetries: job.maxRetries,
+    canResume: job.canResume,
+    threadMode: job.threadMode,
+    threadCount: job.threadCount,
+    enableMultithread: job.enableMultithread,
+    enableResume: job.enableResume,
     message: job.message,
     error: job.error,
     requiresConfirmation: job.requiresConfirmation,
@@ -541,6 +684,326 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, sessions: sessionStore.size, jobs: jobStore.size });
 });
 
+function createSegmentPlan(totalBytes, threadCount) {
+  const safeCount = Math.max(1, Math.min(threadCount, totalBytes || 1));
+  const segments = [];
+  const base = Math.floor(totalBytes / safeCount);
+  let start = 0;
+
+  for (let index = 0; index < safeCount; index += 1) {
+    const size = index === safeCount - 1 ? totalBytes - start : base;
+    const end = Math.max(start, start + size - 1);
+    segments.push({ start, end, current: start });
+    start = end + 1;
+  }
+
+  return segments;
+}
+
+function isRetryableDownloadError(error) {
+  if (!error) {
+    return false;
+  }
+
+  if (error.name === "AbortError") {
+    return false;
+  }
+
+  if (error.code === "OVERSIZE_CONFIRM") {
+    return false;
+  }
+
+  if (error.code === "DOWNLOAD_FATAL") {
+    return false;
+  }
+
+  if (error.statusCode) {
+    if (error.statusCode >= 500) {
+      return true;
+    }
+
+    return error.statusCode === 408 || error.statusCode === 429;
+  }
+
+  return true;
+}
+
+function createDownloadProgressMonitor(job, state) {
+  let timer = null;
+  let lastTickAt = Date.now();
+  let lastTickBytes = state.getDownloadedBytes();
+  let averageSpeed = 0;
+  let noProgressSince = Date.now();
+
+  function tick(force = false) {
+    const now = Date.now();
+    const currentBytes = state.getDownloadedBytes();
+    const reportedSize = state.getReportedSize();
+    const elapsedMs = Math.max(1, now - lastTickAt);
+    const deltaBytes = Math.max(0, currentBytes - lastTickBytes);
+    if (!force && elapsedMs < PROGRESS_EMIT_INTERVAL_MS) {
+      return;
+    }
+
+    const instantSpeed = Math.max(
+      0,
+      Math.round((deltaBytes * 1000) / elapsedMs),
+    );
+
+    if (deltaBytes > 0) {
+      noProgressSince = now;
+    }
+
+    if (instantSpeed > 0) {
+      averageSpeed =
+        averageSpeed <= 0
+          ? instantSpeed
+          : Math.round(averageSpeed * 0.75 + instantSpeed * 0.25);
+    } else {
+      averageSpeed = Math.round(averageSpeed * 0.86);
+    }
+
+    const stallDurationMs = Math.max(0, now - noProgressSince);
+    const isStalled =
+      state.phase() === "downloading" &&
+      state.status() === "downloading" &&
+      stallDurationMs >= STALL_THRESHOLD_MS;
+    const percent =
+      reportedSize > 0
+        ? Math.min(100, Math.floor((currentBytes / reportedSize) * 100))
+        : null;
+    const etaSeconds =
+      reportedSize > 0 && averageSpeed > 0
+        ? Math.max(0, Math.ceil((reportedSize - currentBytes) / averageSpeed))
+        : null;
+
+    emitJob(job, {
+      downloadedBytes: currentBytes,
+      reportedSize,
+      percent,
+      downloadSpeedBytesPerSec: instantSpeed,
+      averageSpeedBytesPerSec: Math.max(0, averageSpeed),
+      etaSeconds,
+      isStalled,
+      stallDurationMs,
+      message: state.getMessage({
+        currentBytes,
+        reportedSize,
+        isStalled,
+        etaSeconds,
+      }),
+    });
+
+    lastTickAt = now;
+    lastTickBytes = currentBytes;
+  }
+
+  return {
+    start() {
+      if (!timer) {
+        timer = setInterval(() => tick(false), PROGRESS_EMIT_INTERVAL_MS);
+        timer.unref?.();
+      }
+    },
+    flush() {
+      tick(true);
+    },
+    stop() {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    },
+  };
+}
+
+async function downloadSingleAttempt({
+  url,
+  zipPath,
+  metadata,
+  state,
+  signal,
+  confirmOversize,
+  allowResume,
+}) {
+  const existingStats = await stat(zipPath).catch(() => null);
+  const existingSize = existingStats?.isFile() ? existingStats.size : 0;
+  const shouldResume =
+    allowResume &&
+    metadata.acceptRanges &&
+    metadata.size > 0 &&
+    existingSize > 0;
+  const headers = {};
+
+  if (shouldResume) {
+    headers.range = `bytes=${existingSize}-`;
+    if (metadata.etag) {
+      headers["if-range"] = metadata.etag;
+    } else if (metadata.lastModified) {
+      headers["if-range"] = metadata.lastModified;
+    }
+  }
+
+  const response = await fetch(url, {
+    redirect: "follow",
+    signal,
+    headers,
+  });
+
+  if (!response.ok || !response.body) {
+    const error = new Error(`Download failed with status ${response.status}.`);
+    error.statusCode = response.status;
+    if (
+      response.status >= 400 &&
+      response.status < 500 &&
+      response.status !== 408 &&
+      response.status !== 429
+    ) {
+      error.code = "DOWNLOAD_FATAL";
+    }
+    throw error;
+  }
+
+  const isResumedResponse = shouldResume && response.status === 206;
+  let startOffset = 0;
+  if (isResumedResponse) {
+    startOffset = existingSize;
+  } else {
+    await open(zipPath, "w").then((handle) => handle.close());
+  }
+
+  const contentRangeTotal = parseContentRangeTotal(
+    response.headers.get("content-range"),
+  );
+  const responseSize = Number(response.headers.get("content-length")) || 0;
+  state.reportedSize =
+    contentRangeTotal || metadata.size || responseSize + startOffset;
+  state.downloadedBytes = startOffset;
+
+  const guard = new Transform({
+    transform(chunk, _encoding, callback) {
+      state.downloadedBytes += chunk.length;
+      if (!confirmOversize && state.downloadedBytes > CONFIRM_SIZE_BYTES) {
+        const error = new Error("Archive exceeds 1 GB.");
+        error.code = "OVERSIZE_CONFIRM";
+        callback(error);
+        return;
+      }
+      callback(null, chunk);
+    },
+  });
+
+  await pipeline(
+    Readable.fromWeb(response.body),
+    guard,
+    createWriteStream(zipPath, {
+      flags: isResumedResponse ? "r+" : "w",
+      start: startOffset,
+    }),
+  );
+}
+
+async function downloadSegmentedAttempt({
+  url,
+  zipPath,
+  metadata,
+  state,
+  signal,
+  confirmOversize,
+  threadCount,
+  segments,
+}) {
+  if (!metadata.acceptRanges || metadata.size <= 0) {
+    const error = new Error("Server does not support ranged downloads.");
+    error.code = "RANGE_UNSUPPORTED";
+    throw error;
+  }
+
+  if (!segments.length) {
+    segments.push(...createSegmentPlan(metadata.size, threadCount));
+    await open(zipPath, "w+").then(async (handle) => {
+      await handle.truncate(metadata.size);
+      await handle.close();
+    });
+  }
+
+  state.reportedSize = metadata.size;
+  state.downloadedBytes = segments.reduce(
+    (sum, segment) => sum + Math.max(0, segment.current - segment.start),
+    0,
+  );
+
+  await Promise.all(
+    segments.map(async (segment) => {
+      if (segment.current > segment.end) {
+        return;
+      }
+
+      const headers = {
+        range: `bytes=${segment.current}-${segment.end}`,
+      };
+      if (metadata.etag) {
+        headers["if-range"] = metadata.etag;
+      } else if (metadata.lastModified) {
+        headers["if-range"] = metadata.lastModified;
+      }
+
+      const response = await fetch(url, {
+        redirect: "follow",
+        signal,
+        headers,
+      });
+
+      if (response.status === 200) {
+        const error = new Error(
+          "Range mode not supported for segmented download.",
+        );
+        error.code = "RANGE_UNSUPPORTED";
+        throw error;
+      }
+
+      if (!response.ok || !response.body) {
+        const error = new Error(
+          `Download failed with status ${response.status}.`,
+        );
+        error.statusCode = response.status;
+        if (
+          response.status >= 400 &&
+          response.status < 500 &&
+          response.status !== 408 &&
+          response.status !== 429
+        ) {
+          error.code = "DOWNLOAD_FATAL";
+        }
+        throw error;
+      }
+
+      const guard = new Transform({
+        transform(chunk, _encoding, callback) {
+          segment.current += chunk.length;
+          state.downloadedBytes += chunk.length;
+          if (!confirmOversize && state.downloadedBytes > CONFIRM_SIZE_BYTES) {
+            const error = new Error("Archive exceeds 1 GB.");
+            error.code = "OVERSIZE_CONFIRM";
+            callback(error);
+            return;
+          }
+          callback(null, chunk);
+        },
+      });
+
+      await pipeline(
+        Readable.fromWeb(response.body),
+        guard,
+        createWriteStream(zipPath, {
+          flags: "r+",
+          start: segment.current,
+        }),
+      );
+    }),
+  );
+}
+
 async function processSessionJob(job, confirmOversize = false) {
   const { url } = job;
 
@@ -570,10 +1033,51 @@ async function processSessionJob(job, confirmOversize = false) {
   job.extractDir = extractDir;
   job.abortController = new AbortController();
 
+  const settings = normalizeDownloadSettings(job.downloadSettings);
+  job.maxRetries = settings.maxRetries;
+  job.threadMode = settings.threadMode;
+  job.threadCount = settings.threadCount;
+  job.enableMultithread = settings.enableMultithread;
+  job.enableResume = settings.enableResume;
+
+  const downloadState = {
+    downloadedBytes: 0,
+    reportedSize: 0,
+    statusText: "Starting archive download",
+  };
+
+  const monitor = createDownloadProgressMonitor(job, {
+    getDownloadedBytes: () => downloadState.downloadedBytes,
+    getReportedSize: () => downloadState.reportedSize,
+    phase: () => job.phase,
+    status: () => job.status,
+    getMessage: ({ currentBytes, reportedSize, isStalled }) => {
+      if (downloadState.statusText) {
+        return downloadState.statusText;
+      }
+
+      if (isStalled) {
+        return "Download appears stalled. Waiting for more data...";
+      }
+
+      if (reportedSize > 0) {
+        return `Downloading archive: ${formatBytes(currentBytes)} of ${formatBytes(reportedSize)}`;
+      }
+
+      return `Downloading archive: ${formatBytes(currentBytes)} received`;
+    },
+  });
+
   try {
     emitJob(job, {
       status: "downloading",
       phase: "downloading",
+      retryCount: 0,
+      downloadSpeedBytesPerSec: 0,
+      averageSpeedBytesPerSec: 0,
+      etaSeconds: null,
+      isStalled: false,
+      stallDurationMs: 0,
       message: "Starting archive download",
       error: "",
     });
@@ -582,35 +1086,12 @@ async function processSessionJob(job, confirmOversize = false) {
       url,
       confirmOversize,
       workspaceDir,
+      settings,
     });
 
-    const response = await fetch(url, {
-      redirect: "follow",
-      signal: job.abortController.signal,
-    });
-    if (!response.ok || !response.body) {
-      throw new Error(`Download failed with status ${response.status}.`);
-    }
-
-    const headerSize = Number(response.headers.get("content-length")) || 0;
-    emitJob(job, {
-      reportedSize: headerSize,
-      downloadedBytes: 0,
-      percent: headerSize > 0 ? 0 : null,
-      downloadSpeedBytesPerSec: 0,
-      message:
-        headerSize > 0
-          ? `Downloading archive: 0 of ${formatBytes(headerSize)}`
-          : "Downloading archive",
-    });
-    logEvent("info", "download.start", {
-      jobId: job.id,
-      url,
-      reportedSize: headerSize,
-      reportedSizeLabel: formatBytes(headerSize),
-    });
-
-    if (headerSize > CONFIRM_SIZE_BYTES && !confirmOversize) {
+    const metadata = await fetchRemoteMetadata(url, job.abortController.signal);
+    downloadState.reportedSize = metadata.size;
+    if (metadata.size > CONFIRM_SIZE_BYTES && !confirmOversize) {
       await rm(workspaceDir, { recursive: true, force: true });
       emitJob(
         job,
@@ -618,137 +1099,151 @@ async function processSessionJob(job, confirmOversize = false) {
           status: "awaiting_confirmation",
           phase: "confirm",
           requiresConfirmation: true,
-          reportedSize: headerSize,
+          reportedSize: metadata.size,
           downloadSpeedBytesPerSec: 0,
-          message: `Archive is ${formatBytes(headerSize)} and needs confirmation before download.`,
+          averageSpeedBytesPerSec: 0,
+          etaSeconds: null,
+          message: `Archive is ${formatBytes(metadata.size)} and needs confirmation before download.`,
         },
         "confirmation",
       );
-      logEvent("warn", "download.confirmation.required", {
-        jobId: job.id,
-        url,
-        reportedSize: headerSize,
-        reportedSizeLabel: formatBytes(headerSize),
-        limit: CONFIRM_SIZE_BYTES,
-        limitLabel: formatBytes(CONFIRM_SIZE_BYTES),
-      });
       closeJob(job, "awaiting_confirmation");
       return;
     }
 
-    let downloadedBytes = 0;
-    let downloadWindowBytes = 0;
-    let lastDownloadEmitAt = Date.now();
-
-    function emitDownloadProgress(force = false) {
-      const now = Date.now();
-      const elapsedMs = Math.max(1, now - lastDownloadEmitAt);
-      if (!force && elapsedMs < PROGRESS_EMIT_INTERVAL_MS) {
-        return;
-      }
-
-      const speed = Math.max(
-        0,
-        Math.round((downloadWindowBytes * 1000) / elapsedMs),
-      );
-      const percent =
-        headerSize > 0
-          ? Math.floor((downloadedBytes / headerSize) * 100)
-          : null;
-      emitJob(job, {
-        downloadedBytes,
-        reportedSize: headerSize,
-        percent: percent == null ? null : Math.min(percent, 100),
-        downloadSpeedBytesPerSec: speed,
-        message:
-          headerSize > 0
-            ? `Downloading archive: ${formatBytes(downloadedBytes)} of ${formatBytes(headerSize)}`
-            : `Downloading archive: ${formatBytes(downloadedBytes)} received`,
-      });
-
-      logEvent("info", "download.progress", {
-        jobId: job.id,
-        url,
-        downloadedBytes,
-        downloadedLabel: formatBytes(downloadedBytes),
-        totalBytes: headerSize,
-        totalLabel: formatBytes(headerSize),
-        speedBytesPerSec: speed,
-        speedLabel: `${formatBytes(speed)}/s`,
-        percent: percent == null ? null : Math.min(percent, 100),
-      });
-
-      lastDownloadEmitAt = now;
-      downloadWindowBytes = 0;
+    let resolvedMode = settings.threadMode;
+    if (resolvedMode === "auto") {
+      resolvedMode =
+        settings.enableMultithread && metadata.acceptRanges && metadata.size > 0
+          ? "segmented"
+          : "single";
+    }
+    if (resolvedMode === "segmented" && !settings.enableMultithread) {
+      resolvedMode = "single";
     }
 
-    const guard = new Transform({
-      transform(chunk, _encoding, callback) {
-        downloadedBytes += chunk.length;
-        downloadWindowBytes += chunk.length;
-        emitDownloadProgress(false);
+    const resolvedThreadCount =
+      resolvedMode === "segmented" ? Math.max(1, settings.threadCount) : 1;
+    job.threadMode = resolvedMode;
+    job.threadCount = resolvedThreadCount;
+    job.canResume =
+      settings.enableResume &&
+      (metadata.acceptRanges || resolvedMode === "segmented");
 
-        if (!confirmOversize && downloadedBytes > CONFIRM_SIZE_BYTES) {
-          const error = new Error("Archive exceeds 1 GB.");
-          error.code = "OVERSIZE_CONFIRM";
-          callback(error);
+    const segments = [];
+    monitor.start();
+
+    for (let attempt = 0; attempt <= settings.maxRetries; attempt += 1) {
+      job.retryCount = attempt;
+      downloadState.statusText =
+        attempt === 0
+          ? "Starting archive download"
+          : `Retrying download (attempt ${attempt}/${settings.maxRetries})`;
+      monitor.flush();
+
+      try {
+        downloadState.statusText = "";
+        if (resolvedMode === "segmented") {
+          await downloadSegmentedAttempt({
+            url,
+            zipPath,
+            metadata,
+            state: downloadState,
+            signal: job.abortController.signal,
+            confirmOversize,
+            threadCount: resolvedThreadCount,
+            segments,
+          });
+        } else {
+          await downloadSingleAttempt({
+            url,
+            zipPath,
+            metadata,
+            state: downloadState,
+            signal: job.abortController.signal,
+            confirmOversize,
+            allowResume: settings.enableResume,
+          });
+        }
+        break;
+      } catch (error) {
+        if (
+          error.code === "RANGE_UNSUPPORTED" &&
+          settings.threadMode === "auto"
+        ) {
+          resolvedMode = "single";
+          job.threadMode = "single";
+          job.threadCount = 1;
+          job.canResume = settings.enableResume && metadata.acceptRanges;
+          downloadState.downloadedBytes = 0;
+          segments.length = 0;
+          continue;
+        }
+
+        if (error.code === "OVERSIZE_CONFIRM") {
+          monitor.stop();
+          await rm(workspaceDir, { recursive: true, force: true });
+          emitJob(
+            job,
+            {
+              status: "awaiting_confirmation",
+              phase: "confirm",
+              requiresConfirmation: true,
+              reportedSize: downloadState.downloadedBytes,
+              downloadedBytes: downloadState.downloadedBytes,
+              percent: null,
+              downloadSpeedBytesPerSec: 0,
+              averageSpeedBytesPerSec: 0,
+              etaSeconds: null,
+              message: `Archive exceeded ${formatBytes(CONFIRM_SIZE_BYTES)} and needs confirmation to continue.`,
+            },
+            "confirmation",
+          );
+          closeJob(job, "awaiting_confirmation");
           return;
         }
-        callback(null, chunk);
-      },
-    });
 
-    try {
-      await pipeline(
-        Readable.fromWeb(response.body),
-        guard,
-        createWriteStream(zipPath),
-      );
-      emitDownloadProgress(true);
-      emitJob(job, {
-        downloadedBytes,
-        reportedSize: headerSize,
-        percent: 100,
-        downloadSpeedBytesPerSec: 0,
-        message: "Archive download complete. Preparing extraction...",
-      });
-      logEvent("info", "download.complete", {
-        jobId: job.id,
-        url,
-        downloadedBytes,
-        downloadedLabel: formatBytes(downloadedBytes),
-        zipPath,
-      });
-    } catch (error) {
-      if (error.code === "OVERSIZE_CONFIRM") {
-        await rm(workspaceDir, { recursive: true, force: true });
-        emitJob(
-          job,
-          {
-            status: "awaiting_confirmation",
-            phase: "confirm",
-            requiresConfirmation: true,
-            reportedSize: downloadedBytes,
-            downloadedBytes,
-            percent: null,
-            downloadSpeedBytesPerSec: 0,
-            message: `Archive exceeded ${formatBytes(CONFIRM_SIZE_BYTES)} and needs confirmation to continue.`,
-          },
-          "confirmation",
-        );
-        logEvent("warn", "download.confirmation.required", {
-          jobId: job.id,
-          url,
-          reportedSize: downloadedBytes,
-          reportedSizeLabel: formatBytes(downloadedBytes),
-          limit: CONFIRM_SIZE_BYTES,
-          limitLabel: formatBytes(CONFIRM_SIZE_BYTES),
-        });
-        closeJob(job, "awaiting_confirmation");
-        return;
+        if (
+          attempt >= settings.maxRetries ||
+          !isRetryableDownloadError(error)
+        ) {
+          throw error;
+        }
+
+        const delayMs =
+          RETRY_BASE_DELAY_MS * 2 ** attempt + Math.floor(Math.random() * 400);
+        downloadState.statusText = `Download failed, retrying in ${(delayMs / 1000).toFixed(1)}s (attempt ${attempt + 1}/${settings.maxRetries})`;
+        monitor.flush();
+        await sleepWithSignal(delayMs, job.abortController.signal);
       }
-      throw error;
     }
+
+    downloadState.statusText =
+      "Archive download complete. Preparing extraction...";
+    monitor.flush();
+    monitor.stop();
+
+    emitJob(job, {
+      downloadedBytes: downloadState.downloadedBytes,
+      reportedSize: downloadState.reportedSize,
+      percent: 100,
+      downloadSpeedBytesPerSec: 0,
+      averageSpeedBytesPerSec: 0,
+      etaSeconds: 0,
+      isStalled: false,
+      stallDurationMs: 0,
+      message: "Archive download complete. Preparing extraction...",
+    });
+    logEvent("info", "download.complete", {
+      jobId: job.id,
+      url,
+      downloadedBytes: downloadState.downloadedBytes,
+      downloadedLabel: formatBytes(downloadState.downloadedBytes),
+      zipPath,
+      mode: job.threadMode,
+      threadCount: job.threadCount,
+      retries: job.retryCount,
+    });
 
     const directory = await unzipper.Open.file(zipPath);
     const extractedEntries = [];
@@ -770,6 +1265,10 @@ async function processSessionJob(job, confirmOversize = false) {
         totalEntries: directory.files.length,
         percent: Math.min(extractPercent, 100),
         downloadSpeedBytesPerSec: 0,
+        averageSpeedBytesPerSec: 0,
+        etaSeconds: null,
+        isStalled: false,
+        stallDurationMs: 0,
         message: `Extracting archive: ${extractedEntries.length} of ${directory.files.length} entries`,
       });
       lastExtractEmitAt = now;
@@ -782,6 +1281,10 @@ async function processSessionJob(job, confirmOversize = false) {
       extractedEntries: 0,
       percent: 0,
       downloadSpeedBytesPerSec: 0,
+      averageSpeedBytesPerSec: 0,
+      etaSeconds: null,
+      isStalled: false,
+      stallDurationMs: 0,
       message: `Extracting archive: 0 of ${directory.files.length} entries`,
     });
     logEvent("info", "extract.start", {
@@ -877,6 +1380,10 @@ async function processSessionJob(job, confirmOversize = false) {
         sessionId,
         percent: 100,
         downloadSpeedBytesPerSec: 0,
+        averageSpeedBytesPerSec: 0,
+        etaSeconds: 0,
+        isStalled: false,
+        stallDurationMs: 0,
         message: "Archive is ready to browse.",
         requiresConfirmation: false,
       },
@@ -884,6 +1391,7 @@ async function processSessionJob(job, confirmOversize = false) {
     );
     closeJob(job, "ready");
   } catch (error) {
+    monitor.stop();
     await rm(workspaceDir, { recursive: true, force: true });
     logEvent("error", "session.create.failed", {
       jobId: job.id,
@@ -900,6 +1408,10 @@ async function processSessionJob(job, confirmOversize = false) {
           phase: "cancelled",
           error: "",
           downloadSpeedBytesPerSec: 0,
+          averageSpeedBytesPerSec: 0,
+          etaSeconds: null,
+          isStalled: false,
+          stallDurationMs: 0,
           message: "Archive loading was cancelled.",
         },
         "cancelled",
@@ -915,6 +1427,10 @@ async function processSessionJob(job, confirmOversize = false) {
         phase: "error",
         error: error.message || "Could not process this ZIP file.",
         downloadSpeedBytesPerSec: 0,
+        averageSpeedBytesPerSec: 0,
+        etaSeconds: null,
+        isStalled: false,
+        stallDurationMs: 0,
         message: error.message || "Could not process this ZIP file.",
       },
       "job-error",
@@ -924,11 +1440,15 @@ async function processSessionJob(job, confirmOversize = false) {
 }
 
 app.post("/api/sessions", async (req, res) => {
-  const { url, confirmOversize = false } = req.body || {};
+  const {
+    url,
+    confirmOversize = false,
+    downloadSettings = {},
+  } = req.body || {};
   if (!url) {
     return res.status(400).json({ error: "ZIP URL is required." });
   }
-  const job = createJob(url);
+  const job = createJob(url, downloadSettings);
 
   emitJob(job, { message: "Queued archive request" });
   processSessionJob(job, confirmOversize).catch((error) => {
@@ -1126,11 +1646,9 @@ app.get("/api/sessions/:id/file", async (req, res) => {
 
   if (wantsThumbnail) {
     if (classifyMimeType(contentType) !== "image") {
-      return res
-        .status(400)
-        .json({
-          error: "Thumbnail preview is only available for image files.",
-        });
+      return res.status(400).json({
+        error: "Thumbnail preview is only available for image files.",
+      });
     }
 
     try {
