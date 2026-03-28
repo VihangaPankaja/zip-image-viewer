@@ -12,6 +12,8 @@ Browse a public ZIP file through a modern web UI running from a single Docker co
 - text-style files such as `txt`, `md`, `json`, `csv`, `js`, `ts`, `html`, and `css` open in a text preview
 - dark mode and light mode are both available from the interface toggle
 - archive loading shows real-time download and extraction progress in the hero panel
+- download panel shows live speed, ETA, retry state, mode, and thread details
+- download settings are configurable from the UI (auto/single/segmented mode, threads, resume, retries)
 - loaded archives can be cleared directly from the app without reloading the page
 - sessions are cleaned up automatically after inactivity
 
@@ -71,6 +73,9 @@ Open `http://localhost:8080`.
 - if the ZIP is larger than `1 GB`, the app asks whether to continue
 - extracted files are stored only in temporary server session folders
 - archive creation now runs as an async background job with live progress updates over SSE
+- download progress speed monitoring is decoupled from transfer chunks, so stalled downloads report speed/ETA changes correctly
+- auto mode defaults to 3 simultaneous segmented threads when the source supports range requests
+- resumable downloads and retry with backoff are supported for transient failures
 - unsupported binary files can still be opened as raw files
 
 ## Sample Public ZIP URLs
@@ -85,7 +90,7 @@ Note: some large repositories may take longer to download and unpack, and some Z
 
 ## API Endpoints
 
-- `POST /api/sessions` start an async archive job from a ZIP URL
+- `POST /api/sessions` start an async archive job from a ZIP URL (supports `downloadSettings`)
 - `GET /api/session-jobs/:id` fetch current archive job state
 - `GET /api/session-jobs/:id/events` subscribe to live archive progress events
 - `POST /api/session-jobs/:id/confirm` continue an oversized archive job
