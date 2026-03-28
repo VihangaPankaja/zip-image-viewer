@@ -1,19 +1,17 @@
+// @ts-nocheck
 import express from "express";
 import { createReadStream, createWriteStream } from "node:fs";
 import { mkdtemp, mkdir, open, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { fileURLToPath } from "node:url";
 import os from "node:os";
 import crypto from "node:crypto";
 import mime from "mime-types";
 import sharp from "sharp";
 import unzipper from "unzipper";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const distDir = path.resolve(__dirname, "..", "dist");
+const distDir = path.resolve(process.cwd(), "dist");
 const app = express();
 const sessionStore = new Map();
 const jobStore = new Map();

@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { createPortal } from "react-dom";
 
 const IMAGE_EXTENSIONS = new Set([
@@ -183,7 +189,15 @@ function getNodeBadge(node) {
   return "FILE";
 }
 
-function buildFileUrl(sessionId, filePath, options = {}) {
+type BuildFileUrlOptions = {
+  previewText?: boolean;
+  thumbnail?: boolean;
+  size?: number;
+  imagePreview?: boolean;
+  quality?: string;
+};
+
+function buildFileUrl(sessionId, filePath, options: BuildFileUrlOptions = {}) {
   if (!sessionId || !filePath) {
     return "";
   }
@@ -416,13 +430,15 @@ function TreeNode({
   const previewPath = sessionId ? folderPreview.get(node.path) : "";
   const previewCount = folderImages.get(node.path)?.length || 0;
 
+  const depthStyle = { "--depth": depth } as CSSProperties;
+
   if (isDirectory) {
     return (
       <div className="tree-node">
         <button
           type="button"
           className={`tree-row tree-folder ${isSelected ? "selected" : ""}`}
-          style={{ "--depth": depth }}
+          style={depthStyle}
           onClick={() => {
             setOpen((current) => !current);
             onSelect(node);
@@ -473,7 +489,7 @@ function TreeNode({
     <button
       type="button"
       className={`tree-row tree-file ${isSelected ? "selected" : ""}`}
-      style={{ "--depth": depth }}
+      style={depthStyle}
       onClick={() => onSelect(node)}
     >
       <span className="tree-caret" />
