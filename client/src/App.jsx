@@ -48,6 +48,18 @@ const SLIDESHOW_FIT_OPTIONS = [
   { value: "fit-width", label: "Fit width" },
   { value: "fit-height", label: "Fit height" },
 ];
+const DOWNLOAD_THREAD_MODE_OPTIONS = [
+  { value: "auto", label: "Auto (recommended)" },
+  { value: "single", label: "Single stream" },
+  { value: "segmented", label: "Segmented" },
+];
+const DEFAULT_DOWNLOAD_SETTINGS = {
+  threadMode: "auto",
+  threadCount: 3,
+  enableMultithread: true,
+  enableResume: true,
+  maxRetries: 3,
+};
 const NAME_COLLATOR = new Intl.Collator(undefined, {
   sensitivity: "base",
   numeric: false,
@@ -81,6 +93,67 @@ function formatTransferBytes(value) {
 function formatSpeed(bytesPerSec) {
   if (!Number.isFinite(bytesPerSec) || bytesPerSec <= 0) return "--";
   return `${formatTransferBytes(bytesPerSec)}/s`;
+}
+
+function clampNumber(value, min, max, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.max(min, Math.min(max, parsed));
+}
+
+function normalizeDownloadSettings(value) {
+  const source = value && typeof value === "object" ? value : {};
+  const threadMode =
+    source.threadMode === "auto" ||
+    source.threadMode === "single" ||
+    source.threadMode === "segmented"
+      ? source.threadMode
+      : DEFAULT_DOWNLOAD_SETTINGS.threadMode;
+
+  return {
+    threadMode,
+    threadCount: clampNumber(
+      source.threadCount,
+      1,
+      8,
+      DEFAULT_DOWNLOAD_SETTINGS.threadCount,
+    ),
+    enableMultithread:
+      source.enableMultithread == null
+        ? DEFAULT_DOWNLOAD_SETTINGS.enableMultithread
+        : Boolean(source.enableMultithread),
+    enableResume:
+      source.enableResume == null
+        ? DEFAULT_DOWNLOAD_SETTINGS.enableResume
+        : Boolean(source.enableResume),
+    maxRetries: clampNumber(
+      source.maxRetries,
+      0,
+      8,
+      DEFAULT_DOWNLOAD_SETTINGS.maxRetries,
+    ),
+  };
+}
+
+function formatEta(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return "--";
+  }
+
+  const total = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(secs).padStart(2, "0")}s`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${String(secs).padStart(2, "0")}s`;
+  }
+  return `${secs}s`;
 }
 
 function formatDate(value) {
@@ -303,6 +376,9 @@ function formatProgressMessage(job) {
   }
 
   if (job.phase === "downloading" && job.reportedSize > 0) {
+    if (job.isStalled) {
+      return "Download stalled, waiting for data or retry.";
+    }
     return `Downloading archive: ${formatTransferBytes(job.downloadedBytes)} of ${formatTransferBytes(job.reportedSize)}`;
   }
 
@@ -513,7 +589,18 @@ function App() {
   const [slideshowFitMode, setSlideshowFitMode] = useState("best-fit");
   const [slideshowChromeHidden, setSlideshowChromeHidden] = useState(false);
   const [activeJob, setActiveJob] = useState(null);
-  const [optimisticProgress, setOptimisticProgress] = useState(null);
+  const [downloadSettings, setDownloadSettings] = useState(() => {
+    if (typeof window === "undefined") {
+      return DEFAULT_DOWNLOAD_SETTINGS;
+    }
+
+    try {
+      const raw = window.localStorage.getItem("zip-download-settings");
+      return normalizeDownloadSettings(raw ? JSON.parse(raw) : null);
+    } catch {
+      return DEFAULT_DOWNLOAD_SETTINGS;
+    }
+  });
   const textPreviewCacheRef = useRef(new Map());
   const imagePreviewCacheRef = useRef(new Map());
   const eventSourceRef = useRef(null);
@@ -521,15 +608,6 @@ function App() {
   const latestSessionIdRef = useRef("");
   const latestJobIdRef = useRef("");
   const hydrationRef = useRef({ sessionId: "", promise: null });
-  const optimisticProgressRef = useRef({
-    timer: null,
-    baselineTime: 0,
-    baselineBytes: 0,
-    targetBytes: 0,
-    reportedSize: 0,
-    speed: 0,
-    phase: "",
-  });
 
   const sortedTree = useMemo(() => {
     if (!session?.tree) {
@@ -608,81 +686,6 @@ function App() {
     }
   }
 
-  function stopOptimisticProgress() {
-    if (optimisticProgressRef.current.timer) {
-      window.clearInterval(optimisticProgressRef.current.timer);
-      optimisticProgressRef.current.timer = null;
-    }
-    optimisticProgressRef.current = {
-      timer: null,
-      baselineTime: 0,
-      baselineBytes: 0,
-      targetBytes: 0,
-      reportedSize: 0,
-      speed: 0,
-      phase: "",
-    };
-    setOptimisticProgress(null);
-  }
-
-  function startOptimisticProgressFromJob(job) {
-    if (!job || job.phase !== "downloading") {
-      stopOptimisticProgress();
-      return;
-    }
-
-    const now = Date.now();
-    const baselineBytes = Math.max(0, Number(job.downloadedBytes) || 0);
-    const speed = Math.max(0, Number(job.downloadSpeedBytesPerSec) || 0);
-    const targetBytes = baselineBytes + speed;
-
-    optimisticProgressRef.current.baselineTime = now;
-    optimisticProgressRef.current.baselineBytes = baselineBytes;
-    optimisticProgressRef.current.targetBytes = targetBytes;
-    optimisticProgressRef.current.reportedSize = Math.max(
-      0,
-      Number(job.reportedSize) || 0,
-    );
-    optimisticProgressRef.current.speed = speed;
-    optimisticProgressRef.current.phase = job.phase;
-    setOptimisticProgress({
-      downloadedBytes: baselineBytes,
-      percent: job.percent,
-    });
-
-    if (optimisticProgressRef.current.timer) {
-      return;
-    }
-
-    optimisticProgressRef.current.timer = window.setInterval(() => {
-      const state = optimisticProgressRef.current;
-      if (state.phase !== "downloading") {
-        return;
-      }
-
-      const elapsed = Math.min(
-        1000,
-        Math.max(0, Date.now() - state.baselineTime),
-      );
-      const progress = elapsed / 1000;
-      const estimatedBytes =
-        state.baselineBytes +
-        (state.targetBytes - state.baselineBytes) * progress;
-      const downloadedBytes = Math.max(state.baselineBytes, estimatedBytes);
-      const percent =
-        state.reportedSize > 0
-          ? Math.min(
-              100,
-              Math.max(
-                0,
-                Math.floor((downloadedBytes / state.reportedSize) * 100),
-              ),
-            )
-          : null;
-      setOptimisticProgress({ downloadedBytes, percent });
-    }, 100);
-  }
-
   function stopJobPolling() {
     if (jobPollTimeoutRef.current) {
       window.clearTimeout(jobPollTimeoutRef.current);
@@ -693,7 +696,6 @@ function App() {
   function resetArchiveView() {
     setSession(null);
     setActiveJob(null);
-    stopOptimisticProgress();
     setSelectedPath("");
     setTextPreview("");
     setSelectedImageSrc("");
@@ -846,15 +848,6 @@ function App() {
   async function handleJobSnapshot(payload, nextUrl) {
     latestJobIdRef.current = payload?.id || "";
     setActiveJob(payload);
-
-    if (
-      payload?.phase === "downloading" &&
-      !isTerminalJobStatus(payload.status)
-    ) {
-      startOptimisticProgressFromJob(payload);
-    } else {
-      stopOptimisticProgress();
-    }
 
     if (payload?.sessionId) {
       await hydrateSession(payload.sessionId, nextUrl);
@@ -1009,7 +1002,11 @@ function App() {
       const response = await fetch("/api/sessions", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url, confirmOversize }),
+        body: JSON.stringify({
+          url,
+          confirmOversize,
+          downloadSettings,
+        }),
       });
       const payload = await response.json();
 
@@ -1042,6 +1039,13 @@ function App() {
     document.documentElement.dataset.theme = theme;
     window.localStorage.setItem("zip-image-viewer-theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      "zip-download-settings",
+      JSON.stringify(downloadSettings),
+    );
+  }, [downloadSettings]);
 
   useEffect(() => {
     if (!flatData || !sortedTree) {
@@ -1137,7 +1141,6 @@ function App() {
     return () => {
       closeJobEvents();
       stopJobPolling();
-      stopOptimisticProgress();
       clearImagePreviewCache();
       textPreviewCacheRef.current.clear();
       if (latestSessionIdRef.current) {
@@ -1409,14 +1412,11 @@ function App() {
         )
       : null;
 
-  const visualDownloadedBytes =
-    activeJob?.phase === "downloading" && optimisticProgress
-      ? optimisticProgress.downloadedBytes
-      : Math.max(0, Number(activeJob?.downloadedBytes) || 0);
-  const visualPercent =
-    activeJob?.phase === "downloading" && optimisticProgress
-      ? optimisticProgress.percent
-      : activeJob?.percent;
+  const visualDownloadedBytes = Math.max(
+    0,
+    Number(activeJob?.downloadedBytes) || 0,
+  );
+  const visualPercent = activeJob?.percent;
   const visualPercentLabel =
     visualPercent == null
       ? "Live"
@@ -1429,7 +1429,18 @@ function App() {
     activeJob?.reportedSize > 0
       ? `${formatTransferBytes(visualDownloadedBytes)} / ${formatTransferBytes(activeJob.reportedSize)}`
       : `${formatTransferBytes(visualDownloadedBytes)} downloaded`;
-  const speedLabel = formatSpeed(activeJob?.downloadSpeedBytesPerSec);
+  const speedLabel = formatSpeed(
+    activeJob?.downloadSpeedBytesPerSec || activeJob?.averageSpeedBytesPerSec,
+  );
+  const etaLabel = formatEta(activeJob?.etaSeconds);
+  const modeLabel =
+    activeJob?.threadMode === "segmented"
+      ? "Segmented"
+      : activeJob?.threadMode === "single"
+        ? "Single"
+        : "Auto";
+  const threadLabel = `${activeJob?.threadCount || 1}`;
+  const retryLabel = `${activeJob?.retryCount || 0} / ${activeJob?.maxRetries || 0}`;
 
   return (
     <div className="app-shell">
@@ -1485,6 +1496,101 @@ function App() {
             </button>
           </form>
 
+          <div className="download-settings-card">
+            <div className="download-settings-head">
+              <strong>Download settings</strong>
+              <span>Applied to new loads</span>
+            </div>
+            <div className="download-settings-grid">
+              <CustomDropdown
+                id="download-thread-mode"
+                label="Thread mode"
+                value={downloadSettings.threadMode}
+                options={DOWNLOAD_THREAD_MODE_OPTIONS}
+                onChange={(value) =>
+                  setDownloadSettings((current) =>
+                    normalizeDownloadSettings({
+                      ...current,
+                      threadMode: value,
+                    }),
+                  )
+                }
+              />
+
+              <label className="input-shell">
+                <span className="input-label">Thread count</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="8"
+                  value={downloadSettings.threadCount}
+                  disabled={
+                    !downloadSettings.enableMultithread ||
+                    downloadSettings.threadMode === "single"
+                  }
+                  onChange={(event) =>
+                    setDownloadSettings((current) =>
+                      normalizeDownloadSettings({
+                        ...current,
+                        threadCount: event.target.value,
+                      }),
+                    )
+                  }
+                />
+              </label>
+
+              <label className="input-shell">
+                <span className="input-label">Max retries</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="8"
+                  value={downloadSettings.maxRetries}
+                  onChange={(event) =>
+                    setDownloadSettings((current) =>
+                      normalizeDownloadSettings({
+                        ...current,
+                        maxRetries: event.target.value,
+                      }),
+                    )
+                  }
+                />
+              </label>
+
+              <label className="toggle-row">
+                <input
+                  type="checkbox"
+                  checked={downloadSettings.enableMultithread}
+                  onChange={(event) =>
+                    setDownloadSettings((current) =>
+                      normalizeDownloadSettings({
+                        ...current,
+                        enableMultithread: event.target.checked,
+                      }),
+                    )
+                  }
+                />
+                <span>Enable multithread</span>
+              </label>
+
+              <label className="toggle-row">
+                <input
+                  type="checkbox"
+                  checked={downloadSettings.enableResume}
+                  onChange={(event) =>
+                    setDownloadSettings((current) =>
+                      normalizeDownloadSettings({
+                        ...current,
+                        enableResume: event.target.checked,
+                      }),
+                    )
+                  }
+                />
+                <span>Enable resume</span>
+              </label>
+            </div>
+          </div>
+
           {activeJob ? (
             <div className="progress-card" aria-live="polite">
               <div className="progress-card-head">
@@ -1515,6 +1621,28 @@ function App() {
                 <div className="progress-stat-cell">
                   <span className="progress-stat-label">Speed</span>
                   <strong>{speedLabel}</strong>
+                </div>
+                <div className="progress-stat-cell">
+                  <span className="progress-stat-label">ETA</span>
+                  <strong>{etaLabel}</strong>
+                </div>
+                <div className="progress-stat-cell">
+                  <span className="progress-stat-label">Mode</span>
+                  <strong>{`${modeLabel} (${threadLabel}x)`}</strong>
+                </div>
+                <div className="progress-stat-cell">
+                  <span className="progress-stat-label">Retries</span>
+                  <strong>{retryLabel}</strong>
+                </div>
+                <div className="progress-stat-cell">
+                  <span className="progress-stat-label">Status</span>
+                  <strong>
+                    {activeJob?.isStalled
+                      ? "Stalled"
+                      : activeJob?.phase === "extracting"
+                        ? "Extracting"
+                        : "Downloading"}
+                  </strong>
                 </div>
               </div>
               <div className="progress-meta-row">
