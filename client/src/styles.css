@@ -615,6 +615,49 @@ input::placeholder {
   gap: 16px;
 }
 
+.download-settings-card {
+  margin-top: 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--bg-panel-strong) 82%, transparent);
+}
+
+.download-settings-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.download-settings-head span {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.download-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.toggle-row {
+  min-height: 52px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--bg-panel-strong) 76%, transparent);
+}
+
+.toggle-row input {
+  width: 16px;
+  height: 16px;
+}
+
 .progress-card {
   margin-top: 18px;
   padding: 16px 18px;
@@ -669,7 +712,7 @@ input::placeholder {
 
 .progress-stats-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   margin-top: 10px;
 }
@@ -1300,6 +1343,11 @@ input::placeholder {
     grid-template-columns: 1fr;
   }
 
+  .download-settings-grid,
+  .progress-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .tree-scroll {
     max-height: 420px;
   }
@@ -1432,6 +1480,7 @@ input::placeholder {
   .slideshow-actions,
   .slideshow-neighbors,
   .slideshow-controls-card,
+  .download-settings-head,
   .progress-card-head,
   .progress-meta-row,
   .status-row,
@@ -1445,6 +1494,11 @@ input::placeholder {
   .status-pill,
   .panel-chip {
     justify-content: center;
+  }
+
+  .download-settings-grid,
+  .progress-stats-grid {
+    grid-template-columns: 1fr;
   }
 
   .slideshow-stage {
