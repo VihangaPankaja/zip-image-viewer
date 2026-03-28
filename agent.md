@@ -35,3 +35,8 @@ npm start
 - For multi-step feature work, create a commit after each major implementation step
 - Before each major commit, run `npm run format`, `npm run lint`, `npm run typecheck`, and `npm run build`
 - Keep formatter, lint, and typecheck configurations current with repo scripts
+
+## Tooling Rule
+
+- Always run `npm run format`, `npm run lint`, `npm run typecheck`, and `npm run build` before each major commit and before opening a PR
+- If any step fails, fix the issue before committing

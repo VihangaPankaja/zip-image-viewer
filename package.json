@@ -1,21 +1,29 @@
 {
   "name": "zip-image-viewer",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
-    "dev:server": "node --watch server/index.js",
+    "dev:server": "tsx watch server/index.ts",
     "dev:client": "vite",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
+    "typecheck": "npm run typecheck:client && npm run typecheck:server",
+    "typecheck:client": "tsc --noEmit -p tsconfig.app.json",
+    "typecheck:server": "tsc --noEmit -p tsconfig.server.json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "build": "vite build",
-    "start": "node server/index.js"
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "vite build",
+    "build:server": "tsc -p tsconfig.server.json",
+    "start": "node build/server/index.js"
   },
   "dependencies": {
+    "7zip-bin": "^5.2.0",
     "express": "^5.1.0",
+    "ffmpeg-static": "^5.2.0",
+    "file-type": "^19.6.0",
+    "hls.js": "^1.5.21",
     "mime-types": "^3.0.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -24,13 +32,20 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
+    "@types/express": "^5.0.3",
     "@types/node": "^22.13.10",
+    "@types/react": "^19.1.14",
+    "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.2",
     "eslint": "^9.22.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^5.2.0",
     "globals": "^16.0.0",
     "prettier": "^3.8.1",
+    "tsx": "^4.20.6",
     "typescript": "^5.8.2",
+    "typescript-eslint": "^8.44.1",
     "vite": "^6.2.2"
   }
 }
