@@ -1,19 +1,20 @@
 # ZIP Image Viewer
 
-Browse a public ZIP file through a modern web UI running from a single Docker container on port `8080`.
+Browse a public file or archive URL through a modern web UI running from a single Docker container on port `8080`.
 
 ## What It Does
 
-- paste a public ZIP URL into the app
-- backend downloads it into a temporary session workspace
-- ZIP contents are extracted safely and shown as a sidebar file tree
+- paste a public file or archive URL into the app
+- backend downloads it into a temporary session workspace with resilient retries/resume
+- archive contents (`zip`, `rar`, `7z`, `tar` families) are extracted safely and shown as a sidebar file tree
 - images open in the preview panel with left and right arrow navigation for sibling images in the same folder
-- videos such as `mp4`, `webm`, `mov`, `m4v`, and `ogv` open in an inline player with range-based streaming support
+- videos such as `mp4`, `webm`, `mov`, `m4v`, and `ogv` open in an inline player with range-based streaming support and generated quality variants when available
+- audio files such as `mp3`, `wav`, `ogg`, `aac`, and `m4a` open in an inline player
 - text-style files such as `txt`, `md`, `json`, `csv`, `js`, `ts`, `html`, and `css` open in a text preview
 - dark mode and light mode are both available from the interface toggle
 - archive loading shows real-time download and extraction progress in the hero panel
 - download panel shows live speed, ETA, retry state, mode, and thread details
-- download settings are configurable from the UI (auto/single/segmented mode, threads, resume, retries)
+- download settings are configurable from the UI (auto/single/segmented mode, threads, resume, finite retries or unlimited)
 - loaded archives can be cleared directly from the app without reloading the page
 - sessions are cleaned up automatically after inactivity
 
@@ -21,7 +22,9 @@ Browse a public ZIP file through a modern web UI running from a single Docker co
 
 - `Express` server for the API and static asset hosting
 - `React + Vite` frontend for the browsing UI
-- `unzipper` for ZIP extraction
+- `unzipper` and `7zip-bin` for multi-format archive extraction
+- `aria2c` runtime binary for resilient segmented downloads
+- `ffmpeg` runtime binary for video quality variant generation
 - single Docker image for portable deployment
 
 ## Local Development
@@ -69,28 +72,28 @@ Open `http://localhost:8080`.
 
 ## Behavior Notes
 
-- public `http` and `https` ZIP URLs are supported
-- if the ZIP is larger than `1 GB`, the app asks whether to continue
+- public `http` and `https` file URLs are supported
+- if the file is larger than `1 GB`, the app asks whether to continue
 - extracted files are stored only in temporary server session folders
-- archive creation now runs as an async background job with live progress updates over SSE
+- file loading runs as an async background job with live progress updates over SSE
 - download progress speed monitoring is decoupled from transfer chunks, so stalled downloads report speed/ETA changes correctly
 - auto mode defaults to 3 simultaneous segmented threads when the source supports range requests
-- resumable downloads and retry with backoff are supported for transient failures
+- resumable downloads and retry with backoff are supported for transient failures (including unlimited retry mode)
 - unsupported binary files can still be opened as raw files
 
-## Sample Public ZIP URLs
+## Sample Public URLs
 
-You can test with any direct public ZIP URL. A few examples that are often useful:
+You can test with any direct public file URL. A few archive examples:
 
 - `https://github.com/jquery/jquery/archive/refs/heads/main.zip`
 - `https://github.com/twbs/icons/archive/refs/heads/main.zip`
 - `https://github.com/google/fonts/archive/refs/heads/main.zip`
 
-Note: some large repositories may take longer to download and unpack, and some ZIPs may not contain images.
+Note: some large repositories may take longer to download and unpack.
 
 ## API Endpoints
 
-- `POST /api/sessions` start an async archive job from a ZIP URL (supports `downloadSettings`)
+- `POST /api/sessions` start an async file/archive job from a URL (supports `downloadSettings`)
 - `GET /api/session-jobs/:id` fetch current archive job state
 - `GET /api/session-jobs/:id/events` subscribe to live archive progress events
 - `POST /api/session-jobs/:id/confirm` continue an oversized archive job

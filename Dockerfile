@@ -8,7 +8,7 @@ RUN npm run build
 FROM node:20-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-RUN apt-get update && apt-get install -y dumb-init ffmpeg p7zip-full && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y dumb-init ffmpeg p7zip-full aria2 && rm -rf /var/lib/apt/lists/*
 COPY package.json ./
 RUN npm install --omit=dev
 COPY --from=build /app/build/server ./build/server

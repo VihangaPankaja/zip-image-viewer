@@ -1,15 +1,29 @@
 // @ts-nocheck
 import express from "express";
 import { createReadStream, createWriteStream } from "node:fs";
-import { mkdtemp, mkdir, open, rm, stat } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  open,
+  readdir,
+  rename,
+  rm,
+  stat,
+} from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
 import path from "node:path";
-import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import os from "node:os";
 import crypto from "node:crypto";
 import mime from "mime-types";
 import sharp from "sharp";
 import unzipper from "unzipper";
+import { fileTypeFromFile } from "file-type";
+
+const require = createRequire(import.meta.url);
+const { path7za } = require("7zip-bin");
+const ffmpegPath = require("ffmpeg-static");
 
 const distDir = path.resolve(process.cwd(), "dist");
 const app = express();
@@ -35,13 +49,31 @@ const DEFAULT_DOWNLOAD_SETTINGS = {
 };
 const MAX_THREAD_COUNT = 8;
 const MAX_RETRIES = 8;
+const UNLIMITED_RETRIES = -1;
 const RETRY_BASE_DELAY_MS = 1200;
 const STALL_THRESHOLD_MS = 4000;
+const ARCHIVE_EXTENSIONS = new Set([
+  "zip",
+  "rar",
+  "7z",
+  "tar",
+  "gz",
+  "tgz",
+  "bz2",
+  "xz",
+]);
+const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v", "ogv", "mkv"]);
+const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "ogg", "aac", "m4a", "flac"]);
 const IMAGE_PREVIEW_PROFILES = {
   low: { size: 1280, quality: 58 },
   balanced: { size: 1920, quality: 72 },
   high: { size: 2560, quality: 82 },
 };
+const VIDEO_QUALITY_PRESETS = [
+  { id: "source", label: "Original", height: 0, crf: 0 },
+  { id: "480p", label: "480p", height: 480, crf: 28 },
+  { id: "720p", label: "720p", height: 720, crf: 26 },
+];
 
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(distDir));
@@ -96,15 +128,6 @@ function sleepWithSignal(ms, signal) {
   });
 }
 
-function parseContentRangeTotal(headerValue) {
-  if (!headerValue) {
-    return 0;
-  }
-
-  const match = String(headerValue).match(/\/([0-9]+)$/);
-  return match ? Number(match[1]) || 0 : 0;
-}
-
 function sanitizeThreadMode(value) {
   if (value === "single" || value === "segmented" || value === "auto") {
     return value;
@@ -122,14 +145,19 @@ function normalizeDownloadSettings(input) {
         DEFAULT_DOWNLOAD_SETTINGS.threadCount,
     ),
   );
-  const maxRetries = Math.max(
-    0,
-    Math.min(
-      MAX_RETRIES,
-      Number.parseInt(source.maxRetries, 10) ||
-        DEFAULT_DOWNLOAD_SETTINGS.maxRetries,
-    ),
-  );
+  const requestedRetries = Number.parseInt(source.maxRetries, 10);
+  const maxRetries =
+    requestedRetries === UNLIMITED_RETRIES
+      ? UNLIMITED_RETRIES
+      : Math.max(
+          0,
+          Math.min(
+            MAX_RETRIES,
+            Number.isFinite(requestedRetries)
+              ? requestedRetries
+              : DEFAULT_DOWNLOAD_SETTINGS.maxRetries,
+          ),
+        );
 
   return {
     threadMode: sanitizeThreadMode(source.threadMode),
@@ -144,6 +172,49 @@ function normalizeDownloadSettings(input) {
         : Boolean(source.enableResume),
     maxRetries,
   };
+}
+
+function isArchiveByName(value) {
+  const name = String(value || "").toLowerCase();
+  const ext = name.includes(".") ? name.split(".").pop() : "";
+  return ARCHIVE_EXTENSIONS.has(ext);
+}
+
+function classifyDetectedType(filePath, detected) {
+  const detectedMime = detected?.mime || mime.lookup(filePath) || "";
+  const ext = path.extname(filePath).slice(1).toLowerCase();
+
+  if (
+    isArchiveByName(filePath) ||
+    String(detectedMime).includes("zip") ||
+    String(detectedMime).includes("rar") ||
+    String(detectedMime).includes("7z") ||
+    String(detectedMime).includes("tar") ||
+    String(detectedMime).includes("compressed")
+  ) {
+    return "archive";
+  }
+
+  if (String(detectedMime).startsWith("video/") || VIDEO_EXTENSIONS.has(ext)) {
+    return "video";
+  }
+
+  if (String(detectedMime).startsWith("audio/") || AUDIO_EXTENSIONS.has(ext)) {
+    return "audio";
+  }
+
+  if (String(detectedMime).startsWith("image/")) {
+    return "image";
+  }
+
+  if (
+    String(detectedMime).startsWith("text/") ||
+    detectedMime === "application/json"
+  ) {
+    return "text";
+  }
+
+  return "binary";
 }
 
 async function fetchRemoteMetadata(url, signal) {
@@ -594,6 +665,200 @@ async function ensureImagePreview(
   return previewPath;
 }
 
+async function runCommand(command, args, options = {}) {
+  await new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      stdio: ["ignore", "ignore", "pipe"],
+      ...options,
+    });
+    let stderr = "";
+    child.stderr.on("data", (chunk) => {
+      stderr += String(chunk);
+    });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve(undefined);
+        return;
+      }
+      reject(new Error(stderr || `Command failed with code ${code}`));
+    });
+  });
+}
+
+async function extractWith7zip(archivePath, extractDir) {
+  await runCommand(path7za, ["x", "-y", `-o${extractDir}`, archivePath]);
+}
+
+async function transcodeVideoVariants(sourcePath, outputDir) {
+  if (!ffmpegPath) {
+    return [];
+  }
+
+  await mkdir(outputDir, { recursive: true });
+  const variants = [];
+
+  for (const preset of VIDEO_QUALITY_PRESETS) {
+    if (preset.id === "source") {
+      continue;
+    }
+    const outputPath = path.join(outputDir, `${preset.id}.mp4`);
+    await runCommand(String(ffmpegPath), [
+      "-y",
+      "-i",
+      sourcePath,
+      "-vf",
+      `scale=-2:${preset.height}`,
+      "-c:v",
+      "libx264",
+      "-preset",
+      "veryfast",
+      "-crf",
+      String(preset.crf),
+      "-c:a",
+      "aac",
+      "-movflags",
+      "+faststart",
+      outputPath,
+    ]);
+    variants.push({
+      id: preset.id,
+      label: preset.label,
+      relativePath: outputPath,
+    });
+  }
+
+  return variants;
+}
+
+async function downloadWithAria2({
+  url,
+  targetPath,
+  signal,
+  settings,
+  state,
+  confirmOversize,
+}) {
+  const maxTries =
+    settings.maxRetries === UNLIMITED_RETRIES
+      ? "0"
+      : String(settings.maxRetries + 1);
+  const split = settings.enableMultithread
+    ? String(Math.max(1, settings.threadCount))
+    : "1";
+  const args = [
+    "--allow-overwrite=true",
+    `--continue=${settings.enableResume ? "true" : "false"}`,
+    `--split=${split}`,
+    `--max-connection-per-server=${split}`,
+    `--max-tries=${maxTries}`,
+    "--retry-wait=1",
+    "--summary-interval=1",
+    "--console-log-level=warn",
+    "--download-result=hide",
+    "--auto-file-renaming=false",
+    "--check-integrity=true",
+    "--file-allocation=none",
+    `--dir=${path.dirname(targetPath)}`,
+    `--out=${path.basename(targetPath)}`,
+    url,
+  ];
+
+  await new Promise((resolve, reject) => {
+    const child = spawn("aria2c", args, { stdio: ["ignore", "pipe", "pipe"] });
+    let stderr = "";
+
+    function parseLine(line) {
+      const dlMatch = line.match(/DL:([^\s]+)/);
+      if (dlMatch) {
+        const speed = dlMatch[1].toLowerCase();
+        let value = Number(speed.replace(/[^0-9.]/g, "")) || 0;
+        if (speed.includes("kib")) value *= 1024;
+        if (speed.includes("mib")) value *= 1024 * 1024;
+        if (speed.includes("gib")) value *= 1024 * 1024 * 1024;
+        state.downloadedSpeed = Math.round(value);
+      }
+      const sizeMatch = line.match(/\(([0-9]{1,3})%\)/);
+      if (sizeMatch) {
+        state.reportedPercent = Number(sizeMatch[1]);
+      }
+    }
+
+    child.stdout.on("data", (chunk) => {
+      String(chunk).split(/\r?\n/).filter(Boolean).forEach(parseLine);
+    });
+    child.stderr.on("data", (chunk) => {
+      const text = String(chunk);
+      stderr += text;
+      text.split(/\r?\n/).filter(Boolean).forEach(parseLine);
+    });
+
+    const onAbort = () => {
+      child.kill("SIGTERM");
+      reject(Object.assign(new Error("Aborted"), { name: "AbortError" }));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+
+    child.on("error", reject);
+    child.on("close", async (code) => {
+      signal?.removeEventListener("abort", onAbort);
+      if (code !== 0) {
+        reject(new Error(stderr || `aria2c failed with code ${code}`));
+        return;
+      }
+
+      const finishedStat = await stat(targetPath).catch(() => null);
+      if (!finishedStat?.isFile()) {
+        reject(new Error("Download did not produce a file."));
+        return;
+      }
+      state.downloadedBytes = finishedStat.size;
+      if (!confirmOversize && state.downloadedBytes > CONFIRM_SIZE_BYTES) {
+        reject(
+          Object.assign(new Error("Archive exceeds 1 GB."), {
+            code: "OVERSIZE_CONFIRM",
+          }),
+        );
+        return;
+      }
+      resolve(undefined);
+    });
+  });
+}
+
+async function listExtractedEntries(
+  rootDir,
+  currentDir = rootDir,
+  entries = [],
+) {
+  const dirEntries = await readdir(currentDir, { withFileTypes: true });
+  for (const dirEntry of dirEntries) {
+    const fullPath = path.join(currentDir, dirEntry.name);
+    const relativePath = path
+      .relative(rootDir, fullPath)
+      .split(path.sep)
+      .join("/");
+    const details = await stat(fullPath);
+    if (dirEntry.isDirectory()) {
+      entries.push({
+        relativePath,
+        type: "directory",
+        size: 0,
+        modifiedAt: details.mtimeMs,
+      });
+      await listExtractedEntries(rootDir, fullPath, entries);
+    } else if (dirEntry.isFile()) {
+      entries.push({
+        relativePath,
+        type: "file",
+        size: details.size,
+        modifiedAt: details.mtimeMs,
+      });
+    }
+  }
+  return entries;
+}
+
 setInterval(() => {
   const now = Date.now();
   for (const [sessionId, session] of sessionStore.entries()) {
@@ -681,22 +946,6 @@ process.on("SIGINT", () => {
 app.get("/health", (_req, res) => {
   res.json({ ok: true, sessions: sessionStore.size, jobs: jobStore.size });
 });
-
-function createSegmentPlan(totalBytes, threadCount) {
-  const safeCount = Math.max(1, Math.min(threadCount, totalBytes || 1));
-  const segments = [];
-  const base = Math.floor(totalBytes / safeCount);
-  let start = 0;
-
-  for (let index = 0; index < safeCount; index += 1) {
-    const size = index === safeCount - 1 ? totalBytes - start : base;
-    const end = Math.max(start, start + size - 1);
-    segments.push({ start, end, current: start });
-    start = end + 1;
-  }
-
-  return segments;
-}
 
 function isRetryableDownloadError(error) {
   if (!error) {
@@ -815,198 +1064,11 @@ function createDownloadProgressMonitor(job, state) {
   };
 }
 
-async function downloadSingleAttempt({
-  url,
-  zipPath,
-  metadata,
-  state,
-  signal,
-  confirmOversize,
-  allowResume,
-}) {
-  const existingStats = await stat(zipPath).catch(() => null);
-  const existingSize = existingStats?.isFile() ? existingStats.size : 0;
-  const shouldResume =
-    allowResume &&
-    metadata.acceptRanges &&
-    metadata.size > 0 &&
-    existingSize > 0;
-  const headers = {};
-
-  if (shouldResume) {
-    headers.range = `bytes=${existingSize}-`;
-    if (metadata.etag) {
-      headers["if-range"] = metadata.etag;
-    } else if (metadata.lastModified) {
-      headers["if-range"] = metadata.lastModified;
-    }
-  }
-
-  const response = await fetch(url, {
-    redirect: "follow",
-    signal,
-    headers,
-  });
-
-  if (!response.ok || !response.body) {
-    const error = new Error(`Download failed with status ${response.status}.`);
-    error.statusCode = response.status;
-    if (
-      response.status >= 400 &&
-      response.status < 500 &&
-      response.status !== 408 &&
-      response.status !== 429
-    ) {
-      error.code = "DOWNLOAD_FATAL";
-    }
-    throw error;
-  }
-
-  const isResumedResponse = shouldResume && response.status === 206;
-  let startOffset = 0;
-  if (isResumedResponse) {
-    startOffset = existingSize;
-  } else {
-    await open(zipPath, "w").then((handle) => handle.close());
-  }
-
-  const contentRangeTotal = parseContentRangeTotal(
-    response.headers.get("content-range"),
-  );
-  const responseSize = Number(response.headers.get("content-length")) || 0;
-  state.reportedSize =
-    contentRangeTotal || metadata.size || responseSize + startOffset;
-  state.downloadedBytes = startOffset;
-
-  const guard = new Transform({
-    transform(chunk, _encoding, callback) {
-      state.downloadedBytes += chunk.length;
-      if (!confirmOversize && state.downloadedBytes > CONFIRM_SIZE_BYTES) {
-        const error = new Error("Archive exceeds 1 GB.");
-        error.code = "OVERSIZE_CONFIRM";
-        callback(error);
-        return;
-      }
-      callback(null, chunk);
-    },
-  });
-
-  await pipeline(
-    Readable.fromWeb(response.body),
-    guard,
-    createWriteStream(zipPath, {
-      flags: isResumedResponse ? "r+" : "w",
-      start: startOffset,
-    }),
-  );
-}
-
-async function downloadSegmentedAttempt({
-  url,
-  zipPath,
-  metadata,
-  state,
-  signal,
-  confirmOversize,
-  threadCount,
-  segments,
-}) {
-  if (!metadata.acceptRanges || metadata.size <= 0) {
-    const error = new Error("Server does not support ranged downloads.");
-    error.code = "RANGE_UNSUPPORTED";
-    throw error;
-  }
-
-  if (!segments.length) {
-    segments.push(...createSegmentPlan(metadata.size, threadCount));
-    await open(zipPath, "w+").then(async (handle) => {
-      await handle.truncate(metadata.size);
-      await handle.close();
-    });
-  }
-
-  state.reportedSize = metadata.size;
-  state.downloadedBytes = segments.reduce(
-    (sum, segment) => sum + Math.max(0, segment.current - segment.start),
-    0,
-  );
-
-  await Promise.all(
-    segments.map(async (segment) => {
-      if (segment.current > segment.end) {
-        return;
-      }
-
-      const headers = {
-        range: `bytes=${segment.current}-${segment.end}`,
-      };
-      if (metadata.etag) {
-        headers["if-range"] = metadata.etag;
-      } else if (metadata.lastModified) {
-        headers["if-range"] = metadata.lastModified;
-      }
-
-      const response = await fetch(url, {
-        redirect: "follow",
-        signal,
-        headers,
-      });
-
-      if (response.status === 200) {
-        const error = new Error(
-          "Range mode not supported for segmented download.",
-        );
-        error.code = "RANGE_UNSUPPORTED";
-        throw error;
-      }
-
-      if (!response.ok || !response.body) {
-        const error = new Error(
-          `Download failed with status ${response.status}.`,
-        );
-        error.statusCode = response.status;
-        if (
-          response.status >= 400 &&
-          response.status < 500 &&
-          response.status !== 408 &&
-          response.status !== 429
-        ) {
-          error.code = "DOWNLOAD_FATAL";
-        }
-        throw error;
-      }
-
-      const guard = new Transform({
-        transform(chunk, _encoding, callback) {
-          segment.current += chunk.length;
-          state.downloadedBytes += chunk.length;
-          if (!confirmOversize && state.downloadedBytes > CONFIRM_SIZE_BYTES) {
-            const error = new Error("Archive exceeds 1 GB.");
-            error.code = "OVERSIZE_CONFIRM";
-            callback(error);
-            return;
-          }
-          callback(null, chunk);
-        },
-      });
-
-      await pipeline(
-        Readable.fromWeb(response.body),
-        guard,
-        createWriteStream(zipPath, {
-          flags: "r+",
-          start: segment.current,
-        }),
-      );
-    }),
-  );
-}
-
 async function processSessionJob(job, confirmOversize = false) {
   const { url } = job;
 
   if (!url) {
-    throw new Error("ZIP URL is required.");
+    throw new Error("File URL is required.");
   }
 
   let parsedUrl;
@@ -1023,7 +1085,8 @@ async function processSessionJob(job, confirmOversize = false) {
   const workspaceDir = await mkdtemp(
     path.join(os.tmpdir(), "zip-image-viewer-"),
   );
-  const zipPath = path.join(workspaceDir, "archive.zip");
+  const requestedName = path.basename(parsedUrl.pathname) || "download.bin";
+  const zipPath = path.join(workspaceDir, requestedName);
   const extractDir = path.join(workspaceDir, "extracted");
   await mkdir(extractDir, { recursive: true });
   job.workspaceDir = workspaceDir;
@@ -1131,38 +1194,33 @@ async function processSessionJob(job, confirmOversize = false) {
     const segments = [];
     monitor.start();
 
-    for (let attempt = 0; attempt <= settings.maxRetries; attempt += 1) {
+    for (
+      let attempt = 0;
+      settings.maxRetries === UNLIMITED_RETRIES ||
+      attempt <= settings.maxRetries;
+      attempt += 1
+    ) {
       job.retryCount = attempt;
+      const retriesLabel =
+        settings.maxRetries === UNLIMITED_RETRIES
+          ? "∞"
+          : String(settings.maxRetries);
       downloadState.statusText =
         attempt === 0
           ? "Starting archive download"
-          : `Retrying download (attempt ${attempt}/${settings.maxRetries})`;
+          : `Retrying download (attempt ${attempt}/${retriesLabel})`;
       monitor.flush();
 
       try {
         downloadState.statusText = "";
-        if (resolvedMode === "segmented") {
-          await downloadSegmentedAttempt({
-            url,
-            zipPath,
-            metadata,
-            state: downloadState,
-            signal: job.abortController.signal,
-            confirmOversize,
-            threadCount: resolvedThreadCount,
-            segments,
-          });
-        } else {
-          await downloadSingleAttempt({
-            url,
-            zipPath,
-            metadata,
-            state: downloadState,
-            signal: job.abortController.signal,
-            confirmOversize,
-            allowResume: settings.enableResume,
-          });
-        }
+        await downloadWithAria2({
+          url,
+          targetPath: zipPath,
+          signal: job.abortController.signal,
+          settings,
+          state: downloadState,
+          confirmOversize,
+        });
         break;
       } catch (error) {
         if (
@@ -1202,7 +1260,8 @@ async function processSessionJob(job, confirmOversize = false) {
         }
 
         if (
-          attempt >= settings.maxRetries ||
+          (settings.maxRetries !== UNLIMITED_RETRIES &&
+            attempt >= settings.maxRetries) ||
           !isRetryableDownloadError(error)
         ) {
           throw error;
@@ -1210,7 +1269,7 @@ async function processSessionJob(job, confirmOversize = false) {
 
         const delayMs =
           RETRY_BASE_DELAY_MS * 2 ** attempt + Math.floor(Math.random() * 400);
-        downloadState.statusText = `Download failed, retrying in ${(delayMs / 1000).toFixed(1)}s (attempt ${attempt + 1}/${settings.maxRetries})`;
+        downloadState.statusText = `Download failed, retrying in ${(delayMs / 1000).toFixed(1)}s (attempt ${attempt + 1}/${retriesLabel})`;
         monitor.flush();
         await sleepWithSignal(delayMs, job.abortController.signal);
       }
@@ -1243,7 +1302,8 @@ async function processSessionJob(job, confirmOversize = false) {
       retries: job.retryCount,
     });
 
-    const directory = await unzipper.Open.file(zipPath);
+    const detected = await fileTypeFromFile(zipPath).catch(() => null);
+    const detectedKind = classifyDetectedType(zipPath, detected);
     const extractedEntries = [];
     const extractRootPath = path.resolve(extractDir);
     let lastExtractEmitAt = Date.now();
@@ -1254,84 +1314,123 @@ async function processSessionJob(job, confirmOversize = false) {
         return;
       }
 
-      const safeTotal = Math.max(1, directory.files.length);
+      const safeTotal = Math.max(1, extractedEntries.length || 1);
       const extractPercent = Math.floor(
         (extractedEntries.length / safeTotal) * 100,
       );
       emitJob(job, {
         extractedEntries: extractedEntries.length,
-        totalEntries: directory.files.length,
+        totalEntries: safeTotal,
         percent: Math.min(extractPercent, 100),
         downloadSpeedBytesPerSec: 0,
         averageSpeedBytesPerSec: 0,
         etaSeconds: null,
         isStalled: false,
         stallDurationMs: 0,
-        message: `Extracting archive: ${extractedEntries.length} of ${directory.files.length} entries`,
+        message: `Extracting archive: ${extractedEntries.length} of ${safeTotal} entries`,
       });
       lastExtractEmitAt = now;
     }
 
-    emitJob(job, {
-      status: "extracting",
-      phase: "extracting",
-      totalEntries: directory.files.length,
-      extractedEntries: 0,
-      percent: 0,
-      downloadSpeedBytesPerSec: 0,
-      averageSpeedBytesPerSec: 0,
-      etaSeconds: null,
-      isStalled: false,
-      stallDurationMs: 0,
-      message: `Extracting archive: 0 of ${directory.files.length} entries`,
-    });
-    logEvent("info", "extract.start", {
-      jobId: job.id,
-      url,
-      entryCount: directory.files.length,
-      extractDir,
-    });
-
-    for (const entry of directory.files) {
-      const relativePath = sanitizeEntryPath(entry.path);
-      const destination = path.join(extractDir, relativePath);
-      const resolved = path.resolve(destination);
-
-      if (
-        !resolved.startsWith(`${extractRootPath}${path.sep}`) &&
-        resolved !== extractRootPath
-      ) {
-        throw new Error("Archive contains invalid file paths.");
-      }
-
-      if (entry.type === "Directory") {
-        await mkdir(destination, { recursive: true });
-        extractedEntries.push({
-          relativePath,
-          type: "directory",
-          size: 0,
-          modifiedAt: entry.lastModifiedDateTime?.getTime() || 0,
-        });
-        emitExtractionProgress(false);
-        continue;
-      }
-
-      await mkdir(path.dirname(destination), { recursive: true });
-      await pipeline(entry.stream(), createWriteStream(destination));
-      extractedEntries.push({
-        relativePath,
-        type: "file",
-        size: entry.uncompressedSize || 0,
-        modifiedAt: entry.lastModifiedDateTime?.getTime() || 0,
+    if (detectedKind === "archive") {
+      emitJob(job, {
+        status: "extracting",
+        phase: "extracting",
+        totalEntries: 0,
+        extractedEntries: 0,
+        percent: 0,
+        downloadSpeedBytesPerSec: 0,
+        averageSpeedBytesPerSec: 0,
+        etaSeconds: null,
+        isStalled: false,
+        stallDurationMs: 0,
+        message: "Extracting archive",
       });
 
-      emitExtractionProgress(false);
+      if (isArchiveByName(zipPath) && !/\.zip$/i.test(zipPath)) {
+        await extractWith7zip(zipPath, extractDir);
+        const entries = await listExtractedEntries(extractDir);
+        extractedEntries.push(...entries);
+      } else {
+        const directory = await unzipper.Open.file(zipPath);
+        for (const entry of directory.files) {
+          const relativePath = sanitizeEntryPath(entry.path);
+          const destination = path.join(extractDir, relativePath);
+          const resolved = path.resolve(destination);
+
+          if (
+            !resolved.startsWith(`${extractRootPath}${path.sep}`) &&
+            resolved !== extractRootPath
+          ) {
+            throw new Error("Archive contains invalid file paths.");
+          }
+
+          if (entry.type === "Directory") {
+            await mkdir(destination, { recursive: true });
+            extractedEntries.push({
+              relativePath,
+              type: "directory",
+              size: 0,
+              modifiedAt: entry.lastModifiedDateTime?.getTime() || 0,
+            });
+            emitExtractionProgress(false);
+            continue;
+          }
+
+          await mkdir(path.dirname(destination), { recursive: true });
+          await pipeline(entry.stream(), createWriteStream(destination));
+          extractedEntries.push({
+            relativePath,
+            type: "file",
+            size: entry.uncompressedSize || 0,
+            modifiedAt: entry.lastModifiedDateTime?.getTime() || 0,
+          });
+
+          emitExtractionProgress(false);
+        }
+      }
+    } else {
+      const mediaDir = path.join(extractDir, "direct");
+      await mkdir(mediaDir, { recursive: true });
+      const mediaPath = path.join(mediaDir, path.basename(zipPath));
+      await rename(zipPath, mediaPath);
+      extractedEntries.push({
+        relativePath: `direct/${path.basename(zipPath)}`,
+        type: "file",
+        size: (await stat(mediaPath)).size,
+        modifiedAt: Date.now(),
+      });
+
+      if (detectedKind === "video") {
+        const variantsDir = path.join(mediaDir, "variants");
+        const variants = await transcodeVideoVariants(
+          mediaPath,
+          variantsDir,
+        ).catch(() => []);
+        for (const variant of variants) {
+          const variantStats = await stat(variant.relativePath).catch(
+            () => null,
+          );
+          if (variantStats?.isFile()) {
+            extractedEntries.push({
+              relativePath: path
+                .relative(extractDir, variant.relativePath)
+                .split(path.sep)
+                .join("/"),
+              type: "file",
+              size: variantStats.size,
+              modifiedAt: variantStats.mtimeMs,
+            });
+          }
+        }
+      }
     }
 
     emitExtractionProgress(true);
 
-    const archiveName = path.basename(parsedUrl.pathname) || "archive.zip";
-    const rootName = archiveName.replace(/\.zip$/i, "") || archiveName;
+    const archiveName = path.basename(parsedUrl.pathname) || "download";
+    const rootName =
+      archiveName.replace(/\.(zip|rar|7z|tar|gz|tgz)$/i, "") || archiveName;
     const { tree, firstFilePath, stats } = buildTree(
       extractedEntries,
       rootName,
@@ -1423,13 +1522,13 @@ async function processSessionJob(job, confirmOversize = false) {
       {
         status: "error",
         phase: "error",
-        error: error.message || "Could not process this ZIP file.",
+        error: error.message || "Could not process this file.",
         downloadSpeedBytesPerSec: 0,
         averageSpeedBytesPerSec: 0,
         etaSeconds: null,
         isStalled: false,
         stallDurationMs: 0,
-        message: error.message || "Could not process this ZIP file.",
+        message: error.message || "Could not process this file.",
       },
       "job-error",
     );
@@ -1444,7 +1543,7 @@ app.post("/api/sessions", async (req, res) => {
     downloadSettings = {},
   } = req.body || {};
   if (!url) {
-    return res.status(400).json({ error: "ZIP URL is required." });
+    return res.status(400).json({ error: "File URL is required." });
   }
   const job = createJob(url, downloadSettings);
 

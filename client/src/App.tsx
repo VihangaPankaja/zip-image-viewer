@@ -18,6 +18,7 @@ const IMAGE_EXTENSIONS = new Set([
   "avif",
 ]);
 const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v", "ogv"]);
+const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "ogg", "aac", "m4a", "flac"]);
 const TEXT_EXTENSIONS = new Set([
   "txt",
   "md",
@@ -58,6 +59,13 @@ const DOWNLOAD_THREAD_MODE_OPTIONS = [
   { value: "auto", label: "Auto (recommended)" },
   { value: "single", label: "Single stream" },
   { value: "segmented", label: "Segmented" },
+];
+const DOWNLOAD_RETRY_OPTIONS = [
+  { value: 0, label: "No retry" },
+  { value: 3, label: "3 retries" },
+  { value: 5, label: "5 retries" },
+  { value: 8, label: "8 retries" },
+  { value: -1, label: "Unlimited" },
 ];
 const DEFAULT_DOWNLOAD_SETTINGS = {
   threadMode: "auto",
@@ -134,12 +142,15 @@ function normalizeDownloadSettings(value) {
       source.enableResume == null
         ? DEFAULT_DOWNLOAD_SETTINGS.enableResume
         : Boolean(source.enableResume),
-    maxRetries: clampNumber(
-      source.maxRetries,
-      0,
-      8,
-      DEFAULT_DOWNLOAD_SETTINGS.maxRetries,
-    ),
+    maxRetries:
+      Number.parseInt(source.maxRetries, 10) === -1
+        ? -1
+        : clampNumber(
+            source.maxRetries,
+            0,
+            8,
+            DEFAULT_DOWNLOAD_SETTINGS.maxRetries,
+          ),
   };
 }
 
@@ -178,6 +189,7 @@ function classifyNode(node) {
   if (!node || node.type === "directory") return "directory";
   if (IMAGE_EXTENSIONS.has(node.extension)) return "image";
   if (VIDEO_EXTENSIONS.has(node.extension)) return "video";
+  if (AUDIO_EXTENSIONS.has(node.extension)) return "audio";
   if (TEXT_EXTENSIONS.has(node.extension)) return "text";
   return "binary";
 }
@@ -186,6 +198,7 @@ function getNodeBadge(node) {
   const kind = classifyNode(node);
   if (kind === "image") return "IMG";
   if (kind === "video") return "VID";
+  if (kind === "audio") return "AUD";
   return "FILE";
 }
 
@@ -839,7 +852,7 @@ function App() {
           return payload;
         }
 
-        lastError = new Error(payload.error || "Could not open ZIP URL.");
+        lastError = new Error(payload.error || "Could not open file URL.");
         if (response.status !== 404 || attempt === 2) {
           throw lastError;
         }
@@ -847,7 +860,7 @@ function App() {
         await wait(250 * (attempt + 1));
       }
 
-      throw lastError || new Error("Could not open ZIP URL.");
+      throw lastError || new Error("Could not open file URL.");
     })();
 
     hydrationRef.current = { sessionId, promise: request };
@@ -894,7 +907,7 @@ function App() {
       stopJobPolling();
       latestJobIdRef.current = "";
       setActiveJob(null);
-      setError(payload.error || "Could not process this ZIP file.");
+      setError(payload.error || "Could not process this file.");
       setIsLoading(false);
       return;
     }
@@ -1027,7 +1040,7 @@ function App() {
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload.error || "Could not open ZIP URL.");
+        throw new Error(payload.error || "Could not open file URL.");
       }
       latestJobIdRef.current = payload.jobId;
       setActiveJob(payload);
@@ -1456,7 +1469,7 @@ function App() {
         ? "Single"
         : "Auto";
   const threadLabel = `${activeJob?.threadCount || 1}`;
-  const retryLabel = `${activeJob?.retryCount || 0} / ${activeJob?.maxRetries || 0}`;
+  const retryLabel = `${activeJob?.retryCount || 0} / ${activeJob?.maxRetries === -1 ? "∞" : (activeJob?.maxRetries ?? 0)}`;
 
   return (
     <div className="app-shell">
@@ -1492,7 +1505,7 @@ function App() {
               <input
                 id="zip-url"
                 type="url"
-                placeholder="https://example.com/archive.zip"
+                placeholder="https://example.com/file-or-archive"
                 value={zipUrl}
                 onChange={(event) => setZipUrl(event.target.value)}
                 autoComplete="off"
@@ -1505,10 +1518,10 @@ function App() {
               disabled={isLoading}
             >
               {activeJob
-                ? "Loading archive..."
+                ? "Loading file..."
                 : isLoading
-                  ? "Opening archive..."
-                  : "Open archive"}
+                  ? "Opening file..."
+                  : "Open file"}
             </button>
           </form>
 
@@ -1555,23 +1568,20 @@ function App() {
                 />
               </label>
 
-              <label className="input-shell">
-                <span className="input-label">Max retries</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="8"
-                  value={downloadSettings.maxRetries}
-                  onChange={(event) =>
-                    setDownloadSettings((current) =>
-                      normalizeDownloadSettings({
-                        ...current,
-                        maxRetries: event.target.value,
-                      }),
-                    )
-                  }
-                />
-              </label>
+              <CustomDropdown
+                id="download-max-retries"
+                label="Max retries"
+                value={downloadSettings.maxRetries}
+                options={DOWNLOAD_RETRY_OPTIONS}
+                onChange={(value) =>
+                  setDownloadSettings((current) =>
+                    normalizeDownloadSettings({
+                      ...current,
+                      maxRetries: value,
+                    }),
+                  )
+                }
+              />
 
               <label className="toggle-row">
                 <input
@@ -1939,6 +1949,28 @@ function App() {
                 <div className="navigation-hint">
                   Video playback streams from the extracted file and supports
                   browser seeking when the server serves ranges.
+                </div>
+              </div>
+            ) : null}
+
+            {selectedNode?.type === "file" && selectedKind === "audio" ? (
+              <div className="preview-stage">
+                <div className="preview-toolbar">
+                  <span>{formatBytes(selectedNode.size)}</span>
+                  <span>
+                    {selectedNode.extension.toUpperCase()} stream preview
+                  </span>
+                  <span>{formatDate(selectedNode.modifiedAt)}</span>
+                </div>
+                <div className="image-frame media-frame">
+                  <audio
+                    className="video-player"
+                    src={selectedFileUrl}
+                    controls
+                    preload="metadata"
+                  >
+                    Your browser cannot play this audio inline.
+                  </audio>
                 </div>
               </div>
             ) : null}
