@@ -1664,7 +1664,20 @@ function App() {
     0,
     Number(activeJob?.downloadedBytes) || 0,
   );
-  const visualPercent = activeJob?.percent;
+  const transcodeCompleted = Math.max(
+    0,
+    Number(activeJob?.transcodedEntries) || 0,
+  );
+  const transcodeTotal = Math.max(
+    0,
+    Number(activeJob?.totalTranscodeEntries) || 0,
+  );
+  const visualPercent =
+    activeJob?.phase === "transcoding" &&
+    activeJob?.percent == null &&
+    transcodeTotal > 0
+      ? (transcodeCompleted / transcodeTotal) * 100
+      : activeJob?.percent;
   const visualPercentLabel =
     visualPercent == null
       ? "Live"
@@ -1674,9 +1687,11 @@ function App() {
       ? undefined
       : `${Math.max(0, Math.min(100, visualPercent))}%`;
   const transferLabel =
-    activeJob?.reportedSize > 0
-      ? `${formatTransferBytes(visualDownloadedBytes)} / ${formatTransferBytes(activeJob.reportedSize)}`
-      : `${formatTransferBytes(visualDownloadedBytes)} downloaded`;
+    activeJob?.phase === "transcoding"
+      ? `${transcodeCompleted} / ${Math.max(1, transcodeTotal)} files`
+      : activeJob?.reportedSize > 0
+        ? `${formatTransferBytes(visualDownloadedBytes)} / ${formatTransferBytes(activeJob.reportedSize)}`
+        : `${formatTransferBytes(visualDownloadedBytes)} downloaded`;
   const speedLabel = formatSpeed(
     activeJob?.downloadSpeedBytesPerSec || activeJob?.averageSpeedBytesPerSec,
   );

@@ -1159,7 +1159,7 @@ async function transcodeVideoToQuality({
     return;
   }
 
-  const tempOutputPath = `${outputPath}.part`;
+  const tempOutputPath = `${outputPath}.part.mp4`;
   await rm(tempOutputPath, { force: true }).catch(() => {});
 
   const selectedHeight =
@@ -1195,6 +1195,8 @@ async function transcodeVideoToQuality({
     "aac",
     "-movflags",
     "+faststart",
+    "-f",
+    "mp4",
     tempOutputPath,
   );
 
@@ -1873,6 +1875,22 @@ async function processSessionJob(job, confirmOversize = false) {
           entry.relativePath,
           settings.videoQuality,
         );
+
+        emitJob(job, {
+          status: "transcoding",
+          phase: "transcoding",
+          sessionId,
+          percent: Math.max(
+            0,
+            Math.min(
+              99,
+              Math.floor((index / Math.max(1, videoEntries.length)) * 100),
+            ),
+          ),
+          totalTranscodeEntries: videoEntries.length,
+          transcodedEntries: index,
+          message: `Transcoding videos to ${settings.videoQuality}: ${index} of ${videoEntries.length} (starting ${path.basename(entry.relativePath)})`,
+        });
 
         try {
           await transcodeVideoToQuality({
