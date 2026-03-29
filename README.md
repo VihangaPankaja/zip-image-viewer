@@ -7,14 +7,17 @@ Browse a public file or archive URL through a modern web UI running from a singl
 - paste a public file or archive URL into the app
 - backend downloads it into a temporary session workspace with resilient retries/resume
 - archive contents (`zip`, `rar`, `7z`, `tar` families) are extracted safely and shown as a sidebar file tree
+- workspace is split into dedicated tabs for `Download`, `Preview`, and `Explorer`
+- explorer tab provides file-manager-style metadata listing with configurable columns
 - images open in the preview panel with left and right arrow navigation for sibling images in the same folder
 - videos such as `mp4`, `webm`, `mov`, `m4v`, and `ogv` open in an inline player with range-based streaming support and generated quality variants when available
+- direct video URLs can be previewed while download bytes are still arriving via job stream endpoint
 - audio files such as `mp3`, `wav`, `ogg`, `aac`, and `m4a` open in an inline player
 - text-style files such as `txt`, `md`, `json`, `csv`, `js`, `ts`, `html`, and `css` open in a text preview
 - dark mode and light mode are both available from the interface toggle
 - archive loading shows real-time download and extraction progress in the hero panel over websocket
 - download panel shows live speed, ETA, retry state, mode, and thread details
-- download settings are configurable from the UI (auto/single/segmented mode, threads, resume, finite retries or unlimited)
+- global settings sheet centralizes download tuning, sort defaults, explorer columns, and keyboard shortcuts
 - loaded archives can be cleared directly from the app without reloading the page
 - sessions are cleaned up automatically after inactivity
 
@@ -23,7 +26,7 @@ Browse a public file or archive URL through a modern web UI running from a singl
 - `Express` server for the API and static asset hosting
 - `React + Vite` frontend for the browsing UI
 - `unzipper` and `7zip-bin` for multi-format archive extraction
-- `aria2c` runtime binary for resilient segmented downloads
+- `got`-based segmented downloader service for retry/resume/threaded transfers
 - `ffmpeg` runtime binary for video quality variant generation
 - single Docker image for portable deployment
 
@@ -96,6 +99,7 @@ Note: some large repositories may take longer to download and unpack.
 - `POST /api/sessions` start an async file/archive job from a URL (supports `downloadSettings`)
 - `GET /api/session-jobs/:id` fetch current archive job state
 - `WS /ws/jobs?jobId=...` subscribe to live archive progress events
+- `GET /api/session-jobs/:id/stream` read currently downloaded bytes while a job is running
 - `POST /api/session-jobs/:id/confirm` continue an oversized archive job
 - `DELETE /api/session-jobs/:id` cancel an active archive job
 - `GET /api/sessions/:id/tree` fetch the extracted tree for a ready session
