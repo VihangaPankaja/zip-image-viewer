@@ -1143,7 +1143,12 @@ function getSessionQualityOutputPath(session, normalizedPath, quality) {
   );
 }
 
-async function transcodeVideoToQuality({ sourcePath, outputPath, quality }) {
+async function transcodeVideoToQuality({
+  sourcePath,
+  outputPath,
+  quality,
+  onProgress,
+}) {
   if (!ffmpegPath) {
     throw new Error("Video transcoder is unavailable.");
   }
@@ -1154,11 +1159,26 @@ async function transcodeVideoToQuality({ sourcePath, outputPath, quality }) {
     return;
   }
 
+  const tempOutputPath = `${outputPath}.part`;
+  await rm(tempOutputPath, { force: true }).catch(() => {});
+
   const selectedHeight =
     quality === "source"
       ? 0
       : Number.parseInt(String(quality).replace("p", ""), 10) || 0;
-  const args = ["-hide_banner", "-loglevel", "error", "-y", "-i", sourcePath];
+  const metadata = await getVideoMetadata(sourcePath);
+  const durationSeconds = Math.max(0, Number(metadata.durationSeconds) || 0);
+  const args = [
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-y",
+    "-progress",
+    "pipe:2",
+    "-nostats",
+    "-i",
+    sourcePath,
+  ];
 
   if (selectedHeight > 0) {
     args.push("-vf", `scale=-2:${selectedHeight}`);
@@ -1175,10 +1195,87 @@ async function transcodeVideoToQuality({ sourcePath, outputPath, quality }) {
     "aac",
     "-movflags",
     "+faststart",
-    outputPath,
+    tempOutputPath,
   );
 
-  await runCommand(String(ffmpegPath), args);
+  try {
+    await new Promise((resolve, reject) => {
+      const child = spawn(String(ffmpegPath), args, {
+        stdio: ["ignore", "ignore", "pipe"],
+      });
+
+      let stderr = "";
+      let lineBuffer = "";
+      let lastEmitAt = 0;
+
+      function emitProgress(fraction) {
+        if (typeof onProgress !== "function") {
+          return;
+        }
+
+        const now = Date.now();
+        const clamped = Math.max(0, Math.min(1, fraction));
+        if (clamped < 1 && now - lastEmitAt < 450) {
+          return;
+        }
+        lastEmitAt = now;
+        onProgress(clamped);
+      }
+
+      child.stderr.on("data", (chunk) => {
+        const text = String(chunk || "");
+        stderr += text;
+        lineBuffer += text;
+        const lines = lineBuffer.split(/\r?\n/);
+        lineBuffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("out_time_ms=")) {
+            const outTimeMs = Number.parseInt(
+              line.slice("out_time_ms=".length),
+              10,
+            );
+            if (durationSeconds > 0 && Number.isFinite(outTimeMs)) {
+              emitProgress(outTimeMs / 1_000_000 / durationSeconds);
+            }
+            continue;
+          }
+
+          if (line.startsWith("out_time=")) {
+            const value = line.slice("out_time=".length);
+            const match = value.match(/(\d+):(\d+):(\d+(?:\.\d+)?)/);
+            if (durationSeconds > 0 && match) {
+              const totalSeconds =
+                (Number.parseInt(match[1], 10) || 0) * 3600 +
+                (Number.parseInt(match[2], 10) || 0) * 60 +
+                (Number.parseFloat(match[3]) || 0);
+              emitProgress(totalSeconds / durationSeconds);
+            }
+            continue;
+          }
+
+          if (line.trim() === "progress=end") {
+            emitProgress(1);
+          }
+        }
+      });
+
+      child.on("error", reject);
+      child.on("close", (code) => {
+        if (code === 0) {
+          emitProgress(1);
+          resolve(undefined);
+          return;
+        }
+        reject(new Error(stderr || `Command failed with code ${code}`));
+      });
+    });
+
+    await rename(tempOutputPath, outputPath);
+  } catch (error) {
+    await rm(tempOutputPath, { force: true }).catch(() => {});
+    throw error;
+  }
 }
 
 async function downloadWithAria2({
@@ -1777,11 +1874,37 @@ async function processSessionJob(job, confirmOversize = false) {
           settings.videoQuality,
         );
 
-        await transcodeVideoToQuality({
-          sourcePath,
-          outputPath,
-          quality: settings.videoQuality,
-        });
+        try {
+          await transcodeVideoToQuality({
+            sourcePath,
+            outputPath,
+            quality: settings.videoQuality,
+            onProgress: (fraction) => {
+              const safeFraction = Math.max(0, Math.min(1, fraction || 0));
+              const combined = (index + safeFraction) / videoEntries.length;
+              const percent = Math.max(
+                0,
+                Math.min(99, Math.floor(combined * 100)),
+              );
+              emitJob(job, {
+                status: "transcoding",
+                phase: "transcoding",
+                sessionId,
+                percent,
+                totalTranscodeEntries: videoEntries.length,
+                transcodedEntries: index,
+                message: `Transcoding videos to ${settings.videoQuality}: ${index} of ${videoEntries.length} (${Math.floor(safeFraction * 100)}% current)`,
+              });
+            },
+          });
+        } catch (error) {
+          logEvent("warn", "video.transcode.entry.failed", {
+            sessionId,
+            quality: settings.videoQuality,
+            path: entry.relativePath,
+            error: error.message,
+          });
+        }
 
         const completed = index + 1;
         const percent = Math.floor((completed / videoEntries.length) * 100);
