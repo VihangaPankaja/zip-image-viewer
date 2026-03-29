@@ -6,6 +6,7 @@ import {
   type CSSProperties,
 } from "react";
 import { createPortal } from "react-dom";
+import Plyr from "plyr";
 import { openJobSocket } from "./lib/jobSocket";
 import { WorkspaceTabs } from "./components/WorkspaceTabs";
 import { ExplorerTablePanel } from "./components/ExplorerTablePanel";
@@ -196,21 +197,6 @@ function formatEta(seconds) {
     return `${minutes}m ${String(secs).padStart(2, "0")}s`;
   }
   return `${secs}s`;
-}
-
-function formatMediaTime(seconds) {
-  if (!Number.isFinite(seconds) || seconds < 0) {
-    return "00:00";
-  }
-
-  const whole = Math.floor(seconds);
-  const hours = Math.floor(whole / 3600);
-  const minutes = Math.floor((whole % 3600) / 60);
-  const secs = whole % 60;
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-  }
-  return `${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
 
 function formatDate(value) {
@@ -662,9 +648,6 @@ function App() {
   const [activeJob, setActiveJob] = useState(null);
   const [videoPlaybackRate, setVideoPlaybackRate] = useState(1);
   const [videoVolume, setVideoVolume] = useState(0.9);
-  const [videoDuration, setVideoDuration] = useState(0);
-  const [videoCurrentTime, setVideoCurrentTime] = useState(0);
-  const [videoIsPlaying, setVideoIsPlaying] = useState(false);
   const [keyboardSettings, setKeyboardSettings] = useState(() => {
     if (typeof window === "undefined") {
       return { jumpSeconds: 5, rateStep: 0.25 };
@@ -714,6 +697,7 @@ function App() {
   const textPreviewCacheRef = useRef(new Map());
   const imagePreviewCacheRef = useRef(new Map());
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const videoPlayerRef = useRef<Plyr | null>(null);
   const videoShellRef = useRef<HTMLDivElement | null>(null);
   const jobSocketRef = useRef(null);
   const jobPollTimeoutRef = useRef(null);
@@ -1248,47 +1232,100 @@ function App() {
   }, [session]);
 
   useEffect(() => {
-    if (!videoRef.current || selectedKind !== "video") {
-      setVideoDuration(0);
-      setVideoCurrentTime(0);
-      setVideoIsPlaying(false);
+    if (selectedKind !== "video" || !videoRef.current) {
+      videoPlayerRef.current?.destroy();
+      videoPlayerRef.current = null;
       return;
     }
 
-    const videoElement = videoRef.current;
-    videoElement.src = selectedVideoUrl;
-    videoElement.load();
-
-    function onLoadedMetadata() {
-      setVideoDuration(Number(videoElement.duration) || 0);
-      videoElement.playbackRate = videoPlaybackRate;
-      videoElement.volume = videoVolume;
+    if (videoPlayerRef.current) {
+      return;
     }
 
-    function onTimeUpdate() {
-      setVideoCurrentTime(videoElement.currentTime || 0);
+    const player = new Plyr(videoRef.current, {
+      controls: [
+        "play-large",
+        "rewind",
+        "play",
+        "fast-forward",
+        "progress",
+        "current-time",
+        "duration",
+        "mute",
+        "volume",
+        "settings",
+        "fullscreen",
+      ],
+      settings: ["speed"],
+      speed: {
+        selected: 1,
+        options: [0.5, 0.75, 1, 1.25, 1.5, 2],
+      },
+      keyboard: {
+        focused: true,
+        global: false,
+      },
+    });
+    videoPlayerRef.current = player;
+
+    function onRateChange() {
+      setVideoPlaybackRate(Number(player.speed) || 1);
     }
 
-    function onPlay() {
-      setVideoIsPlaying(true);
+    function onVolumeChange() {
+      setVideoVolume(Math.max(0, Math.min(1, Number(player.volume) || 0)));
     }
 
-    function onPause() {
-      setVideoIsPlaying(false);
-    }
+    player.on("ratechange", onRateChange);
+    player.on("volumechange", onVolumeChange);
 
-    videoElement.addEventListener("loadedmetadata", onLoadedMetadata);
-    videoElement.addEventListener("timeupdate", onTimeUpdate);
-    videoElement.addEventListener("play", onPlay);
-    videoElement.addEventListener("pause", onPause);
+    player.volume = videoVolume;
+    player.speed = videoPlaybackRate;
 
     return () => {
-      videoElement.removeEventListener("loadedmetadata", onLoadedMetadata);
-      videoElement.removeEventListener("timeupdate", onTimeUpdate);
-      videoElement.removeEventListener("play", onPlay);
-      videoElement.removeEventListener("pause", onPause);
+      player.off("ratechange", onRateChange);
+      player.off("volumechange", onVolumeChange);
+      player.destroy();
+      if (videoPlayerRef.current === player) {
+        videoPlayerRef.current = null;
+      }
     };
-  }, [selectedKind, selectedVideoUrl, videoPlaybackRate, videoVolume]);
+  }, [selectedKind]);
+
+  useEffect(() => {
+    const player = videoPlayerRef.current;
+    if (!player || selectedKind !== "video" || !selectedVideoUrl) {
+      return;
+    }
+
+    player.source = {
+      type: "video",
+      title: "Preview",
+      sources: [{ src: selectedVideoUrl, type: "video/mp4" }],
+    };
+  }, [selectedKind, selectedVideoUrl]);
+
+  useEffect(() => {
+    const player = videoPlayerRef.current;
+    if (!player || selectedKind !== "video") {
+      return;
+    }
+
+    if (Math.abs(player.volume - videoVolume) > 0.01) {
+      player.volume = videoVolume;
+    }
+  }, [selectedKind, videoVolume]);
+
+  useEffect(() => {
+    const player = videoPlayerRef.current;
+    if (!player || selectedKind !== "video") {
+      return;
+    }
+
+    if (Math.abs((player.speed || 1) - videoPlaybackRate) > 0.01) {
+      player.speed = videoPlaybackRate;
+    }
+  }, [selectedKind, videoPlaybackRate]);
 
   useEffect(() => {
     latestJobIdRef.current = activeJob?.id || "";
@@ -1328,7 +1365,8 @@ function App() {
         return;
       }
 
-      if (selectedKind === "video" && videoRef.current) {
+      if (selectedKind === "video" && videoPlayerRef.current) {
+        const player = videoPlayerRef.current;
         const step = Math.max(1, Number(keyboardSettings.jumpSeconds) || 5);
         const rateStep = Math.max(
           0.05,
@@ -1337,56 +1375,44 @@ function App() {
 
         if (event.key === "ArrowRight") {
           event.preventDefault();
-          videoRef.current.currentTime = Math.max(
-            0,
-            videoRef.current.currentTime + step,
-          );
+          player.currentTime = Math.max(0, (player.currentTime || 0) + step);
           return;
         }
 
         if (event.key === "ArrowLeft") {
           event.preventDefault();
-          videoRef.current.currentTime = Math.max(
-            0,
-            videoRef.current.currentTime - step,
-          );
+          player.currentTime = Math.max(0, (player.currentTime || 0) - step);
           return;
         }
 
         if (event.key === "ArrowUp") {
           event.preventDefault();
-          const nextVolume = Math.min(1, (videoRef.current.volume || 0) + 0.05);
-          videoRef.current.volume = nextVolume;
+          const nextVolume = Math.min(1, (player.volume || 0) + 0.05);
+          player.volume = nextVolume;
           setVideoVolume(nextVolume);
           return;
         }
 
         if (event.key === "ArrowDown") {
           event.preventDefault();
-          const nextVolume = Math.max(0, (videoRef.current.volume || 0) - 0.05);
-          videoRef.current.volume = nextVolume;
+          const nextVolume = Math.max(0, (player.volume || 0) - 0.05);
+          player.volume = nextVolume;
           setVideoVolume(nextVolume);
           return;
         }
 
         if (event.key === "]") {
           event.preventDefault();
-          const nextRate = Math.min(
-            3,
-            (videoRef.current.playbackRate || 1) + rateStep,
-          );
-          videoRef.current.playbackRate = nextRate;
+          const nextRate = Math.min(3, (player.speed || 1) + rateStep);
+          player.speed = nextRate;
           setVideoPlaybackRate(nextRate);
           return;
         }
 
         if (event.key === "[") {
           event.preventDefault();
-          const nextRate = Math.max(
-            0.25,
-            (videoRef.current.playbackRate || 1) - rateStep,
-          );
-          videoRef.current.playbackRate = nextRate;
+          const nextRate = Math.max(0.25, (player.speed || 1) - rateStep);
+          player.speed = nextRate;
           setVideoPlaybackRate(nextRate);
           return;
         }
@@ -2062,87 +2088,12 @@ function App() {
                     <video
                       ref={videoRef}
                       className="video-player"
-                      controls={false}
+                      controls
+                      playsInline
                       preload="metadata"
                     >
                       Your browser cannot play this video inline.
                     </video>
-                    <div
-                      className="custom-video-controls"
-                      role="group"
-                      aria-label="Video controls"
-                    >
-                      <button
-                        className="ghost-button compact-button"
-                        type="button"
-                        onClick={() => {
-                          if (!videoRef.current) return;
-                          if (videoRef.current.paused) {
-                            videoRef.current.play().catch(() => {});
-                          } else {
-                            videoRef.current.pause();
-                          }
-                        }}
-                      >
-                        {videoIsPlaying ? "Pause" : "Play"}
-                      </button>
-                      <span className="video-time-label">
-                        {formatMediaTime(videoCurrentTime)} /{" "}
-                        {formatMediaTime(videoDuration)}
-                      </span>
-                      <input
-                        className="video-progress-range"
-                        type="range"
-                        min="0"
-                        max={Math.max(1, videoDuration)}
-                        step="0.01"
-                        value={Math.min(
-                          videoCurrentTime,
-                          Math.max(1, videoDuration),
-                        )}
-                        onChange={(event) => {
-                          if (!videoRef.current) return;
-                          const nextTime = Number(event.target.value) || 0;
-                          videoRef.current.currentTime = nextTime;
-                          setVideoCurrentTime(nextTime);
-                        }}
-                      />
-                      <label className="video-volume-shell">
-                        <span>Vol</span>
-                        <input
-                          type="range"
-                          min="0"
-                          max="1"
-                          step="0.01"
-                          value={videoVolume}
-                          onChange={(event) => {
-                            if (!videoRef.current) return;
-                            const nextVolume = Math.max(
-                              0,
-                              Math.min(1, Number(event.target.value) || 0),
-                            );
-                            videoRef.current.volume = nextVolume;
-                            setVideoVolume(nextVolume);
-                          }}
-                        />
-                      </label>
-                      <button
-                        className="ghost-button compact-button"
-                        type="button"
-                        onClick={() => {
-                          if (!videoShellRef.current) return;
-                          const requestFullscreen =
-                            videoShellRef.current.requestFullscreen;
-                          if (requestFullscreen) {
-                            requestFullscreen
-                              .call(videoShellRef.current)
-                              .catch(() => {});
-                          }
-                        }}
-                      >
-                        Fullscreen
-                      </button>
-                    </div>
                   </div>
                   <div className="progress-meta-row">
                     <span>
@@ -2159,13 +2110,13 @@ function App() {
                         className="ghost-button compact-button"
                         type="button"
                         onClick={() => {
-                          if (!videoRef.current) return;
+                          if (!videoPlayerRef.current) return;
                           const nextRate = Math.max(
                             0.25,
-                            videoRef.current.playbackRate -
+                            videoPlayerRef.current.speed -
                               keyboardSettings.rateStep,
                           );
-                          videoRef.current.playbackRate = nextRate;
+                          videoPlayerRef.current.speed = nextRate;
                           setVideoPlaybackRate(nextRate);
                         }}
                       >
@@ -2175,13 +2126,13 @@ function App() {
                         className="ghost-button compact-button"
                         type="button"
                         onClick={() => {
-                          if (!videoRef.current) return;
+                          if (!videoPlayerRef.current) return;
                           const nextRate = Math.min(
                             3,
-                            videoRef.current.playbackRate +
+                            videoPlayerRef.current.speed +
                               keyboardSettings.rateStep,
                           );
-                          videoRef.current.playbackRate = nextRate;
+                          videoPlayerRef.current.speed = nextRate;
                           setVideoPlaybackRate(nextRate);
                         }}
                       >
