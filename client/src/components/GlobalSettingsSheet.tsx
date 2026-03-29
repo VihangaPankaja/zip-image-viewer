@@ -12,13 +12,26 @@ type GlobalSettingsSheetProps = {
   previewQuality: string;
   setPreviewQuality: (value: string) => void;
   previewQualityOptions: Array<{ value: string; label: string }>;
+  videoTranscodeQuality: string;
+  setVideoTranscodeQuality: (value: string) => void;
+  videoTranscodeQualityOptions: Array<{ value: string; label: string }>;
   keyboardSettings: { jumpSeconds: number; rateStep: number };
   setKeyboardSettings: (updater: any) => void;
-  explorerColumns: { type: boolean; size: boolean; date: boolean; path: boolean };
+  explorerColumns: {
+    type: boolean;
+    size: boolean;
+    date: boolean;
+    path: boolean;
+  };
   setExplorerColumns: (updater: any) => void;
   downloadThreadModeOptions: Array<{ value: string; label: string }>;
   downloadRetryOptions: Array<{ value: number; label: string }>;
-  clampNumber: (value: string, min: number, max: number, fallback: number) => number;
+  clampNumber: (
+    value: string,
+    min: number,
+    max: number,
+    fallback: number,
+  ) => number;
   DropdownComponent: any;
 };
 
@@ -35,6 +48,9 @@ export function GlobalSettingsSheet(props: GlobalSettingsSheetProps) {
     previewQuality,
     setPreviewQuality,
     previewQualityOptions,
+    videoTranscodeQuality,
+    setVideoTranscodeQuality,
+    videoTranscodeQualityOptions,
     keyboardSettings,
     setKeyboardSettings,
     explorerColumns,
@@ -133,6 +149,14 @@ export function GlobalSettingsSheet(props: GlobalSettingsSheetProps) {
             value={previewQuality}
             options={previewQualityOptions}
             onChange={setPreviewQuality}
+          />
+
+          <DropdownComponent
+            id="settings-video-transcode-quality"
+            label="Video transcode quality"
+            value={videoTranscodeQuality}
+            options={videoTranscodeQualityOptions}
+            onChange={setVideoTranscodeQuality}
           />
 
           <label className="input-shell">

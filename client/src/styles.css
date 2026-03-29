@@ -1120,6 +1120,45 @@ input::placeholder {
   background: #000;
 }
 
+.custom-video-controls {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 14px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-panel-strong) 90%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+.video-time-label {
+  min-width: 108px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.video-progress-range {
+  flex: 1;
+}
+
+.video-volume-shell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+}
+
+.video-volume-shell input {
+  width: 90px;
+}
+
 .media-frame .plyr {
   position: relative;
   z-index: 1;
