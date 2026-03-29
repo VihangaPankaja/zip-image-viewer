@@ -16,7 +16,10 @@ function getJobSocketUrl(jobId: string): string {
   return `${protocol}//${window.location.host}/ws/jobs?jobId=${encodeURIComponent(jobId)}`;
 }
 
-export function openJobSocket(jobId: string, handlers: JobSocketHandlers): WebSocket {
+export function openJobSocket(
+  jobId: string,
+  handlers: JobSocketHandlers,
+): WebSocket {
   const socket = new WebSocket(getJobSocketUrl(jobId));
 
   socket.addEventListener("message", (event) => {

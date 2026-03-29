@@ -39,7 +39,8 @@ function buildSegments(totalSize, segmentCount) {
 
   let start = 0;
   for (let i = 0; i < safeCount; i += 1) {
-    const end = i === safeCount - 1 ? totalSize - 1 : start + sizePerSegment - 1;
+    const end =
+      i === safeCount - 1 ? totalSize - 1 : start + sizePerSegment - 1;
     segments.push({ index: i, start, end });
     start = end + 1;
   }
@@ -82,7 +83,9 @@ async function streamSingleRange({
 
     if (strictRange && headers.Range && response.statusCode !== 206) {
       const err = Object.assign(
-        new Error("Server does not support range requests for segmented download."),
+        new Error(
+          "Server does not support range requests for segmented download.",
+        ),
         { code: "RANGE_UNSUPPORTED" },
       );
       request.destroy(err);
@@ -126,7 +129,8 @@ async function downloadSingleWithResume({
   state.downloadedBytes = existingBytes;
 
   const canRangeResume = metadata.acceptRanges && metadata.size > 0;
-  const shouldRangeResume = settings.enableResume && existingBytes > 0 && canRangeResume;
+  const shouldRangeResume =
+    settings.enableResume && existingBytes > 0 && canRangeResume;
   const start = shouldRangeResume ? existingBytes : 0;
   const end = metadata.size > 0 ? metadata.size - 1 : Number.NaN;
 
