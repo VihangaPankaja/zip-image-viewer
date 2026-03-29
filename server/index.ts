@@ -22,6 +22,8 @@ import sharp from "sharp";
 import unzipper from "unzipper";
 import { fileTypeFromFile } from "file-type";
 import { attachJobWebSocketServer } from "./realtime/jobSocketServer";
+import { downloadWithSegmentedManager } from "./services/segmentedDownloader";
+import { createDownloadProgressMonitor } from "./services/jobProgressMonitor";
 
 const require = createRequire(import.meta.url);
 const { path7za } = require("7zip-bin");
@@ -757,93 +759,23 @@ async function downloadWithAria2({
   signal,
   settings,
   state,
+  metadata,
   confirmOversize,
 }) {
-  const maxTries =
-    settings.maxRetries === UNLIMITED_RETRIES
-      ? "0"
-      : String(settings.maxRetries + 1);
-  const split = settings.enableMultithread
-    ? String(Math.max(1, settings.threadCount))
-    : "1";
-  const args = [
-    "--allow-overwrite=true",
-    `--continue=${settings.enableResume ? "true" : "false"}`,
-    `--split=${split}`,
-    `--max-connection-per-server=${split}`,
-    `--max-tries=${maxTries}`,
-    "--retry-wait=1",
-    "--summary-interval=1",
-    "--console-log-level=warn",
-    "--download-result=hide",
-    "--auto-file-renaming=false",
-    "--check-integrity=true",
-    "--file-allocation=none",
-    `--dir=${path.dirname(targetPath)}`,
-    `--out=${path.basename(targetPath)}`,
+  await downloadWithSegmentedManager({
     url,
-  ];
-
-  await new Promise((resolve, reject) => {
-    const child = spawn("aria2c", args, { stdio: ["ignore", "pipe", "pipe"] });
-    let stderr = "";
-
-    function parseLine(line) {
-      const dlMatch = line.match(/DL:([^\s]+)/);
-      if (dlMatch) {
-        const speed = dlMatch[1].toLowerCase();
-        let value = Number(speed.replace(/[^0-9.]/g, "")) || 0;
-        if (speed.includes("kib")) value *= 1024;
-        if (speed.includes("mib")) value *= 1024 * 1024;
-        if (speed.includes("gib")) value *= 1024 * 1024 * 1024;
-        state.downloadedSpeed = Math.round(value);
-      }
-      const sizeMatch = line.match(/\(([0-9]{1,3})%\)/);
-      if (sizeMatch) {
-        state.reportedPercent = Number(sizeMatch[1]);
-      }
-    }
-
-    child.stdout.on("data", (chunk) => {
-      String(chunk).split(/\r?\n/).filter(Boolean).forEach(parseLine);
-    });
-    child.stderr.on("data", (chunk) => {
-      const text = String(chunk);
-      stderr += text;
-      text.split(/\r?\n/).filter(Boolean).forEach(parseLine);
-    });
-
-    const onAbort = () => {
-      child.kill("SIGTERM");
-      reject(Object.assign(new Error("Aborted"), { name: "AbortError" }));
-    };
-    signal?.addEventListener("abort", onAbort, { once: true });
-
-    child.on("error", reject);
-    child.on("close", async (code) => {
-      signal?.removeEventListener("abort", onAbort);
-      if (code !== 0) {
-        reject(new Error(stderr || `aria2c failed with code ${code}`));
-        return;
-      }
-
-      const finishedStat = await stat(targetPath).catch(() => null);
-      if (!finishedStat?.isFile()) {
-        reject(new Error("Download did not produce a file."));
-        return;
-      }
-      state.downloadedBytes = finishedStat.size;
-      if (!confirmOversize && state.downloadedBytes > CONFIRM_SIZE_BYTES) {
-        reject(
-          Object.assign(new Error("Archive exceeds 1 GB."), {
-            code: "OVERSIZE_CONFIRM",
-          }),
-        );
-        return;
-      }
-      resolve(undefined);
-    });
+    targetPath,
+    signal,
+    settings,
+    state,
+    metadata,
   });
+
+  if (!confirmOversize && state.downloadedBytes > CONFIRM_SIZE_BYTES) {
+    throw Object.assign(new Error("Archive exceeds 1 GB."), {
+      code: "OVERSIZE_CONFIRM",
+    });
+  }
 }
 
 async function listExtractedEntries(
@@ -995,95 +927,6 @@ function isRetryableDownloadError(error) {
   return true;
 }
 
-function createDownloadProgressMonitor(job, state) {
-  let timer = null;
-  let lastTickAt = Date.now();
-  let lastTickBytes = state.getDownloadedBytes();
-  let averageSpeed = 0;
-  let noProgressSince = Date.now();
-
-  function tick(force = false) {
-    const now = Date.now();
-    const currentBytes = state.getDownloadedBytes();
-    const reportedSize = state.getReportedSize();
-    const elapsedMs = Math.max(1, now - lastTickAt);
-    const deltaBytes = Math.max(0, currentBytes - lastTickBytes);
-    if (!force && elapsedMs < PROGRESS_EMIT_INTERVAL_MS) {
-      return;
-    }
-
-    const instantSpeed = Math.max(
-      0,
-      Math.round((deltaBytes * 1000) / elapsedMs),
-    );
-
-    if (deltaBytes > 0) {
-      noProgressSince = now;
-    }
-
-    if (instantSpeed > 0) {
-      averageSpeed =
-        averageSpeed <= 0
-          ? instantSpeed
-          : Math.round(averageSpeed * 0.75 + instantSpeed * 0.25);
-    } else {
-      averageSpeed = Math.round(averageSpeed * 0.86);
-    }
-
-    const stallDurationMs = Math.max(0, now - noProgressSince);
-    const isStalled =
-      state.phase() === "downloading" &&
-      state.status() === "downloading" &&
-      stallDurationMs >= STALL_THRESHOLD_MS;
-    const percent =
-      reportedSize > 0
-        ? Math.min(100, Math.floor((currentBytes / reportedSize) * 100))
-        : null;
-    const etaSeconds =
-      reportedSize > 0 && averageSpeed > 0
-        ? Math.max(0, Math.ceil((reportedSize - currentBytes) / averageSpeed))
-        : null;
-
-    emitJob(job, {
-      downloadedBytes: currentBytes,
-      reportedSize,
-      percent,
-      downloadSpeedBytesPerSec: instantSpeed,
-      averageSpeedBytesPerSec: Math.max(0, averageSpeed),
-      etaSeconds,
-      isStalled,
-      stallDurationMs,
-      message: state.getMessage({
-        currentBytes,
-        reportedSize,
-        isStalled,
-        etaSeconds,
-      }),
-    });
-
-    lastTickAt = now;
-    lastTickBytes = currentBytes;
-  }
-
-  return {
-    start() {
-      if (!timer) {
-        timer = setInterval(() => tick(false), PROGRESS_EMIT_INTERVAL_MS);
-        timer.unref?.();
-      }
-    },
-    flush() {
-      tick(true);
-    },
-    stop() {
-      if (timer) {
-        clearInterval(timer);
-        timer = null;
-      }
-    },
-  };
-}
-
 async function processSessionJob(job, confirmOversize = false) {
   const { url } = job;
 
@@ -1127,25 +970,31 @@ async function processSessionJob(job, confirmOversize = false) {
     statusText: "Starting archive download",
   };
 
-  const monitor = createDownloadProgressMonitor(job, {
-    getDownloadedBytes: () => downloadState.downloadedBytes,
-    getReportedSize: () => downloadState.reportedSize,
-    phase: () => job.phase,
-    status: () => job.status,
-    getMessage: ({ currentBytes, reportedSize, isStalled }) => {
-      if (downloadState.statusText) {
-        return downloadState.statusText;
-      }
+  const monitor = createDownloadProgressMonitor({
+    job,
+    emitJob,
+    progressEmitIntervalMs: PROGRESS_EMIT_INTERVAL_MS,
+    stallThresholdMs: STALL_THRESHOLD_MS,
+    state: {
+      getDownloadedBytes: () => downloadState.downloadedBytes,
+      getReportedSize: () => downloadState.reportedSize,
+      phase: () => job.phase,
+      status: () => job.status,
+      getMessage: ({ currentBytes, reportedSize, isStalled }) => {
+        if (downloadState.statusText) {
+          return downloadState.statusText;
+        }
 
-      if (isStalled) {
-        return "Download appears stalled. Waiting for more data...";
-      }
+        if (isStalled) {
+          return "Download appears stalled. Waiting for more data...";
+        }
 
-      if (reportedSize > 0) {
-        return `Downloading archive: ${formatBytes(currentBytes)} of ${formatBytes(reportedSize)}`;
-      }
+        if (reportedSize > 0) {
+          return `Downloading archive: ${formatBytes(currentBytes)} of ${formatBytes(reportedSize)}`;
+        }
 
-      return `Downloading archive: ${formatBytes(currentBytes)} received`;
+        return `Downloading archive: ${formatBytes(currentBytes)} received`;
+      },
     },
   });
 
@@ -1239,6 +1088,7 @@ async function processSessionJob(job, confirmOversize = false) {
           signal: job.abortController.signal,
           settings,
           state: downloadState,
+          metadata,
           confirmOversize,
         });
         break;
