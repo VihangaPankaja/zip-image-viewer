@@ -1,57 +1,28 @@
 # ZIP Image Viewer
 
-Browse a public file or archive URL through a modern web UI running from a single Docker container on port `8080`.
+Fast web app for opening public archive/file URLs, browsing extracted content, and streaming media with realtime progress.
 
-## What It Does
-
-- paste a public file or archive URL into the app
-- backend downloads it into a temporary session workspace with resilient retries/resume
-- archive contents (`zip`, `rar`, `7z`, `tar` families) are extracted safely and shown as a sidebar file tree
-- workspace is split into dedicated tabs for `Download`, `Preview`, and `Explorer`
-- explorer tab provides file-manager-style metadata listing with configurable columns
-- images open in the preview panel with left and right arrow navigation for sibling images in the same folder
-- videos such as `mp4`, `webm`, `mov`, `m4v`, and `ogv` open in an inline player with range-based streaming support and generated quality variants when available
-- direct video URLs can be previewed while download bytes are still arriving via job stream endpoint
-- audio files such as `mp3`, `wav`, `ogg`, `aac`, and `m4a` open in an inline player
-- text-style files such as `txt`, `md`, `json`, `csv`, `js`, `ts`, `html`, and `css` open in a text preview
-- dark mode and light mode are both available from the interface toggle
-- archive loading shows real-time download and extraction progress in the hero panel over websocket
-- download panel shows live speed, ETA, retry state, mode, and thread details
-- global settings sheet centralizes download tuning, sort defaults, explorer columns, and keyboard shortcuts
-- loaded archives can be cleared directly from the app without reloading the page
-- sessions are cleaned up automatically after inactivity
-
-## Tech Stack
-
-- `Express` server for the API and static asset hosting
-- `React + Vite` frontend for the browsing UI
-- `unzipper` and `7zip-bin` for multi-format archive extraction
-- `got`-based segmented downloader service for retry/resume/threaded transfers
-- `ffmpeg` runtime binary for video quality variant generation
-- single Docker image for portable deployment
-
-## Local Development
+## Quick Start
 
 Requirements:
-
-- Node.js `20+` recommended
+- Node.js 20+
 - npm
 
-Install and run:
-
+Run locally:
 ```bash
 npm install
 npm run dev
 ```
+- frontend: http://localhost:5173
+- backend: http://localhost:8080
 
-- frontend dev server runs on `5173`
-- backend runs on `8080`
-- Vite proxies `/api` requests to the backend
+Production build:
+```bash
+npm run build
+npm start
+```
 
-## Production Run With Docker
-
-Build and run locally:
-
+Docker:
 ```bash
 docker build -t zip-image-viewer .
 docker run -p 8080:8080 zip-image-viewer
@@ -68,41 +39,44 @@ Versioned image example:
 
 ```bash
 docker pull vihangapankaja/zip-image-viewer:1.0.6
-docker run -p 8080:8080 vihangapankaja/zip-image-viewer:1.0.6
+docker run -p 8080:8080 vihangapankaja/zip-image-viewer:1.2.3
 ```
 
 Open `http://localhost:8080`.
 
-## Behavior Notes
+## Highlights
 
-- public `http` and `https` file URLs are supported
-- if the file is larger than `1 GB`, the app asks whether to continue
-- extracted files are stored only in temporary server session folders
-- file loading runs as an async background job with live progress updates over websocket
-- download progress speed monitoring is decoupled from transfer chunks, so stalled downloads report speed/ETA changes correctly
-- auto mode defaults to 3 simultaneous segmented threads when the source supports range requests
-- resumable downloads and retry with backoff are supported for transient failures (including unlimited retry mode)
-- unsupported binary files can still be opened as raw files
+- Realtime job updates over WebSocket
+- Segmented/resumable downloader with retry and ETA/speed monitoring
+- Tabbed UX: Download, Preview, Explorer
+- Explorer table with sortable metadata and configurable columns
+- Inline image/text/audio/video previews
+- Live preview for direct video URLs while bytes are still downloading
+- On-demand video quality streaming via ffmpeg (no pre-generated variants)
 
-## Sample Public URLs
+## Video Quality Behavior
 
-You can test with any direct public file URL. A few archive examples:
+- Videos are stored as original files only.
+- Quality variants are NOT generated during download/extract.
+- When a user opens a video, quality options are fetched dynamically based on source resolution.
+- Quality options include `Original` plus valid levels up to source height:
+  - 360p, 480p, 720p, 1080p, 1440p, 2160p
+- Default quality:
+  - 720p if source is at least 720p
+  - Original if source is below 720p
+- Reduced qualities are transcoded in realtime through ffmpeg only when selected.
 
-- `https://github.com/jquery/jquery/archive/refs/heads/main.zip`
-- `https://github.com/twbs/icons/archive/refs/heads/main.zip`
-- `https://github.com/google/fonts/archive/refs/heads/main.zip`
+## API (Core)
 
-Note: some large repositories may take longer to download and unpack.
+- `POST /api/sessions` start async load job
+- `GET /api/session-jobs/:id` get job snapshot
+- `WS /ws/jobs?jobId=...` realtime job updates
+- `GET /api/session-jobs/:id/stream` stream currently downloaded bytes for active direct job
+- `GET /api/sessions/:id/tree` get ready explorer tree
+- `GET /api/sessions/:id/file?path=...` range/raw file serving
+- `GET /api/sessions/:id/video/qualities?path=...` get available quality options for selected video
+- `GET /api/sessions/:id/video/stream?path=...&quality=...` realtime ffmpeg transcode stream
 
-## API Endpoints
+## Project Structure
 
-- `POST /api/sessions` start an async file/archive job from a URL (supports `downloadSettings`)
-- `GET /api/session-jobs/:id` fetch current archive job state
-- `WS /ws/jobs?jobId=...` subscribe to live archive progress events
-- `GET /api/session-jobs/:id/stream` read currently downloaded bytes while a job is running
-- `POST /api/session-jobs/:id/confirm` continue an oversized archive job
-- `DELETE /api/session-jobs/:id` cancel an active archive job
-- `GET /api/sessions/:id/tree` fetch the extracted tree for a ready session
-- `GET /api/sessions/:id/file?path=...` stream a file
-- `DELETE /api/sessions/:id` remove a loaded session manually
-- `GET /health` basic server health response
+See [docs/project-structure.md](docs/project-structure.md).
