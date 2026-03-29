@@ -632,7 +632,7 @@ function App() {
   });
   const textPreviewCacheRef = useRef(new Map());
   const imagePreviewCacheRef = useRef(new Map());
-  const eventSourceRef = useRef(null);
+  const jobSocketRef = useRef(null);
   const jobPollTimeoutRef = useRef(null);
   const latestSessionIdRef = useRef("");
   const latestJobIdRef = useRef("");
@@ -709,9 +709,9 @@ function App() {
   const nextImageName = flatData?.nodesByPath.get(nextImagePath)?.name || "";
 
   function closeJobEvents() {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
+    if (jobSocketRef.current) {
+      jobSocketRef.current.close();
+      jobSocketRef.current = null;
     }
   }
 
@@ -966,56 +966,44 @@ function App() {
   function attachJobEvents(jobId, nextUrl) {
     closeJobEvents();
 
-    const source = new EventSource(`/api/session-jobs/${jobId}/events`);
-    eventSourceRef.current = source;
+    const protocol =
+      window.location.protocol === "https:" ? "wss:" : "ws:";
+    const socketUrl = `${protocol}//${window.location.host}/ws/jobs?jobId=${encodeURIComponent(jobId)}`;
+    const socket = new WebSocket(socketUrl);
+    jobSocketRef.current = socket;
 
-    const handleSnapshot = async (event) => {
-      const payload = JSON.parse(event.data);
+    const handleSnapshot = async (payload) => {
       await handleJobSnapshot(payload, nextUrl);
     };
 
-    source.addEventListener("progress", (event) => {
-      handleSnapshot(event).catch((jobError) => {
-        setError(jobError.message);
+    socket.addEventListener("message", (event) => {
+      try {
+        const packet = JSON.parse(event.data);
+        const payload = packet?.job;
+        if (!payload) {
+          return;
+        }
+
+        handleSnapshot(payload).catch((jobError) => {
+          setError(jobError.message);
+          setIsLoading(false);
+        });
+      } catch (jobError) {
+        setError(jobError.message || "Realtime update failed.");
         setIsLoading(false);
-      });
+      }
     });
 
-    source.addEventListener("confirmation", (event) => {
-      handleSnapshot(event).catch((jobError) => {
-        setError(jobError.message);
-        setIsLoading(false);
-      });
+    socket.addEventListener("error", () => {
+      closeJobEvents();
+      startJobPolling(jobId, nextUrl);
     });
 
-    source.addEventListener("ready", (event) => {
-      handleSnapshot(event).catch((jobError) => {
-        setError(jobError.message);
-        setIsLoading(false);
-      });
-    });
-
-    source.addEventListener("job-error", (event) => {
-      handleSnapshot(event).catch((jobError) => {
-        setError(jobError.message);
-        setIsLoading(false);
-      });
-    });
-
-    source.addEventListener("cancelled", (event) => {
-      handleSnapshot(event).catch((jobError) => {
-        setError(jobError.message);
-        setIsLoading(false);
-      });
-    });
-
-    source.addEventListener("error", () => {
-      if (source.readyState === EventSource.CLOSED) {
-        closeJobEvents();
+    socket.addEventListener("close", () => {
+      if (!latestJobIdRef.current || latestJobIdRef.current !== jobId) {
         return;
       }
 
-      closeJobEvents();
       startJobPolling(jobId, nextUrl);
     });
   }
@@ -1044,7 +1032,6 @@ function App() {
       }
       latestJobIdRef.current = payload.jobId;
       setActiveJob(payload);
-      startJobPolling(payload.jobId, url);
       attachJobEvents(payload.jobId, url);
     } catch (requestError) {
       setError(requestError.message);

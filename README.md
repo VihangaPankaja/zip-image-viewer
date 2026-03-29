@@ -12,7 +12,7 @@ Browse a public file or archive URL through a modern web UI running from a singl
 - audio files such as `mp3`, `wav`, `ogg`, `aac`, and `m4a` open in an inline player
 - text-style files such as `txt`, `md`, `json`, `csv`, `js`, `ts`, `html`, and `css` open in a text preview
 - dark mode and light mode are both available from the interface toggle
-- archive loading shows real-time download and extraction progress in the hero panel
+- archive loading shows real-time download and extraction progress in the hero panel over websocket
 - download panel shows live speed, ETA, retry state, mode, and thread details
 - download settings are configurable from the UI (auto/single/segmented mode, threads, resume, finite retries or unlimited)
 - loaded archives can be cleared directly from the app without reloading the page
@@ -75,7 +75,7 @@ Open `http://localhost:8080`.
 - public `http` and `https` file URLs are supported
 - if the file is larger than `1 GB`, the app asks whether to continue
 - extracted files are stored only in temporary server session folders
-- file loading runs as an async background job with live progress updates over SSE
+- file loading runs as an async background job with live progress updates over websocket
 - download progress speed monitoring is decoupled from transfer chunks, so stalled downloads report speed/ETA changes correctly
 - auto mode defaults to 3 simultaneous segmented threads when the source supports range requests
 - resumable downloads and retry with backoff are supported for transient failures (including unlimited retry mode)
@@ -95,7 +95,7 @@ Note: some large repositories may take longer to download and unpack.
 
 - `POST /api/sessions` start an async file/archive job from a URL (supports `downloadSettings`)
 - `GET /api/session-jobs/:id` fetch current archive job state
-- `GET /api/session-jobs/:id/events` subscribe to live archive progress events
+- `WS /ws/jobs?jobId=...` subscribe to live archive progress events
 - `POST /api/session-jobs/:id/confirm` continue an oversized archive job
 - `DELETE /api/session-jobs/:id` cancel an active archive job
 - `GET /api/sessions/:id/tree` fetch the extracted tree for a ready session

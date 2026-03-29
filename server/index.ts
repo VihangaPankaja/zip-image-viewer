@@ -14,12 +14,14 @@ import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
+import { createServer } from "node:http";
 import os from "node:os";
 import crypto from "node:crypto";
 import mime from "mime-types";
 import sharp from "sharp";
 import unzipper from "unzipper";
 import { fileTypeFromFile } from "file-type";
+import { WebSocketServer } from "ws";
 
 const require = createRequire(import.meta.url);
 const { path7za } = require("7zip-bin");
@@ -344,6 +346,7 @@ function createJob(url, downloadSettings = DEFAULT_DOWNLOAD_SETTINGS) {
     createdAt: Date.now(),
     updatedAt: Date.now(),
     subscribers: new Set(),
+    socketSubscribers: new Set(),
     workspaceDir: "",
     zipPath: "",
     extractDir: "",
@@ -395,7 +398,13 @@ function closeJob(job, terminalStatus) {
 
 function emitJob(job, patch = {}, eventName = "progress") {
   Object.assign(job, patch, { updatedAt: Date.now() });
-  const payload = JSON.stringify(sanitizeJob(job));
+  const sanitizedJob = sanitizeJob(job);
+  const payload = JSON.stringify(sanitizedJob);
+  const socketPayload = JSON.stringify({
+    type: eventName,
+    job: sanitizedJob,
+  });
+
   for (const res of job.subscribers) {
     res.write(`event: ${eventName}\n`);
     res.write(`data: ${payload}\n\n`);
@@ -404,8 +413,15 @@ function emitJob(job, patch = {}, eventName = "progress") {
     }
   }
 
+  for (const socket of job.socketSubscribers) {
+    if (socket.readyState === 1) {
+      socket.send(socketPayload);
+    }
+  }
+
   if (isTerminalJobStatus(job.status)) {
     job.subscribers.clear();
+    job.socketSubscribers.clear();
   }
 }
 
@@ -430,8 +446,47 @@ async function cleanupJob(jobId, reason = "cleanup") {
   }
 
   job.subscribers.clear();
+  for (const socket of job.socketSubscribers) {
+    socket.close(1000, "job-cleanup");
+  }
+  job.socketSubscribers.clear();
   jobStore.delete(jobId);
   logEvent("info", "job.removed", { jobId, reason });
+}
+
+function attachJobWebSocketServer(httpServer) {
+  const socketServer = new WebSocketServer({
+    server: httpServer,
+    path: "/ws/jobs",
+  });
+
+  socketServer.on("connection", (socket, req) => {
+    const requestUrl = new URL(
+      req.url || "/ws/jobs",
+      `http://${req.headers.host || "localhost"}`,
+    );
+    const jobId = requestUrl.searchParams.get("jobId") || "";
+    const job = jobStore.get(jobId);
+
+    if (!job) {
+      socket.send(
+        JSON.stringify({ type: "error", error: "Job not found." }),
+      );
+      socket.close(1008, "job-not-found");
+      return;
+    }
+
+    job.socketSubscribers.add(socket);
+    socket.send(
+      JSON.stringify({ type: "snapshot", job: sanitizeJob(job) }),
+    );
+
+    socket.on("close", () => {
+      job.socketSubscribers.delete(socket);
+    });
+  });
+
+  return socketServer;
 }
 
 app.use((req, res, next) => {
@@ -1847,7 +1902,10 @@ app.get(/.*/, (_req, res) => {
   res.sendFile(path.join(distDir, "index.html"));
 });
 
-server = app.listen(PORT, "0.0.0.0", () => {
+server = createServer(app);
+attachJobWebSocketServer(server);
+
+server.listen(PORT, "0.0.0.0", () => {
   logEvent("info", "server.started", {
     url: `http://0.0.0.0:${PORT}`,
     sessionTtlMs: SESSION_TTL_MS,
