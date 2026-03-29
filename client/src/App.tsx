@@ -7,6 +7,9 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { openJobSocket } from "./lib/jobSocket";
+import { WorkspaceTabs } from "./components/WorkspaceTabs";
+import { ExplorerTablePanel } from "./components/ExplorerTablePanel";
+import { GlobalSettingsSheet } from "./components/GlobalSettingsSheet";
 
 const IMAGE_EXTENSIONS = new Set([
   "jpg",
@@ -1605,29 +1608,12 @@ function App() {
       <div className="backdrop backdrop-two" />
 
       <main className="workspace">
-        <div className="workspace-switcher">
-          <div className="workspace-tabs" role="tablist" aria-label="Workspace tabs">
-            {WORKSPACE_TABS.map((tab) => (
-              <button
-                key={tab.value}
-                type="button"
-                role="tab"
-                aria-selected={activeTab === tab.value}
-                className={`tab-button ${activeTab === tab.value ? "active" : ""}`}
-                onClick={() => setActiveTab(tab.value)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-          <button
-            className="ghost-button compact-button"
-            type="button"
-            onClick={() => setSettingsOpen(true)}
-          >
-            Global settings
-          </button>
-        </div>
+        <WorkspaceTabs
+          tabs={WORKSPACE_TABS}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
 
         {activeTab === "download" ? (
         <section className="hero-panel">
@@ -2163,279 +2149,43 @@ function App() {
         ) : null}
 
         {activeTab === "explorer" ? (
-          <section className="explorer-table-panel">
-            <div className="panel-header panel-header-stackable explorer-header">
-              <div className="panel-title-group explorer-title-group">
-                <p className="panel-label">Explorer</p>
-                <h2 title={sortedTree?.name || "No archive loaded"}>
-                  {sortedTree?.name || "No archive loaded"}
-                </h2>
-              </div>
-              <div className="sidebar-header-actions">
-                {session ? <span className="panel-chip">{explorerRows.length} entries</span> : null}
-              </div>
-              <CustomDropdown
-                id="sort-mode-explorer"
-                label="Sort"
-                value={sortMode}
-                options={SORT_OPTIONS}
-                onChange={setSortMode}
-                className="toolbar-select-shell-wide explorer-sort-shell"
-              />
-            </div>
-
-            {!sortedTree ? (
-              <div className="empty-card">
-                <strong>Explorer is ready</strong>
-                <p>Open a URL from the Download tab to list files like a file manager with sortable metadata.</p>
-              </div>
-            ) : (
-              <div className="explorer-table-wrap">
-                <table className="explorer-table">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      {explorerColumns.type ? <th>Type</th> : null}
-                      {explorerColumns.size ? <th>Size</th> : null}
-                      {explorerColumns.date ? <th>Modified</th> : null}
-                      {explorerColumns.path ? <th>Path</th> : null}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {explorerRows.map((row) => (
-                      <tr
-                        key={row.path}
-                        className={row.path === selectedPath ? "active" : ""}
-                        onClick={() => {
-                          if (row.type === "file") {
-                            setSelectedPath(row.path);
-                          }
-                        }}
-                      >
-                        <td>{row.name}</td>
-                        {explorerColumns.type ? <td>{row.type === "directory" ? "Folder" : row.extension || "file"}</td> : null}
-                        {explorerColumns.size ? <td>{row.type === "directory" ? "--" : formatBytes(row.size)}</td> : null}
-                        {explorerColumns.date ? <td>{formatDate(row.modifiedAt)}</td> : null}
-                        {explorerColumns.path ? <td>{row.path}</td> : null}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
+          <ExplorerTablePanel
+            sortedTree={sortedTree}
+            session={session}
+            explorerRows={explorerRows}
+            selectedPath={selectedPath}
+            setSelectedPath={setSelectedPath}
+            sortMode={sortMode}
+            setSortMode={setSortMode}
+            sortOptions={SORT_OPTIONS}
+            explorerColumns={explorerColumns}
+            formatDate={formatDate}
+            formatBytes={formatBytes}
+            DropdownComponent={CustomDropdown}
+          />
         ) : null}
       </main>
-      {settingsOpen ? (
-        <div className="settings-overlay" role="dialog" aria-modal="true">
-          <div className="settings-sheet">
-            <div className="panel-header">
-              <div className="panel-title-group">
-                <p className="panel-label">Global settings</p>
-                <h2>Download, explorer, and shortcuts</h2>
-              </div>
-              <button
-                className="ghost-button compact-button"
-                type="button"
-                onClick={() => setSettingsOpen(false)}
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="download-settings-grid">
-              <CustomDropdown
-                id="settings-download-thread-mode"
-                label="Thread mode"
-                value={downloadSettings.threadMode}
-                options={DOWNLOAD_THREAD_MODE_OPTIONS}
-                onChange={(value) =>
-                  setDownloadSettings((current) =>
-                    normalizeDownloadSettings({
-                      ...current,
-                      threadMode: value,
-                    }),
-                  )
-                }
-              />
-
-              <label className="input-shell">
-                <span className="input-label">Thread count</span>
-                <input
-                  type="number"
-                  min="1"
-                  max="8"
-                  value={downloadSettings.threadCount}
-                  disabled={
-                    !downloadSettings.enableMultithread ||
-                    downloadSettings.threadMode === "single"
-                  }
-                  onChange={(event) =>
-                    setDownloadSettings((current) =>
-                      normalizeDownloadSettings({
-                        ...current,
-                        threadCount: event.target.value,
-                      }),
-                    )
-                  }
-                />
-              </label>
-
-              <CustomDropdown
-                id="settings-download-max-retries"
-                label="Max retries"
-                value={downloadSettings.maxRetries}
-                options={DOWNLOAD_RETRY_OPTIONS}
-                onChange={(value) =>
-                  setDownloadSettings((current) =>
-                    normalizeDownloadSettings({
-                      ...current,
-                      maxRetries: value,
-                    }),
-                  )
-                }
-              />
-
-              <CustomDropdown
-                id="settings-sort-mode"
-                label="Default sort"
-                value={sortMode}
-                options={SORT_OPTIONS}
-                onChange={setSortMode}
-              />
-
-              <CustomDropdown
-                id="settings-preview-quality"
-                label="Default preview quality"
-                value={previewQuality}
-                options={PREVIEW_QUALITY_OPTIONS}
-                onChange={setPreviewQuality}
-              />
-
-              <label className="input-shell">
-                <span className="input-label">Seek jump seconds</span>
-                <input
-                  type="number"
-                  min="1"
-                  max="30"
-                  value={keyboardSettings.jumpSeconds}
-                  onChange={(event) =>
-                    setKeyboardSettings((current) => ({
-                      ...current,
-                      jumpSeconds: clampNumber(event.target.value, 1, 30, 5),
-                    }))
-                  }
-                />
-              </label>
-
-              <label className="input-shell">
-                <span className="input-label">Speed step</span>
-                <input
-                  type="number"
-                  min="0.05"
-                  max="1"
-                  step="0.05"
-                  value={keyboardSettings.rateStep}
-                  onChange={(event) =>
-                    setKeyboardSettings((current) => ({
-                      ...current,
-                      rateStep: Math.max(0.05, Number(event.target.value) || 0.25),
-                    }))
-                  }
-                />
-              </label>
-
-              <label className="toggle-row">
-                <input
-                  type="checkbox"
-                  checked={downloadSettings.enableMultithread}
-                  onChange={(event) =>
-                    setDownloadSettings((current) =>
-                      normalizeDownloadSettings({
-                        ...current,
-                        enableMultithread: event.target.checked,
-                      }),
-                    )
-                  }
-                />
-                <span>Enable multithread</span>
-              </label>
-
-              <label className="toggle-row">
-                <input
-                  type="checkbox"
-                  checked={downloadSettings.enableResume}
-                  onChange={(event) =>
-                    setDownloadSettings((current) =>
-                      normalizeDownloadSettings({
-                        ...current,
-                        enableResume: event.target.checked,
-                      }),
-                    )
-                  }
-                />
-                <span>Enable resume</span>
-              </label>
-
-              <label className="toggle-row">
-                <input
-                  type="checkbox"
-                  checked={explorerColumns.type}
-                  onChange={(event) =>
-                    setExplorerColumns((current) => ({
-                      ...current,
-                      type: event.target.checked,
-                    }))
-                  }
-                />
-                <span>Show Type column</span>
-              </label>
-
-              <label className="toggle-row">
-                <input
-                  type="checkbox"
-                  checked={explorerColumns.size}
-                  onChange={(event) =>
-                    setExplorerColumns((current) => ({
-                      ...current,
-                      size: event.target.checked,
-                    }))
-                  }
-                />
-                <span>Show Size column</span>
-              </label>
-
-              <label className="toggle-row">
-                <input
-                  type="checkbox"
-                  checked={explorerColumns.date}
-                  onChange={(event) =>
-                    setExplorerColumns((current) => ({
-                      ...current,
-                      date: event.target.checked,
-                    }))
-                  }
-                />
-                <span>Show Date column</span>
-              </label>
-
-              <label className="toggle-row">
-                <input
-                  type="checkbox"
-                  checked={explorerColumns.path}
-                  onChange={(event) =>
-                    setExplorerColumns((current) => ({
-                      ...current,
-                      path: event.target.checked,
-                    }))
-                  }
-                />
-                <span>Show Path column</span>
-              </label>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <GlobalSettingsSheet
+        settingsOpen={settingsOpen}
+        setSettingsOpen={setSettingsOpen}
+        downloadSettings={downloadSettings}
+        setDownloadSettings={setDownloadSettings}
+        normalizeDownloadSettings={normalizeDownloadSettings}
+        sortMode={sortMode}
+        setSortMode={setSortMode}
+        sortOptions={SORT_OPTIONS}
+        previewQuality={previewQuality}
+        setPreviewQuality={setPreviewQuality}
+        previewQualityOptions={PREVIEW_QUALITY_OPTIONS}
+        keyboardSettings={keyboardSettings}
+        setKeyboardSettings={setKeyboardSettings}
+        explorerColumns={explorerColumns}
+        setExplorerColumns={setExplorerColumns}
+        downloadThreadModeOptions={DOWNLOAD_THREAD_MODE_OPTIONS}
+        downloadRetryOptions={DOWNLOAD_RETRY_OPTIONS}
+        clampNumber={clampNumber}
+        DropdownComponent={CustomDropdown}
+      />
       {slideshowModal}
     </div>
   );
