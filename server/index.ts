@@ -21,9 +21,9 @@ import mime from "mime-types";
 import sharp from "sharp";
 import unzipper from "unzipper";
 import { fileTypeFromFile } from "file-type";
-import { attachJobWebSocketServer } from "./realtime/jobSocketServer";
-import { downloadWithSegmentedManager } from "./services/segmentedDownloader";
-import { createDownloadProgressMonitor } from "./services/jobProgressMonitor";
+import { attachJobWebSocketServer } from "./realtime/jobSocketServer.js";
+import { downloadWithSegmentedManager } from "./services/segmentedDownloader.js";
+import { createDownloadProgressMonitor } from "./services/jobProgressMonitor.js";
 
 const require = createRequire(import.meta.url);
 const { path7za } = require("7zip-bin");
