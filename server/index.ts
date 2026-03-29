@@ -705,10 +705,11 @@ async function runCommand(command, args, options = {}) {
 }
 
 async function runCommandCapture(command, args, options = {}) {
+  const { allowNonZeroExit = false, ...spawnOptions } = options;
   return await new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       stdio: ["ignore", "pipe", "pipe"],
-      ...options,
+      ...spawnOptions,
     });
     let stdout = "";
     let stderr = "";
@@ -720,7 +721,7 @@ async function runCommandCapture(command, args, options = {}) {
     });
     child.on("error", reject);
     child.on("close", (code) => {
-      if (code === 0) {
+      if (code === 0 || allowNonZeroExit) {
         resolve({ stdout, stderr });
         return;
       }
@@ -739,11 +740,29 @@ async function getVideoDimensions(videoPath) {
   }
 
   try {
-    const { stderr } = await runCommandCapture(String(ffmpegPath), [
-      "-i",
-      videoPath,
-    ]);
+    const { stderr } = await runCommandCapture(
+      String(ffmpegPath),
+      ["-hide_banner", "-i", videoPath],
+      {
+        allowNonZeroExit: true,
+      },
+    );
     const lines = stderr.split(/\r?\n/);
+
+    const streamLine = lines.find(
+      (line) => line.includes("Stream #") && line.includes("Video:"),
+    );
+    if (streamLine) {
+      const streamMatch = streamLine.match(/\b(\d{2,5})x(\d{2,5})\b/);
+      if (streamMatch) {
+        const width = Number.parseInt(streamMatch[1], 10) || 0;
+        const height = Number.parseInt(streamMatch[2], 10) || 0;
+        if (width > 0 && height > 0) {
+          return { width, height };
+        }
+      }
+    }
+
     for (const line of lines) {
       if (!line.includes("Video:")) {
         continue;
@@ -1611,7 +1630,9 @@ app.get("/api/sessions/:id/video/qualities", async (req, res) => {
     return res.status(400).json({ error: error.message });
   }
 
-  const targetPath = path.resolve(path.join(session.extractDir, normalizedPath));
+  const targetPath = path.resolve(
+    path.join(session.extractDir, normalizedPath),
+  );
   const rootPath = path.resolve(session.extractDir);
   if (
     !targetPath.startsWith(`${rootPath}${path.sep}`) &&
@@ -1669,7 +1690,9 @@ app.get("/api/sessions/:id/video/stream", async (req, res) => {
     return res.status(400).json({ error: error.message });
   }
 
-  const targetPath = path.resolve(path.join(session.extractDir, normalizedPath));
+  const targetPath = path.resolve(
+    path.join(session.extractDir, normalizedPath),
+  );
   const rootPath = path.resolve(session.extractDir);
   if (
     !targetPath.startsWith(`${rootPath}${path.sep}`) &&
@@ -1692,13 +1715,7 @@ app.get("/api/sessions/:id/video/stream", async (req, res) => {
       ? 0
       : Number.parseInt(selectedQuality.replace("p", ""), 10) || 0;
 
-  const ffmpegArgs = [
-    "-hide_banner",
-    "-loglevel",
-    "error",
-    "-i",
-    targetPath,
-  ];
+  const ffmpegArgs = ["-hide_banner", "-loglevel", "error", "-i", targetPath];
 
   if (selectedHeight > 0) {
     ffmpegArgs.push("-vf", `scale=-2:${selectedHeight}`);
