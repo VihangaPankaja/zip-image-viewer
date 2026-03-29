@@ -1279,8 +1279,8 @@ function App() {
     player.on("ratechange", onRateChange);
     player.on("volumechange", onVolumeChange);
 
-    player.volume = videoVolume;
-    player.speed = videoPlaybackRate;
+    player.volume = 0.9;
+    player.speed = 1;
 
     return () => {
       player.off("ratechange", onRateChange);
