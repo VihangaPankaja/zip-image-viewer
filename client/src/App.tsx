@@ -6,6 +6,10 @@ import {
   type CSSProperties,
 } from "react";
 import { createPortal } from "react-dom";
+import { openJobSocket } from "./lib/jobSocket";
+import { WorkspaceTabs } from "./components/WorkspaceTabs";
+import { ExplorerTablePanel } from "./components/ExplorerTablePanel";
+import { GlobalSettingsSheet } from "./components/GlobalSettingsSheet";
 
 const IMAGE_EXTENSIONS = new Set([
   "jpg",
@@ -66,6 +70,11 @@ const DOWNLOAD_RETRY_OPTIONS = [
   { value: 5, label: "5 retries" },
   { value: 8, label: "8 retries" },
   { value: -1, label: "Unlimited" },
+];
+const WORKSPACE_TABS = [
+  { value: "download", label: "Download" },
+  { value: "preview", label: "Preview" },
+  { value: "explorer", label: "Explorer" },
 ];
 const DEFAULT_DOWNLOAD_SETTINGS = {
   threadMode: "auto",
@@ -192,6 +201,16 @@ function classifyNode(node) {
   if (AUDIO_EXTENSIONS.has(node.extension)) return "audio";
   if (TEXT_EXTENSIONS.has(node.extension)) return "text";
   return "binary";
+}
+
+function isLikelyVideoUrl(value) {
+  try {
+    const parsed = new URL(value || "");
+    const extension = parsed.pathname.split(".").at(-1)?.toLowerCase() || "";
+    return VIDEO_EXTENSIONS.has(extension);
+  } catch {
+    return false;
+  }
 }
 
 function getNodeBadge(node) {
@@ -598,6 +617,8 @@ function CustomDropdown({
 
 function App() {
   const [zipUrl, setZipUrl] = useState("");
+  const [activeTab, setActiveTab] = useState("download");
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [session, setSession] = useState(null);
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") {
@@ -618,6 +639,43 @@ function App() {
   const [slideshowFitMode, setSlideshowFitMode] = useState("best-fit");
   const [slideshowChromeHidden, setSlideshowChromeHidden] = useState(false);
   const [activeJob, setActiveJob] = useState(null);
+  const [videoQuality, setVideoQuality] = useState("source");
+  const [videoPlaybackRate, setVideoPlaybackRate] = useState(1);
+  const [videoVolume, setVideoVolume] = useState(0.9);
+  const [keyboardSettings, setKeyboardSettings] = useState(() => {
+    if (typeof window === "undefined") {
+      return { jumpSeconds: 5, rateStep: 0.25 };
+    }
+
+    try {
+      const raw = window.localStorage.getItem("zip-shortcut-settings");
+      const parsed = raw ? JSON.parse(raw) : null;
+      return {
+        jumpSeconds: clampNumber(parsed?.jumpSeconds, 1, 30, 5),
+        rateStep: Number(parsed?.rateStep) > 0 ? Number(parsed.rateStep) : 0.25,
+      };
+    } catch {
+      return { jumpSeconds: 5, rateStep: 0.25 };
+    }
+  });
+  const [explorerColumns, setExplorerColumns] = useState(() => {
+    if (typeof window === "undefined") {
+      return { type: true, size: true, date: true, path: true };
+    }
+
+    try {
+      const raw = window.localStorage.getItem("zip-explorer-columns");
+      const parsed = raw ? JSON.parse(raw) : null;
+      return {
+        type: parsed?.type !== false,
+        size: parsed?.size !== false,
+        date: parsed?.date !== false,
+        path: parsed?.path !== false,
+      };
+    } catch {
+      return { type: true, size: true, date: true, path: true };
+    }
+  });
   const [downloadSettings, setDownloadSettings] = useState(() => {
     if (typeof window === "undefined") {
       return DEFAULT_DOWNLOAD_SETTINGS;
@@ -632,7 +690,8 @@ function App() {
   });
   const textPreviewCacheRef = useRef(new Map());
   const imagePreviewCacheRef = useRef(new Map());
-  const eventSourceRef = useRef(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const jobSocketRef = useRef(null);
   const jobPollTimeoutRef = useRef(null);
   const latestSessionIdRef = useRef("");
   const latestJobIdRef = useRef("");
@@ -707,11 +766,34 @@ function App() {
   const previousImageName =
     flatData?.nodesByPath.get(previousImagePath)?.name || "";
   const nextImageName = flatData?.nodesByPath.get(nextImagePath)?.name || "";
+  const explorerRows = useMemo(() => {
+    if (!flatData || !sortedTree) {
+      return [];
+    }
+
+    return Array.from(flatData.nodesByPath.values())
+      .filter((node) => node.path !== sortedTree.path)
+      .sort((left, right) => compareNodes(left, right, sortMode));
+  }, [flatData, sortedTree, sortMode]);
+  const activeJobStreamUrl = activeJob?.id
+    ? `/api/session-jobs/${activeJob.id}/stream`
+    : "";
+  const showLiveJobVideo =
+    !session &&
+    Boolean(activeJob?.id) &&
+    activeJob?.phase === "downloading" &&
+    isLikelyVideoUrl(zipUrl);
+  const selectedVideoUrl =
+    selectedNode?.type === "file" && selectedKind === "video"
+      ? videoQuality === "source"
+        ? selectedFileUrl
+        : buildFileUrl(session?.id, `direct/variants/${videoQuality}.mp4`)
+      : "";
 
   function closeJobEvents() {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
+    if (jobSocketRef.current) {
+      jobSocketRef.current.close();
+      jobSocketRef.current = null;
     }
   }
 
@@ -966,58 +1048,31 @@ function App() {
   function attachJobEvents(jobId, nextUrl) {
     closeJobEvents();
 
-    const source = new EventSource(`/api/session-jobs/${jobId}/events`);
-    eventSourceRef.current = source;
-
-    const handleSnapshot = async (event) => {
-      const payload = JSON.parse(event.data);
-      await handleJobSnapshot(payload, nextUrl);
-    };
-
-    source.addEventListener("progress", (event) => {
-      handleSnapshot(event).catch((jobError) => {
-        setError(jobError.message);
+    const socket = openJobSocket(jobId, {
+      onJob: (payload) => {
+        handleJobSnapshot(payload, nextUrl).catch((jobError) => {
+          setError(jobError.message);
+          setIsLoading(false);
+        });
+      },
+      onMalformedPayload: () => {
+        setError("Realtime update failed.");
         setIsLoading(false);
-      });
-    });
-
-    source.addEventListener("confirmation", (event) => {
-      handleSnapshot(event).catch((jobError) => {
-        setError(jobError.message);
-        setIsLoading(false);
-      });
-    });
-
-    source.addEventListener("ready", (event) => {
-      handleSnapshot(event).catch((jobError) => {
-        setError(jobError.message);
-        setIsLoading(false);
-      });
-    });
-
-    source.addEventListener("job-error", (event) => {
-      handleSnapshot(event).catch((jobError) => {
-        setError(jobError.message);
-        setIsLoading(false);
-      });
-    });
-
-    source.addEventListener("cancelled", (event) => {
-      handleSnapshot(event).catch((jobError) => {
-        setError(jobError.message);
-        setIsLoading(false);
-      });
-    });
-
-    source.addEventListener("error", () => {
-      if (source.readyState === EventSource.CLOSED) {
+      },
+      onSocketError: () => {
         closeJobEvents();
-        return;
-      }
+        startJobPolling(jobId, nextUrl);
+      },
+      onSocketClose: () => {
+        if (!latestJobIdRef.current || latestJobIdRef.current !== jobId) {
+          return;
+        }
 
-      closeJobEvents();
-      startJobPolling(jobId, nextUrl);
+        startJobPolling(jobId, nextUrl);
+      },
     });
+
+    jobSocketRef.current = socket;
   }
 
   async function loadSession(url, confirmOversize = false) {
@@ -1044,7 +1099,6 @@ function App() {
       }
       latestJobIdRef.current = payload.jobId;
       setActiveJob(payload);
-      startJobPolling(payload.jobId, url);
       attachJobEvents(payload.jobId, url);
     } catch (requestError) {
       setError(requestError.message);
@@ -1075,6 +1129,20 @@ function App() {
       JSON.stringify(downloadSettings),
     );
   }, [downloadSettings]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      "zip-explorer-columns",
+      JSON.stringify(explorerColumns),
+    );
+  }, [explorerColumns]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      "zip-shortcut-settings",
+      JSON.stringify(keyboardSettings),
+    );
+  }, [keyboardSettings]);
 
   useEffect(() => {
     if (!flatData || !sortedTree) {
@@ -1200,6 +1268,67 @@ function App() {
         return;
       }
 
+      if ((selectedKind === "video" || showLiveJobVideo) && videoRef.current) {
+        const step = Math.max(1, Number(keyboardSettings.jumpSeconds) || 5);
+        const rateStep = Math.max(0.05, Number(keyboardSettings.rateStep) || 0.25);
+
+        if (event.key === "ArrowRight") {
+          event.preventDefault();
+          videoRef.current.currentTime = Math.max(
+            0,
+            videoRef.current.currentTime + step,
+          );
+          return;
+        }
+
+        if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          videoRef.current.currentTime = Math.max(
+            0,
+            videoRef.current.currentTime - step,
+          );
+          return;
+        }
+
+        if (event.key === "ArrowUp") {
+          event.preventDefault();
+          const nextVolume = Math.min(1, (videoRef.current.volume || 0) + 0.05);
+          videoRef.current.volume = nextVolume;
+          setVideoVolume(nextVolume);
+          return;
+        }
+
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          const nextVolume = Math.max(0, (videoRef.current.volume || 0) - 0.05);
+          videoRef.current.volume = nextVolume;
+          setVideoVolume(nextVolume);
+          return;
+        }
+
+        if (event.key === "]") {
+          event.preventDefault();
+          const nextRate = Math.min(
+            3,
+            (videoRef.current.playbackRate || 1) + rateStep,
+          );
+          videoRef.current.playbackRate = nextRate;
+          setVideoPlaybackRate(nextRate);
+          return;
+        }
+
+        if (event.key === "[") {
+          event.preventDefault();
+          const nextRate = Math.max(
+            0.25,
+            (videoRef.current.playbackRate || 1) - rateStep,
+          );
+          videoRef.current.playbackRate = nextRate;
+          setVideoPlaybackRate(nextRate);
+          return;
+        }
+      }
+
       if (currentImageIndex === -1) {
         if (event.key === "Escape") {
           setSlideshowOpen(false);
@@ -1259,7 +1388,9 @@ function App() {
     currentImageIndex,
     nextImagePath,
     previousImagePath,
+    keyboardSettings,
     selectedKind,
+    showLiveJobVideo,
     slideshowOpen,
   ]);
 
@@ -1477,6 +1608,14 @@ function App() {
       <div className="backdrop backdrop-two" />
 
       <main className="workspace">
+        <WorkspaceTabs
+          tabs={WORKSPACE_TABS}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
+
+        {activeTab === "download" ? (
         <section className="hero-panel">
           <div className="hero-topbar">
             <div>
@@ -1525,96 +1664,8 @@ function App() {
             </button>
           </form>
 
-          <div className="download-settings-card">
-            <div className="download-settings-head">
-              <strong>Download settings</strong>
-              <span>Applied to new loads</span>
-            </div>
-            <div className="download-settings-grid">
-              <CustomDropdown
-                id="download-thread-mode"
-                label="Thread mode"
-                value={downloadSettings.threadMode}
-                options={DOWNLOAD_THREAD_MODE_OPTIONS}
-                onChange={(value) =>
-                  setDownloadSettings((current) =>
-                    normalizeDownloadSettings({
-                      ...current,
-                      threadMode: value,
-                    }),
-                  )
-                }
-              />
-
-              <label className="input-shell">
-                <span className="input-label">Thread count</span>
-                <input
-                  type="number"
-                  min="1"
-                  max="8"
-                  value={downloadSettings.threadCount}
-                  disabled={
-                    !downloadSettings.enableMultithread ||
-                    downloadSettings.threadMode === "single"
-                  }
-                  onChange={(event) =>
-                    setDownloadSettings((current) =>
-                      normalizeDownloadSettings({
-                        ...current,
-                        threadCount: event.target.value,
-                      }),
-                    )
-                  }
-                />
-              </label>
-
-              <CustomDropdown
-                id="download-max-retries"
-                label="Max retries"
-                value={downloadSettings.maxRetries}
-                options={DOWNLOAD_RETRY_OPTIONS}
-                onChange={(value) =>
-                  setDownloadSettings((current) =>
-                    normalizeDownloadSettings({
-                      ...current,
-                      maxRetries: value,
-                    }),
-                  )
-                }
-              />
-
-              <label className="toggle-row">
-                <input
-                  type="checkbox"
-                  checked={downloadSettings.enableMultithread}
-                  onChange={(event) =>
-                    setDownloadSettings((current) =>
-                      normalizeDownloadSettings({
-                        ...current,
-                        enableMultithread: event.target.checked,
-                      }),
-                    )
-                  }
-                />
-                <span>Enable multithread</span>
-              </label>
-
-              <label className="toggle-row">
-                <input
-                  type="checkbox"
-                  checked={downloadSettings.enableResume}
-                  onChange={(event) =>
-                    setDownloadSettings((current) =>
-                      normalizeDownloadSettings({
-                        ...current,
-                        enableResume: event.target.checked,
-                      }),
-                    )
-                  }
-                />
-                <span>Enable resume</span>
-              </label>
-            </div>
+          <div className="message-card">
+            Download tuning, explorer columns, sorting defaults, and keyboard shortcuts are now configured from the Global settings sheet.
           </div>
 
           {activeJob ? (
@@ -1684,6 +1735,31 @@ function App() {
             </div>
           ) : null}
 
+          {showLiveJobVideo ? (
+            <div className="progress-card" aria-live="polite">
+              <div className="progress-card-head">
+                <strong>Live video preview while downloading</strong>
+                <span>{visualPercentLabel}</span>
+              </div>
+              <div className="image-frame media-frame">
+                <video
+                  ref={videoRef}
+                  className="video-player"
+                  src={activeJobStreamUrl}
+                  controls
+                  preload="metadata"
+                >
+                  Live stream is not available in this browser.
+                </video>
+              </div>
+              <div className="progress-meta-row">
+                <span>{transferLabel}</span>
+                <span>{speedLabel}</span>
+                <span>Available portion: {visualPercentLabel}</span>
+              </div>
+            </div>
+          ) : null}
+
           <div className="status-row">
             <div className="status-pill">Port 8080 ready</div>
             <div className="status-pill">1 GB prompt threshold</div>
@@ -1735,7 +1811,9 @@ function App() {
             </div>
           ) : null}
         </section>
+        ) : null}
 
+        {activeTab === "preview" ? (
         <section className="viewer-grid">
           <aside className="sidebar-panel">
             <div className="panel-header panel-header-stackable explorer-header">
@@ -1934,21 +2012,103 @@ function App() {
                   <span>
                     {selectedNode.extension.toUpperCase()} stream preview
                   </span>
+                  <CustomDropdown
+                    id="video-quality"
+                    label="Quality"
+                    value={videoQuality}
+                    options={[
+                      { value: "source", label: "Original" },
+                      { value: "720p", label: "720p" },
+                      { value: "480p", label: "480p" },
+                    ]}
+                    onChange={setVideoQuality}
+                  />
                   <span>{formatDate(selectedNode.modifiedAt)}</span>
                 </div>
                 <div className="image-frame media-frame">
                   <video
+                    ref={videoRef}
                     className="video-player"
-                    src={selectedFileUrl}
+                    src={selectedVideoUrl || selectedFileUrl}
                     controls
                     preload="metadata"
+                    onLoadedMetadata={(event) => {
+                      event.currentTarget.playbackRate = videoPlaybackRate;
+                      event.currentTarget.volume = videoVolume;
+                    }}
                   >
                     Your browser cannot play this video inline.
                   </video>
                 </div>
+                <div className="progress-meta-row">
+                  <span>
+                    Jump: {keyboardSettings.jumpSeconds}s | Rate step: {keyboardSettings.rateStep}x
+                  </span>
+                  <div className="message-actions">
+                    <button
+                      className="ghost-button compact-button"
+                      type="button"
+                      onClick={() => {
+                        if (!videoRef.current) return;
+                        const nextRate = Math.max(0.25, videoRef.current.playbackRate - keyboardSettings.rateStep);
+                        videoRef.current.playbackRate = nextRate;
+                        setVideoPlaybackRate(nextRate);
+                      }}
+                    >
+                      Slower
+                    </button>
+                    <button
+                      className="ghost-button compact-button"
+                      type="button"
+                      onClick={() => {
+                        if (!videoRef.current) return;
+                        const nextRate = Math.min(3, videoRef.current.playbackRate + keyboardSettings.rateStep);
+                        videoRef.current.playbackRate = nextRate;
+                        setVideoPlaybackRate(nextRate);
+                      }}
+                    >
+                      Faster
+                    </button>
+                  </div>
+                </div>
                 <div className="navigation-hint">
-                  Video playback streams from the extracted file and supports
-                  browser seeking when the server serves ranges.
+                  Arrow left and right seek by {keyboardSettings.jumpSeconds}s,
+                  arrow up and down changes volume, and [ ] changes speed.
+                </div>
+              </div>
+            ) : null}
+
+            {showLiveJobVideo ? (
+              <div className="preview-stage">
+                <div className="preview-toolbar">
+                  <span>Live while downloading</span>
+                  <span>{visualPercentLabel} available</span>
+                  <span>{transferLabel}</span>
+                </div>
+                <div className="image-frame media-frame">
+                  <video
+                    ref={videoRef}
+                    className="video-player"
+                    src={activeJobStreamUrl}
+                    controls
+                    preload="metadata"
+                  >
+                    Live stream is not available in this browser.
+                  </video>
+                </div>
+                <div className="progress-bar-shell">
+                  <div
+                    className="progress-bar-fill"
+                    style={
+                      visualPercent == null
+                        ? { width: "8%" }
+                        : { width: visualProgressWidth }
+                    }
+                  />
+                </div>
+                <div className="navigation-hint">
+                  Playback is served from downloaded bytes. Seeking is limited
+                  to the completed portion until the download advances.
                 </div>
               </div>
             ) : null}
@@ -1986,7 +2146,46 @@ function App() {
             ) : null}
           </section>
         </section>
+        ) : null}
+
+        {activeTab === "explorer" ? (
+          <ExplorerTablePanel
+            sortedTree={sortedTree}
+            session={session}
+            explorerRows={explorerRows}
+            selectedPath={selectedPath}
+            setSelectedPath={setSelectedPath}
+            sortMode={sortMode}
+            setSortMode={setSortMode}
+            sortOptions={SORT_OPTIONS}
+            explorerColumns={explorerColumns}
+            formatDate={formatDate}
+            formatBytes={formatBytes}
+            DropdownComponent={CustomDropdown}
+          />
+        ) : null}
       </main>
+      <GlobalSettingsSheet
+        settingsOpen={settingsOpen}
+        setSettingsOpen={setSettingsOpen}
+        downloadSettings={downloadSettings}
+        setDownloadSettings={setDownloadSettings}
+        normalizeDownloadSettings={normalizeDownloadSettings}
+        sortMode={sortMode}
+        setSortMode={setSortMode}
+        sortOptions={SORT_OPTIONS}
+        previewQuality={previewQuality}
+        setPreviewQuality={setPreviewQuality}
+        previewQualityOptions={PREVIEW_QUALITY_OPTIONS}
+        keyboardSettings={keyboardSettings}
+        setKeyboardSettings={setKeyboardSettings}
+        explorerColumns={explorerColumns}
+        setExplorerColumns={setExplorerColumns}
+        downloadThreadModeOptions={DOWNLOAD_THREAD_MODE_OPTIONS}
+        downloadRetryOptions={DOWNLOAD_RETRY_OPTIONS}
+        clampNumber={clampNumber}
+        DropdownComponent={CustomDropdown}
+      />
       {slideshowModal}
     </div>
   );
