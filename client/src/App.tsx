@@ -639,7 +639,10 @@ function App() {
   const [slideshowFitMode, setSlideshowFitMode] = useState("best-fit");
   const [slideshowChromeHidden, setSlideshowChromeHidden] = useState(false);
   const [activeJob, setActiveJob] = useState(null);
-  const [videoQuality, setVideoQuality] = useState("source");
+  const [videoQuality, setVideoQuality] = useState("720p");
+  const [videoQualityOptions, setVideoQualityOptions] = useState([
+    { value: "source", label: "Original" },
+  ]);
   const [videoPlaybackRate, setVideoPlaybackRate] = useState(1);
   const [videoVolume, setVideoVolume] = useState(0.9);
   const [keyboardSettings, setKeyboardSettings] = useState(() => {
@@ -787,7 +790,10 @@ function App() {
     selectedNode?.type === "file" && selectedKind === "video"
       ? videoQuality === "source"
         ? selectedFileUrl
-        : buildFileUrl(session?.id, `direct/variants/${videoQuality}.mp4`)
+        : `/api/sessions/${session?.id}/video/stream?${new URLSearchParams({
+            path: selectedNode.path,
+            quality: videoQuality,
+          }).toString()}`
       : "";
 
   function closeJobEvents() {
@@ -1229,6 +1235,59 @@ function App() {
   useEffect(() => {
     latestSessionIdRef.current = session?.id || "";
   }, [session]);
+
+  useEffect(() => {
+    if (!session?.id || !selectedNode || selectedKind !== "video") {
+      setVideoQualityOptions([{ value: "source", label: "Original" }]);
+      setVideoQuality("source");
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadVideoQualities() {
+      try {
+        const params = new URLSearchParams({ path: selectedNode.path });
+        const response = await fetch(
+          `/api/sessions/${session.id}/video/qualities?${params.toString()}`,
+        );
+        if (!response.ok) {
+          throw new Error("Failed to load video quality options.");
+        }
+
+        const payload = await response.json();
+        if (cancelled) {
+          return;
+        }
+
+        const options = Array.isArray(payload.options)
+          ? payload.options.map((option) => ({
+              value: option.id,
+              label: option.label,
+            }))
+          : [{ value: "source", label: "Original" }];
+        setVideoQualityOptions(options);
+
+        const preferred = String(payload.defaultQuality || "source");
+        const nextQuality =
+          options.find((option) => option.value === preferred)?.value ||
+          options[0]?.value ||
+          "source";
+        setVideoQuality(nextQuality);
+      } catch {
+        if (!cancelled) {
+          setVideoQualityOptions([{ value: "source", label: "Original" }]);
+          setVideoQuality("source");
+        }
+      }
+    }
+
+    loadVideoQualities();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session, selectedKind, selectedNode]);
 
   useEffect(() => {
     latestJobIdRef.current = activeJob?.id || "";
@@ -2012,20 +2071,23 @@ function App() {
                   <span>
                     {selectedNode.extension.toUpperCase()} stream preview
                   </span>
-                  <CustomDropdown
-                    id="video-quality"
-                    label="Quality"
-                    value={videoQuality}
-                    options={[
-                      { value: "source", label: "Original" },
-                      { value: "720p", label: "720p" },
-                      { value: "480p", label: "480p" },
-                    ]}
-                    onChange={setVideoQuality}
-                  />
                   <span>{formatDate(selectedNode.modifiedAt)}</span>
                 </div>
                 <div className="image-frame media-frame">
+                  <label className="video-quality-overlay" htmlFor="video-quality-inline">
+                    <span>Quality</span>
+                    <select
+                      id="video-quality-inline"
+                      value={videoQuality}
+                      onChange={(event) => setVideoQuality(event.target.value)}
+                    >
+                      {videoQualityOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <video
                     ref={videoRef}
                     className="video-player"

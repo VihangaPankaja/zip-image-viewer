@@ -1120,6 +1120,32 @@ input::placeholder {
   background: #000;
 }
 
+.video-quality-overlay {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg-panel-strong) 86%, transparent);
+  color: var(--text);
+  box-shadow: var(--shadow-soft);
+  font-size: 0.84rem;
+}
+
+.video-quality-overlay select {
+  min-height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-inset) 84%, transparent);
+  color: var(--text);
+  padding: 0 8px;
+}
+
 .thumbnail-strip-shell {
   border: 1px solid var(--border);
   border-radius: 22px;

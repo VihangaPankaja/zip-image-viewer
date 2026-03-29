@@ -73,11 +73,7 @@ const IMAGE_PREVIEW_PROFILES = {
   balanced: { size: 1920, quality: 72 },
   high: { size: 2560, quality: 82 },
 };
-const VIDEO_QUALITY_PRESETS = [
-  { id: "source", label: "Original", height: 0, crf: 0 },
-  { id: "480p", label: "480p", height: 480, crf: 28 },
-  { id: "720p", label: "720p", height: 720, crf: 26 },
-];
+const VIDEO_STREAM_QUALITY_LEVELS = [2160, 1440, 1080, 720, 480, 360];
 
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(distDir));
@@ -708,49 +704,83 @@ async function runCommand(command, args, options = {}) {
   });
 }
 
+async function runCommandCapture(command, args, options = {}) {
+  return await new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      stdio: ["ignore", "pipe", "pipe"],
+      ...options,
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => {
+      stdout += String(chunk);
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += String(chunk);
+    });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve({ stdout, stderr });
+        return;
+      }
+      reject(new Error(stderr || `Command failed with code ${code}`));
+    });
+  });
+}
+
 async function extractWith7zip(archivePath, extractDir) {
   await runCommand(path7za, ["x", "-y", `-o${extractDir}`, archivePath]);
 }
 
-async function transcodeVideoVariants(sourcePath, outputDir) {
+async function getVideoDimensions(videoPath) {
   if (!ffmpegPath) {
-    return [];
+    return { width: 0, height: 0 };
   }
 
-  await mkdir(outputDir, { recursive: true });
-  const variants = [];
-
-  for (const preset of VIDEO_QUALITY_PRESETS) {
-    if (preset.id === "source") {
-      continue;
-    }
-    const outputPath = path.join(outputDir, `${preset.id}.mp4`);
-    await runCommand(String(ffmpegPath), [
-      "-y",
+  try {
+    const { stderr } = await runCommandCapture(String(ffmpegPath), [
       "-i",
-      sourcePath,
-      "-vf",
-      `scale=-2:${preset.height}`,
-      "-c:v",
-      "libx264",
-      "-preset",
-      "veryfast",
-      "-crf",
-      String(preset.crf),
-      "-c:a",
-      "aac",
-      "-movflags",
-      "+faststart",
-      outputPath,
+      videoPath,
     ]);
-    variants.push({
-      id: preset.id,
-      label: preset.label,
-      relativePath: outputPath,
-    });
+    const lines = stderr.split(/\r?\n/);
+    for (const line of lines) {
+      if (!line.includes("Video:")) {
+        continue;
+      }
+      const sizeMatch = line.match(/\b(\d{2,5})x(\d{2,5})\b/);
+      if (sizeMatch) {
+        const width = Number.parseInt(sizeMatch[1], 10) || 0;
+        const height = Number.parseInt(sizeMatch[2], 10) || 0;
+        if (width > 0 && height > 0) {
+          return { width, height };
+        }
+      }
+    }
+  } catch {
+    return { width: 0, height: 0 };
   }
 
-  return variants;
+  return { width: 0, height: 0 };
+}
+
+function buildVideoQualityOptions(sourceHeight) {
+  if (!Number.isFinite(sourceHeight) || sourceHeight <= 0) {
+    return {
+      options: [{ id: "source", label: "Original", height: 0 }],
+      defaultQuality: "source",
+    };
+  }
+
+  const options = [{ id: "source", label: "Original", height: sourceHeight }];
+  for (const level of VIDEO_STREAM_QUALITY_LEVELS) {
+    if (level <= sourceHeight) {
+      options.push({ id: `${level}p`, label: `${level}p`, height: level });
+    }
+  }
+
+  const defaultQuality = sourceHeight >= 720 ? "720p" : "source";
+  return { options, defaultQuality };
 }
 
 async function downloadWithAria2({
@@ -1270,30 +1300,6 @@ async function processSessionJob(job, confirmOversize = false) {
         size: (await stat(mediaPath)).size,
         modifiedAt: Date.now(),
       });
-
-      if (detectedKind === "video") {
-        const variantsDir = path.join(mediaDir, "variants");
-        const variants = await transcodeVideoVariants(
-          mediaPath,
-          variantsDir,
-        ).catch(() => []);
-        for (const variant of variants) {
-          const variantStats = await stat(variant.relativePath).catch(
-            () => null,
-          );
-          if (variantStats?.isFile()) {
-            extractedEntries.push({
-              relativePath: path
-                .relative(extractDir, variant.relativePath)
-                .split(path.sep)
-                .join("/"),
-              type: "file",
-              size: variantStats.size,
-              modifiedAt: variantStats.mtimeMs,
-            });
-          }
-        }
-      }
     }
 
     emitExtractionProgress(true);
@@ -1583,6 +1589,174 @@ app.get("/api/sessions/:id/tree", (req, res) => {
     firstFilePath: session.firstFilePath,
     stats: session.stats,
   });
+});
+
+app.get("/api/sessions/:id/video/qualities", async (req, res) => {
+  const session = touchSession(req.params.id);
+  if (!session) {
+    return res
+      .status(404)
+      .json({ error: "Session not found or already cleaned up." });
+  }
+
+  const requestedPath = String(req.query.path || "");
+  if (!requestedPath || requestedPath === ".") {
+    return res.status(400).json({ error: "File path is required." });
+  }
+
+  let normalizedPath;
+  try {
+    normalizedPath = sanitizeEntryPath(requestedPath);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const targetPath = path.resolve(path.join(session.extractDir, normalizedPath));
+  const rootPath = path.resolve(session.extractDir);
+  if (
+    !targetPath.startsWith(`${rootPath}${path.sep}`) &&
+    targetPath !== rootPath
+  ) {
+    return res.status(400).json({ error: "Invalid file path." });
+  }
+
+  const fileStats = await stat(targetPath).catch(() => null);
+  if (!fileStats || !fileStats.isFile()) {
+    return res.status(404).json({ error: "File not found." });
+  }
+
+  const contentType = mime.lookup(targetPath) || "application/octet-stream";
+  const extension = path.extname(targetPath).slice(1).toLowerCase();
+  if (
+    !String(contentType).startsWith("video/") &&
+    !VIDEO_EXTENSIONS.has(extension)
+  ) {
+    return res.status(400).json({ error: "Selected file is not a video." });
+  }
+
+  const dimensions = await getVideoDimensions(targetPath);
+  const quality = buildVideoQualityOptions(dimensions.height);
+  return res.json({
+    path: normalizedPath,
+    source: dimensions,
+    options: quality.options,
+    defaultQuality: quality.defaultQuality,
+  });
+});
+
+app.get("/api/sessions/:id/video/stream", async (req, res) => {
+  const session = touchSession(req.params.id);
+  if (!session) {
+    return res
+      .status(404)
+      .json({ error: "Session not found or already cleaned up." });
+  }
+
+  if (!ffmpegPath) {
+    return res.status(503).json({ error: "Video transcoder is unavailable." });
+  }
+
+  const requestedPath = String(req.query.path || "");
+  const quality = String(req.query.quality || "source").toLowerCase();
+  if (!requestedPath || requestedPath === ".") {
+    return res.status(400).json({ error: "File path is required." });
+  }
+
+  let normalizedPath;
+  try {
+    normalizedPath = sanitizeEntryPath(requestedPath);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const targetPath = path.resolve(path.join(session.extractDir, normalizedPath));
+  const rootPath = path.resolve(session.extractDir);
+  if (
+    !targetPath.startsWith(`${rootPath}${path.sep}`) &&
+    targetPath !== rootPath
+  ) {
+    return res.status(400).json({ error: "Invalid file path." });
+  }
+
+  const fileStats = await stat(targetPath).catch(() => null);
+  if (!fileStats || !fileStats.isFile()) {
+    return res.status(404).json({ error: "File not found." });
+  }
+
+  const sourceDimensions = await getVideoDimensions(targetPath);
+  const { options } = buildVideoQualityOptions(sourceDimensions.height);
+  const selectedQuality =
+    options.find((option) => option.id === quality)?.id || "source";
+  const selectedHeight =
+    selectedQuality === "source"
+      ? 0
+      : Number.parseInt(selectedQuality.replace("p", ""), 10) || 0;
+
+  const ffmpegArgs = [
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-i",
+    targetPath,
+  ];
+
+  if (selectedHeight > 0) {
+    ffmpegArgs.push("-vf", `scale=-2:${selectedHeight}`);
+  }
+
+  ffmpegArgs.push(
+    "-c:v",
+    "libx264",
+    "-preset",
+    "veryfast",
+    "-crf",
+    selectedHeight >= 1440 ? "27" : selectedHeight >= 1080 ? "26" : "24",
+    "-c:a",
+    "aac",
+    "-movflags",
+    "+frag_keyframe+empty_moov+faststart",
+    "-f",
+    "mp4",
+    "pipe:1",
+  );
+
+  res.setHeader("cache-control", "no-store");
+  res.type("video/mp4");
+
+  const child = spawn(String(ffmpegPath), ffmpegArgs, {
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let stderr = "";
+  child.stderr.on("data", (chunk) => {
+    stderr += String(chunk);
+  });
+
+  req.on("close", () => {
+    if (!child.killed) {
+      child.kill("SIGTERM");
+    }
+  });
+
+  child.on("error", () => {
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Failed to start transcoder." });
+    }
+  });
+
+  child.on("close", (code) => {
+    if (code !== 0 && !res.writableEnded) {
+      res.end();
+      logEvent("warn", "session.video.transcode.failed", {
+        sessionId: session.id,
+        path: normalizedPath,
+        quality: selectedQuality,
+        code,
+        stderr: stderr.slice(-500),
+      });
+    }
+  });
+
+  return child.stdout.pipe(res);
 });
 
 app.get("/api/sessions/:id/file", async (req, res) => {
