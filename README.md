@@ -5,24 +5,29 @@ Fast web app for opening public archive/file URLs, browsing extracted content, a
 ## Quick Start
 
 Requirements:
+
 - Node.js 20+
 - npm
 
 Run locally:
+
 ```bash
 npm install
 npm run dev
 ```
-- frontend: http://localhost:5173
-- backend: http://localhost:8080
+
+- frontend: <http://localhost:5173>
+- backend: <http://localhost:8080>
 
 Production build:
+
 ```bash
 npm run build
 npm start
 ```
 
 Docker:
+
 ```bash
 docker build -t zip-image-viewer .
 docker run -p 8080:8080 zip-image-viewer

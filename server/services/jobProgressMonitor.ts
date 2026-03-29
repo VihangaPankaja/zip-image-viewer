@@ -24,7 +24,10 @@ export function createDownloadProgressMonitor({
       return;
     }
 
-    const instantSpeed = Math.max(0, Math.round((deltaBytes * 1000) / elapsedMs));
+    const instantSpeed = Math.max(
+      0,
+      Math.round((deltaBytes * 1000) / elapsedMs),
+    );
 
     if (deltaBytes > 0) {
       noProgressSince = now;
