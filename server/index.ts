@@ -75,6 +75,15 @@ const IMAGE_PREVIEW_PROFILES = {
   high: { size: 2560, quality: 82 },
 };
 const VIDEO_STREAM_QUALITY_LEVELS = [2160, 1440, 1080, 720, 480, 360];
+const VIDEO_TRANSCODE_QUALITY_OPTIONS = [
+  "source",
+  "360p",
+  "480p",
+  "720p",
+  "1080p",
+  "1440p",
+  "2160p",
+];
 const DEFAULT_VIDEO_SEGMENT_SECONDS = 4;
 const VIDEO_PRIORITY_WINDOW_SECONDS = 24;
 const videoTranscodeStore = new Map();
@@ -163,6 +172,12 @@ function normalizeDownloadSettings(input) {
           ),
         );
 
+  const videoQuality = VIDEO_TRANSCODE_QUALITY_OPTIONS.includes(
+    String(source.videoQuality || "").toLowerCase(),
+  )
+    ? String(source.videoQuality).toLowerCase()
+    : "720p";
+
   return {
     threadMode: sanitizeThreadMode(source.threadMode),
     threadCount,
@@ -175,6 +190,7 @@ function normalizeDownloadSettings(input) {
         ? DEFAULT_DOWNLOAD_SETTINGS.enableResume
         : Boolean(source.enableResume),
     maxRetries,
+    videoQuality,
   };
 }
 
@@ -347,6 +363,9 @@ function createJob(url, downloadSettings = DEFAULT_DOWNLOAD_SETTINGS) {
     sessionId: "",
     createdAt: Date.now(),
     updatedAt: Date.now(),
+    transcodedEntries: 0,
+    totalTranscodeEntries: 0,
+    videoQuality: "720p",
     subscribers: new Set(),
     socketSubscribers: new Set(),
     workspaceDir: "",
@@ -388,6 +407,9 @@ function sanitizeJob(job) {
     error: job.error,
     requiresConfirmation: job.requiresConfirmation,
     sessionId: job.sessionId,
+    transcodedEntries: job.transcodedEntries,
+    totalTranscodeEntries: job.totalTranscodeEntries,
+    videoQuality: job.videoQuality,
     updatedAt: job.updatedAt,
   };
 }
@@ -1110,22 +1132,53 @@ async function startPrioritySegmentWindow(
   return promise;
 }
 
-async function prewarmDefaultVideoRendition(entry, session) {
+function getSessionQualityOutputPath(session, normalizedPath, quality) {
+  const safeQuality = String(quality || "720p").toLowerCase();
+  const outputRelative = normalizedPath.replace(/\.[^.]+$/, ".mp4");
+  return path.join(
+    session.workspaceDir,
+    "quality",
+    safeQuality,
+    outputRelative,
+  );
+}
+
+async function transcodeVideoToQuality({ sourcePath, outputPath, quality }) {
   if (!ffmpegPath) {
+    throw new Error("Video transcoder is unavailable.");
+  }
+
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  const existing = await stat(outputPath).catch(() => null);
+  if (existing?.isFile() && existing.size > 0) {
     return;
   }
 
-  const defaultQuality = entry.defaultQuality === "source" ? "source" : "720p";
-  if (!entry.qualities.some((option) => option.id === defaultQuality)) {
-    return;
+  const selectedHeight =
+    quality === "source"
+      ? 0
+      : Number.parseInt(String(quality).replace("p", ""), 10) || 0;
+  const args = ["-hide_banner", "-loglevel", "error", "-y", "-i", sourcePath];
+
+  if (selectedHeight > 0) {
+    args.push("-vf", `scale=-2:${selectedHeight}`);
   }
 
-  const rendition = getRenditionState(entry, session, defaultQuality);
-  await refreshRenditionAvailability(rendition);
-  if (rendition.status === "done") {
-    return;
-  }
-  await startRenditionTranscode(entry, session, rendition);
+  args.push(
+    "-c:v",
+    "libx264",
+    "-preset",
+    "veryfast",
+    "-crf",
+    selectedHeight >= 1440 ? "27" : selectedHeight >= 1080 ? "26" : "24",
+    "-c:a",
+    "aac",
+    "-movflags",
+    "+faststart",
+    outputPath,
+  );
+
+  await runCommand(String(ffmpegPath), args);
 }
 
 async function downloadWithAria2({
@@ -1338,6 +1391,7 @@ async function processSessionJob(job, confirmOversize = false) {
   job.threadCount = settings.threadCount;
   job.enableMultithread = settings.enableMultithread;
   job.enableResume = settings.enableResume;
+  job.videoQuality = settings.videoQuality;
 
   const downloadState = {
     downloadedBytes: 0,
@@ -1675,6 +1729,13 @@ async function processSessionJob(job, confirmOversize = false) {
       tree,
       firstFilePath,
       stats,
+      selectedVideoQuality: settings.videoQuality,
+      transcodeStatus: {
+        quality: settings.videoQuality,
+        done: false,
+        completed: 0,
+        total: 0,
+      },
       lastAccessedAt: Date.now(),
     });
 
@@ -1685,6 +1746,66 @@ async function processSessionJob(job, confirmOversize = false) {
       fileCount: stats.fileCount,
       firstFilePath,
     });
+
+    const videoEntries = extractedEntries.filter((entry) => {
+      if (entry.type !== "file") {
+        return false;
+      }
+      const ext = path.extname(entry.relativePath).slice(1).toLowerCase();
+      return VIDEO_EXTENSIONS.has(ext);
+    });
+
+    if (videoEntries.length > 0 && settings.videoQuality !== "source") {
+      emitJob(job, {
+        status: "transcoding",
+        phase: "transcoding",
+        sessionId,
+        percent: 0,
+        totalTranscodeEntries: videoEntries.length,
+        transcodedEntries: 0,
+        message: `Transcoding videos to ${settings.videoQuality}: 0 of ${videoEntries.length}`,
+      });
+
+      const session = sessionStore.get(sessionId);
+      session.transcodeStatus.total = videoEntries.length;
+      for (let index = 0; index < videoEntries.length; index += 1) {
+        const entry = videoEntries[index];
+        const sourcePath = path.join(extractDir, entry.relativePath);
+        const outputPath = getSessionQualityOutputPath(
+          session,
+          entry.relativePath,
+          settings.videoQuality,
+        );
+
+        await transcodeVideoToQuality({
+          sourcePath,
+          outputPath,
+          quality: settings.videoQuality,
+        });
+
+        const completed = index + 1;
+        const percent = Math.floor((completed / videoEntries.length) * 100);
+        session.transcodeStatus.completed = completed;
+        emitJob(job, {
+          status: "transcoding",
+          phase: "transcoding",
+          sessionId,
+          percent,
+          totalTranscodeEntries: videoEntries.length,
+          transcodedEntries: completed,
+          message: `Transcoding videos to ${settings.videoQuality}: ${completed} of ${videoEntries.length}`,
+        });
+      }
+      session.transcodeStatus.done = true;
+    } else {
+      const session = sessionStore.get(sessionId);
+      session.transcodeStatus = {
+        quality: settings.videoQuality,
+        done: true,
+        completed: videoEntries.length,
+        total: videoEntries.length,
+      };
+    }
 
     job.workspaceDir = "";
     job.extractDir = "";
@@ -1936,6 +2057,104 @@ app.get("/api/sessions/:id/tree", (req, res) => {
   });
 });
 
+app.get("/api/sessions/:id/video/play", async (req, res) => {
+  const session = touchSession(req.params.id);
+  if (!session) {
+    return res
+      .status(404)
+      .json({ error: "Session not found or already cleaned up." });
+  }
+
+  const requestedPath = String(req.query.path || "");
+  const quality = String(
+    req.query.quality || session.selectedVideoQuality || "720p",
+  ).toLowerCase();
+  if (!requestedPath || requestedPath === ".") {
+    return res.status(400).json({ error: "File path is required." });
+  }
+
+  let normalizedPath;
+  try {
+    normalizedPath = sanitizeEntryPath(requestedPath);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const rawPath = path.resolve(path.join(session.extractDir, normalizedPath));
+  const rootPath = path.resolve(session.extractDir);
+  if (!rawPath.startsWith(`${rootPath}${path.sep}`) && rawPath !== rootPath) {
+    return res.status(400).json({ error: "Invalid file path." });
+  }
+
+  const rawStats = await stat(rawPath).catch(() => null);
+  if (!rawStats || !rawStats.isFile()) {
+    return res.status(404).json({ error: "File not found." });
+  }
+
+  let targetPath = rawPath;
+  let targetStats = rawStats;
+  let sourceMode = "raw";
+  if (quality !== "source") {
+    const qualityPath = getSessionQualityOutputPath(
+      session,
+      normalizedPath,
+      quality,
+    );
+    const qualityStats = await stat(qualityPath).catch(() => null);
+    if (qualityStats?.isFile()) {
+      targetPath = qualityPath;
+      targetStats = qualityStats;
+      sourceMode = quality;
+    }
+  }
+
+  res.setHeader("cache-control", "no-store");
+  res.setHeader("accept-ranges", "bytes");
+  res.setHeader("x-video-source", sourceMode);
+  res.type(mime.lookup(targetPath) || "video/mp4");
+
+  const range = parseRangeHeader(req.headers.range, targetStats.size);
+  if (range === "invalid") {
+    res.setHeader("content-range", `bytes */${targetStats.size}`);
+    return res.status(416).end();
+  }
+
+  if (range) {
+    const contentLength = range.end - range.start + 1;
+    res.status(206);
+    res.setHeader(
+      "content-range",
+      `bytes ${range.start}-${range.end}/${targetStats.size}`,
+    );
+    res.setHeader("content-length", String(contentLength));
+    return createReadStream(targetPath, {
+      start: range.start,
+      end: range.end,
+    }).pipe(res);
+  }
+
+  res.setHeader("content-length", String(targetStats.size));
+  return createReadStream(targetPath).pipe(res);
+});
+
+app.get("/api/sessions/:id/video/transcode-status", (req, res) => {
+  const session = touchSession(req.params.id);
+  if (!session) {
+    return res
+      .status(404)
+      .json({ error: "Session not found or already cleaned up." });
+  }
+
+  return res.json({
+    quality: session.selectedVideoQuality || "720p",
+    ...(session.transcodeStatus || {
+      done: true,
+      completed: 0,
+      total: 0,
+    }),
+  });
+});
+
 app.get("/api/sessions/:id/video/qualities", async (req, res) => {
   const session = touchSession(req.params.id);
   if (!session) {
@@ -1981,36 +2200,14 @@ app.get("/api/sessions/:id/video/qualities", async (req, res) => {
     return res.status(400).json({ error: "Selected file is not a video." });
   }
 
-  const entry = await ensureVideoTranscodeEntry(
-    session,
-    normalizedPath,
-    targetPath,
-  );
-  await prewarmDefaultVideoRendition(entry, session);
-
-  const options = [];
-  for (const option of entry.qualities) {
-    const rendition = getRenditionState(entry, session, option.id);
-    const availableSegments = await refreshRenditionAvailability(rendition);
-    options.push({
-      id: option.id,
-      label: option.label,
-      height: option.height,
-      status: rendition.status,
-      availableSegments,
-      expectedSegments: rendition.expectedSegments,
-    });
-  }
+  const source = await getVideoMetadata(targetPath);
+  const options = buildVideoQualityOptions(source.height).options;
 
   return res.json({
     path: normalizedPath,
-    source: {
-      width: entry.width,
-      height: entry.height,
-      durationSeconds: entry.durationSeconds,
-    },
+    source,
     options,
-    defaultQuality: entry.defaultQuality,
+    defaultQuality: session.selectedVideoQuality || "720p",
   });
 });
 
