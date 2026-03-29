@@ -287,6 +287,40 @@ input::placeholder {
   padding: 28px 0 40px;
 }
 
+.workspace-switcher {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.workspace-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-panel-strong) 86%, transparent);
+}
+
+.tab-button {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.tab-button.active {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--surface-highlight) 74%, transparent);
+}
+
 .hero-panel,
 .sidebar-panel,
 .preview-panel {
@@ -741,6 +775,78 @@ input::placeholder {
   grid-template-columns: minmax(290px, 360px) minmax(0, 1fr);
   gap: 22px;
   margin-top: 22px;
+}
+
+.explorer-table-panel {
+  margin-top: 22px;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  background: var(--panel-gradient);
+}
+
+.explorer-table-wrap {
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--bg-panel-strong) 82%, transparent);
+  overflow: auto;
+}
+
+.explorer-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+.explorer-table th,
+.explorer-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+}
+
+.explorer-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: color-mix(in srgb, var(--bg-panel-strong) 96%, transparent);
+  color: var(--text-dim);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.explorer-table tbody tr {
+  cursor: pointer;
+}
+
+.explorer-table tbody tr:hover,
+.explorer-table tbody tr.active {
+  background: color-mix(in srgb, var(--surface-highlight) 72%, transparent);
+}
+
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  background: color-mix(in srgb, var(--bg-overlay) 92%, rgba(0, 0, 0, 0.5));
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px;
+}
+
+.settings-sheet {
+  width: min(1080px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+  background: var(--panel-gradient);
+  padding: 20px;
 }
 
 .sidebar-panel,
@@ -1344,6 +1450,11 @@ input::placeholder {
     grid-template-columns: 1fr;
   }
 
+  .workspace-switcher {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .download-settings-grid,
   .progress-stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1500,6 +1611,15 @@ input::placeholder {
   .download-settings-grid,
   .progress-stats-grid {
     grid-template-columns: 1fr;
+  }
+
+  .workspace-tabs {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .tab-button {
+    flex: 1;
   }
 
   .slideshow-stage {

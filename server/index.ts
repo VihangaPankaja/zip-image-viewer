@@ -1485,6 +1485,61 @@ app.post("/api/session-jobs/:id/confirm", (req, res) => {
   return res.json(sanitizeJob(job));
 });
 
+app.get("/api/session-jobs/:id/stream", async (req, res) => {
+  const job = jobStore.get(req.params.id);
+  if (!job) {
+    return res.status(404).json({ error: "Job not found." });
+  }
+
+  if (!job.zipPath) {
+    return res.status(409).json({
+      error: "Streaming source is not ready yet.",
+    });
+  }
+
+  const fileStats = await stat(job.zipPath).catch(() => null);
+  if (!fileStats || !fileStats.isFile() || fileStats.size <= 0) {
+    return res.status(409).json({
+      error: "No downloaded bytes available yet.",
+    });
+  }
+
+  let contentType = "application/octet-stream";
+  try {
+    const parsedUrl = new URL(job.url);
+    contentType = mime.lookup(parsedUrl.pathname) || contentType;
+  } catch {
+    contentType = mime.lookup(job.zipPath) || contentType;
+  }
+
+  res.setHeader("accept-ranges", "bytes");
+  res.setHeader("cache-control", "no-store");
+  res.type(contentType);
+
+  const range = parseRangeHeader(req.headers.range, fileStats.size);
+  if (range === "invalid") {
+    res.setHeader("content-range", `bytes */${fileStats.size}`);
+    return res.status(416).end();
+  }
+
+  if (range) {
+    const contentLength = range.end - range.start + 1;
+    res.status(206);
+    res.setHeader(
+      "content-range",
+      `bytes ${range.start}-${range.end}/${fileStats.size}`,
+    );
+    res.setHeader("content-length", String(contentLength));
+    return createReadStream(job.zipPath, {
+      start: range.start,
+      end: range.end,
+    }).pipe(res);
+  }
+
+  res.setHeader("content-length", String(fileStats.size));
+  return createReadStream(job.zipPath).pipe(res);
+});
+
 app.delete("/api/session-jobs/:id", async (req, res) => {
   const job = jobStore.get(req.params.id);
   if (!job) {

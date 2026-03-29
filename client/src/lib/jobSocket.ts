@@ -5,7 +5,7 @@ export type JobSocketPacket = {
 };
 
 export type JobSocketHandlers = {
-  onJob: (payload: unknown) => void;
+  onJob: (_payload: unknown) => void;
   onMalformedPayload: () => void;
   onSocketError: () => void;
   onSocketClose: () => void;
