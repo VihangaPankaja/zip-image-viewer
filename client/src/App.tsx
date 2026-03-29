@@ -6,9 +6,6 @@ import {
   type CSSProperties,
 } from "react";
 import { createPortal } from "react-dom";
-import Hls from "hls.js";
-import Plyr from "plyr";
-import "plyr/dist/plyr.css";
 import { openJobSocket } from "./lib/jobSocket";
 import { WorkspaceTabs } from "./components/WorkspaceTabs";
 import { ExplorerTablePanel } from "./components/ExplorerTablePanel";
@@ -74,6 +71,15 @@ const DOWNLOAD_RETRY_OPTIONS = [
   { value: 8, label: "8 retries" },
   { value: -1, label: "Unlimited" },
 ];
+const VIDEO_TRANSCODE_QUALITY_OPTIONS = [
+  { value: "720p", label: "720p (default)" },
+  { value: "480p", label: "480p" },
+  { value: "1080p", label: "1080p" },
+  { value: "1440p", label: "1440p" },
+  { value: "2160p", label: "2160p" },
+  { value: "360p", label: "360p" },
+  { value: "source", label: "Original source" },
+];
 const WORKSPACE_TABS = [
   { value: "download", label: "Download" },
   { value: "preview", label: "Preview" },
@@ -85,6 +91,7 @@ const DEFAULT_DOWNLOAD_SETTINGS = {
   enableMultithread: true,
   enableResume: true,
   maxRetries: 3,
+  videoQuality: "720p",
 };
 const NAME_COLLATOR = new Intl.Collator(undefined, {
   sensitivity: "base",
@@ -163,6 +170,12 @@ function normalizeDownloadSettings(value) {
             8,
             DEFAULT_DOWNLOAD_SETTINGS.maxRetries,
           ),
+    videoQuality: VIDEO_TRANSCODE_QUALITY_OPTIONS.some(
+      (option) =>
+        option.value === String(source.videoQuality || "").toLowerCase(),
+    )
+      ? String(source.videoQuality).toLowerCase()
+      : DEFAULT_DOWNLOAD_SETTINGS.videoQuality,
   };
 }
 
@@ -183,6 +196,21 @@ function formatEta(seconds) {
     return `${minutes}m ${String(secs).padStart(2, "0")}s`;
   }
   return `${secs}s`;
+}
+
+function formatMediaTime(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return "00:00";
+  }
+
+  const whole = Math.floor(seconds);
+  const hours = Math.floor(whole / 3600);
+  const minutes = Math.floor((whole % 3600) / 60);
+  const secs = whole % 60;
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  }
+  return `${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
 
 function formatDate(value) {
@@ -632,13 +660,11 @@ function App() {
   const [slideshowFitMode, setSlideshowFitMode] = useState("best-fit");
   const [slideshowChromeHidden, setSlideshowChromeHidden] = useState(false);
   const [activeJob, setActiveJob] = useState(null);
-  const [videoQuality, setVideoQuality] = useState("720p");
-  const [videoQualityOptions, setVideoQualityOptions] = useState([
-    { value: "source", label: "Original", height: 0 },
-  ]);
-  const [videoTranscodeStatus, setVideoTranscodeStatus] = useState(null);
   const [videoPlaybackRate, setVideoPlaybackRate] = useState(1);
   const [videoVolume, setVideoVolume] = useState(0.9);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [videoCurrentTime, setVideoCurrentTime] = useState(0);
+  const [videoIsPlaying, setVideoIsPlaying] = useState(false);
   const [keyboardSettings, setKeyboardSettings] = useState(() => {
     if (typeof window === "undefined") {
       return { jumpSeconds: 5, rateStep: 0.25 };
@@ -688,10 +714,7 @@ function App() {
   const textPreviewCacheRef = useRef(new Map());
   const imagePreviewCacheRef = useRef(new Map());
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const hlsRef = useRef<Hls | null>(null);
-  const plyrRef = useRef<Plyr | null>(null);
-  const resumeTimeRef = useRef(0);
-  const resumePlayRef = useRef(false);
+  const videoShellRef = useRef<HTMLDivElement | null>(null);
   const jobSocketRef = useRef(null);
   const jobPollTimeoutRef = useRef(null);
   const latestSessionIdRef = useRef("");
@@ -778,58 +801,11 @@ function App() {
   }, [flatData, sortedTree, sortMode]);
   const selectedVideoUrl =
     selectedNode?.type === "file" && selectedKind === "video"
-      ? videoQuality === "source"
-        ? selectedFileUrl
-        : `/api/sessions/${session?.id}/video/hls/playlist?${new URLSearchParams(
-            {
-              path: selectedNode.path,
-              quality: videoQuality,
-            },
-          ).toString()}`
+      ? `/api/sessions/${session?.id}/video/play?${new URLSearchParams({
+          path: selectedNode.path,
+          quality: downloadSettings.videoQuality,
+        }).toString()}`
       : "";
-  const plyrQualityConfig = useMemo(() => {
-    const sourceHeight =
-      videoQualityOptions.find((option) => option.value === "source")?.height ||
-      0;
-    const fallbackMenuValue = Math.max(1, sourceHeight || 720) + 1;
-    const byMenuValue = new Map();
-    const qualityLabel = {};
-
-    for (const option of videoQualityOptions) {
-      const numericHeight = Number(option.height) || 0;
-      const menuValue =
-        option.value === "source"
-          ? fallbackMenuValue
-          : Math.max(
-              1,
-              numericHeight || Number.parseInt(option.value, 10) || 1,
-            );
-
-      byMenuValue.set(menuValue, option.value);
-      qualityLabel[menuValue] = option.label;
-    }
-
-    const menuOptions = [...byMenuValue.keys()].sort((a, b) => b - a);
-    const currentOption = videoQualityOptions.find(
-      (option) => option.value === videoQuality,
-    );
-    const currentMenuValue =
-      currentOption?.value === "source"
-        ? fallbackMenuValue
-        : Math.max(
-            1,
-            Number(currentOption?.height) ||
-              Number.parseInt(currentOption?.value || "", 10) ||
-              1,
-          );
-
-    return {
-      menuOptions,
-      qualityLabel,
-      byMenuValue,
-      currentMenuValue,
-    };
-  }, [videoQuality, videoQualityOptions]);
 
   function closeJobEvents() {
     if (jobSocketRef.current) {
@@ -1272,229 +1248,47 @@ function App() {
   }, [session]);
 
   useEffect(() => {
-    if (!session?.id || !selectedNode || selectedKind !== "video") {
-      setVideoQualityOptions([
-        { value: "source", label: "Original", height: 0 },
-      ]);
-      setVideoQuality("source");
-      return;
-    }
-
-    let cancelled = false;
-
-    async function loadVideoQualities() {
-      try {
-        const params = new URLSearchParams({ path: selectedNode.path });
-        const response = await fetch(
-          `/api/sessions/${session.id}/video/qualities?${params.toString()}`,
-        );
-        if (!response.ok) {
-          throw new Error("Failed to load video quality options.");
-        }
-
-        const payload = await response.json();
-        if (cancelled) {
-          return;
-        }
-
-        const options = Array.isArray(payload.options)
-          ? payload.options.map((option) => ({
-              value: option.id,
-              label: option.label,
-              height: Number(option.height) || 0,
-              status: option.status || "idle",
-              availableSegments: Number(option.availableSegments) || 0,
-              expectedSegments: Number(option.expectedSegments) || 0,
-            }))
-          : [{ value: "source", label: "Original", height: 0 }];
-        setVideoQualityOptions(options);
-
-        const has720 = options.some((option) => option.value === "720p");
-        const preferred = has720
-          ? "720p"
-          : String(payload.defaultQuality || "source");
-        const nextQuality =
-          options.find((option) => option.value === preferred)?.value ||
-          options[0]?.value ||
-          "source";
-        setVideoQuality(nextQuality);
-      } catch {
-        if (!cancelled) {
-          setVideoQualityOptions([
-            { value: "source", label: "Original", height: 0 },
-          ]);
-          setVideoQuality("source");
-        }
-      }
-    }
-
-    loadVideoQualities();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [session, selectedKind, selectedNode]);
-
-  useEffect(() => {
-    if (selectedKind !== "video" || !videoRef.current) {
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
-      if (plyrRef.current) {
-        plyrRef.current.destroy();
-        plyrRef.current = null;
-      }
-      return;
-    }
-
-    const player = new Plyr(videoRef.current, {
-      controls: [
-        "play-large",
-        "play",
-        "progress",
-        "current-time",
-        "duration",
-        "mute",
-        "volume",
-        "settings",
-        "fullscreen",
-      ],
-      settings: ["quality", "speed"],
-      quality: {
-        default: plyrQualityConfig.currentMenuValue,
-        options: plyrQualityConfig.menuOptions,
-        forced: true,
-        onChange: (menuValue) => {
-          const next = plyrQualityConfig.byMenuValue.get(Number(menuValue));
-          if (!next) {
-            return;
-          }
-          setVideoQuality((current) => {
-            if (current === next) {
-              return current;
-            }
-
-            if (videoRef.current) {
-              resumeTimeRef.current = videoRef.current.currentTime || 0;
-              resumePlayRef.current = !videoRef.current.paused;
-            }
-
-            return next;
-          });
-        },
-      },
-      i18n: {
-        qualityLabel: plyrQualityConfig.qualityLabel,
-      },
-    });
-
-    plyrRef.current = player;
-
-    return () => {
-      player.destroy();
-      if (plyrRef.current === player) {
-        plyrRef.current = null;
-      }
-    };
-  }, [plyrQualityConfig, selectedKind]);
-
-  useEffect(() => {
     if (!videoRef.current || selectedKind !== "video") {
+      setVideoDuration(0);
+      setVideoCurrentTime(0);
+      setVideoIsPlaying(false);
       return;
-    }
-
-    if (hlsRef.current) {
-      hlsRef.current.destroy();
-      hlsRef.current = null;
     }
 
     const videoElement = videoRef.current;
-    if (videoQuality === "source") {
-      videoElement.src = selectedFileUrl;
-      videoElement.load();
-      return;
-    }
-
-    if (Hls.isSupported()) {
-      const hls = new Hls({
-        maxBufferLength: 40,
-        backBufferLength: 30,
-        manifestLoadingMaxRetry: 8,
-        levelLoadingMaxRetry: 8,
-        fragLoadingMaxRetry: 10,
-      });
-      hlsRef.current = hls;
-      hls.loadSource(selectedVideoUrl);
-      hls.attachMedia(videoElement);
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (!data?.fatal) {
-          return;
-        }
-
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-          hls.startLoad();
-          return;
-        }
-
-        if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-          hls.recoverMediaError();
-          return;
-        }
-
-        setError("Video stream temporarily unavailable. Retrying...");
-      });
-      return;
-    }
-
     videoElement.src = selectedVideoUrl;
     videoElement.load();
-  }, [selectedFileUrl, selectedKind, selectedVideoUrl, videoQuality]);
 
-  useEffect(() => {
-    if (!session?.id || !selectedNode || selectedKind !== "video") {
-      setVideoTranscodeStatus(null);
-      return;
+    function onLoadedMetadata() {
+      setVideoDuration(Number(videoElement.duration) || 0);
+      videoElement.playbackRate = videoPlaybackRate;
+      videoElement.volume = videoVolume;
     }
 
-    let cancelled = false;
-    let timeoutId: number | null = null;
-
-    async function pollStatus() {
-      try {
-        const params = new URLSearchParams({ path: selectedNode.path });
-        const response = await fetch(
-          `/api/sessions/${session.id}/video/hls/status?${params.toString()}`,
-        );
-        if (!response.ok) {
-          throw new Error("Failed to read transcode status.");
-        }
-        const payload = await response.json();
-        if (cancelled) {
-          return;
-        }
-
-        setVideoTranscodeStatus(payload);
-      } catch {
-        if (!cancelled) {
-          setVideoTranscodeStatus(null);
-        }
-      } finally {
-        if (!cancelled) {
-          timeoutId = window.setTimeout(pollStatus, 1600);
-        }
-      }
+    function onTimeUpdate() {
+      setVideoCurrentTime(videoElement.currentTime || 0);
     }
 
-    pollStatus();
+    function onPlay() {
+      setVideoIsPlaying(true);
+    }
+
+    function onPause() {
+      setVideoIsPlaying(false);
+    }
+
+    videoElement.addEventListener("loadedmetadata", onLoadedMetadata);
+    videoElement.addEventListener("timeupdate", onTimeUpdate);
+    videoElement.addEventListener("play", onPlay);
+    videoElement.addEventListener("pause", onPause);
 
     return () => {
-      cancelled = true;
-      if (timeoutId != null) {
-        window.clearTimeout(timeoutId);
-      }
+      videoElement.removeEventListener("loadedmetadata", onLoadedMetadata);
+      videoElement.removeEventListener("timeupdate", onTimeUpdate);
+      videoElement.removeEventListener("play", onPlay);
+      videoElement.removeEventListener("pause", onPause);
     };
-  }, [selectedKind, selectedNode, session, videoQuality]);
+  }, [selectedKind, selectedVideoUrl, videoPlaybackRate, videoVolume]);
 
   useEffect(() => {
     latestJobIdRef.current = activeJob?.id || "";
@@ -1502,10 +1296,6 @@ function App() {
 
   useEffect(() => {
     return () => {
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
       closeJobEvents();
       stopJobPolling();
       clearImagePreviewCache();
@@ -1945,9 +1735,11 @@ function App() {
               <div className="progress-card" aria-live="polite">
                 <div className="progress-card-head">
                   <strong>
-                    {activeJob.phase === "extracting"
-                      ? "Preparing archive"
-                      : "Downloading archive"}
+                    {activeJob.phase === "transcoding"
+                      ? `Transcoding (${activeJob.videoQuality || downloadSettings.videoQuality})`
+                      : activeJob.phase === "extracting"
+                        ? "Preparing archive"
+                        : "Downloading archive"}
                   </strong>
                   <span>{visualPercentLabel}</span>
                 </div>
@@ -1989,9 +1781,11 @@ function App() {
                     <strong>
                       {activeJob?.isStalled
                         ? "Stalled"
-                        : activeJob?.phase === "extracting"
-                          ? "Extracting"
-                          : "Downloading"}
+                        : activeJob?.phase === "transcoding"
+                          ? "Transcoding"
+                          : activeJob?.phase === "extracting"
+                            ? "Extracting"
+                            : "Downloading"}
                     </strong>
                   </div>
                 </div>
@@ -2261,37 +2055,94 @@ function App() {
                     <span>
                       {selectedNode.extension.toUpperCase()} stream preview
                     </span>
-                    <span>
-                      {videoTranscodeStatus?.durationSeconds
-                        ? `${Math.round(videoTranscodeStatus.durationSeconds)}s duration`
-                        : "Preparing duration metadata"}
-                    </span>
+                    <span>Target quality: {downloadSettings.videoQuality}</span>
                     <span>{formatDate(selectedNode.modifiedAt)}</span>
                   </div>
-                  <div className="image-frame media-frame">
+                  <div className="image-frame media-frame" ref={videoShellRef}>
                     <video
                       ref={videoRef}
                       className="video-player"
-                      controls
+                      controls={false}
                       preload="metadata"
-                      onLoadedMetadata={(event) => {
-                        if (resumeTimeRef.current > 0) {
-                          event.currentTarget.currentTime =
-                            resumeTimeRef.current;
-                          resumeTimeRef.current = 0;
-                        }
-
-                        event.currentTarget.playbackRate = videoPlaybackRate;
-                        event.currentTarget.volume = videoVolume;
-
-                        if (resumePlayRef.current) {
-                          event.currentTarget.play().catch(() => {});
-                        }
-                        resumePlayRef.current = false;
-                      }}
                     >
                       Your browser cannot play this video inline.
                     </video>
+                    <div
+                      className="custom-video-controls"
+                      role="group"
+                      aria-label="Video controls"
+                    >
+                      <button
+                        className="ghost-button compact-button"
+                        type="button"
+                        onClick={() => {
+                          if (!videoRef.current) return;
+                          if (videoRef.current.paused) {
+                            videoRef.current.play().catch(() => {});
+                          } else {
+                            videoRef.current.pause();
+                          }
+                        }}
+                      >
+                        {videoIsPlaying ? "Pause" : "Play"}
+                      </button>
+                      <span className="video-time-label">
+                        {formatMediaTime(videoCurrentTime)} /{" "}
+                        {formatMediaTime(videoDuration)}
+                      </span>
+                      <input
+                        className="video-progress-range"
+                        type="range"
+                        min="0"
+                        max={Math.max(1, videoDuration)}
+                        step="0.01"
+                        value={Math.min(
+                          videoCurrentTime,
+                          Math.max(1, videoDuration),
+                        )}
+                        onChange={(event) => {
+                          if (!videoRef.current) return;
+                          const nextTime = Number(event.target.value) || 0;
+                          videoRef.current.currentTime = nextTime;
+                          setVideoCurrentTime(nextTime);
+                        }}
+                      />
+                      <label className="video-volume-shell">
+                        <span>Vol</span>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.01"
+                          value={videoVolume}
+                          onChange={(event) => {
+                            if (!videoRef.current) return;
+                            const nextVolume = Math.max(
+                              0,
+                              Math.min(1, Number(event.target.value) || 0),
+                            );
+                            videoRef.current.volume = nextVolume;
+                            setVideoVolume(nextVolume);
+                          }}
+                        />
+                      </label>
+                      <button
+                        className="ghost-button compact-button"
+                        type="button"
+                        onClick={() => {
+                          if (!videoShellRef.current) return;
+                          const requestFullscreen =
+                            videoShellRef.current.requestFullscreen;
+                          if (requestFullscreen) {
+                            requestFullscreen
+                              .call(videoShellRef.current)
+                              .catch(() => {});
+                          }
+                        }}
+                      >
+                        Fullscreen
+                      </button>
+                    </div>
                   </div>
                   <div className="progress-meta-row">
                     <span>
@@ -2299,18 +2150,9 @@ function App() {
                       {keyboardSettings.rateStep}x
                     </span>
                     <span>
-                      {videoQuality === "source"
-                        ? "Original stream"
-                        : (() => {
-                            const active =
-                              videoTranscodeStatus?.renditions?.find(
-                                (item) => item.quality === videoQuality,
-                              );
-                            if (!active) {
-                              return "Preparing quality";
-                            }
-                            return `${active.quality}: ${active.availableSegments}/${active.expectedSegments} segments`;
-                          })()}
+                      {activeJob?.phase === "transcoding"
+                        ? `Transcoding ${activeJob.videoQuality || downloadSettings.videoQuality}: ${activeJob.transcodedEntries || 0}/${activeJob.totalTranscodeEntries || 0}`
+                        : "Playing selected quality output when available"}
                     </span>
                     <div className="message-actions">
                       <button
@@ -2418,6 +2260,16 @@ function App() {
         previewQuality={previewQuality}
         setPreviewQuality={setPreviewQuality}
         previewQualityOptions={PREVIEW_QUALITY_OPTIONS}
+        videoTranscodeQuality={downloadSettings.videoQuality}
+        setVideoTranscodeQuality={(value) =>
+          setDownloadSettings((current) =>
+            normalizeDownloadSettings({
+              ...current,
+              videoQuality: value,
+            }),
+          )
+        }
+        videoTranscodeQualityOptions={VIDEO_TRANSCODE_QUALITY_OPTIONS}
         keyboardSettings={keyboardSettings}
         setKeyboardSettings={setKeyboardSettings}
         explorerColumns={explorerColumns}

@@ -44,7 +44,9 @@ export function ExplorerTablePanel({
           </h2>
         </div>
         <div className="sidebar-header-actions">
-          {session ? <span className="panel-chip">{explorerRows.length} entries</span> : null}
+          {session ? (
+            <span className="panel-chip">{explorerRows.length} entries</span>
+          ) : null}
         </div>
         <DropdownComponent
           id="sort-mode-explorer"
@@ -59,7 +61,10 @@ export function ExplorerTablePanel({
       {!sortedTree ? (
         <div className="empty-card">
           <strong>Explorer is ready</strong>
-          <p>Open a URL from the Download tab to list files like a file manager with sortable metadata.</p>
+          <p>
+            Open a URL from the Download tab to list files like a file manager
+            with sortable metadata.
+          </p>
         </div>
       ) : (
         <div className="explorer-table-wrap">
@@ -85,9 +90,21 @@ export function ExplorerTablePanel({
                   }}
                 >
                   <td>{row.name}</td>
-                  {explorerColumns.type ? <td>{row.type === "directory" ? "Folder" : row.extension || "file"}</td> : null}
-                  {explorerColumns.size ? <td>{row.type === "directory" ? "--" : formatBytes(row.size)}</td> : null}
-                  {explorerColumns.date ? <td>{formatDate(row.modifiedAt)}</td> : null}
+                  {explorerColumns.type ? (
+                    <td>
+                      {row.type === "directory"
+                        ? "Folder"
+                        : row.extension || "file"}
+                    </td>
+                  ) : null}
+                  {explorerColumns.size ? (
+                    <td>
+                      {row.type === "directory" ? "--" : formatBytes(row.size)}
+                    </td>
+                  ) : null}
+                  {explorerColumns.date ? (
+                    <td>{formatDate(row.modifiedAt)}</td>
+                  ) : null}
                   {explorerColumns.path ? <td>{row.path}</td> : null}
                 </tr>
               ))}

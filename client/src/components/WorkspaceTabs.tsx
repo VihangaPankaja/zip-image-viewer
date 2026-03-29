@@ -20,7 +20,11 @@ export function WorkspaceTabs({
 }: WorkspaceTabsProps) {
   return (
     <div className="workspace-switcher">
-      <div className="workspace-tabs" role="tablist" aria-label="Workspace tabs">
+      <div
+        className="workspace-tabs"
+        role="tablist"
+        aria-label="Workspace tabs"
+      >
         {tabs.map((tab) => (
           <button
             key={tab.value}
