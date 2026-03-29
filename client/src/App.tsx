@@ -6,6 +6,7 @@ import {
   type CSSProperties,
 } from "react";
 import { createPortal } from "react-dom";
+import Hls from "hls.js";
 import Plyr from "plyr";
 import "plyr/dist/plyr.css";
 import { openJobSocket } from "./lib/jobSocket";
@@ -635,6 +636,7 @@ function App() {
   const [videoQualityOptions, setVideoQualityOptions] = useState([
     { value: "source", label: "Original", height: 0 },
   ]);
+  const [videoTranscodeStatus, setVideoTranscodeStatus] = useState(null);
   const [videoPlaybackRate, setVideoPlaybackRate] = useState(1);
   const [videoVolume, setVideoVolume] = useState(0.9);
   const [keyboardSettings, setKeyboardSettings] = useState(() => {
@@ -686,6 +688,7 @@ function App() {
   const textPreviewCacheRef = useRef(new Map());
   const imagePreviewCacheRef = useRef(new Map());
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const plyrRef = useRef<Plyr | null>(null);
   const resumeTimeRef = useRef(0);
   const resumePlayRef = useRef(false);
@@ -777,10 +780,12 @@ function App() {
     selectedNode?.type === "file" && selectedKind === "video"
       ? videoQuality === "source"
         ? selectedFileUrl
-        : `/api/sessions/${session?.id}/video/stream?${new URLSearchParams({
-            path: selectedNode.path,
-            quality: videoQuality,
-          }).toString()}`
+        : `/api/sessions/${session?.id}/video/hls/playlist?${new URLSearchParams(
+            {
+              path: selectedNode.path,
+              quality: videoQuality,
+            },
+          ).toString()}`
       : "";
   const plyrQualityConfig = useMemo(() => {
     const sourceHeight =
@@ -1297,6 +1302,9 @@ function App() {
               value: option.id,
               label: option.label,
               height: Number(option.height) || 0,
+              status: option.status || "idle",
+              availableSegments: Number(option.availableSegments) || 0,
+              expectedSegments: Number(option.expectedSegments) || 0,
             }))
           : [{ value: "source", label: "Original", height: 0 }];
         setVideoQualityOptions(options);
@@ -1329,6 +1337,10 @@ function App() {
 
   useEffect(() => {
     if (selectedKind !== "video" || !videoRef.current) {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
       if (plyrRef.current) {
         plyrRef.current.destroy();
         plyrRef.current = null;
@@ -1355,15 +1367,21 @@ function App() {
         forced: true,
         onChange: (menuValue) => {
           const next = plyrQualityConfig.byMenuValue.get(Number(menuValue));
-          if (!next || next === videoQuality) {
+          if (!next) {
             return;
           }
+          setVideoQuality((current) => {
+            if (current === next) {
+              return current;
+            }
 
-          if (videoRef.current) {
-            resumeTimeRef.current = videoRef.current.currentTime || 0;
-            resumePlayRef.current = !videoRef.current.paused;
-          }
-          setVideoQuality(next);
+            if (videoRef.current) {
+              resumeTimeRef.current = videoRef.current.currentTime || 0;
+              resumePlayRef.current = !videoRef.current.paused;
+            }
+
+            return next;
+          });
         },
       },
       i18n: {
@@ -1379,7 +1397,104 @@ function App() {
         plyrRef.current = null;
       }
     };
-  }, [plyrQualityConfig, selectedKind, videoQuality]);
+  }, [plyrQualityConfig, selectedKind]);
+
+  useEffect(() => {
+    if (!videoRef.current || selectedKind !== "video") {
+      return;
+    }
+
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+
+    const videoElement = videoRef.current;
+    if (videoQuality === "source") {
+      videoElement.src = selectedFileUrl;
+      videoElement.load();
+      return;
+    }
+
+    if (Hls.isSupported()) {
+      const hls = new Hls({
+        maxBufferLength: 40,
+        backBufferLength: 30,
+        manifestLoadingMaxRetry: 8,
+        levelLoadingMaxRetry: 8,
+        fragLoadingMaxRetry: 10,
+      });
+      hlsRef.current = hls;
+      hls.loadSource(selectedVideoUrl);
+      hls.attachMedia(videoElement);
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (!data?.fatal) {
+          return;
+        }
+
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+          hls.startLoad();
+          return;
+        }
+
+        if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+          hls.recoverMediaError();
+          return;
+        }
+
+        setError("Video stream temporarily unavailable. Retrying...");
+      });
+      return;
+    }
+
+    videoElement.src = selectedVideoUrl;
+    videoElement.load();
+  }, [selectedFileUrl, selectedKind, selectedVideoUrl, videoQuality]);
+
+  useEffect(() => {
+    if (!session?.id || !selectedNode || selectedKind !== "video") {
+      setVideoTranscodeStatus(null);
+      return;
+    }
+
+    let cancelled = false;
+    let timeoutId: number | null = null;
+
+    async function pollStatus() {
+      try {
+        const params = new URLSearchParams({ path: selectedNode.path });
+        const response = await fetch(
+          `/api/sessions/${session.id}/video/hls/status?${params.toString()}`,
+        );
+        if (!response.ok) {
+          throw new Error("Failed to read transcode status.");
+        }
+        const payload = await response.json();
+        if (cancelled) {
+          return;
+        }
+
+        setVideoTranscodeStatus(payload);
+      } catch {
+        if (!cancelled) {
+          setVideoTranscodeStatus(null);
+        }
+      } finally {
+        if (!cancelled) {
+          timeoutId = window.setTimeout(pollStatus, 1600);
+        }
+      }
+    }
+
+    pollStatus();
+
+    return () => {
+      cancelled = true;
+      if (timeoutId != null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [selectedKind, selectedNode, session, videoQuality]);
 
   useEffect(() => {
     latestJobIdRef.current = activeJob?.id || "";
@@ -1387,6 +1502,10 @@ function App() {
 
   useEffect(() => {
     return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
       closeJobEvents();
       stopJobPolling();
       clearImagePreviewCache();
@@ -2142,13 +2261,17 @@ function App() {
                     <span>
                       {selectedNode.extension.toUpperCase()} stream preview
                     </span>
+                    <span>
+                      {videoTranscodeStatus?.durationSeconds
+                        ? `${Math.round(videoTranscodeStatus.durationSeconds)}s duration`
+                        : "Preparing duration metadata"}
+                    </span>
                     <span>{formatDate(selectedNode.modifiedAt)}</span>
                   </div>
                   <div className="image-frame media-frame">
                     <video
                       ref={videoRef}
                       className="video-player"
-                      src={selectedVideoUrl || selectedFileUrl}
                       controls
                       preload="metadata"
                       onLoadedMetadata={(event) => {
@@ -2174,6 +2297,20 @@ function App() {
                     <span>
                       Jump: {keyboardSettings.jumpSeconds}s | Rate step:{" "}
                       {keyboardSettings.rateStep}x
+                    </span>
+                    <span>
+                      {videoQuality === "source"
+                        ? "Original stream"
+                        : (() => {
+                            const active =
+                              videoTranscodeStatus?.renditions?.find(
+                                (item) => item.quality === videoQuality,
+                              );
+                            if (!active) {
+                              return "Preparing quality";
+                            }
+                            return `${active.quality}: ${active.availableSegments}/${active.expectedSegments} segments`;
+                          })()}
                     </span>
                     <div className="message-actions">
                       <button

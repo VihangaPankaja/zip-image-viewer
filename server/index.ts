@@ -2,6 +2,7 @@
 import express from "express";
 import { createReadStream, createWriteStream } from "node:fs";
 import {
+  access,
   mkdtemp,
   mkdir,
   open,
@@ -74,6 +75,9 @@ const IMAGE_PREVIEW_PROFILES = {
   high: { size: 2560, quality: 82 },
 };
 const VIDEO_STREAM_QUALITY_LEVELS = [2160, 1440, 1080, 720, 480, 360];
+const DEFAULT_VIDEO_SEGMENT_SECONDS = 4;
+const VIDEO_PRIORITY_WINDOW_SECONDS = 24;
+const videoTranscodeStore = new Map();
 
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(distDir));
@@ -564,6 +568,19 @@ async function removeSession(sessionId, reason = "manual") {
     return;
   }
 
+  for (const [key, entry] of videoTranscodeStore.entries()) {
+    if (entry.sessionId !== sessionId) {
+      continue;
+    }
+
+    for (const rendition of entry.renditions.values()) {
+      if (rendition.process && !rendition.process.killed) {
+        rendition.process.kill("SIGTERM");
+      }
+    }
+    videoTranscodeStore.delete(key);
+  }
+
   sessionStore.delete(sessionId);
   await rm(session.workspaceDir, { recursive: true, force: true });
   logEvent("info", "session.removed", {
@@ -735,59 +752,23 @@ async function extractWith7zip(archivePath, extractDir) {
 }
 
 async function getVideoDimensions(videoPath) {
-  if (!ffmpegPath) {
-    return { width: 0, height: 0 };
-  }
-
-  try {
-    const { stderr } = await runCommandCapture(
-      String(ffmpegPath),
-      ["-hide_banner", "-i", videoPath],
-      {
-        allowNonZeroExit: true,
-      },
-    );
-    const lines = stderr.split(/\r?\n/);
-
-    const streamLine = lines.find(
-      (line) => line.includes("Stream #") && line.includes("Video:"),
-    );
-    if (streamLine) {
-      const streamMatch = streamLine.match(/\b(\d{2,5})x(\d{2,5})\b/);
-      if (streamMatch) {
-        const width = Number.parseInt(streamMatch[1], 10) || 0;
-        const height = Number.parseInt(streamMatch[2], 10) || 0;
-        if (width > 0 && height > 0) {
-          return { width, height };
-        }
-      }
-    }
-
-    for (const line of lines) {
-      if (!line.includes("Video:")) {
-        continue;
-      }
-      const sizeMatch = line.match(/\b(\d{2,5})x(\d{2,5})\b/);
-      if (sizeMatch) {
-        const width = Number.parseInt(sizeMatch[1], 10) || 0;
-        const height = Number.parseInt(sizeMatch[2], 10) || 0;
-        if (width > 0 && height > 0) {
-          return { width, height };
-        }
-      }
-    }
-  } catch {
-    return { width: 0, height: 0 };
-  }
-
-  return { width: 0, height: 0 };
+  const metadata = await getVideoMetadata(videoPath);
+  return {
+    width: metadata.width,
+    height: metadata.height,
+  };
 }
 
 function buildVideoQualityOptions(sourceHeight) {
   if (!Number.isFinite(sourceHeight) || sourceHeight <= 0) {
     return {
-      options: [{ id: "source", label: "Original", height: 0 }],
-      defaultQuality: "source",
+      options: [
+        { id: "source", label: "Original", height: 0 },
+        { id: "720p", label: "720p", height: 720 },
+        { id: "480p", label: "480p", height: 480 },
+        { id: "360p", label: "360p", height: 360 },
+      ],
+      defaultQuality: "720p",
     };
   }
 
@@ -800,6 +781,351 @@ function buildVideoQualityOptions(sourceHeight) {
 
   const defaultQuality = sourceHeight >= 720 ? "720p" : "source";
   return { options, defaultQuality };
+}
+
+function parseDurationSecondsFromStderr(stderr) {
+  const durationMatch = String(stderr || "").match(
+    /Duration:\s*(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)/,
+  );
+  if (!durationMatch) {
+    return 0;
+  }
+
+  const hours = Number.parseInt(durationMatch[1], 10) || 0;
+  const minutes = Number.parseInt(durationMatch[2], 10) || 0;
+  const seconds = Number.parseFloat(durationMatch[3]) || 0;
+  const total = hours * 3600 + minutes * 60 + seconds;
+  return Number.isFinite(total) && total > 0 ? total : 0;
+}
+
+async function getVideoMetadata(videoPath) {
+  if (!ffmpegPath) {
+    return { width: 0, height: 0, durationSeconds: 0 };
+  }
+
+  try {
+    const { stderr } = await runCommandCapture(
+      String(ffmpegPath),
+      ["-hide_banner", "-i", videoPath],
+      {
+        allowNonZeroExit: true,
+      },
+    );
+    const lines = stderr.split(/\r?\n/);
+
+    let width = 0;
+    let height = 0;
+    const streamLine = lines.find(
+      (line) => line.includes("Stream #") && line.includes("Video:"),
+    );
+    if (streamLine) {
+      const streamMatch = streamLine.match(/\b(\d{2,5})x(\d{2,5})\b/);
+      if (streamMatch) {
+        width = Number.parseInt(streamMatch[1], 10) || 0;
+        height = Number.parseInt(streamMatch[2], 10) || 0;
+      }
+    }
+
+    if (!(width > 0 && height > 0)) {
+      for (const line of lines) {
+        if (!line.includes("Video:")) {
+          continue;
+        }
+        const sizeMatch = line.match(/\b(\d{2,5})x(\d{2,5})\b/);
+        if (sizeMatch) {
+          width = Number.parseInt(sizeMatch[1], 10) || 0;
+          height = Number.parseInt(sizeMatch[2], 10) || 0;
+          if (width > 0 && height > 0) {
+            break;
+          }
+        }
+      }
+    }
+
+    const durationSeconds = parseDurationSecondsFromStderr(stderr);
+    return { width, height, durationSeconds };
+  } catch {
+    return { width: 0, height: 0, durationSeconds: 0 };
+  }
+}
+
+function getVideoTranscodeKey(sessionId, normalizedPath) {
+  return `${sessionId}:${normalizedPath}`;
+}
+
+function getRenditionDirectory(session, normalizedPath, qualityId) {
+  const hash = crypto
+    .createHash("sha1")
+    .update(`${session.id}:${normalizedPath}:${qualityId}`)
+    .digest("hex");
+  return path.join(session.workspaceDir, "video-transcodes", hash);
+}
+
+function computeExpectedSegments(durationSeconds) {
+  const safeDuration = Number.isFinite(durationSeconds) ? durationSeconds : 0;
+  if (safeDuration <= 0) {
+    return 1;
+  }
+
+  return Math.max(1, Math.ceil(safeDuration / DEFAULT_VIDEO_SEGMENT_SECONDS));
+}
+
+async function countAvailableSegments(rendition) {
+  const entries = await readdir(rendition.dir).catch(() => []);
+  return entries.filter((entry) => /^segment_\d+\.ts$/i.test(entry)).length;
+}
+
+async function ensureVideoTranscodeEntry(session, normalizedPath, targetPath) {
+  const key = getVideoTranscodeKey(session.id, normalizedPath);
+  let entry = videoTranscodeStore.get(key);
+  if (entry) {
+    return entry;
+  }
+
+  const metadata = await getVideoMetadata(targetPath);
+  const qualityConfig = buildVideoQualityOptions(metadata.height);
+  entry = {
+    sessionId: session.id,
+    path: normalizedPath,
+    targetPath,
+    durationSeconds: metadata.durationSeconds,
+    width: metadata.width,
+    height: metadata.height,
+    expectedSegments: computeExpectedSegments(metadata.durationSeconds),
+    qualities: qualityConfig.options,
+    defaultQuality: qualityConfig.defaultQuality,
+    renditions: new Map(),
+  };
+  videoTranscodeStore.set(key, entry);
+  return entry;
+}
+
+function getRenditionState(entry, session, qualityId) {
+  let rendition = entry.renditions.get(qualityId);
+  if (rendition) {
+    return rendition;
+  }
+
+  const qualityOption = entry.qualities.find(
+    (option) => option.id === qualityId,
+  );
+  const selectedHeight =
+    qualityId === "source"
+      ? 0
+      : Number.parseInt(qualityId.replace("p", ""), 10) ||
+        Number(qualityOption?.height) ||
+        0;
+
+  rendition = {
+    qualityId,
+    selectedHeight,
+    dir: getRenditionDirectory(session, entry.path, qualityId),
+    playlistPath: "",
+    status: "idle",
+    process: null,
+    priorityJobs: new Map(),
+    availableSegments: 0,
+    expectedSegments: entry.expectedSegments,
+    durationSeconds: entry.durationSeconds,
+  };
+
+  entry.renditions.set(qualityId, rendition);
+  return rendition;
+}
+
+async function refreshRenditionAvailability(rendition) {
+  rendition.availableSegments = await countAvailableSegments(rendition);
+  return rendition.availableSegments;
+}
+
+async function waitForFile(filePath, timeoutMs = 12000) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const exists = await access(filePath)
+      .then(() => true)
+      .catch(() => false);
+    if (exists) {
+      return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 160));
+  }
+
+  return false;
+}
+
+function buildTranscodeArgs(targetPath, selectedHeight, outputPattern) {
+  const args = ["-hide_banner", "-loglevel", "error", "-i", targetPath];
+
+  if (selectedHeight > 0) {
+    args.push("-vf", `scale=-2:${selectedHeight}`);
+  }
+
+  args.push(
+    "-c:v",
+    "libx264",
+    "-preset",
+    "veryfast",
+    "-crf",
+    selectedHeight >= 1440 ? "27" : selectedHeight >= 1080 ? "26" : "24",
+    "-c:a",
+    "aac",
+    "-f",
+    "segment",
+    "-segment_time",
+    String(DEFAULT_VIDEO_SEGMENT_SECONDS),
+    "-segment_format",
+    "mpegts",
+    "-reset_timestamps",
+    "1",
+    outputPattern,
+  );
+
+  return args;
+}
+
+async function startRenditionTranscode(entry, session, rendition) {
+  if (!ffmpegPath) {
+    return;
+  }
+
+  if (rendition.status === "running" || rendition.status === "done") {
+    return;
+  }
+
+  await mkdir(rendition.dir, { recursive: true });
+  const outputPattern = path.join(rendition.dir, "segment_%06d.ts");
+  rendition.status = "running";
+  const child = spawn(
+    String(ffmpegPath),
+    buildTranscodeArgs(
+      entry.targetPath,
+      rendition.selectedHeight,
+      outputPattern,
+    ),
+    {
+      stdio: ["ignore", "ignore", "pipe"],
+    },
+  );
+  rendition.process = child;
+
+  let stderr = "";
+  child.stderr.on("data", (chunk) => {
+    stderr += String(chunk);
+  });
+
+  child.on("close", async (code) => {
+    rendition.process = null;
+    await refreshRenditionAvailability(rendition);
+    rendition.status = code === 0 ? "done" : "error";
+    if (code !== 0) {
+      logEvent("warn", "video.transcode.failed", {
+        sessionId: session.id,
+        path: entry.path,
+        quality: rendition.qualityId,
+        code,
+        stderr: stderr.slice(-500),
+      });
+    }
+  });
+}
+
+async function startPrioritySegmentWindow(
+  entry,
+  session,
+  rendition,
+  segmentIndex,
+) {
+  if (!ffmpegPath || segmentIndex < 0) {
+    return;
+  }
+
+  if (rendition.priorityJobs.has(segmentIndex)) {
+    return rendition.priorityJobs.get(segmentIndex);
+  }
+
+  const promise = (async () => {
+    await mkdir(rendition.dir, { recursive: true });
+    const segmentPath = path.join(
+      rendition.dir,
+      `segment_${String(segmentIndex).padStart(6, "0")}.ts`,
+    );
+    const alreadyExists = await access(segmentPath)
+      .then(() => true)
+      .catch(() => false);
+    if (alreadyExists) {
+      return;
+    }
+
+    const seekSeconds = Math.max(
+      0,
+      segmentIndex * DEFAULT_VIDEO_SEGMENT_SECONDS,
+    );
+    const outputPattern = path.join(rendition.dir, "segment_%06d.ts");
+    const args = [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-ss",
+      String(seekSeconds),
+      "-i",
+      entry.targetPath,
+    ];
+
+    if (rendition.selectedHeight > 0) {
+      args.push("-vf", `scale=-2:${rendition.selectedHeight}`);
+    }
+
+    args.push(
+      "-t",
+      String(VIDEO_PRIORITY_WINDOW_SECONDS),
+      "-c:v",
+      "libx264",
+      "-preset",
+      "ultrafast",
+      "-crf",
+      rendition.selectedHeight >= 1080 ? "26" : "24",
+      "-c:a",
+      "aac",
+      "-f",
+      "segment",
+      "-segment_time",
+      String(DEFAULT_VIDEO_SEGMENT_SECONDS),
+      "-segment_start_number",
+      String(segmentIndex),
+      "-segment_format",
+      "mpegts",
+      "-reset_timestamps",
+      "1",
+      outputPattern,
+    );
+
+    await runCommand(String(ffmpegPath), args).catch(() => {});
+    await refreshRenditionAvailability(rendition);
+  })();
+
+  rendition.priorityJobs.set(segmentIndex, promise);
+  promise.finally(() => {
+    rendition.priorityJobs.delete(segmentIndex);
+  });
+  return promise;
+}
+
+async function prewarmDefaultVideoRendition(entry, session) {
+  if (!ffmpegPath) {
+    return;
+  }
+
+  const defaultQuality = entry.defaultQuality === "source" ? "source" : "720p";
+  if (!entry.qualities.some((option) => option.id === defaultQuality)) {
+    return;
+  }
+
+  const rendition = getRenditionState(entry, session, defaultQuality);
+  await refreshRenditionAvailability(rendition);
+  if (rendition.status === "done") {
+    return;
+  }
+  await startRenditionTranscode(entry, session, rendition);
 }
 
 async function downloadWithAria2({
@@ -1655,13 +1981,270 @@ app.get("/api/sessions/:id/video/qualities", async (req, res) => {
     return res.status(400).json({ error: "Selected file is not a video." });
   }
 
-  const dimensions = await getVideoDimensions(targetPath);
-  const quality = buildVideoQualityOptions(dimensions.height);
+  const entry = await ensureVideoTranscodeEntry(
+    session,
+    normalizedPath,
+    targetPath,
+  );
+  await prewarmDefaultVideoRendition(entry, session);
+
+  const options = [];
+  for (const option of entry.qualities) {
+    const rendition = getRenditionState(entry, session, option.id);
+    const availableSegments = await refreshRenditionAvailability(rendition);
+    options.push({
+      id: option.id,
+      label: option.label,
+      height: option.height,
+      status: rendition.status,
+      availableSegments,
+      expectedSegments: rendition.expectedSegments,
+    });
+  }
+
   return res.json({
     path: normalizedPath,
-    source: dimensions,
-    options: quality.options,
-    defaultQuality: quality.defaultQuality,
+    source: {
+      width: entry.width,
+      height: entry.height,
+      durationSeconds: entry.durationSeconds,
+    },
+    options,
+    defaultQuality: entry.defaultQuality,
+  });
+});
+
+app.get("/api/sessions/:id/video/hls/playlist", async (req, res) => {
+  const session = touchSession(req.params.id);
+  if (!session) {
+    return res
+      .status(404)
+      .json({ error: "Session not found or already cleaned up." });
+  }
+
+  if (!ffmpegPath) {
+    return res.status(503).json({ error: "Video transcoder is unavailable." });
+  }
+
+  const requestedPath = String(req.query.path || "");
+  const requestedQuality = String(req.query.quality || "720p").toLowerCase();
+  if (!requestedPath || requestedPath === ".") {
+    return res.status(400).json({ error: "File path is required." });
+  }
+
+  let normalizedPath;
+  try {
+    normalizedPath = sanitizeEntryPath(requestedPath);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const targetPath = path.resolve(
+    path.join(session.extractDir, normalizedPath),
+  );
+  const rootPath = path.resolve(session.extractDir);
+  if (
+    !targetPath.startsWith(`${rootPath}${path.sep}`) &&
+    targetPath !== rootPath
+  ) {
+    return res.status(400).json({ error: "Invalid file path." });
+  }
+
+  const fileStats = await stat(targetPath).catch(() => null);
+  if (!fileStats || !fileStats.isFile()) {
+    return res.status(404).json({ error: "File not found." });
+  }
+
+  const entry = await ensureVideoTranscodeEntry(
+    session,
+    normalizedPath,
+    targetPath,
+  );
+  const selectedQuality =
+    entry.qualities.find((option) => option.id === requestedQuality)?.id ||
+    entry.defaultQuality ||
+    "720p";
+  const rendition = getRenditionState(entry, session, selectedQuality);
+  await startRenditionTranscode(entry, session, rendition);
+  await refreshRenditionAvailability(rendition);
+
+  const segmentCount = Math.max(1, rendition.expectedSegments || 1);
+  const targetDuration = Math.max(1, DEFAULT_VIDEO_SEGMENT_SECONDS);
+  const lines = [
+    "#EXTM3U",
+    "#EXT-X-VERSION:3",
+    `#EXT-X-TARGETDURATION:${targetDuration}`,
+    "#EXT-X-MEDIA-SEQUENCE:0",
+    "#EXT-X-PLAYLIST-TYPE:VOD",
+  ];
+
+  for (let index = 0; index < segmentCount; index += 1) {
+    const remaining =
+      entry.durationSeconds - index * DEFAULT_VIDEO_SEGMENT_SECONDS;
+    const duration =
+      index === segmentCount - 1
+        ? Math.max(
+            0.2,
+            remaining > 0 ? remaining : DEFAULT_VIDEO_SEGMENT_SECONDS,
+          )
+        : DEFAULT_VIDEO_SEGMENT_SECONDS;
+    lines.push(`#EXTINF:${duration.toFixed(3)},`);
+    lines.push(
+      `/api/sessions/${session.id}/video/hls/segment?${new URLSearchParams({
+        path: normalizedPath,
+        quality: selectedQuality,
+        index: String(index),
+      }).toString()}`,
+    );
+  }
+
+  if (rendition.status === "done") {
+    lines.push("#EXT-X-ENDLIST");
+  }
+
+  res.setHeader("cache-control", "no-store");
+  res.setHeader("content-type", "application/vnd.apple.mpegurl");
+  res.setHeader("x-video-duration-seconds", String(entry.durationSeconds || 0));
+  return res.send(`${lines.join("\n")}\n`);
+});
+
+app.get("/api/sessions/:id/video/hls/segment", async (req, res) => {
+  const session = touchSession(req.params.id);
+  if (!session) {
+    return res
+      .status(404)
+      .json({ error: "Session not found or already cleaned up." });
+  }
+
+  if (!ffmpegPath) {
+    return res.status(503).json({ error: "Video transcoder is unavailable." });
+  }
+
+  const requestedPath = String(req.query.path || "");
+  const requestedQuality = String(req.query.quality || "720p").toLowerCase();
+  const segmentIndex = Math.max(
+    0,
+    Number.parseInt(String(req.query.index || "0"), 10) || 0,
+  );
+  if (!requestedPath || requestedPath === ".") {
+    return res.status(400).json({ error: "File path is required." });
+  }
+
+  let normalizedPath;
+  try {
+    normalizedPath = sanitizeEntryPath(requestedPath);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const targetPath = path.resolve(
+    path.join(session.extractDir, normalizedPath),
+  );
+  const rootPath = path.resolve(session.extractDir);
+  if (
+    !targetPath.startsWith(`${rootPath}${path.sep}`) &&
+    targetPath !== rootPath
+  ) {
+    return res.status(400).json({ error: "Invalid file path." });
+  }
+
+  const fileStats = await stat(targetPath).catch(() => null);
+  if (!fileStats || !fileStats.isFile()) {
+    return res.status(404).json({ error: "File not found." });
+  }
+
+  const entry = await ensureVideoTranscodeEntry(
+    session,
+    normalizedPath,
+    targetPath,
+  );
+  const selectedQuality =
+    entry.qualities.find((option) => option.id === requestedQuality)?.id ||
+    entry.defaultQuality ||
+    "720p";
+  const rendition = getRenditionState(entry, session, selectedQuality);
+  await startRenditionTranscode(entry, session, rendition);
+
+  const segmentPath = path.join(
+    rendition.dir,
+    `segment_${String(segmentIndex).padStart(6, "0")}.ts`,
+  );
+  let exists = await access(segmentPath)
+    .then(() => true)
+    .catch(() => false);
+
+  if (!exists) {
+    await startPrioritySegmentWindow(entry, session, rendition, segmentIndex);
+    exists = await waitForFile(segmentPath, 14000);
+  }
+
+  if (!exists) {
+    return res.status(425).json({
+      error: "Segment is being prepared.",
+      status: rendition.status,
+      availableSegments: rendition.availableSegments,
+      requestedSegment: segmentIndex,
+    });
+  }
+
+  await refreshRenditionAvailability(rendition);
+  res.setHeader("cache-control", "no-store");
+  res.setHeader("accept-ranges", "bytes");
+  res.type("video/mp2t");
+  return createReadStream(segmentPath).pipe(res);
+});
+
+app.get("/api/sessions/:id/video/hls/status", async (req, res) => {
+  const session = touchSession(req.params.id);
+  if (!session) {
+    return res
+      .status(404)
+      .json({ error: "Session not found or already cleaned up." });
+  }
+
+  const requestedPath = String(req.query.path || "");
+  if (!requestedPath || requestedPath === ".") {
+    return res.status(400).json({ error: "File path is required." });
+  }
+
+  let normalizedPath;
+  try {
+    normalizedPath = sanitizeEntryPath(requestedPath);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const key = getVideoTranscodeKey(session.id, normalizedPath);
+  const entry = videoTranscodeStore.get(key);
+  if (!entry) {
+    return res.json({
+      path: normalizedPath,
+      status: "idle",
+      durationSeconds: 0,
+      renditions: [],
+    });
+  }
+
+  const renditions = [];
+  for (const [qualityId, rendition] of entry.renditions.entries()) {
+    const availableSegments = await refreshRenditionAvailability(rendition);
+    renditions.push({
+      quality: qualityId,
+      status: rendition.status,
+      availableSegments,
+      expectedSegments: rendition.expectedSegments,
+    });
+  }
+
+  return res.json({
+    path: normalizedPath,
+    status: renditions.some((item) => item.status === "running")
+      ? "running"
+      : renditions.some((item) => item.status === "done")
+        ? "ready"
+        : "idle",
+    durationSeconds: entry.durationSeconds,
+    renditions,
   });
 });
 
