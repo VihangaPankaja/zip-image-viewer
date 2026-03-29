@@ -21,7 +21,7 @@ import mime from "mime-types";
 import sharp from "sharp";
 import unzipper from "unzipper";
 import { fileTypeFromFile } from "file-type";
-import { WebSocketServer } from "ws";
+import { attachJobWebSocketServer } from "./realtime/jobSocketServer";
 
 const require = createRequire(import.meta.url);
 const { path7za } = require("7zip-bin");
@@ -452,41 +452,6 @@ async function cleanupJob(jobId, reason = "cleanup") {
   job.socketSubscribers.clear();
   jobStore.delete(jobId);
   logEvent("info", "job.removed", { jobId, reason });
-}
-
-function attachJobWebSocketServer(httpServer) {
-  const socketServer = new WebSocketServer({
-    server: httpServer,
-    path: "/ws/jobs",
-  });
-
-  socketServer.on("connection", (socket, req) => {
-    const requestUrl = new URL(
-      req.url || "/ws/jobs",
-      `http://${req.headers.host || "localhost"}`,
-    );
-    const jobId = requestUrl.searchParams.get("jobId") || "";
-    const job = jobStore.get(jobId);
-
-    if (!job) {
-      socket.send(
-        JSON.stringify({ type: "error", error: "Job not found." }),
-      );
-      socket.close(1008, "job-not-found");
-      return;
-    }
-
-    job.socketSubscribers.add(socket);
-    socket.send(
-      JSON.stringify({ type: "snapshot", job: sanitizeJob(job) }),
-    );
-
-    socket.on("close", () => {
-      job.socketSubscribers.delete(socket);
-    });
-  });
-
-  return socketServer;
 }
 
 app.use((req, res, next) => {
@@ -1903,7 +1868,7 @@ app.get(/.*/, (_req, res) => {
 });
 
 server = createServer(app);
-attachJobWebSocketServer(server);
+attachJobWebSocketServer(server, { jobStore, sanitizeJob });
 
 server.listen(PORT, "0.0.0.0", () => {
   logEvent("info", "server.started", {

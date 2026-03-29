@@ -6,6 +6,7 @@ import {
   type CSSProperties,
 } from "react";
 import { createPortal } from "react-dom";
+import { openJobSocket } from "./lib/jobSocket";
 
 const IMAGE_EXTENSIONS = new Set([
   "jpg",
@@ -966,46 +967,31 @@ function App() {
   function attachJobEvents(jobId, nextUrl) {
     closeJobEvents();
 
-    const protocol =
-      window.location.protocol === "https:" ? "wss:" : "ws:";
-    const socketUrl = `${protocol}//${window.location.host}/ws/jobs?jobId=${encodeURIComponent(jobId)}`;
-    const socket = new WebSocket(socketUrl);
-    jobSocketRef.current = socket;
-
-    const handleSnapshot = async (payload) => {
-      await handleJobSnapshot(payload, nextUrl);
-    };
-
-    socket.addEventListener("message", (event) => {
-      try {
-        const packet = JSON.parse(event.data);
-        const payload = packet?.job;
-        if (!payload) {
-          return;
-        }
-
-        handleSnapshot(payload).catch((jobError) => {
+    const socket = openJobSocket(jobId, {
+      onJob: (payload) => {
+        handleJobSnapshot(payload, nextUrl).catch((jobError) => {
           setError(jobError.message);
           setIsLoading(false);
         });
-      } catch (jobError) {
-        setError(jobError.message || "Realtime update failed.");
+      },
+      onMalformedPayload: () => {
+        setError("Realtime update failed.");
         setIsLoading(false);
-      }
+      },
+      onSocketError: () => {
+        closeJobEvents();
+        startJobPolling(jobId, nextUrl);
+      },
+      onSocketClose: () => {
+        if (!latestJobIdRef.current || latestJobIdRef.current !== jobId) {
+          return;
+        }
+
+        startJobPolling(jobId, nextUrl);
+      },
     });
 
-    socket.addEventListener("error", () => {
-      closeJobEvents();
-      startJobPolling(jobId, nextUrl);
-    });
-
-    socket.addEventListener("close", () => {
-      if (!latestJobIdRef.current || latestJobIdRef.current !== jobId) {
-        return;
-      }
-
-      startJobPolling(jobId, nextUrl);
-    });
+    jobSocketRef.current = socket;
   }
 
   async function loadSession(url, confirmOversize = false) {
