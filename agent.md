@@ -39,4 +39,5 @@ npm start
 ## Tooling Rule
 
 - Always run `npm run format`, `npm run lint`, `npm run typecheck`, and `npm run build` before each major commit and before opening a PR
+- Formatting is mandatory for every commit: run `npm run format` immediately before `git commit` (no exceptions)
 - If any step fails, fix the issue before committing
