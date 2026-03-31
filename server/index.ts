@@ -1049,6 +1049,11 @@ async function runCommandCapture(command, args, options = {}) {
 async function extractWith7zip(archivePath, extractDir, password) {
   const args = ["x", "-y", `-o${extractDir}`];
   if (password) {
+    // NOTE: 7za has no supported mechanism (env var, stdin, or file) for
+    // passing passwords other than the -p command-line argument. On shared
+    // multi-user systems this arg is visible via /proc/<pid>/cmdline for the
+    // brief lifetime of the 7za process. This app is intended for personal /
+    // isolated single-user deployments; avoid exposing it on shared hosts.
     args.push(`-p${password}`);
   }
   args.push(archivePath);
