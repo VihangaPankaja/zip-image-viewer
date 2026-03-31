@@ -21,6 +21,7 @@ Thumbs.db
 .vscode/
 .idea/
 .cursor/
+.sisyphus/
 
 #other
 improvemennt ideas.txt
