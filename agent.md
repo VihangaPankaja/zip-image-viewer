@@ -23,6 +23,8 @@ npm run typecheck
 npm run format
 npm run format:check
 npm run build
+npm run test
+npm run test:e2e
 npm start
 ```
 
@@ -35,9 +37,25 @@ npm start
 - For multi-step feature work, create a commit after each major implementation step
 - Before each major commit, run `npm run format`, `npm run lint`, `npm run typecheck`, and `npm run build`
 - Keep formatter, lint, and typecheck configurations current with repo scripts
+- Keep test tooling current: Vitest for unit/component and Playwright for e2e smoke/regression
 
 ## Tooling Rule
 
 - Always run `npm run format`, `npm run lint`, `npm run typecheck`, and `npm run build` before each major commit and before opening a PR
+- Always run `npm run test` and `npm run test:e2e` before opening a PR (or document why skipped)
 - Formatting is mandatory for every commit: run `npm run format` immediately before `git commit` (no exceptions)
 - If any step fails, fix the issue before committing
+
+## CI/PR Workflow Snapshot
+
+- Existing workflow checks in `.github/workflows/`:
+  - `version-check.yml` (PRs to `master`)
+  - `docker-build.yml` (pushes to `master`)
+- Scripts now available for local/CI enforcement:
+  - `npm run lint`
+  - `npm run typecheck`
+  - `npm run format:check`
+  - `npm run test`
+  - `npm run test:e2e`
+  - `npm run build`
+- Keep `package.json` and `package-lock.json` versions aligned.

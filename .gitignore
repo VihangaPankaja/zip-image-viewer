@@ -23,5 +23,11 @@ Thumbs.db
 .cursor/
 .sisyphus/
 
+# test artifacts
+test-results/
+playwright-report/
+coverage/
+*.lcov
+
 #other
 improvemennt ideas.txt
