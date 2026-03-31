@@ -1,3 +1,5 @@
+import React from "react";
+
 /* eslint-disable no-unused-vars, @typescript-eslint/no-explicit-any */
 
 type ExplorerTablePanelProps = {
@@ -17,6 +19,7 @@ type ExplorerTablePanelProps = {
   };
   formatDate: (value: number) => string;
   formatBytes: (value: number) => string;
+  onUnlockArchive?: (row: any) => void;
   DropdownComponent: any;
 };
 
@@ -32,6 +35,7 @@ export function ExplorerTablePanel({
   explorerColumns,
   formatDate,
   formatBytes,
+  onUnlockArchive,
   DropdownComponent,
 }: ExplorerTablePanelProps) {
   return (
@@ -89,7 +93,23 @@ export function ExplorerTablePanel({
                     }
                   }}
                 >
-                  <td>{row.name}</td>
+                  <td>
+                    <div className="message-actions">
+                      <span>{row.name}</span>
+                      {row.locked ? (
+                        <button
+                          type="button"
+                          className="ghost-button compact-button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onUnlockArchive?.(row);
+                          }}
+                        >
+                          🔒 Unlock
+                        </button>
+                      ) : null}
+                    </div>
+                  </td>
                   {explorerColumns.type ? (
                     <td>
                       {row.type === "directory"

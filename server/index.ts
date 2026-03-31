@@ -3,6 +3,7 @@ import express from "express";
 import { createReadStream, createWriteStream } from "node:fs";
 import {
   access,
+  copyFile,
   mkdtemp,
   mkdir,
   open,
@@ -69,6 +70,27 @@ const ARCHIVE_EXTENSIONS = new Set([
 ]);
 const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v", "ogv", "mkv"]);
 const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "ogg", "aac", "m4a", "flac"]);
+const SUPPORTED_DOWNLOAD_EXTENSIONS = new Set([
+  "jpg",
+  "jpeg",
+  "png",
+  "gif",
+  "webp",
+  "bmp",
+  "svg",
+  "avif",
+  "mp4",
+  "webm",
+  "mov",
+  "m4v",
+  "ogv",
+  "mkv",
+  "zip",
+  "rar",
+  "7z",
+  "pdf",
+  "txt",
+]);
 const IMAGE_PREVIEW_PROFILES = {
   low: { size: 1280, quality: 58 },
   balanced: { size: 1920, quality: 72 },
@@ -87,6 +109,13 @@ const VIDEO_TRANSCODE_QUALITY_OPTIONS = [
 const DEFAULT_VIDEO_SEGMENT_SECONDS = 4;
 const VIDEO_PRIORITY_WINDOW_SECONDS = 24;
 const videoTranscodeStore = new Map();
+const DEFAULT_SIMULTANEOUS_DOWNLOADS = 2;
+const MAX_SIMULTANEOUS_DOWNLOADS = 6;
+const queueState = {
+  order: [],
+  running: new Set(),
+  maxConcurrent: DEFAULT_SIMULTANEOUS_DOWNLOADS,
+};
 
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(distDir));
@@ -288,6 +317,118 @@ function classifyMimeType(contentType) {
   return "binary";
 }
 
+function isPotentialHtmlContentType(contentType) {
+  const value = String(contentType || "").toLowerCase();
+  return value.includes("text/html") || value.includes("application/xhtml+xml");
+}
+
+function isSupportedDownloadUrl(target) {
+  try {
+    const parsed = new URL(target);
+    const pathname = parsed.pathname || "";
+    const ext = pathname.includes(".")
+      ? pathname.split(".").pop().toLowerCase()
+      : "";
+    if (SUPPORTED_DOWNLOAD_EXTENSIONS.has(ext)) {
+      return true;
+    }
+    const contentHint = String(
+      parsed.searchParams.get("format") || "",
+    ).toLowerCase();
+    return SUPPORTED_DOWNLOAD_EXTENSIONS.has(contentHint);
+  } catch {
+    return false;
+  }
+}
+
+function extractHrefLinks(html, baseUrl) {
+  const links = [];
+  const pattern = /<a\s+[^>]*href\s*=\s*["']([^"']+)["'][^>]*>/gi;
+  let match;
+  while ((match = pattern.exec(html))) {
+    const raw = String(match[1] || "").trim();
+    if (!raw || raw.startsWith("#") || raw.startsWith("javascript:")) {
+      continue;
+    }
+    try {
+      const resolved = new URL(raw, baseUrl).toString();
+      links.push(resolved);
+    } catch {}
+  }
+  return links;
+}
+
+async function extractSublinks({ seedUrl, depth = 1, maxDepth = 3 }) {
+  const safeDepth = Math.max(0, Math.min(maxDepth, depth));
+  const seed = new URL(seedUrl);
+  const visited = new Set();
+  const queue = [{ url: seed.toString(), level: 0 }];
+  const supported = new Map();
+  const pages = [];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || visited.has(current.url)) {
+      continue;
+    }
+    visited.add(current.url);
+
+    const response = await fetch(current.url, {
+      method: "GET",
+      redirect: "follow",
+      headers: { "user-agent": "zip-image-viewer/1.3.0" },
+    }).catch(() => null);
+
+    if (!response || !response.ok) {
+      continue;
+    }
+
+    const contentType = String(response.headers.get("content-type") || "");
+    if (!isPotentialHtmlContentType(contentType)) {
+      if (isSupportedDownloadUrl(current.url)) {
+        supported.set(current.url, {
+          url: current.url,
+          type: "file",
+          source: current.url,
+          depth: current.level,
+        });
+      }
+      continue;
+    }
+
+    const html = await response.text().catch(() => "");
+    pages.push({ url: current.url, depth: current.level });
+    const links = extractHrefLinks(html, current.url);
+
+    for (const link of links) {
+      const parsed = new URL(link);
+      if (parsed.origin !== seed.origin) {
+        continue;
+      }
+
+      if (isSupportedDownloadUrl(link)) {
+        supported.set(link, {
+          url: link,
+          type: "file",
+          source: current.url,
+          depth: current.level + 1,
+        });
+      }
+
+      if (current.level < safeDepth && !visited.has(link)) {
+        queue.push({ url: link, level: current.level + 1 });
+      }
+    }
+  }
+
+  return {
+    seedUrl: seed.toString(),
+    depth: safeDepth,
+    pages,
+    links: [...supported.values()],
+  };
+}
+
 function shouldPreserveOriginalPreview(contentType) {
   return contentType === "image/svg+xml" || contentType === "image/gif";
 }
@@ -373,6 +514,8 @@ function createJob(url, downloadSettings = DEFAULT_DOWNLOAD_SETTINGS) {
     extractDir: "",
     abortController: null,
     cleanupAt: 0,
+    pauseRequested: false,
+    queuePosition: -1,
     downloadSettings: normalizeDownloadSettings(downloadSettings),
   };
 
@@ -411,6 +554,80 @@ function sanitizeJob(job) {
     totalTranscodeEntries: job.totalTranscodeEntries,
     videoQuality: job.videoQuality,
     updatedAt: job.updatedAt,
+    queuePosition: job.queuePosition,
+  };
+}
+
+function normalizeQueueConcurrency(value) {
+  return Math.max(
+    1,
+    Math.min(
+      MAX_SIMULTANEOUS_DOWNLOADS,
+      Number.parseInt(String(value), 10) || DEFAULT_SIMULTANEOUS_DOWNLOADS,
+    ),
+  );
+}
+
+function removeFromQueue(jobId) {
+  const index = queueState.order.indexOf(jobId);
+  if (index !== -1) {
+    queueState.order.splice(index, 1);
+  }
+}
+
+function refreshQueuePositions() {
+  for (const [jobId, job] of jobStore.entries()) {
+    const position = queueState.order.indexOf(jobId);
+    job.queuePosition = position;
+  }
+}
+
+function enqueueJob(jobId, atFront = false) {
+  removeFromQueue(jobId);
+  if (atFront) {
+    queueState.order.unshift(jobId);
+  } else {
+    queueState.order.push(jobId);
+  }
+  refreshQueuePositions();
+}
+
+function canRunJob(job) {
+  return (
+    job &&
+    (job.status === "queued" || job.status === "retrying") &&
+    !job.requiresConfirmation
+  );
+}
+
+function getQueueSnapshot() {
+  refreshQueuePositions();
+  const jobs = [...jobStore.values()]
+    .filter((job) => !isTerminalJobStatus(job.status))
+    .sort((left, right) => {
+      const leftRunning = queueState.running.has(left.id) ? 0 : 1;
+      const rightRunning = queueState.running.has(right.id) ? 0 : 1;
+      if (leftRunning !== rightRunning) {
+        return leftRunning - rightRunning;
+      }
+      if (left.queuePosition === -1 && right.queuePosition === -1) {
+        return left.createdAt - right.createdAt;
+      }
+      if (left.queuePosition === -1) {
+        return 1;
+      }
+      if (right.queuePosition === -1) {
+        return -1;
+      }
+      return left.queuePosition - right.queuePosition;
+    })
+    .map((job) => sanitizeJob(job));
+
+  return {
+    maxConcurrent: queueState.maxConcurrent,
+    runningCount: queueState.running.size,
+    queuedIds: [...queueState.order],
+    jobs,
   };
 }
 
@@ -520,6 +737,23 @@ function sanitizeEntryPath(entryPath) {
   return cleaned;
 }
 
+function detectArchiveFormat(filePath) {
+  const ext = path
+    .extname(String(filePath || ""))
+    .slice(1)
+    .toLowerCase();
+  if (ext === "zip") {
+    return "zip";
+  }
+  if (ext === "7z") {
+    return "7z";
+  }
+  if (ext === "rar") {
+    return "rar";
+  }
+  return "archive";
+}
+
 function createNode(name, nodePath, type) {
   return {
     name,
@@ -582,6 +816,25 @@ function buildTree(entries, rootName) {
   }
 
   return { tree: root, firstFilePath, stats: { fileCount } };
+}
+
+function rebuildSessionTree(session, rootName) {
+  const { tree, firstFilePath, stats } = buildTree(session.entries, rootName);
+  session.tree = tree;
+  session.firstFilePath = firstFilePath;
+  session.stats = stats;
+}
+
+function upsertSessionEntry(session, entry, rootName) {
+  const existingIndex = session.entries.findIndex(
+    (item) => item.relativePath === entry.relativePath,
+  );
+  if (existingIndex === -1) {
+    session.entries.push(entry);
+  } else {
+    session.entries[existingIndex] = entry;
+  }
+  rebuildSessionTree(session, rootName);
 }
 
 async function removeSession(sessionId, reason = "manual") {
@@ -769,8 +1022,30 @@ async function runCommandCapture(command, args, options = {}) {
   });
 }
 
-async function extractWith7zip(archivePath, extractDir) {
-  await runCommand(path7za, ["x", "-y", `-o${extractDir}`, archivePath]);
+async function extractWith7zip(archivePath, extractDir, password) {
+  const args = ["x", "-y", `-o${extractDir}`];
+  if (password) {
+    args.push(`-p${password}`);
+  }
+  args.push(archivePath);
+  await runCommand(path7za, args);
+}
+
+async function detectArchiveEncryption(archivePath) {
+  if (!path7za) {
+    return false;
+  }
+  const { stdout } = await runCommandCapture(
+    path7za,
+    ["l", "-slt", archivePath],
+    {
+      allowNonZeroExit: true,
+    },
+  );
+  const output = String(stdout || "");
+  return (
+    /Encrypted\s*=\s*\+/i.test(output) || /Method\s*=\s*\w+\s+AES/i.test(output)
+  );
 }
 
 async function getVideoDimensions(videoPath) {
@@ -1135,12 +1410,7 @@ async function startPrioritySegmentWindow(
 function getSessionQualityOutputPath(session, normalizedPath, quality) {
   const safeQuality = String(quality || "720p").toLowerCase();
   const outputRelative = normalizedPath.replace(/\.[^.]+$/, ".mp4");
-  return path.join(
-    session.workspaceDir,
-    "quality",
-    safeQuality,
-    outputRelative,
-  );
+  return path.join(session.extractDir, "quality", safeQuality, outputRelative);
 }
 
 async function transcodeVideoToQuality({
@@ -1472,6 +1742,12 @@ async function processSessionJob(job, confirmOversize = false) {
     throw new Error("Only HTTP and HTTPS URLs are supported.");
   }
 
+  if (job.workspaceDir && !job.sessionId) {
+    await rm(job.workspaceDir, { recursive: true, force: true }).catch(
+      () => {},
+    );
+  }
+
   const workspaceDir = await mkdtemp(
     path.join(os.tmpdir(), "zip-image-viewer-"),
   );
@@ -1730,6 +2006,66 @@ async function processSessionJob(job, confirmOversize = false) {
       lastExtractEmitAt = now;
     }
 
+    const archiveEncrypted =
+      detectedKind === "archive"
+        ? await detectArchiveEncryption(zipPath).catch(() => false)
+        : false;
+
+    if (archiveEncrypted) {
+      emitJob(
+        job,
+        {
+          status: "awaiting_password",
+          phase: "awaiting_password",
+          message:
+            "Archive is password protected. Provide password to extract.",
+          error: "",
+        },
+        "awaiting-password",
+      );
+
+      const sessionId = crypto.randomUUID();
+      const rootName = "session-files";
+      const encryptedName = path.basename(zipPath);
+      const entry = {
+        relativePath: `locked/${encryptedName}`,
+        type: "file",
+        size: (await stat(zipPath)).size,
+        modifiedAt: Date.now(),
+        locked: true,
+        archiveFormat: detectArchiveFormat(zipPath),
+      };
+      const { tree, firstFilePath, stats } = buildTree([entry], rootName);
+      sessionStore.set(sessionId, {
+        id: sessionId,
+        workspaceDir,
+        extractDir,
+        tree,
+        firstFilePath,
+        stats,
+        entries: [entry],
+        rootName,
+        selectedVideoQuality: settings.videoQuality,
+        pendingArchive: {
+          archivePath: zipPath,
+          extractDir,
+          format: detectArchiveFormat(zipPath),
+        },
+        transcodeStatus: {
+          quality: settings.videoQuality,
+          done: true,
+          completed: 0,
+          total: 0,
+        },
+        lastAccessedAt: Date.now(),
+      });
+
+      job.sessionId = sessionId;
+      closeJob(job, "awaiting_password");
+      emitJob(job, { sessionId }, "awaiting-password");
+      return;
+    }
+
     if (detectedKind === "archive") {
       emitJob(job, {
         status: "extracting",
@@ -1803,8 +2139,7 @@ async function processSessionJob(job, confirmOversize = false) {
     emitExtractionProgress(true);
 
     const archiveName = path.basename(parsedUrl.pathname) || "download";
-    const rootName =
-      archiveName.replace(/\.(zip|rar|7z|tar|gz|tgz)$/i, "") || archiveName;
+    const rootName = "session-files";
     const { tree, firstFilePath, stats } = buildTree(
       extractedEntries,
       rootName,
@@ -1828,6 +2163,8 @@ async function processSessionJob(job, confirmOversize = false) {
       tree,
       firstFilePath,
       stats,
+      entries: [...extractedEntries],
+      rootName,
       selectedVideoQuality: settings.videoQuality,
       transcodeStatus: {
         quality: settings.videoQuality,
@@ -1893,8 +2230,11 @@ async function processSessionJob(job, confirmOversize = false) {
         });
 
         try {
+          const sourceCopyPath = `${sourcePath}.transcode-source-${settings.videoQuality}`;
+          await copyFile(sourcePath, sourceCopyPath);
+
           await transcodeVideoToQuality({
-            sourcePath,
+            sourcePath: sourceCopyPath,
             outputPath,
             quality: settings.videoQuality,
             onProgress: (fraction) => {
@@ -1915,6 +2255,26 @@ async function processSessionJob(job, confirmOversize = false) {
               });
             },
           });
+
+          await rm(sourceCopyPath, { force: true }).catch(() => {});
+
+          const relativeQualityPath = path
+            .relative(extractDir, outputPath)
+            .split(path.sep)
+            .join("/");
+          const qualityStats = await stat(outputPath).catch(() => null);
+          if (qualityStats?.isFile()) {
+            upsertSessionEntry(
+              session,
+              {
+                relativePath: relativeQualityPath,
+                type: "file",
+                size: qualityStats.size,
+                modifiedAt: qualityStats.mtimeMs,
+              },
+              rootName,
+            );
+          }
         } catch (error) {
           logEvent("warn", "video.transcode.entry.failed", {
             sessionId,
@@ -1981,6 +2341,24 @@ async function processSessionJob(job, confirmOversize = false) {
     });
 
     if (error.name === "AbortError") {
+      if (job.pauseRequested) {
+        emitJob(
+          job,
+          {
+            status: "paused",
+            phase: "paused",
+            error: "",
+            downloadSpeedBytesPerSec: 0,
+            averageSpeedBytesPerSec: 0,
+            etaSeconds: null,
+            isStalled: false,
+            stallDurationMs: 0,
+            message: "Job paused.",
+          },
+          "paused",
+        );
+        return;
+      }
       emitJob(
         job,
         {
@@ -2019,6 +2397,80 @@ async function processSessionJob(job, confirmOversize = false) {
   }
 }
 
+app.post("/api/extractor/sublinks", async (req, res) => {
+  const { url, depth = 1 } = req.body || {};
+  if (!url) {
+    return res.status(400).json({ error: "url is required." });
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(String(url));
+  } catch {
+    return res.status(400).json({ error: "Invalid URL." });
+  }
+
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    return res
+      .status(400)
+      .json({ error: "Only HTTP and HTTPS are supported." });
+  }
+
+  try {
+    const result = await extractSublinks({
+      seedUrl: parsed.toString(),
+      depth: Number.parseInt(String(depth), 10) || 1,
+      maxDepth: 3,
+    });
+    return res.json(result);
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ error: error.message || "Extraction failed." });
+  }
+});
+
+function scheduleQueue() {
+  if (queueState.running.size >= queueState.maxConcurrent) {
+    return;
+  }
+
+  while (queueState.running.size < queueState.maxConcurrent) {
+    const nextId = queueState.order.find((jobId) => {
+      const job = jobStore.get(jobId);
+      return canRunJob(job) && !queueState.running.has(jobId);
+    });
+
+    if (!nextId) {
+      break;
+    }
+
+    const job = jobStore.get(nextId);
+    if (!job) {
+      removeFromQueue(nextId);
+      continue;
+    }
+
+    queueState.running.add(nextId);
+    removeFromQueue(nextId);
+    refreshQueuePositions();
+
+    processSessionJob(job, Boolean(job.confirmTokenAccepted))
+      .catch((error) => {
+        logEvent("error", "job.process.unhandled", {
+          jobId: job.id,
+          error: error.message,
+          stack: error.stack,
+        });
+      })
+      .finally(() => {
+        queueState.running.delete(nextId);
+        refreshQueuePositions();
+        scheduleQueue();
+      });
+  }
+}
+
 app.post("/api/sessions", async (req, res) => {
   const {
     url,
@@ -2029,17 +2481,46 @@ app.post("/api/sessions", async (req, res) => {
     return res.status(400).json({ error: "File URL is required." });
   }
   const job = createJob(url, downloadSettings);
-
-  emitJob(job, { message: "Queued archive request" });
-  processSessionJob(job, confirmOversize).catch((error) => {
-    logEvent("error", "job.process.unhandled", {
-      jobId: job.id,
-      error: error.message,
-      stack: error.stack,
-    });
+  enqueueJob(job.id);
+  emitJob(job, {
+    status: "queued",
+    phase: "queued",
+    queuePosition: job.queuePosition,
+    message: "Queued archive request",
   });
+  if (confirmOversize) {
+    job.confirmTokenAccepted = true;
+  }
+  scheduleQueue();
 
   return res.status(202).json({ jobId: job.id, ...sanitizeJob(job) });
+});
+
+app.post("/api/sessions/batch", async (req, res) => {
+  const { urls = [], downloadSettings = {} } = req.body || {};
+  if (!Array.isArray(urls) || urls.length === 0) {
+    return res.status(400).json({ error: "urls array is required." });
+  }
+
+  const jobs = [];
+  for (const rawUrl of urls) {
+    const nextUrl = String(rawUrl || "").trim();
+    if (!nextUrl) {
+      continue;
+    }
+    const job = createJob(nextUrl, downloadSettings);
+    enqueueJob(job.id);
+    emitJob(job, {
+      status: "queued",
+      phase: "queued",
+      queuePosition: job.queuePosition,
+      message: "Queued archive request",
+    });
+    jobs.push(sanitizeJob(job));
+  }
+
+  scheduleQueue();
+  return res.status(202).json({ jobs, queue: getQueueSnapshot() });
 });
 
 app.get("/api/session-jobs/:id", (req, res) => {
@@ -2049,6 +2530,83 @@ app.get("/api/session-jobs/:id", (req, res) => {
   }
 
   return res.json(sanitizeJob(job));
+});
+
+app.get("/api/session-jobs", (_req, res) => {
+  return res.json(getQueueSnapshot());
+});
+
+app.patch("/api/session-jobs/settings", (req, res) => {
+  const next = normalizeQueueConcurrency(req.body?.maxConcurrent);
+  queueState.maxConcurrent = next;
+  return res.json(getQueueSnapshot());
+});
+
+app.post("/api/session-jobs/:id/pause", (req, res) => {
+  const job = jobStore.get(req.params.id);
+  if (!job) {
+    return res.status(404).json({ error: "Job not found." });
+  }
+
+  job.pauseRequested = true;
+  if (job.status === "queued" || job.status === "retrying") {
+    job.status = "paused";
+    job.phase = "paused";
+    removeFromQueue(job.id);
+    refreshQueuePositions();
+    emitJob(job, { message: "Paused", queuePosition: -1 }, "paused");
+  } else if (job.status === "downloading") {
+    job.abortController?.abort();
+    emitJob(job, { message: "Pause requested..." }, "pausing");
+  }
+
+  return res.json(sanitizeJob(job));
+});
+
+app.post("/api/session-jobs/:id/resume", (req, res) => {
+  const job = jobStore.get(req.params.id);
+  if (!job) {
+    return res.status(404).json({ error: "Job not found." });
+  }
+
+  if (isTerminalJobStatus(job.status)) {
+    return res.status(400).json({ error: "Cannot resume terminal job." });
+  }
+
+  job.pauseRequested = false;
+  if (job.status === "paused") {
+    job.status = "queued";
+    job.phase = "queued";
+    enqueueJob(job.id, true);
+    emitJob(
+      job,
+      { message: "Resumed and queued", queuePosition: job.queuePosition },
+      "resumed",
+    );
+    scheduleQueue();
+  }
+
+  return res.json(sanitizeJob(job));
+});
+
+app.post("/api/session-jobs/reorder", (req, res) => {
+  const { jobId, toIndex } = req.body || {};
+  const idx = Number.parseInt(String(toIndex), 10);
+  if (!jobId || !Number.isInteger(idx)) {
+    return res.status(400).json({ error: "jobId and toIndex are required." });
+  }
+
+  const currentIndex = queueState.order.indexOf(String(jobId));
+  if (currentIndex === -1) {
+    return res.status(404).json({ error: "Queued job not found." });
+  }
+
+  const bounded = Math.max(0, Math.min(queueState.order.length - 1, idx));
+  const [removed] = queueState.order.splice(currentIndex, 1);
+  queueState.order.splice(bounded, 0, removed);
+  refreshQueuePositions();
+
+  return res.json(getQueueSnapshot());
 });
 
 app.get("/api/session-jobs/:id/events", (req, res) => {
@@ -2087,13 +2645,13 @@ app.post("/api/session-jobs/:id/confirm", (req, res) => {
 
   job.requiresConfirmation = false;
   job.cleanupAt = 0;
-  processSessionJob(job, true).catch((error) => {
-    logEvent("error", "job.confirm.unhandled", {
-      jobId: job.id,
-      error: error.message,
-      stack: error.stack,
-    });
-  });
+  job.confirmTokenAccepted = true;
+  if (job.status === "awaiting_confirmation") {
+    job.status = "queued";
+    job.phase = "queued";
+    enqueueJob(job.id, true);
+    scheduleQueue();
+  }
 
   return res.json(sanitizeJob(job));
 });
@@ -2160,6 +2718,9 @@ app.delete("/api/session-jobs/:id", async (req, res) => {
   }
 
   job.abortController?.abort();
+  removeFromQueue(job.id);
+  queueState.running.delete(job.id);
+  refreshQueuePositions();
   emitJob(
     job,
     {
@@ -2195,7 +2756,63 @@ app.get("/api/sessions/:id/tree", (req, res) => {
     tree: session.tree,
     firstFilePath: session.firstFilePath,
     stats: session.stats,
+    pendingArchive: session.pendingArchive
+      ? {
+          format: session.pendingArchive.format,
+          locked: true,
+        }
+      : null,
   });
+});
+
+app.post("/api/sessions/:id/archive/unlock", async (req, res) => {
+  const session = touchSession(req.params.id);
+  if (!session) {
+    return res
+      .status(404)
+      .json({ error: "Session not found or already cleaned up." });
+  }
+
+  if (!session.pendingArchive?.archivePath) {
+    return res
+      .status(400)
+      .json({ error: "No locked archive in this session." });
+  }
+
+  const password = String(req.body?.password || "");
+  if (!password) {
+    return res.status(400).json({ error: "Password is required." });
+  }
+
+  try {
+    await rm(session.extractDir, { recursive: true, force: true }).catch(
+      () => {},
+    );
+    await mkdir(session.extractDir, { recursive: true });
+    await extractWith7zip(
+      session.pendingArchive.archivePath,
+      session.extractDir,
+      password,
+    );
+
+    const extractedEntries = await listExtractedEntries(session.extractDir);
+    session.entries = extractedEntries;
+    rebuildSessionTree(session, session.rootName || "session-files");
+    session.pendingArchive = null;
+    session.lastAccessedAt = Date.now();
+
+    return res.json({
+      ok: true,
+      tree: session.tree,
+      firstFilePath: session.firstFilePath,
+      stats: session.stats,
+    });
+  } catch {
+    return res.status(400).json({
+      error: "Incorrect password. Try again.",
+      code: "INVALID_ARCHIVE_PASSWORD",
+    });
+  }
 });
 
 app.get("/api/sessions/:id/video/play", async (req, res) => {

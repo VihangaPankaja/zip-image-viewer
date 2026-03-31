@@ -1,4 +1,5 @@
 import {
+  default as React,
   useEffect,
   useMemo,
   useRef,
@@ -8,7 +9,13 @@ import {
 import { createPortal } from "react-dom";
 import Plyr from "plyr";
 import { openJobSocket } from "./lib/jobSocket";
-import { WorkspaceTabs } from "./components/WorkspaceTabs";
+import {
+  WorkspaceTabs,
+  type WorkspaceTabId,
+  type TabOption,
+  type ExplorerModalContract,
+  type SlideshowTabContract,
+} from "./components/WorkspaceTabs";
 import { ExplorerTablePanel } from "./components/ExplorerTablePanel";
 import { GlobalSettingsSheet } from "./components/GlobalSettingsSheet";
 
@@ -81,10 +88,14 @@ const VIDEO_TRANSCODE_QUALITY_OPTIONS = [
   { value: "360p", label: "360p" },
   { value: "source", label: "Original source" },
 ];
-const WORKSPACE_TABS = [
+const DOWNLOAD_QUEUE_DEFAULTS = {
+  maxConcurrent: 2,
+  extractorDepth: 1,
+};
+const WORKSPACE_TABS: TabOption[] = [
   { value: "download", label: "Download" },
   { value: "preview", label: "Preview" },
-  { value: "explorer", label: "Explorer" },
+  { value: "slideshow", label: "Slideshow" },
 ];
 const DEFAULT_DOWNLOAD_SETTINGS = {
   threadMode: "auto",
@@ -624,8 +635,25 @@ function CustomDropdown({
 
 function App() {
   const [zipUrl, setZipUrl] = useState("");
-  const [activeTab, setActiveTab] = useState("download");
+  const [activeTab, setActiveTab] = useState<WorkspaceTabId>("download");
+  const [explorerModalOpen, setExplorerModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [queueMaxConcurrent, setQueueMaxConcurrent] = useState(
+    DOWNLOAD_QUEUE_DEFAULTS.maxConcurrent,
+  );
+  const [extractorDepth, setExtractorDepth] = useState(
+    DOWNLOAD_QUEUE_DEFAULTS.extractorDepth,
+  );
+  const [queueJobs, setQueueJobs] = useState([]);
+  const [batchLinks, setBatchLinks] = useState([]);
+  const [downloadHistory, setDownloadHistory] = useState([]);
+  const [sublinkSeed, setSublinkSeed] = useState("");
+  const [sublinkResults, setSublinkResults] = useState([]);
+  const [sublinkError, setSublinkError] = useState("");
+  const [draggedQueueJobId, setDraggedQueueJobId] = useState("");
+  const [unlockRow, setUnlockRow] = useState(null);
+  const [unlockPassword, setUnlockPassword] = useState("");
+  const [unlockError, setUnlockError] = useState("");
   const [session, setSession] = useState(null);
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") {
@@ -643,6 +671,7 @@ function App() {
   const [error, setError] = useState("");
   const [oversizePrompt, setOversizePrompt] = useState(null);
   const [slideshowOpen, setSlideshowOpen] = useState(false);
+  const [slideshowFullscreen, setSlideshowFullscreen] = useState(false);
   const [slideshowFitMode, setSlideshowFitMode] = useState("best-fit");
   const [slideshowChromeHidden, setSlideshowChromeHidden] = useState(false);
   const [activeJob, setActiveJob] = useState(null);
@@ -699,11 +728,24 @@ function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const videoPlayerRef = useRef<Plyr | null>(null);
   const videoShellRef = useRef<HTMLDivElement | null>(null);
+  const slideshowTabRef = useRef<HTMLDivElement | null>(null);
   const jobSocketRef = useRef(null);
   const jobPollTimeoutRef = useRef(null);
   const latestSessionIdRef = useRef("");
   const latestJobIdRef = useRef("");
   const hydrationRef = useRef({ sessionId: "", promise: null });
+
+  async function refreshQueueSnapshot() {
+    const response = await fetch("/api/session-jobs");
+    if (!response.ok) {
+      return;
+    }
+    const payload = await response.json();
+    setQueueJobs(Array.isArray(payload.jobs) ? payload.jobs : []);
+    if (Number.isFinite(payload.maxConcurrent)) {
+      setQueueMaxConcurrent(payload.maxConcurrent);
+    }
+  }
 
   const sortedTree = useMemo(() => {
     if (!session?.tree) {
@@ -976,12 +1018,20 @@ function App() {
     }
 
     if (payload.status === "ready") {
+      setDownloadHistory((current) => {
+        const next = [
+          payload,
+          ...current.filter((item) => item.id !== payload.id),
+        ];
+        return next.slice(0, 200);
+      });
       closeJobEvents();
       stopJobPolling();
       latestJobIdRef.current = "";
       setOversizePrompt(null);
       setActiveJob(null);
       setIsLoading(false);
+      refreshQueueSnapshot().catch(() => {});
       return;
     }
 
@@ -992,6 +1042,7 @@ function App() {
       setActiveJob(null);
       setError(payload.error || "Could not process this file.");
       setIsLoading(false);
+      refreshQueueSnapshot().catch(() => {});
       return;
     }
 
@@ -1001,6 +1052,7 @@ function App() {
       latestJobIdRef.current = "";
       setActiveJob(null);
       setIsLoading(false);
+      refreshQueueSnapshot().catch(() => {});
     }
   }
 
@@ -1101,6 +1153,7 @@ function App() {
       latestJobIdRef.current = payload.jobId;
       setActiveJob(payload);
       attachJobEvents(payload.jobId, url);
+      refreshQueueSnapshot().catch(() => {});
     } catch (requestError) {
       setError(requestError.message);
       latestJobIdRef.current = "";
@@ -1117,6 +1170,139 @@ function App() {
       return;
     }
     await loadSession(zipUrl.trim(), false);
+  }
+
+  async function handleBatchSubmit(event) {
+    event.preventDefault();
+    const urls = batchLinks
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+    if (!urls.length) {
+      setError("Add at least one URL for batch download.");
+      return;
+    }
+
+    const response = await fetch("/api/sessions/batch", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ urls, downloadSettings }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setError(payload.error || "Failed to queue batch downloads.");
+      return;
+    }
+    setBatchLinks([""]);
+    setError("");
+    refreshQueueSnapshot().catch(() => {});
+  }
+
+  async function updateQueueConcurrency(nextValue) {
+    const bounded = clampNumber(String(nextValue), 1, 6, 2);
+    setQueueMaxConcurrent(bounded);
+    await fetch("/api/session-jobs/settings", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ maxConcurrent: bounded }),
+    }).catch(() => {});
+    refreshQueueSnapshot().catch(() => {});
+  }
+
+  async function pauseJob(jobId) {
+    await fetch(`/api/session-jobs/${jobId}/pause`, { method: "POST" }).catch(
+      () => {},
+    );
+    refreshQueueSnapshot().catch(() => {});
+  }
+
+  async function resumeJob(jobId) {
+    await fetch(`/api/session-jobs/${jobId}/resume`, { method: "POST" }).catch(
+      () => {},
+    );
+    refreshQueueSnapshot().catch(() => {});
+  }
+
+  async function moveQueueJob(jobId, toIndex) {
+    await fetch("/api/session-jobs/reorder", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jobId, toIndex }),
+    }).catch(() => {});
+    refreshQueueSnapshot().catch(() => {});
+  }
+
+  async function extractSublinks(event) {
+    event.preventDefault();
+    setSublinkError("");
+    const seed = String(sublinkSeed || "").trim();
+    if (!seed) {
+      setSublinkError("Enter a webpage URL to extract links.");
+      return;
+    }
+
+    const response = await fetch("/api/extractor/sublinks", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: seed, depth: extractorDepth }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setSublinkError(payload.error || "Could not extract links.");
+      return;
+    }
+    setSublinkResults(Array.isArray(payload.links) ? payload.links : []);
+  }
+
+  async function queueSelectedSublinks() {
+    const selected = sublinkResults
+      .filter((item) => item.selected)
+      .map((item) => item.url)
+      .filter(Boolean);
+    if (!selected.length) {
+      setError("Select at least one extracted link.");
+      return;
+    }
+    const response = await fetch("/api/sessions/batch", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ urls: selected, downloadSettings }),
+    });
+    if (!response.ok) {
+      setError("Failed to queue selected links.");
+      return;
+    }
+    setError("");
+    refreshQueueSnapshot().catch(() => {});
+  }
+
+  async function unlockArchive() {
+    if (!session?.id || !unlockPassword) {
+      return;
+    }
+    const response = await fetch(`/api/sessions/${session.id}/archive/unlock`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ password: unlockPassword }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setUnlockError(payload.error || "Unlock failed.");
+      return;
+    }
+    setSession((current) =>
+      current
+        ? {
+            ...current,
+            tree: payload.tree,
+            firstFilePath: payload.firstFilePath,
+            stats: payload.stats,
+            pendingArchive: null,
+          }
+        : current,
+    );
+    setUnlockRow(null);
+    setUnlockPassword("");
+    setUnlockError("");
   }
 
   useEffect(() => {
@@ -1144,6 +1330,32 @@ function App() {
       JSON.stringify(keyboardSettings),
     );
   }, [keyboardSettings]);
+
+  useEffect(() => {
+    refreshQueueSnapshot().catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== "slideshow") {
+      return;
+    }
+
+    const target = slideshowTabRef.current;
+    if (!target) {
+      return;
+    }
+
+    if (slideshowFullscreen) {
+      if (!document.fullscreenElement) {
+        target.requestFullscreen?.().catch(() => {});
+      }
+      return;
+    }
+
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.().catch(() => {});
+    }
+  }, [activeTab, slideshowFullscreen]);
 
   useEffect(() => {
     if (!flatData || !sortedTree) {
@@ -1455,6 +1667,12 @@ function App() {
         setSelectedPath(currentFolderImages[currentFolderImages.length - 1]);
       }
 
+      if (activeTab === "slideshow" && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        setSlideshowFullscreen((current) => !current);
+        return;
+      }
+
       if (
         !slideshowOpen &&
         selectedKind === "image" &&
@@ -1473,6 +1691,7 @@ function App() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [
+    activeTab,
     currentFolderImages,
     currentImageIndex,
     nextImagePath,
@@ -1767,6 +1986,260 @@ function App() {
               </button>
             </form>
 
+            <section className="download-settings-card">
+              <div className="download-settings-head">
+                <strong>Queue controls</strong>
+                <span>Simultaneous downloads and order control</span>
+              </div>
+              <div className="download-settings-grid">
+                <label className="input-shell">
+                  <span className="input-label">Simultaneous downloads</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="6"
+                    value={queueMaxConcurrent}
+                    onChange={(event) =>
+                      updateQueueConcurrency(event.target.value)
+                    }
+                  />
+                </label>
+                <label className="input-shell">
+                  <span className="input-label">Crawler depth</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="3"
+                    value={extractorDepth}
+                    onChange={(event) =>
+                      setExtractorDepth(
+                        clampNumber(event.target.value, 0, 3, 1),
+                      )
+                    }
+                  />
+                </label>
+              </div>
+            </section>
+
+            <section className="download-settings-card">
+              <div className="download-settings-head">
+                <strong>Batch URL queue</strong>
+                <button
+                  className="ghost-button compact-button"
+                  type="button"
+                  onClick={() => setBatchLinks((current) => [...current, ""])}
+                >
+                  Add URL row
+                </button>
+              </div>
+              <form
+                onSubmit={handleBatchSubmit}
+                className="download-settings-grid"
+              >
+                {batchLinks.map((value, index) => (
+                  <label className="input-shell" key={`batch-${index}`}>
+                    <span className="input-label">URL #{index + 1}</span>
+                    <input
+                      type="url"
+                      value={value}
+                      onChange={(event) =>
+                        setBatchLinks((current) => {
+                          const next = [...current];
+                          next[index] = event.target.value;
+                          return next;
+                        })
+                      }
+                      placeholder="https://example.com/file.zip"
+                    />
+                  </label>
+                ))}
+                <button className="primary-button" type="submit">
+                  Queue batch downloads
+                </button>
+              </form>
+            </section>
+
+            <section className="download-settings-card">
+              <div className="download-settings-head">
+                <strong>Sublink extractor</strong>
+                <span>Extract supported file links from webpages</span>
+              </div>
+              <form className="url-form" onSubmit={extractSublinks}>
+                <label className="input-shell" htmlFor="sublink-url">
+                  <span className="input-label">Webpage URL</span>
+                  <input
+                    id="sublink-url"
+                    type="url"
+                    value={sublinkSeed}
+                    onChange={(event) => setSublinkSeed(event.target.value)}
+                    placeholder="https://example.com/page"
+                  />
+                </label>
+                <button className="ghost-button" type="submit">
+                  Extract links
+                </button>
+              </form>
+              {sublinkError ? (
+                <div className="message-card error">{sublinkError}</div>
+              ) : null}
+              {sublinkResults.length ? (
+                <div className="explorer-table-wrap">
+                  <table className="explorer-table">
+                    <thead>
+                      <tr>
+                        <th>Select</th>
+                        <th>URL</th>
+                        <th>Depth</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sublinkResults.map((item, index) => (
+                        <tr key={`${item.url}-${index}`}>
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={Boolean(item.selected)}
+                              onChange={(event) =>
+                                setSublinkResults((current) =>
+                                  current.map((entry, entryIndex) =>
+                                    entryIndex === index
+                                      ? {
+                                          ...entry,
+                                          selected: event.target.checked,
+                                        }
+                                      : entry,
+                                  ),
+                                )
+                              }
+                            />
+                          </td>
+                          <td>{item.url}</td>
+                          <td>{item.depth}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+              {sublinkResults.length ? (
+                <div className="message-actions">
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={queueSelectedSublinks}
+                  >
+                    Queue selected links
+                  </button>
+                </div>
+              ) : null}
+            </section>
+
+            <section className="download-settings-card">
+              <div className="download-settings-head">
+                <strong>Download queue</strong>
+                <span>Pause/resume and reorder priorities</span>
+              </div>
+              <div className="explorer-table-wrap">
+                <table className="explorer-table">
+                  <thead>
+                    <tr>
+                      <th>Order</th>
+                      <th>URL</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {queueJobs.map((job, index) => (
+                      <tr
+                        key={job.id}
+                        draggable
+                        onDragStart={() => setDraggedQueueJobId(job.id)}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          if (
+                            !draggedQueueJobId ||
+                            draggedQueueJobId === job.id
+                          ) {
+                            return;
+                          }
+                          moveQueueJob(draggedQueueJobId, index);
+                          setDraggedQueueJobId("");
+                        }}
+                        onDragEnd={() => setDraggedQueueJobId("")}
+                      >
+                        <td>{index + 1}</td>
+                        <td>{job.url}</td>
+                        <td>{job.status}</td>
+                        <td>
+                          <div className="message-actions">
+                            <button
+                              className="ghost-button compact-button"
+                              type="button"
+                              onClick={() =>
+                                moveQueueJob(job.id, Math.max(0, index - 1))
+                              }
+                            >
+                              Up
+                            </button>
+                            <button
+                              className="ghost-button compact-button"
+                              type="button"
+                              onClick={() => moveQueueJob(job.id, index + 1)}
+                            >
+                              Down
+                            </button>
+                            <button
+                              className="ghost-button compact-button"
+                              type="button"
+                              onClick={() => pauseJob(job.id)}
+                            >
+                              Pause
+                            </button>
+                            <button
+                              className="ghost-button compact-button"
+                              type="button"
+                              onClick={() => resumeJob(job.id)}
+                            >
+                              Resume
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className="download-settings-card">
+              <div className="download-settings-head">
+                <strong>Downloaded files history</strong>
+                <span>Old completed entries are retained</span>
+              </div>
+              <div className="explorer-table-wrap">
+                <table className="explorer-table">
+                  <thead>
+                    <tr>
+                      <th>Job</th>
+                      <th>Status</th>
+                      <th>Session</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {downloadHistory.map((item) => (
+                      <tr key={`history-${item.id}`}>
+                        <td>{item.url}</td>
+                        <td>{item.status}</td>
+                        <td>{item.sessionId || "--"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
             <div className="message-card">
               Download tuning, explorer columns, sorting defaults, and keyboard
               shortcuts are now configured from the Global settings sheet.
@@ -1966,27 +2439,36 @@ function App() {
                     {selectedNode?.name || "Select a file"}
                   </h2>
                 </div>
-                {selectedNode?.type === "file" ? (
-                  <div className="panel-actions">
-                    {selectedKind === "image" ? (
-                      <button
-                        className="ghost-button"
-                        type="button"
-                        onClick={() => setSlideshowOpen(true)}
+                <div className="panel-actions">
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => setExplorerModalOpen(true)}
+                  >
+                    Open Explorer
+                  </button>
+                  {selectedNode?.type === "file" ? (
+                    <>
+                      {selectedKind === "image" ? (
+                        <button
+                          className="ghost-button"
+                          type="button"
+                          onClick={() => setActiveTab("slideshow")}
+                        >
+                          Slideshow
+                        </button>
+                      ) : null}
+                      <a
+                        className="ghost-button inline-link"
+                        href={selectedFileUrl}
+                        target="_blank"
+                        rel="noreferrer"
                       >
-                        Slideshow
-                      </button>
-                    ) : null}
-                    <a
-                      className="ghost-button inline-link"
-                      href={selectedFileUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Open raw
-                    </a>
-                  </div>
-                ) : null}
+                        Raw file
+                      </a>
+                    </>
+                  ) : null}
+                </div>
               </div>
 
               {!selectedNode || selectedNode.type !== "file" ? (
@@ -2197,23 +2679,118 @@ function App() {
           </section>
         ) : null}
 
-        {activeTab === "explorer" ? (
-          <ExplorerTablePanel
-            sortedTree={sortedTree}
-            session={session}
-            explorerRows={explorerRows}
-            selectedPath={selectedPath}
-            setSelectedPath={setSelectedPath}
-            sortMode={sortMode}
-            setSortMode={setSortMode}
-            sortOptions={SORT_OPTIONS}
-            explorerColumns={explorerColumns}
-            formatDate={formatDate}
-            formatBytes={formatBytes}
-            DropdownComponent={CustomDropdown}
-          />
+        {activeTab === "slideshow" ? (
+          <section className="slideshow-panel" ref={slideshowTabRef}>
+            <div className="empty-card">
+              <strong>Slideshow Tab</strong>
+              <p>
+                This tab is dedicated to image slideshows. Press 'F' to toggle
+                fullscreen.
+              </p>
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() => setSlideshowFullscreen((current) => !current)}
+              >
+                {slideshowFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+              </button>
+            </div>
+          </section>
         ) : null}
       </main>
+
+      {explorerModalOpen ? (
+        <div className="slideshow-overlay">
+          <div
+            className="slideshow-viewport"
+            role="dialog"
+            aria-modal="true"
+            style={{
+              background: "var(--bg-base)",
+              padding: "2rem",
+              overflow: "auto",
+            }}
+          >
+            <div className="panel-header">
+              <h2>Explorer Modal</h2>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => setExplorerModalOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+            <ExplorerTablePanel
+              sortedTree={sortedTree}
+              session={session}
+              explorerRows={explorerRows}
+              selectedPath={selectedPath}
+              setSelectedPath={(path) => {
+                setSelectedPath(path);
+                setExplorerModalOpen(false);
+              }}
+              sortMode={sortMode}
+              setSortMode={setSortMode}
+              sortOptions={SORT_OPTIONS}
+              explorerColumns={explorerColumns}
+              formatDate={formatDate}
+              formatBytes={formatBytes}
+              onUnlockArchive={(row) => {
+                setUnlockRow(row);
+                setUnlockPassword("");
+                setUnlockError("");
+              }}
+              DropdownComponent={CustomDropdown}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {unlockRow ? (
+        <div className="settings-overlay" role="dialog" aria-modal="true">
+          <div className="settings-sheet">
+            <div className="panel-header">
+              <div className="panel-title-group">
+                <p className="panel-label">Archive unlock</p>
+                <h2>Enter password for {unlockRow.name}</h2>
+              </div>
+              <button
+                className="ghost-button compact-button"
+                type="button"
+                onClick={() => {
+                  setUnlockRow(null);
+                  setUnlockError("");
+                }}
+              >
+                Close
+              </button>
+            </div>
+            <label className="input-shell">
+              <span className="input-label">Password</span>
+              <input
+                type="password"
+                value={unlockPassword}
+                onChange={(event) => setUnlockPassword(event.target.value)}
+                placeholder="Enter archive password"
+              />
+            </label>
+            {unlockError ? (
+              <div className="message-card error">{unlockError}</div>
+            ) : null}
+            <div className="message-actions">
+              <button
+                className="primary-button"
+                type="button"
+                onClick={unlockArchive}
+              >
+                Unlock and extract
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <GlobalSettingsSheet
         settingsOpen={settingsOpen}
         setSettingsOpen={setSettingsOpen}
@@ -2243,6 +2820,10 @@ function App() {
         downloadThreadModeOptions={DOWNLOAD_THREAD_MODE_OPTIONS}
         downloadRetryOptions={DOWNLOAD_RETRY_OPTIONS}
         clampNumber={clampNumber}
+        queueMaxConcurrent={queueMaxConcurrent}
+        setQueueMaxConcurrent={updateQueueConcurrency}
+        extractorDepth={extractorDepth}
+        setExtractorDepth={setExtractorDepth}
         DropdownComponent={CustomDropdown}
       />
       {slideshowModal}
