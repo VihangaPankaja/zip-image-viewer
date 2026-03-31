@@ -13,8 +13,6 @@ import {
   WorkspaceTabs,
   type WorkspaceTabId,
   type TabOption,
-  type ExplorerModalContract,
-  type SlideshowTabContract,
 } from "./components/WorkspaceTabs";
 import { ExplorerTablePanel } from "./components/ExplorerTablePanel";
 import { GlobalSettingsSheet } from "./components/GlobalSettingsSheet";
@@ -1013,6 +1011,11 @@ function App() {
         reportedSize: payload.reportedSize,
         limit: 1024 * 1024 * 1024,
       });
+      setIsLoading(false);
+      return;
+    }
+
+    if (payload.status === "awaiting_password") {
       setIsLoading(false);
       return;
     }

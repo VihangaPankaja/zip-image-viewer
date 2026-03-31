@@ -91,6 +91,15 @@ const SUPPORTED_DOWNLOAD_EXTENSIONS = new Set([
   "pdf",
   "txt",
 ]);
+const SUBLINK_MAX_PAGES = 60;
+const SUBLINK_MAX_LINKS = 400;
+const SUBLINK_REQUEST_TIMEOUT_MS = 12_000;
+const PASSWORD_ERROR_HINTS = [
+  "wrong password",
+  "can not open encrypted",
+  "crc failed",
+  "password",
+];
 const IMAGE_PREVIEW_PROFILES = {
   low: { size: 1280, quality: 58 },
   balanced: { size: 1920, quality: 72 },
@@ -353,7 +362,9 @@ function extractHrefLinks(html, baseUrl) {
     try {
       const resolved = new URL(raw, baseUrl).toString();
       links.push(resolved);
-    } catch {}
+    } catch {
+      continue;
+    }
   }
   return links;
 }
@@ -366,18 +377,31 @@ async function extractSublinks({ seedUrl, depth = 1, maxDepth = 3 }) {
   const supported = new Map();
   const pages = [];
 
-  while (queue.length > 0) {
-    const current = queue.shift();
+  let cursor = 0;
+  while (
+    cursor < queue.length &&
+    pages.length < SUBLINK_MAX_PAGES &&
+    supported.size < SUBLINK_MAX_LINKS
+  ) {
+    const current = queue[cursor++];
     if (!current || visited.has(current.url)) {
       continue;
     }
     visited.add(current.url);
 
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      SUBLINK_REQUEST_TIMEOUT_MS,
+    );
     const response = await fetch(current.url, {
       method: "GET",
       redirect: "follow",
       headers: { "user-agent": "zip-image-viewer/1.3.0" },
-    }).catch(() => null);
+      signal: controller.signal,
+    })
+      .catch(() => null)
+      .finally(() => clearTimeout(timeout));
 
     if (!response || !response.ok) {
       continue;
@@ -2062,6 +2086,14 @@ async function processSessionJob(job, confirmOversize = false) {
 
       job.sessionId = sessionId;
       closeJob(job, "awaiting_password");
+      for (const res of job.subscribers) {
+        res.end();
+      }
+      job.subscribers.clear();
+      for (const socket of job.socketSubscribers) {
+        socket.close(1000, "awaiting-password");
+      }
+      job.socketSubscribers.clear();
       emitJob(job, { sessionId }, "awaiting-password");
       return;
     }
@@ -2138,7 +2170,6 @@ async function processSessionJob(job, confirmOversize = false) {
 
     emitExtractionProgress(true);
 
-    const archiveName = path.basename(parsedUrl.pathname) || "download";
     const rootName = "session-files";
     const { tree, firstFilePath, stats } = buildTree(
       extractedEntries,
@@ -2229,8 +2260,9 @@ async function processSessionJob(job, confirmOversize = false) {
           message: `Transcoding videos to ${settings.videoQuality}: ${index} of ${videoEntries.length} (starting ${path.basename(entry.relativePath)})`,
         });
 
+        let sourceCopyPath = "";
         try {
-          const sourceCopyPath = `${sourcePath}.transcode-source-${settings.videoQuality}`;
+          sourceCopyPath = `${sourcePath}.transcode-source-${settings.videoQuality}`;
           await copyFile(sourcePath, sourceCopyPath);
 
           await transcodeVideoToQuality({
@@ -2256,8 +2288,6 @@ async function processSessionJob(job, confirmOversize = false) {
             },
           });
 
-          await rm(sourceCopyPath, { force: true }).catch(() => {});
-
           const relativeQualityPath = path
             .relative(extractDir, outputPath)
             .split(path.sep)
@@ -2282,6 +2312,10 @@ async function processSessionJob(job, confirmOversize = false) {
             path: entry.relativePath,
             error: error.message,
           });
+        } finally {
+          if (sourceCopyPath) {
+            await rm(sourceCopyPath, { force: true }).catch(() => {});
+          }
         }
 
         const completed = index + 1;
@@ -2539,6 +2573,7 @@ app.get("/api/session-jobs", (_req, res) => {
 app.patch("/api/session-jobs/settings", (req, res) => {
   const next = normalizeQueueConcurrency(req.body?.maxConcurrent);
   queueState.maxConcurrent = next;
+  scheduleQueue();
   return res.json(getQueueSnapshot());
 });
 
@@ -2807,10 +2842,24 @@ app.post("/api/sessions/:id/archive/unlock", async (req, res) => {
       firstFilePath: session.firstFilePath,
       stats: session.stats,
     });
-  } catch {
-    return res.status(400).json({
-      error: "Incorrect password. Try again.",
-      code: "INVALID_ARCHIVE_PASSWORD",
+  } catch (error) {
+    const message = String(error?.message || "").toLowerCase();
+    if (PASSWORD_ERROR_HINTS.some((hint) => message.includes(hint))) {
+      return res.status(400).json({
+        error: "Incorrect password. Try again.",
+        code: "INVALID_ARCHIVE_PASSWORD",
+      });
+    }
+
+    logEvent("error", "archive.unlock.failed", {
+      sessionId: req.params.id,
+      error: error?.message || "Unknown error",
+      stack: error?.stack,
+    });
+
+    return res.status(500).json({
+      error: "Failed to unlock archive. Please try again later.",
+      code: "ARCHIVE_EXTRACTION_FAILED",
     });
   }
 });
