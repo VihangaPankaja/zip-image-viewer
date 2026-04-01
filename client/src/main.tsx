@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import "plyr/dist/plyr.css";
+import "video.js/dist/video-js.css";
 import "./styles.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(

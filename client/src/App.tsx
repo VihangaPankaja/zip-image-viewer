@@ -1,21 +1,11 @@
-import {
-  default as React,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import Plyr from "plyr";
+import videojs from "video.js";
 import { openJobSocket } from "./lib/jobSocket";
-import {
-  WorkspaceTabs,
-  type WorkspaceTabId,
-  type TabOption,
-} from "./components/WorkspaceTabs";
+import { WorkspaceTabs, type WorkspaceTabId } from "./components/WorkspaceTabs";
 import { ExplorerTablePanel } from "./components/ExplorerTablePanel";
 import { GlobalSettingsSheet } from "./components/GlobalSettingsSheet";
+import { TreeExplorer } from "./components/TreeExplorer";
 
 const IMAGE_EXTENSIONS = new Set([
   "jpg",
@@ -46,7 +36,6 @@ const TEXT_EXTENSIONS = new Set([
   "css",
 ]);
 
-const FOLDER_THUMB_SIZE = 88;
 const STRIP_THUMB_SIZE = 220;
 const SORT_OPTIONS = [
   { value: "name-asc", label: "Name A-Z" },
@@ -86,14 +75,10 @@ const VIDEO_TRANSCODE_QUALITY_OPTIONS = [
   { value: "360p", label: "360p" },
   { value: "source", label: "Original source" },
 ];
-const DOWNLOAD_QUEUE_DEFAULTS = {
-  maxConcurrent: 2,
-  extractorDepth: 1,
-};
-const WORKSPACE_TABS: TabOption[] = [
+const WORKSPACE_TABS: Array<{ value: WorkspaceTabId; label: string }> = [
   { value: "download", label: "Download" },
   { value: "preview", label: "Preview" },
-  { value: "slideshow", label: "Slideshow" },
+  { value: "explorer", label: "Explorer" },
 ];
 const DEFAULT_DOWNLOAD_SETTINGS = {
   threadMode: "auto",
@@ -189,6 +174,90 @@ function normalizeDownloadSettings(value) {
   };
 }
 
+function normalizeDownloadOptions(value): DownloadOptions {
+  const source = value && typeof value === "object" ? value : {};
+  const transportSource =
+    source.transport && typeof source.transport === "object"
+      ? source.transport
+      : {};
+  const retrySource =
+    source.retry && typeof source.retry === "object" ? source.retry : {};
+  const mediaSource =
+    source.media && typeof source.media === "object" ? source.media : {};
+  const extractionSource =
+    source.extraction && typeof source.extraction === "object"
+      ? source.extraction
+      : {};
+  const requestSource =
+    source.request && typeof source.request === "object" ? source.request : {};
+
+  const legacy = normalizeDownloadSettings(source);
+  const timeoutMs = clampNumber(retrySource.timeoutMs, 5000, 180000, 30000);
+  const headers =
+    requestSource.headers && typeof requestSource.headers === "object"
+      ? Object.fromEntries(
+          Object.entries(requestSource.headers)
+            .filter(([key, val]) => key && val != null)
+            .map(([key, val]) => [String(key), String(val)]),
+        )
+      : {};
+
+  return {
+    transport: {
+      mode:
+        transportSource.mode === "single" ||
+        transportSource.mode === "segmented" ||
+        transportSource.mode === "auto"
+          ? transportSource.mode
+          : legacy.threadMode,
+      threads: clampNumber(transportSource.threads, 1, 8, legacy.threadCount),
+      multithread:
+        transportSource.multithread == null
+          ? legacy.enableMultithread
+          : Boolean(transportSource.multithread),
+      resume:
+        transportSource.resume == null
+          ? legacy.enableResume
+          : Boolean(transportSource.resume),
+    },
+    retry: {
+      maxRetries:
+        Number.parseInt(retrySource.maxRetries, 10) === -1
+          ? -1
+          : clampNumber(retrySource.maxRetries, 0, 8, legacy.maxRetries),
+      timeoutMs,
+    },
+    media: {
+      videoQuality: VIDEO_TRANSCODE_QUALITY_OPTIONS.some(
+        (option) =>
+          option.value === String(mediaSource.videoQuality || "").toLowerCase(),
+      )
+        ? String(mediaSource.videoQuality).toLowerCase()
+        : legacy.videoQuality,
+    },
+    extraction: {
+      enabled:
+        extractionSource.enabled == null
+          ? DEFAULT_DOWNLOAD_OPTIONS.extraction.enabled
+          : Boolean(extractionSource.enabled),
+    },
+    request: {
+      headers,
+    },
+  };
+}
+
+function downloadOptionsToLegacySettings(options: DownloadOptions) {
+  return {
+    threadMode: options.transport.mode,
+    threadCount: options.transport.threads,
+    enableMultithread: options.transport.multithread,
+    enableResume: options.transport.resume,
+    maxRetries: options.retry.maxRetries,
+    videoQuality: options.media.videoQuality,
+  };
+}
+
 function formatEta(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) {
     return "--";
@@ -229,20 +298,56 @@ function classifyNode(node) {
   return "binary";
 }
 
-function getNodeBadge(node) {
-  const kind = classifyNode(node);
-  if (kind === "image") return "IMG";
-  if (kind === "video") return "VID";
-  if (kind === "audio") return "AUD";
-  return "FILE";
-}
-
 type BuildFileUrlOptions = {
   previewText?: boolean;
   thumbnail?: boolean;
   size?: number;
   imagePreview?: boolean;
   quality?: string;
+};
+
+type DownloadOptions = {
+  transport: {
+    mode: "auto" | "single" | "segmented";
+    threads: number;
+    multithread: boolean;
+    resume: boolean;
+  };
+  retry: {
+    maxRetries: number;
+    timeoutMs: number;
+  };
+  media: {
+    videoQuality: string;
+  };
+  extraction: {
+    enabled: boolean;
+  };
+  request: {
+    headers: Record<string, string>;
+  };
+};
+
+const DEFAULT_DOWNLOAD_OPTIONS: DownloadOptions = {
+  transport: {
+    mode: "auto",
+    threads: 3,
+    multithread: true,
+    resume: true,
+  },
+  retry: {
+    maxRetries: 3,
+    timeoutMs: 30000,
+  },
+  media: {
+    videoQuality: "720p",
+  },
+  extraction: {
+    enabled: true,
+  },
+  request: {
+    headers: {},
+  },
 };
 
 function buildFileUrl(sessionId, filePath, options: BuildFileUrlOptions = {}) {
@@ -463,91 +568,6 @@ function isTerminalJobStatus(status) {
   return status === "ready" || status === "error" || status === "cancelled";
 }
 
-function TreeNode({
-  node,
-  selectedPath,
-  onSelect,
-  sessionId,
-  folderPreview,
-  folderImages,
-  depth = 0,
-}) {
-  const [open, setOpen] = useState(depth < 2);
-  const isDirectory = node.type === "directory";
-  const isSelected = node.path === selectedPath;
-  const previewPath = sessionId ? folderPreview.get(node.path) : "";
-  const previewCount = folderImages.get(node.path)?.length || 0;
-
-  const depthStyle = { "--depth": depth } as CSSProperties;
-
-  if (isDirectory) {
-    return (
-      <div className="tree-node">
-        <button
-          type="button"
-          className={`tree-row tree-folder ${isSelected ? "selected" : ""}`}
-          style={depthStyle}
-          onClick={() => {
-            setOpen((current) => !current);
-            onSelect(node);
-          }}
-        >
-          <span className="tree-caret">{open ? "v" : ">"}</span>
-          <span className="tree-icon folder-icon-shell">
-            {previewPath ? (
-              <img
-                className="folder-thumb"
-                src={buildFileUrl(sessionId, previewPath, {
-                  thumbnail: true,
-                  size: FOLDER_THUMB_SIZE,
-                })}
-                alt=""
-                loading="lazy"
-              />
-            ) : (
-              "[]"
-            )}
-          </span>
-          <span className="tree-label">{node.name}</span>
-          <span className="tree-meta">
-            {previewCount > 0 ? `${previewCount} img` : node.children.length}
-          </span>
-        </button>
-        {open ? (
-          <div>
-            {node.children.map((child) => (
-              <TreeNode
-                key={child.path}
-                node={child}
-                selectedPath={selectedPath}
-                onSelect={onSelect}
-                sessionId={sessionId}
-                folderPreview={folderPreview}
-                folderImages={folderImages}
-                depth={depth + 1}
-              />
-            ))}
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      className={`tree-row tree-file ${isSelected ? "selected" : ""}`}
-      style={depthStyle}
-      onClick={() => onSelect(node)}
-    >
-      <span className="tree-caret" />
-      <span className="tree-icon">{getNodeBadge(node)}</span>
-      <span className="tree-label">{node.name}</span>
-      <span className="tree-meta">{node.extension || "--"}</span>
-    </button>
-  );
-}
-
 function CustomDropdown({
   id,
   label,
@@ -634,24 +654,7 @@ function CustomDropdown({
 function App() {
   const [zipUrl, setZipUrl] = useState("");
   const [activeTab, setActiveTab] = useState<WorkspaceTabId>("download");
-  const [explorerModalOpen, setExplorerModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [queueMaxConcurrent, setQueueMaxConcurrent] = useState(
-    DOWNLOAD_QUEUE_DEFAULTS.maxConcurrent,
-  );
-  const [extractorDepth, setExtractorDepth] = useState(
-    DOWNLOAD_QUEUE_DEFAULTS.extractorDepth,
-  );
-  const [queueJobs, setQueueJobs] = useState([]);
-  const [batchLinks, setBatchLinks] = useState([]);
-  const [downloadHistory, setDownloadHistory] = useState([]);
-  const [sublinkSeed, setSublinkSeed] = useState("");
-  const [sublinkResults, setSublinkResults] = useState([]);
-  const [sublinkError, setSublinkError] = useState("");
-  const [draggedQueueJobId, setDraggedQueueJobId] = useState("");
-  const [unlockRow, setUnlockRow] = useState(null);
-  const [unlockPassword, setUnlockPassword] = useState("");
-  const [unlockError, setUnlockError] = useState("");
   const [session, setSession] = useState(null);
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") {
@@ -669,7 +672,7 @@ function App() {
   const [error, setError] = useState("");
   const [oversizePrompt, setOversizePrompt] = useState(null);
   const [slideshowOpen, setSlideshowOpen] = useState(false);
-  const [slideshowFullscreen, setSlideshowFullscreen] = useState(false);
+  const [explorerModalOpen, setExplorerModalOpen] = useState(false);
   const [slideshowFitMode, setSlideshowFitMode] = useState("best-fit");
   const [slideshowChromeHidden, setSlideshowChromeHidden] = useState(false);
   const [activeJob, setActiveJob] = useState(null);
@@ -709,41 +712,45 @@ function App() {
       return { type: true, size: true, date: true, path: true };
     }
   });
-  const [downloadSettings, setDownloadSettings] = useState(() => {
-    if (typeof window === "undefined") {
-      return DEFAULT_DOWNLOAD_SETTINGS;
-    }
+  const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>(
+    () => {
+      if (typeof window === "undefined") {
+        return DEFAULT_DOWNLOAD_OPTIONS;
+      }
 
-    try {
-      const raw = window.localStorage.getItem("zip-download-settings");
-      return normalizeDownloadSettings(raw ? JSON.parse(raw) : null);
-    } catch {
-      return DEFAULT_DOWNLOAD_SETTINGS;
-    }
-  });
+      try {
+        const raw = window.localStorage.getItem("zip-download-options");
+        const legacy = window.localStorage.getItem("zip-download-settings");
+        if (raw) {
+          return normalizeDownloadOptions(JSON.parse(raw));
+        }
+        if (legacy) {
+          return normalizeDownloadOptions(JSON.parse(legacy));
+        }
+        return DEFAULT_DOWNLOAD_OPTIONS;
+      } catch {
+        return DEFAULT_DOWNLOAD_OPTIONS;
+      }
+    },
+  );
+  const downloadSettings = useMemo(
+    () => downloadOptionsToLegacySettings(downloadOptions),
+    [downloadOptions],
+  );
   const textPreviewCacheRef = useRef(new Map());
   const imagePreviewCacheRef = useRef(new Map());
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const videoPlayerRef = useRef<Plyr | null>(null);
+  const videoPlayerRef = useRef<ReturnType<typeof videojs> | null>(null);
   const videoShellRef = useRef<HTMLDivElement | null>(null);
-  const slideshowTabRef = useRef<HTMLDivElement | null>(null);
+  const [videoQualityOptions, setVideoQualityOptions] = useState<
+    Array<{ id: string; label: string }>
+  >([]);
+  const [selectedVideoQuality, setSelectedVideoQuality] = useState("source");
   const jobSocketRef = useRef(null);
   const jobPollTimeoutRef = useRef(null);
   const latestSessionIdRef = useRef("");
   const latestJobIdRef = useRef("");
   const hydrationRef = useRef({ sessionId: "", promise: null });
-
-  async function refreshQueueSnapshot() {
-    const response = await fetch("/api/session-jobs");
-    if (!response.ok) {
-      return;
-    }
-    const payload = await response.json();
-    setQueueJobs(Array.isArray(payload.jobs) ? payload.jobs : []);
-    if (Number.isFinite(payload.maxConcurrent)) {
-      setQueueMaxConcurrent(payload.maxConcurrent);
-    }
-  }
 
   const sortedTree = useMemo(() => {
     if (!session?.tree) {
@@ -825,9 +832,9 @@ function App() {
   }, [flatData, sortedTree, sortMode]);
   const selectedVideoUrl =
     selectedNode?.type === "file" && selectedKind === "video"
-      ? `/api/sessions/${session?.id}/video/play?${new URLSearchParams({
+      ? `/api/sessions/${session?.id}/video/stream?${new URLSearchParams({
           path: selectedNode.path,
-          quality: downloadSettings.videoQuality,
+          quality: selectedVideoQuality,
         }).toString()}`
       : "";
 
@@ -1015,26 +1022,13 @@ function App() {
       return;
     }
 
-    if (payload.status === "awaiting_password") {
-      setIsLoading(false);
-      return;
-    }
-
     if (payload.status === "ready") {
-      setDownloadHistory((current) => {
-        const next = [
-          payload,
-          ...current.filter((item) => item.id !== payload.id),
-        ];
-        return next.slice(0, 200);
-      });
       closeJobEvents();
       stopJobPolling();
       latestJobIdRef.current = "";
       setOversizePrompt(null);
       setActiveJob(null);
       setIsLoading(false);
-      refreshQueueSnapshot().catch(() => {});
       return;
     }
 
@@ -1045,7 +1039,6 @@ function App() {
       setActiveJob(null);
       setError(payload.error || "Could not process this file.");
       setIsLoading(false);
-      refreshQueueSnapshot().catch(() => {});
       return;
     }
 
@@ -1055,7 +1048,6 @@ function App() {
       latestJobIdRef.current = "";
       setActiveJob(null);
       setIsLoading(false);
-      refreshQueueSnapshot().catch(() => {});
     }
   }
 
@@ -1156,7 +1148,6 @@ function App() {
       latestJobIdRef.current = payload.jobId;
       setActiveJob(payload);
       attachJobEvents(payload.jobId, url);
-      refreshQueueSnapshot().catch(() => {});
     } catch (requestError) {
       setError(requestError.message);
       latestJobIdRef.current = "";
@@ -1175,139 +1166,6 @@ function App() {
     await loadSession(zipUrl.trim(), false);
   }
 
-  async function handleBatchSubmit(event) {
-    event.preventDefault();
-    const urls = batchLinks
-      .map((value) => String(value || "").trim())
-      .filter(Boolean);
-    if (!urls.length) {
-      setError("Add at least one URL for batch download.");
-      return;
-    }
-
-    const response = await fetch("/api/sessions/batch", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ urls, downloadSettings }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setError(payload.error || "Failed to queue batch downloads.");
-      return;
-    }
-    setBatchLinks([""]);
-    setError("");
-    refreshQueueSnapshot().catch(() => {});
-  }
-
-  async function updateQueueConcurrency(nextValue) {
-    const bounded = clampNumber(String(nextValue), 1, 6, 2);
-    setQueueMaxConcurrent(bounded);
-    await fetch("/api/session-jobs/settings", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ maxConcurrent: bounded }),
-    }).catch(() => {});
-    refreshQueueSnapshot().catch(() => {});
-  }
-
-  async function pauseJob(jobId) {
-    await fetch(`/api/session-jobs/${jobId}/pause`, { method: "POST" }).catch(
-      () => {},
-    );
-    refreshQueueSnapshot().catch(() => {});
-  }
-
-  async function resumeJob(jobId) {
-    await fetch(`/api/session-jobs/${jobId}/resume`, { method: "POST" }).catch(
-      () => {},
-    );
-    refreshQueueSnapshot().catch(() => {});
-  }
-
-  async function moveQueueJob(jobId, toIndex) {
-    await fetch("/api/session-jobs/reorder", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ jobId, toIndex }),
-    }).catch(() => {});
-    refreshQueueSnapshot().catch(() => {});
-  }
-
-  async function extractSublinks(event) {
-    event.preventDefault();
-    setSublinkError("");
-    const seed = String(sublinkSeed || "").trim();
-    if (!seed) {
-      setSublinkError("Enter a webpage URL to extract links.");
-      return;
-    }
-
-    const response = await fetch("/api/extractor/sublinks", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ url: seed, depth: extractorDepth }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setSublinkError(payload.error || "Could not extract links.");
-      return;
-    }
-    setSublinkResults(Array.isArray(payload.links) ? payload.links : []);
-  }
-
-  async function queueSelectedSublinks() {
-    const selected = sublinkResults
-      .filter((item) => item.selected)
-      .map((item) => item.url)
-      .filter(Boolean);
-    if (!selected.length) {
-      setError("Select at least one extracted link.");
-      return;
-    }
-    const response = await fetch("/api/sessions/batch", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ urls: selected, downloadSettings }),
-    });
-    if (!response.ok) {
-      setError("Failed to queue selected links.");
-      return;
-    }
-    setError("");
-    refreshQueueSnapshot().catch(() => {});
-  }
-
-  async function unlockArchive() {
-    if (!session?.id || !unlockPassword) {
-      return;
-    }
-    const response = await fetch(`/api/sessions/${session.id}/archive/unlock`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ password: unlockPassword }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setUnlockError(payload.error || "Unlock failed.");
-      return;
-    }
-    setSession((current) =>
-      current
-        ? {
-            ...current,
-            tree: payload.tree,
-            firstFilePath: payload.firstFilePath,
-            stats: payload.stats,
-            pendingArchive: null,
-          }
-        : current,
-    );
-    setUnlockRow(null);
-    setUnlockPassword("");
-    setUnlockError("");
-  }
-
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     window.localStorage.setItem("zip-image-viewer-theme", theme);
@@ -1315,10 +1173,10 @@ function App() {
 
   useEffect(() => {
     window.localStorage.setItem(
-      "zip-download-settings",
-      JSON.stringify(downloadSettings),
+      "zip-download-options",
+      JSON.stringify(downloadOptions),
     );
-  }, [downloadSettings]);
+  }, [downloadOptions]);
 
   useEffect(() => {
     window.localStorage.setItem(
@@ -1333,32 +1191,6 @@ function App() {
       JSON.stringify(keyboardSettings),
     );
   }, [keyboardSettings]);
-
-  useEffect(() => {
-    refreshQueueSnapshot().catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (activeTab !== "slideshow") {
-      return;
-    }
-
-    const target = slideshowTabRef.current;
-    if (!target) {
-      return;
-    }
-
-    if (slideshowFullscreen) {
-      if (!document.fullscreenElement) {
-        target.requestFullscreen?.().catch(() => {});
-      }
-      return;
-    }
-
-    if (document.fullscreenElement) {
-      document.exitFullscreen?.().catch(() => {});
-    }
-  }, [activeTab, slideshowFullscreen]);
 
   useEffect(() => {
     if (!flatData || !sortedTree) {
@@ -1448,7 +1280,7 @@ function App() {
 
   useEffect(() => {
     if (selectedKind !== "video" || !videoRef.current) {
-      videoPlayerRef.current?.destroy();
+      videoPlayerRef.current?.dispose();
       videoPlayerRef.current = null;
       return;
     }
@@ -1457,50 +1289,35 @@ function App() {
       return;
     }
 
-    const player = new Plyr(videoRef.current, {
-      controls: [
-        "play-large",
-        "rewind",
-        "play",
-        "fast-forward",
-        "progress",
-        "current-time",
-        "duration",
-        "mute",
-        "volume",
-        "settings",
-        "fullscreen",
-      ],
-      settings: ["speed"],
-      speed: {
-        selected: 1,
-        options: [0.5, 0.75, 1, 1.25, 1.5, 2],
-      },
-      keyboard: {
-        focused: true,
-        global: false,
+    const player = videojs(videoRef.current, {
+      controls: true,
+      fluid: true,
+      preload: "metadata",
+      playbackRates: [0.5, 0.75, 1, 1.25, 1.5, 2],
+      controlBar: {
+        pictureInPictureToggle: true,
       },
     });
     videoPlayerRef.current = player;
 
     function onRateChange() {
-      setVideoPlaybackRate(Number(player.speed) || 1);
+      setVideoPlaybackRate(Number(player.playbackRate()) || 1);
     }
 
     function onVolumeChange() {
-      setVideoVolume(Math.max(0, Math.min(1, Number(player.volume) || 0)));
+      setVideoVolume(Math.max(0, Math.min(1, Number(player.volume()) || 0)));
     }
 
     player.on("ratechange", onRateChange);
     player.on("volumechange", onVolumeChange);
 
-    player.volume = 0.9;
-    player.speed = 1;
+    player.volume(0.9);
+    player.playbackRate(1);
 
     return () => {
       player.off("ratechange", onRateChange);
       player.off("volumechange", onVolumeChange);
-      player.destroy();
+      player.dispose();
       if (videoPlayerRef.current === player) {
         videoPlayerRef.current = null;
       }
@@ -1513,11 +1330,7 @@ function App() {
       return;
     }
 
-    player.source = {
-      type: "video",
-      title: "Preview",
-      sources: [{ src: selectedVideoUrl, type: "video/mp4" }],
-    };
+    player.src({ src: selectedVideoUrl, type: "video/mp4" });
   }, [selectedKind, selectedVideoUrl]);
 
   useEffect(() => {
@@ -1526,8 +1339,8 @@ function App() {
       return;
     }
 
-    if (Math.abs(player.volume - videoVolume) > 0.01) {
-      player.volume = videoVolume;
+    if (Math.abs(player.volume() - videoVolume) > 0.01) {
+      player.volume(videoVolume);
     }
   }, [selectedKind, videoVolume]);
 
@@ -1537,10 +1350,65 @@ function App() {
       return;
     }
 
-    if (Math.abs((player.speed || 1) - videoPlaybackRate) > 0.01) {
-      player.speed = videoPlaybackRate;
+    if (Math.abs((player.playbackRate() || 1) - videoPlaybackRate) > 0.01) {
+      player.playbackRate(videoPlaybackRate);
     }
   }, [selectedKind, videoPlaybackRate]);
+
+  useEffect(() => {
+    if (
+      selectedKind !== "video" ||
+      !session?.id ||
+      selectedNode?.type !== "file"
+    ) {
+      setVideoQualityOptions([]);
+      setSelectedVideoQuality("source");
+      return;
+    }
+
+    let cancelled = false;
+    const path = selectedNode.path;
+
+    async function loadQualityOptions() {
+      try {
+        const query = new URLSearchParams({ path });
+        const response = await fetch(
+          `/api/sessions/${session.id}/video/qualities?${query.toString()}`,
+        );
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Could not load video qualities.");
+        }
+
+        const options = Array.isArray(payload.options)
+          ? payload.options.map((option) => ({
+              id: String(option.id),
+              label: String(option.label || option.id),
+            }))
+          : [];
+        const selected =
+          options.find((item) => item.id === payload.defaultQuality)?.id ||
+          options.find((item) => item.id === "source")?.id ||
+          options[0]?.id ||
+          "source";
+
+        if (!cancelled) {
+          setVideoQualityOptions(options);
+          setSelectedVideoQuality(selected);
+        }
+      } catch {
+        if (!cancelled) {
+          setVideoQualityOptions([{ id: "source", label: "Original" }]);
+          setSelectedVideoQuality("source");
+        }
+      }
+    }
+
+    loadQualityOptions();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedKind, selectedNode, session]);
 
   useEffect(() => {
     latestJobIdRef.current = activeJob?.id || "";
@@ -1590,44 +1458,47 @@ function App() {
 
         if (event.key === "ArrowRight") {
           event.preventDefault();
-          player.currentTime = Math.max(0, (player.currentTime || 0) + step);
+          player.currentTime(Math.max(0, (player.currentTime() || 0) + step));
           return;
         }
 
         if (event.key === "ArrowLeft") {
           event.preventDefault();
-          player.currentTime = Math.max(0, (player.currentTime || 0) - step);
+          player.currentTime(Math.max(0, (player.currentTime() || 0) - step));
           return;
         }
 
         if (event.key === "ArrowUp") {
           event.preventDefault();
-          const nextVolume = Math.min(1, (player.volume || 0) + 0.05);
-          player.volume = nextVolume;
+          const nextVolume = Math.min(1, (player.volume() || 0) + 0.05);
+          player.volume(nextVolume);
           setVideoVolume(nextVolume);
           return;
         }
 
         if (event.key === "ArrowDown") {
           event.preventDefault();
-          const nextVolume = Math.max(0, (player.volume || 0) - 0.05);
-          player.volume = nextVolume;
+          const nextVolume = Math.max(0, (player.volume() || 0) - 0.05);
+          player.volume(nextVolume);
           setVideoVolume(nextVolume);
           return;
         }
 
         if (event.key === "]") {
           event.preventDefault();
-          const nextRate = Math.min(3, (player.speed || 1) + rateStep);
-          player.speed = nextRate;
+          const nextRate = Math.min(3, (player.playbackRate() || 1) + rateStep);
+          player.playbackRate(nextRate);
           setVideoPlaybackRate(nextRate);
           return;
         }
 
         if (event.key === "[") {
           event.preventDefault();
-          const nextRate = Math.max(0.25, (player.speed || 1) - rateStep);
-          player.speed = nextRate;
+          const nextRate = Math.max(
+            0.25,
+            (player.playbackRate() || 1) - rateStep,
+          );
+          player.playbackRate(nextRate);
           setVideoPlaybackRate(nextRate);
           return;
         }
@@ -1670,12 +1541,6 @@ function App() {
         setSelectedPath(currentFolderImages[currentFolderImages.length - 1]);
       }
 
-      if (activeTab === "slideshow" && event.key.toLowerCase() === "f") {
-        event.preventDefault();
-        setSlideshowFullscreen((current) => !current);
-        return;
-      }
-
       if (
         !slideshowOpen &&
         selectedKind === "image" &&
@@ -1694,7 +1559,6 @@ function App() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [
-    activeTab,
     currentFolderImages,
     currentImageIndex,
     nextImagePath,
@@ -1882,6 +1746,42 @@ function App() {
         )
       : null;
 
+  const explorerModal =
+    explorerModalOpen && sortedTree
+      ? createPortal(
+          <div className="settings-overlay" role="dialog" aria-modal="true">
+            <div className="settings-sheet explorer-modal-sheet">
+              <div className="panel-header">
+                <div className="panel-title-group">
+                  <p className="panel-label">Explorer modal</p>
+                  <h2 title={sortedTree.name}>{sortedTree.name}</h2>
+                </div>
+                <button
+                  className="ghost-button compact-button"
+                  type="button"
+                  onClick={() => setExplorerModalOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
+              <div className="explorer-modal-body">
+                <TreeExplorer
+                  rootNode={sortedTree}
+                  selectedPath={selectedPath}
+                  onSelect={(node) => {
+                    if (node.type === "file") {
+                      setSelectedPath(node.path);
+                      setExplorerModalOpen(false);
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
+
   const visualDownloadedBytes = Math.max(
     0,
     Number(activeJob?.downloadedBytes) || 0,
@@ -1988,260 +1888,6 @@ function App() {
                     : "Open file"}
               </button>
             </form>
-
-            <section className="download-settings-card">
-              <div className="download-settings-head">
-                <strong>Queue controls</strong>
-                <span>Simultaneous downloads and order control</span>
-              </div>
-              <div className="download-settings-grid">
-                <label className="input-shell">
-                  <span className="input-label">Simultaneous downloads</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max="6"
-                    value={queueMaxConcurrent}
-                    onChange={(event) =>
-                      updateQueueConcurrency(event.target.value)
-                    }
-                  />
-                </label>
-                <label className="input-shell">
-                  <span className="input-label">Crawler depth</span>
-                  <input
-                    type="number"
-                    min="0"
-                    max="3"
-                    value={extractorDepth}
-                    onChange={(event) =>
-                      setExtractorDepth(
-                        clampNumber(event.target.value, 0, 3, 1),
-                      )
-                    }
-                  />
-                </label>
-              </div>
-            </section>
-
-            <section className="download-settings-card">
-              <div className="download-settings-head">
-                <strong>Batch URL queue</strong>
-                <button
-                  className="ghost-button compact-button"
-                  type="button"
-                  onClick={() => setBatchLinks((current) => [...current, ""])}
-                >
-                  Add URL row
-                </button>
-              </div>
-              <form
-                onSubmit={handleBatchSubmit}
-                className="download-settings-grid"
-              >
-                {batchLinks.map((value, index) => (
-                  <label className="input-shell" key={`batch-${index}`}>
-                    <span className="input-label">URL #{index + 1}</span>
-                    <input
-                      type="url"
-                      value={value}
-                      onChange={(event) =>
-                        setBatchLinks((current) => {
-                          const next = [...current];
-                          next[index] = event.target.value;
-                          return next;
-                        })
-                      }
-                      placeholder="https://example.com/file.zip"
-                    />
-                  </label>
-                ))}
-                <button className="primary-button" type="submit">
-                  Queue batch downloads
-                </button>
-              </form>
-            </section>
-
-            <section className="download-settings-card">
-              <div className="download-settings-head">
-                <strong>Sublink extractor</strong>
-                <span>Extract supported file links from webpages</span>
-              </div>
-              <form className="url-form" onSubmit={extractSublinks}>
-                <label className="input-shell" htmlFor="sublink-url">
-                  <span className="input-label">Webpage URL</span>
-                  <input
-                    id="sublink-url"
-                    type="url"
-                    value={sublinkSeed}
-                    onChange={(event) => setSublinkSeed(event.target.value)}
-                    placeholder="https://example.com/page"
-                  />
-                </label>
-                <button className="ghost-button" type="submit">
-                  Extract links
-                </button>
-              </form>
-              {sublinkError ? (
-                <div className="message-card error">{sublinkError}</div>
-              ) : null}
-              {sublinkResults.length ? (
-                <div className="explorer-table-wrap">
-                  <table className="explorer-table">
-                    <thead>
-                      <tr>
-                        <th>Select</th>
-                        <th>URL</th>
-                        <th>Depth</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sublinkResults.map((item, index) => (
-                        <tr key={`${item.url}-${index}`}>
-                          <td>
-                            <input
-                              type="checkbox"
-                              checked={Boolean(item.selected)}
-                              onChange={(event) =>
-                                setSublinkResults((current) =>
-                                  current.map((entry, entryIndex) =>
-                                    entryIndex === index
-                                      ? {
-                                          ...entry,
-                                          selected: event.target.checked,
-                                        }
-                                      : entry,
-                                  ),
-                                )
-                              }
-                            />
-                          </td>
-                          <td>{item.url}</td>
-                          <td>{item.depth}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : null}
-              {sublinkResults.length ? (
-                <div className="message-actions">
-                  <button
-                    type="button"
-                    className="primary-button"
-                    onClick={queueSelectedSublinks}
-                  >
-                    Queue selected links
-                  </button>
-                </div>
-              ) : null}
-            </section>
-
-            <section className="download-settings-card">
-              <div className="download-settings-head">
-                <strong>Download queue</strong>
-                <span>Pause/resume and reorder priorities</span>
-              </div>
-              <div className="explorer-table-wrap">
-                <table className="explorer-table">
-                  <thead>
-                    <tr>
-                      <th>Order</th>
-                      <th>URL</th>
-                      <th>Status</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {queueJobs.map((job, index) => (
-                      <tr
-                        key={job.id}
-                        draggable
-                        onDragStart={() => setDraggedQueueJobId(job.id)}
-                        onDragOver={(event) => event.preventDefault()}
-                        onDrop={(event) => {
-                          event.preventDefault();
-                          if (
-                            !draggedQueueJobId ||
-                            draggedQueueJobId === job.id
-                          ) {
-                            return;
-                          }
-                          moveQueueJob(draggedQueueJobId, index);
-                          setDraggedQueueJobId("");
-                        }}
-                        onDragEnd={() => setDraggedQueueJobId("")}
-                      >
-                        <td>{index + 1}</td>
-                        <td>{job.url}</td>
-                        <td>{job.status}</td>
-                        <td>
-                          <div className="message-actions">
-                            <button
-                              className="ghost-button compact-button"
-                              type="button"
-                              onClick={() =>
-                                moveQueueJob(job.id, Math.max(0, index - 1))
-                              }
-                            >
-                              Up
-                            </button>
-                            <button
-                              className="ghost-button compact-button"
-                              type="button"
-                              onClick={() => moveQueueJob(job.id, index + 1)}
-                            >
-                              Down
-                            </button>
-                            <button
-                              className="ghost-button compact-button"
-                              type="button"
-                              onClick={() => pauseJob(job.id)}
-                            >
-                              Pause
-                            </button>
-                            <button
-                              className="ghost-button compact-button"
-                              type="button"
-                              onClick={() => resumeJob(job.id)}
-                            >
-                              Resume
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-
-            <section className="download-settings-card">
-              <div className="download-settings-head">
-                <strong>Downloaded files history</strong>
-                <span>Old completed entries are retained</span>
-              </div>
-              <div className="explorer-table-wrap">
-                <table className="explorer-table">
-                  <thead>
-                    <tr>
-                      <th>Job</th>
-                      <th>Status</th>
-                      <th>Session</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {downloadHistory.map((item) => (
-                      <tr key={`history-${item.id}`}>
-                        <td>{item.url}</td>
-                        <td>{item.status}</td>
-                        <td>{item.sessionId || "--"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
 
             <div className="message-card">
               Download tuning, explorer columns, sorting defaults, and keyboard
@@ -2410,12 +2056,9 @@ function App() {
 
               <div className="tree-scroll">
                 {sortedTree ? (
-                  <TreeNode
-                    node={sortedTree}
+                  <TreeExplorer
+                    rootNode={sortedTree}
                     selectedPath={selectedPath}
-                    sessionId={session.id}
-                    folderPreview={flatData.folderPreview}
-                    folderImages={flatData.folderImages}
                     onSelect={(node) => {
                       if (node.type === "file") {
                         setSelectedPath(node.path);
@@ -2442,36 +2085,34 @@ function App() {
                     {selectedNode?.name || "Select a file"}
                   </h2>
                 </div>
-                <div className="panel-actions">
-                  <button
-                    className="ghost-button"
-                    type="button"
-                    onClick={() => setExplorerModalOpen(true)}
-                  >
-                    Open Explorer
-                  </button>
-                  {selectedNode?.type === "file" ? (
-                    <>
-                      {selectedKind === "image" ? (
-                        <button
-                          className="ghost-button"
-                          type="button"
-                          onClick={() => setActiveTab("slideshow")}
-                        >
-                          Slideshow
-                        </button>
-                      ) : null}
-                      <a
-                        className="ghost-button inline-link"
-                        href={selectedFileUrl}
-                        target="_blank"
-                        rel="noreferrer"
+                {selectedNode?.type === "file" ? (
+                  <div className="panel-actions">
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={() => setExplorerModalOpen(true)}
+                    >
+                      Open explorer
+                    </button>
+                    {selectedKind === "image" ? (
+                      <button
+                        className="ghost-button"
+                        type="button"
+                        onClick={() => setSlideshowOpen(true)}
                       >
-                        Raw file
-                      </a>
-                    </>
-                  ) : null}
-                </div>
+                        Slideshow
+                      </button>
+                    ) : null}
+                    <a
+                      className="ghost-button inline-link"
+                      href={selectedFileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open raw
+                    </a>
+                  </div>
+                ) : null}
               </div>
 
               {!selectedNode || selectedNode.type !== "file" ? (
@@ -2581,7 +2222,20 @@ function App() {
                     <span>
                       {selectedNode.extension.toUpperCase()} stream preview
                     </span>
-                    <span>Target quality: {downloadSettings.videoQuality}</span>
+                    <CustomDropdown
+                      id="video-quality"
+                      label="Quality"
+                      value={selectedVideoQuality}
+                      options={
+                        videoQualityOptions.length
+                          ? videoQualityOptions.map((item) => ({
+                              value: item.id,
+                              label: item.label,
+                            }))
+                          : [{ value: "source", label: "Original" }]
+                      }
+                      onChange={setSelectedVideoQuality}
+                    />
                     <span>{formatDate(selectedNode.modifiedAt)}</span>
                   </div>
                   <div className="image-frame media-frame" ref={videoShellRef}>
@@ -2602,8 +2256,8 @@ function App() {
                     </span>
                     <span>
                       {activeJob?.phase === "transcoding"
-                        ? `Transcoding ${activeJob.videoQuality || downloadSettings.videoQuality}: ${activeJob.transcodedEntries || 0}/${activeJob.totalTranscodeEntries || 0}`
-                        : "Playing selected quality output when available"}
+                        ? `Transcoding ${activeJob.videoQuality || selectedVideoQuality}: ${activeJob.transcodedEntries || 0}/${activeJob.totalTranscodeEntries || 0}`
+                        : `Playing ${selectedVideoQuality} quality`}
                     </span>
                     <div className="message-actions">
                       <button
@@ -2613,10 +2267,10 @@ function App() {
                           if (!videoPlayerRef.current) return;
                           const nextRate = Math.max(
                             0.25,
-                            videoPlayerRef.current.speed -
+                            videoPlayerRef.current.playbackRate() -
                               keyboardSettings.rateStep,
                           );
-                          videoPlayerRef.current.speed = nextRate;
+                          videoPlayerRef.current.playbackRate(nextRate);
                           setVideoPlaybackRate(nextRate);
                         }}
                       >
@@ -2629,10 +2283,10 @@ function App() {
                           if (!videoPlayerRef.current) return;
                           const nextRate = Math.min(
                             3,
-                            videoPlayerRef.current.speed +
+                            videoPlayerRef.current.playbackRate() +
                               keyboardSettings.rateStep,
                           );
-                          videoPlayerRef.current.speed = nextRate;
+                          videoPlayerRef.current.playbackRate(nextRate);
                           setVideoPlaybackRate(nextRate);
                         }}
                       >
@@ -2682,123 +2336,35 @@ function App() {
           </section>
         ) : null}
 
-        {activeTab === "slideshow" ? (
-          <section className="slideshow-panel" ref={slideshowTabRef}>
-            <div className="empty-card">
-              <strong>Slideshow Tab</strong>
-              <p>
-                This tab is dedicated to image slideshows. Press 'F' to toggle
-                fullscreen.
-              </p>
-              <button
-                className="primary-button"
-                type="button"
-                onClick={() => setSlideshowFullscreen((current) => !current)}
-              >
-                {slideshowFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
-              </button>
-            </div>
-          </section>
+        {activeTab === "explorer" ? (
+          <ExplorerTablePanel
+            sortedTree={sortedTree}
+            session={session}
+            explorerRows={explorerRows}
+            selectedPath={selectedPath}
+            setSelectedPath={setSelectedPath}
+            sortMode={sortMode}
+            setSortMode={setSortMode}
+            sortOptions={SORT_OPTIONS}
+            explorerColumns={explorerColumns}
+            formatDate={formatDate}
+            formatBytes={formatBytes}
+            DropdownComponent={CustomDropdown}
+          />
         ) : null}
       </main>
-
-      {explorerModalOpen ? (
-        <div className="slideshow-overlay">
-          <div
-            className="slideshow-viewport"
-            role="dialog"
-            aria-modal="true"
-            style={{
-              background: "var(--bg-base)",
-              padding: "2rem",
-              overflow: "auto",
-            }}
-          >
-            <div className="panel-header">
-              <h2>Explorer Modal</h2>
-              <button
-                className="ghost-button"
-                type="button"
-                onClick={() => setExplorerModalOpen(false)}
-              >
-                Close
-              </button>
-            </div>
-            <ExplorerTablePanel
-              sortedTree={sortedTree}
-              session={session}
-              explorerRows={explorerRows}
-              selectedPath={selectedPath}
-              setSelectedPath={(path) => {
-                setSelectedPath(path);
-                setExplorerModalOpen(false);
-              }}
-              sortMode={sortMode}
-              setSortMode={setSortMode}
-              sortOptions={SORT_OPTIONS}
-              explorerColumns={explorerColumns}
-              formatDate={formatDate}
-              formatBytes={formatBytes}
-              onUnlockArchive={(row) => {
-                setUnlockRow(row);
-                setUnlockPassword("");
-                setUnlockError("");
-              }}
-              DropdownComponent={CustomDropdown}
-            />
-          </div>
-        </div>
-      ) : null}
-
-      {unlockRow ? (
-        <div className="settings-overlay" role="dialog" aria-modal="true">
-          <div className="settings-sheet">
-            <div className="panel-header">
-              <div className="panel-title-group">
-                <p className="panel-label">Archive unlock</p>
-                <h2>Enter password for {unlockRow.name}</h2>
-              </div>
-              <button
-                className="ghost-button compact-button"
-                type="button"
-                onClick={() => {
-                  setUnlockRow(null);
-                  setUnlockError("");
-                }}
-              >
-                Close
-              </button>
-            </div>
-            <label className="input-shell">
-              <span className="input-label">Password</span>
-              <input
-                type="password"
-                value={unlockPassword}
-                onChange={(event) => setUnlockPassword(event.target.value)}
-                placeholder="Enter archive password"
-              />
-            </label>
-            {unlockError ? (
-              <div className="message-card error">{unlockError}</div>
-            ) : null}
-            <div className="message-actions">
-              <button
-                className="primary-button"
-                type="button"
-                onClick={unlockArchive}
-              >
-                Unlock and extract
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
       <GlobalSettingsSheet
         settingsOpen={settingsOpen}
         setSettingsOpen={setSettingsOpen}
         downloadSettings={downloadSettings}
-        setDownloadSettings={setDownloadSettings}
+        setDownloadSettings={(updater) => {
+          setDownloadOptions((current) => {
+            const legacyCurrent = downloadOptionsToLegacySettings(current);
+            const legacyNext =
+              typeof updater === "function" ? updater(legacyCurrent) : updater;
+            return normalizeDownloadOptions(legacyNext);
+          });
+        }}
         normalizeDownloadSettings={normalizeDownloadSettings}
         sortMode={sortMode}
         setSortMode={setSortMode}
@@ -2808,10 +2374,13 @@ function App() {
         previewQualityOptions={PREVIEW_QUALITY_OPTIONS}
         videoTranscodeQuality={downloadSettings.videoQuality}
         setVideoTranscodeQuality={(value) =>
-          setDownloadSettings((current) =>
-            normalizeDownloadSettings({
+          setDownloadOptions((current) =>
+            normalizeDownloadOptions({
               ...current,
-              videoQuality: value,
+              media: {
+                ...current.media,
+                videoQuality: value,
+              },
             }),
           )
         }
@@ -2823,13 +2392,10 @@ function App() {
         downloadThreadModeOptions={DOWNLOAD_THREAD_MODE_OPTIONS}
         downloadRetryOptions={DOWNLOAD_RETRY_OPTIONS}
         clampNumber={clampNumber}
-        queueMaxConcurrent={queueMaxConcurrent}
-        setQueueMaxConcurrent={updateQueueConcurrency}
-        extractorDepth={extractorDepth}
-        setExtractorDepth={setExtractorDepth}
         DropdownComponent={CustomDropdown}
       />
       {slideshowModal}
+      {explorerModal}
     </div>
   );
 }

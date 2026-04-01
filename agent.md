@@ -45,6 +45,7 @@ npm start
 - Always run `npm run test` and `npm run test:e2e` before opening a PR (or document why skipped)
 - Formatting is mandatory for every commit: run `npm run format` immediately before `git commit` (no exceptions)
 - If any step fails, fix the issue before committing
+- Never run long-lived scripts (for example `npm run dev`, `npm run dev:client`, `npm run dev:server`, or any watch mode) as a blocking foreground command in agent sessions. Use non-blocking/background patterns or explicit short timeouts for health checks so the session never hangs waiting forever.
 
 ## CI/PR Workflow Snapshot
 

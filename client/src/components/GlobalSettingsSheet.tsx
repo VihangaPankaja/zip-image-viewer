@@ -34,10 +34,6 @@ type GlobalSettingsSheetProps = {
     max: number,
     fallback: number,
   ) => number;
-  queueMaxConcurrent: number;
-  setQueueMaxConcurrent: (value: number) => void;
-  extractorDepth: number;
-  setExtractorDepth: (value: number) => void;
   DropdownComponent: any;
 };
 
@@ -64,10 +60,6 @@ export function GlobalSettingsSheet(props: GlobalSettingsSheetProps) {
     downloadThreadModeOptions,
     downloadRetryOptions,
     clampNumber,
-    queueMaxConcurrent,
-    setQueueMaxConcurrent,
-    extractorDepth,
-    setExtractorDepth,
     DropdownComponent,
   } = props;
 
@@ -198,32 +190,6 @@ export function GlobalSettingsSheet(props: GlobalSettingsSheetProps) {
                   ...current,
                   rateStep: Math.max(0.05, Number(event.target.value) || 0.25),
                 }))
-              }
-            />
-          </label>
-
-          <label className="input-shell">
-            <span className="input-label">Simultaneous downloads</span>
-            <input
-              type="number"
-              min="1"
-              max="6"
-              value={queueMaxConcurrent}
-              onChange={(event) =>
-                setQueueMaxConcurrent(clampNumber(event.target.value, 1, 6, 2))
-              }
-            />
-          </label>
-
-          <label className="input-shell">
-            <span className="input-label">Sublink recursion depth</span>
-            <input
-              type="number"
-              min="0"
-              max="3"
-              value={extractorDepth}
-              onChange={(event) =>
-                setExtractorDepth(clampNumber(event.target.value, 0, 3, 1))
               }
             />
           </label>

@@ -1,4 +1,5 @@
 import React from "react";
+import { TreeExplorer } from "./TreeExplorer";
 
 /* eslint-disable no-unused-vars, @typescript-eslint/no-explicit-any */
 
@@ -32,10 +33,10 @@ export function ExplorerTablePanel({
   sortMode,
   setSortMode,
   sortOptions,
-  explorerColumns,
-  formatDate,
-  formatBytes,
-  onUnlockArchive,
+  explorerColumns: _explorerColumns,
+  formatDate: _formatDate,
+  formatBytes: _formatBytes,
+  onUnlockArchive: _onUnlockArchive,
   DropdownComponent,
 }: ExplorerTablePanelProps) {
   return (
@@ -71,65 +72,17 @@ export function ExplorerTablePanel({
           </p>
         </div>
       ) : (
-        <div className="explorer-table-wrap">
-          <table className="explorer-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                {explorerColumns.type ? <th>Type</th> : null}
-                {explorerColumns.size ? <th>Size</th> : null}
-                {explorerColumns.date ? <th>Modified</th> : null}
-                {explorerColumns.path ? <th>Path</th> : null}
-              </tr>
-            </thead>
-            <tbody>
-              {explorerRows.map((row) => (
-                <tr
-                  key={row.path}
-                  className={row.path === selectedPath ? "active" : ""}
-                  onClick={() => {
-                    if (row.type === "file") {
-                      setSelectedPath(row.path);
-                    }
-                  }}
-                >
-                  <td>
-                    <div className="message-actions">
-                      <span>{row.name}</span>
-                      {row.locked ? (
-                        <button
-                          type="button"
-                          className="ghost-button compact-button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onUnlockArchive?.(row);
-                          }}
-                        >
-                          🔒 Unlock
-                        </button>
-                      ) : null}
-                    </div>
-                  </td>
-                  {explorerColumns.type ? (
-                    <td>
-                      {row.type === "directory"
-                        ? "Folder"
-                        : row.extension || "file"}
-                    </td>
-                  ) : null}
-                  {explorerColumns.size ? (
-                    <td>
-                      {row.type === "directory" ? "--" : formatBytes(row.size)}
-                    </td>
-                  ) : null}
-                  {explorerColumns.date ? (
-                    <td>{formatDate(row.modifiedAt)}</td>
-                  ) : null}
-                  {explorerColumns.path ? <td>{row.path}</td> : null}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="explorer-tree-wrap">
+          <TreeExplorer
+            rootNode={sortedTree}
+            selectedPath={selectedPath}
+            onSelect={(node) => {
+              if (node?.type === "file") {
+                setSelectedPath(node.path);
+              }
+            }}
+            compact
+          />
         </div>
       )}
     </section>

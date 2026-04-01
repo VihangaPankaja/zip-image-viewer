@@ -786,6 +786,93 @@ input::placeholder {
   background: var(--panel-gradient);
 }
 
+.explorer-tree-wrap {
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--bg-panel-strong) 82%, transparent);
+  overflow: auto;
+  padding: 8px;
+}
+
+.tree-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tree-shell.compact {
+  gap: 2px;
+}
+
+.tree-item {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  display: grid;
+  grid-template-columns: 16px 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+}
+
+.tree-item:hover {
+  border-color: color-mix(in srgb, var(--border) 88%, transparent);
+  background: color-mix(in srgb, var(--surface-highlight) 66%, transparent);
+}
+
+.tree-item.selected {
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  background: color-mix(in srgb, var(--surface-highlight) 86%, transparent);
+}
+
+.tree-item-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+}
+
+.tree-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--accent-warm);
+}
+
+.tree-item-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.92rem;
+}
+
+.tree-item-meta {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.explorer-modal-sheet {
+  max-width: 980px;
+}
+
+.explorer-modal-body {
+  max-height: min(72vh, 720px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 8px;
+  background: color-mix(in srgb, var(--bg-panel-strong) 78%, transparent);
+}
+
 .explorer-table-wrap {
   margin-top: 14px;
   border: 1px solid var(--border);
