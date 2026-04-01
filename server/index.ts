@@ -3,7 +3,6 @@ import express from "express";
 import { createReadStream, createWriteStream } from "node:fs";
 import {
   access,
-  copyFile,
   mkdtemp,
   mkdir,
   open,
@@ -53,6 +52,27 @@ const DEFAULT_DOWNLOAD_SETTINGS = {
   enableResume: true,
   maxRetries: 3,
 };
+const DEFAULT_DOWNLOAD_OPTIONS = {
+  transport: {
+    mode: "auto",
+    threads: 3,
+    multithread: true,
+    resume: true,
+  },
+  retry: {
+    maxRetries: 3,
+    timeoutMs: 30000,
+  },
+  media: {
+    videoQuality: "720p",
+  },
+  extraction: {
+    enabled: true,
+  },
+  request: {
+    headers: {},
+  },
+};
 const MAX_THREAD_COUNT = 8;
 const MAX_RETRIES = 8;
 const UNLIMITED_RETRIES = -1;
@@ -70,36 +90,6 @@ const ARCHIVE_EXTENSIONS = new Set([
 ]);
 const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v", "ogv", "mkv"]);
 const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "ogg", "aac", "m4a", "flac"]);
-const SUPPORTED_DOWNLOAD_EXTENSIONS = new Set([
-  "jpg",
-  "jpeg",
-  "png",
-  "gif",
-  "webp",
-  "bmp",
-  "svg",
-  "avif",
-  "mp4",
-  "webm",
-  "mov",
-  "m4v",
-  "ogv",
-  "mkv",
-  "zip",
-  "rar",
-  "7z",
-  "pdf",
-  "txt",
-]);
-const SUBLINK_MAX_PAGES = 60;
-const SUBLINK_MAX_LINKS = 400;
-const SUBLINK_REQUEST_TIMEOUT_MS = 12_000;
-const PASSWORD_ERROR_HINTS = [
-  "wrong password",
-  "can not open encrypted",
-  "crc failed",
-  "password",
-];
 const IMAGE_PREVIEW_PROFILES = {
   low: { size: 1280, quality: 58 },
   balanced: { size: 1920, quality: 72 },
@@ -118,13 +108,9 @@ const VIDEO_TRANSCODE_QUALITY_OPTIONS = [
 const DEFAULT_VIDEO_SEGMENT_SECONDS = 4;
 const VIDEO_PRIORITY_WINDOW_SECONDS = 24;
 const videoTranscodeStore = new Map();
-const DEFAULT_SIMULTANEOUS_DOWNLOADS = 2;
-const MAX_SIMULTANEOUS_DOWNLOADS = 6;
-const queueState = {
-  order: [],
-  running: new Set(),
-  maxConcurrent: DEFAULT_SIMULTANEOUS_DOWNLOADS,
-};
+const MAX_ACTIVE_SESSION_JOBS = 2;
+let activeSessionJobCount = 0;
+const pendingSessionJobs = [];
 
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(distDir));
@@ -232,6 +218,106 @@ function normalizeDownloadSettings(input) {
   };
 }
 
+function normalizeDownloadOptions(input) {
+  const source = input && typeof input === "object" ? input : {};
+  const flatSource = normalizeDownloadSettings(source);
+  const transportSource =
+    source.transport && typeof source.transport === "object"
+      ? source.transport
+      : {};
+  const retrySource =
+    source.retry && typeof source.retry === "object" ? source.retry : {};
+  const mediaSource =
+    source.media && typeof source.media === "object" ? source.media : {};
+  const extractionSource =
+    source.extraction && typeof source.extraction === "object"
+      ? source.extraction
+      : {};
+  const requestSource =
+    source.request && typeof source.request === "object" ? source.request : {};
+
+  const timeoutMs = Math.max(
+    5000,
+    Math.min(180000, Number.parseInt(retrySource.timeoutMs, 10) || 30000),
+  );
+
+  const headers =
+    requestSource.headers && typeof requestSource.headers === "object"
+      ? Object.fromEntries(
+          Object.entries(requestSource.headers)
+            .filter(([key, value]) => key && value != null)
+            .map(([key, value]) => [String(key), String(value)]),
+        )
+      : {};
+
+  return {
+    transport: {
+      mode: sanitizeThreadMode(transportSource.mode || flatSource.threadMode),
+      threads: Math.max(
+        1,
+        Math.min(
+          MAX_THREAD_COUNT,
+          Number.parseInt(transportSource.threads, 10) ||
+            flatSource.threadCount,
+        ),
+      ),
+      multithread:
+        transportSource.multithread == null
+          ? flatSource.enableMultithread
+          : Boolean(transportSource.multithread),
+      resume:
+        transportSource.resume == null
+          ? flatSource.enableResume
+          : Boolean(transportSource.resume),
+    },
+    retry: {
+      maxRetries:
+        Number.parseInt(retrySource.maxRetries, 10) === UNLIMITED_RETRIES
+          ? UNLIMITED_RETRIES
+          : Math.max(
+              0,
+              Math.min(
+                MAX_RETRIES,
+                Number.parseInt(retrySource.maxRetries, 10) ||
+                  flatSource.maxRetries,
+              ),
+            ),
+      timeoutMs,
+    },
+    media: {
+      videoQuality: VIDEO_TRANSCODE_QUALITY_OPTIONS.includes(
+        String(
+          mediaSource.videoQuality || flatSource.videoQuality,
+        ).toLowerCase(),
+      )
+        ? String(
+            mediaSource.videoQuality || flatSource.videoQuality,
+          ).toLowerCase()
+        : DEFAULT_DOWNLOAD_OPTIONS.media.videoQuality,
+    },
+    extraction: {
+      enabled:
+        extractionSource.enabled == null
+          ? DEFAULT_DOWNLOAD_OPTIONS.extraction.enabled
+          : Boolean(extractionSource.enabled),
+    },
+    request: {
+      headers,
+    },
+  };
+}
+
+function downloadOptionsToSettings(options) {
+  return {
+    threadMode: options.transport.mode,
+    threadCount: options.transport.threads,
+    enableMultithread: options.transport.multithread,
+    enableResume: options.transport.resume,
+    maxRetries: options.retry.maxRetries,
+    videoQuality: options.media.videoQuality,
+  };
+}
+
 function isArchiveByName(value) {
   const name = String(value || "").toLowerCase();
   const ext = name.includes(".") ? name.split(".").pop() : "";
@@ -326,133 +412,6 @@ function classifyMimeType(contentType) {
   return "binary";
 }
 
-function isPotentialHtmlContentType(contentType) {
-  const value = String(contentType || "").toLowerCase();
-  return value.includes("text/html") || value.includes("application/xhtml+xml");
-}
-
-function isSupportedDownloadUrl(target) {
-  try {
-    const parsed = new URL(target);
-    const pathname = parsed.pathname || "";
-    const ext = pathname.includes(".")
-      ? pathname.split(".").pop().toLowerCase()
-      : "";
-    if (SUPPORTED_DOWNLOAD_EXTENSIONS.has(ext)) {
-      return true;
-    }
-    const contentHint = String(
-      parsed.searchParams.get("format") || "",
-    ).toLowerCase();
-    return SUPPORTED_DOWNLOAD_EXTENSIONS.has(contentHint);
-  } catch {
-    return false;
-  }
-}
-
-function extractHrefLinks(html, baseUrl) {
-  const links = [];
-  const pattern = /<a\s+[^>]*href\s*=\s*["']([^"']+)["'][^>]*>/gi;
-  let match;
-  while ((match = pattern.exec(html))) {
-    const raw = String(match[1] || "").trim();
-    if (!raw || raw.startsWith("#") || raw.startsWith("javascript:")) {
-      continue;
-    }
-    try {
-      const resolved = new URL(raw, baseUrl).toString();
-      links.push(resolved);
-    } catch {
-      continue;
-    }
-  }
-  return links;
-}
-
-async function extractSublinks({ seedUrl, depth = 1, maxDepth = 3 }) {
-  const safeDepth = Math.max(0, Math.min(maxDepth, depth));
-  const seed = new URL(seedUrl);
-  const visited = new Set();
-  const queue = [{ url: seed.toString(), level: 0 }];
-  const supported = new Map();
-  const pages = [];
-
-  let cursor = 0;
-  while (
-    cursor < queue.length &&
-    pages.length < SUBLINK_MAX_PAGES &&
-    supported.size < SUBLINK_MAX_LINKS
-  ) {
-    const current = queue[cursor++];
-    if (!current || visited.has(current.url)) {
-      continue;
-    }
-    visited.add(current.url);
-
-    const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      SUBLINK_REQUEST_TIMEOUT_MS,
-    );
-    const response = await fetch(current.url, {
-      method: "GET",
-      redirect: "follow",
-      headers: { "user-agent": "zip-image-viewer/1.3.0" },
-      signal: controller.signal,
-    })
-      .catch(() => null)
-      .finally(() => clearTimeout(timeout));
-
-    if (!response || !response.ok) {
-      continue;
-    }
-
-    const contentType = String(response.headers.get("content-type") || "");
-    if (!isPotentialHtmlContentType(contentType)) {
-      if (isSupportedDownloadUrl(current.url)) {
-        supported.set(current.url, {
-          url: current.url,
-          type: "file",
-          source: current.url,
-          depth: current.level,
-        });
-      }
-      continue;
-    }
-
-    const html = await response.text().catch(() => "");
-    pages.push({ url: current.url, depth: current.level });
-    const links = extractHrefLinks(html, current.url);
-
-    for (const link of links) {
-      const parsed = new URL(link);
-      if (parsed.origin !== seed.origin) {
-        continue;
-      }
-
-      if (isSupportedDownloadUrl(link)) {
-        supported.set(link, {
-          url: link,
-          type: "file",
-          source: current.url,
-          depth: current.level + 1,
-        });
-      }
-
-      if (current.level < safeDepth && !visited.has(link)) {
-        queue.push({ url: link, level: current.level + 1 });
-      }
-    }
-  }
-
-  return {
-    seedUrl: seed.toString(),
-    depth: safeDepth,
-    pages,
-    links: [...supported.values()],
-  };
-}
-
 function shouldPreserveOriginalPreview(contentType) {
   return contentType === "image/svg+xml" || contentType === "image/gif";
 }
@@ -498,7 +457,8 @@ function parseRangeHeader(rangeHeader, size) {
   };
 }
 
-function createJob(url, downloadSettings = DEFAULT_DOWNLOAD_SETTINGS) {
+function createJob(url, downloadOptions = DEFAULT_DOWNLOAD_OPTIONS) {
+  const normalizedOptions = normalizeDownloadOptions(downloadOptions);
   const job = {
     id: crypto.randomUUID(),
     url,
@@ -538,9 +498,7 @@ function createJob(url, downloadSettings = DEFAULT_DOWNLOAD_SETTINGS) {
     extractDir: "",
     abortController: null,
     cleanupAt: 0,
-    pauseRequested: false,
-    queuePosition: -1,
-    downloadSettings: normalizeDownloadSettings(downloadSettings),
+    downloadOptions: normalizedOptions,
   };
 
   jobStore.set(job.id, job);
@@ -548,6 +506,16 @@ function createJob(url, downloadSettings = DEFAULT_DOWNLOAD_SETTINGS) {
 }
 
 function sanitizeJob(job) {
+  const safeDownloadOptions = job.downloadOptions
+    ? {
+        ...job.downloadOptions,
+        request: {
+          ...(job.downloadOptions.request || {}),
+          headers: {},
+        },
+      }
+    : null;
+
   return {
     id: job.id,
     url: job.url,
@@ -577,82 +545,40 @@ function sanitizeJob(job) {
     transcodedEntries: job.transcodedEntries,
     totalTranscodeEntries: job.totalTranscodeEntries,
     videoQuality: job.videoQuality,
+    downloadOptions: safeDownloadOptions,
     updatedAt: job.updatedAt,
-    queuePosition: job.queuePosition,
   };
 }
 
-function normalizeQueueConcurrency(value) {
-  return Math.max(
-    1,
-    Math.min(
-      MAX_SIMULTANEOUS_DOWNLOADS,
-      Number.parseInt(String(value), 10) || DEFAULT_SIMULTANEOUS_DOWNLOADS,
-    ),
-  );
-}
+function scheduleSessionJobs() {
+  while (
+    activeSessionJobCount < MAX_ACTIVE_SESSION_JOBS &&
+    pendingSessionJobs.length > 0
+  ) {
+    const next = pendingSessionJobs.shift();
+    if (!next) {
+      break;
+    }
 
-function removeFromQueue(jobId) {
-  const index = queueState.order.indexOf(jobId);
-  if (index !== -1) {
-    queueState.order.splice(index, 1);
+    activeSessionJobCount += 1;
+    processSessionJob(next.job, next.confirmOversize)
+      .catch((error) => {
+        logEvent("error", "job.process.unhandled", {
+          jobId: next.job.id,
+          error: error.message,
+          stack: error.stack,
+        });
+      })
+      .finally(() => {
+        activeSessionJobCount = Math.max(0, activeSessionJobCount - 1);
+        scheduleSessionJobs();
+      });
   }
 }
 
-function refreshQueuePositions() {
-  for (const [jobId, job] of jobStore.entries()) {
-    const position = queueState.order.indexOf(jobId);
-    job.queuePosition = position;
-  }
-}
-
-function enqueueJob(jobId, atFront = false) {
-  removeFromQueue(jobId);
-  if (atFront) {
-    queueState.order.unshift(jobId);
-  } else {
-    queueState.order.push(jobId);
-  }
-  refreshQueuePositions();
-}
-
-function canRunJob(job) {
-  return (
-    job &&
-    (job.status === "queued" || job.status === "retrying") &&
-    !job.requiresConfirmation
-  );
-}
-
-function getQueueSnapshot() {
-  refreshQueuePositions();
-  const jobs = [...jobStore.values()]
-    .filter((job) => !isTerminalJobStatus(job.status))
-    .sort((left, right) => {
-      const leftRunning = queueState.running.has(left.id) ? 0 : 1;
-      const rightRunning = queueState.running.has(right.id) ? 0 : 1;
-      if (leftRunning !== rightRunning) {
-        return leftRunning - rightRunning;
-      }
-      if (left.queuePosition === -1 && right.queuePosition === -1) {
-        return left.createdAt - right.createdAt;
-      }
-      if (left.queuePosition === -1) {
-        return 1;
-      }
-      if (right.queuePosition === -1) {
-        return -1;
-      }
-      return left.queuePosition - right.queuePosition;
-    })
-    .map((job) => sanitizeJob(job));
-
-  return {
-    maxConcurrent: queueState.maxConcurrent,
-    runningCount: queueState.running.size,
-    queuedIds: [...queueState.order],
-    jobs,
-  };
+function enqueueSessionJob(job, confirmOversize) {
+  pendingSessionJobs.push({ job, confirmOversize });
+  scheduleSessionJobs();
 }
 
 function closeJob(job, terminalStatus) {
@@ -761,23 +687,6 @@ function sanitizeEntryPath(entryPath) {
   return cleaned;
 }
 
-function detectArchiveFormat(filePath) {
-  const ext = path
-    .extname(String(filePath || ""))
-    .slice(1)
-    .toLowerCase();
-  if (ext === "zip") {
-    return "zip";
-  }
-  if (ext === "7z") {
-    return "7z";
-  }
-  if (ext === "rar") {
-    return "rar";
-  }
-  return "archive";
-}
-
 function createNode(name, nodePath, type) {
   return {
     name,
@@ -840,25 +749,6 @@ function buildTree(entries, rootName) {
   }
 
   return { tree: root, firstFilePath, stats: { fileCount } };
-}
-
-function rebuildSessionTree(session, rootName) {
-  const { tree, firstFilePath, stats } = buildTree(session.entries, rootName);
-  session.tree = tree;
-  session.firstFilePath = firstFilePath;
-  session.stats = stats;
-}
-
-function upsertSessionEntry(session, entry, rootName) {
-  const existingIndex = session.entries.findIndex(
-    (item) => item.relativePath === entry.relativePath,
-  );
-  if (existingIndex === -1) {
-    session.entries.push(entry);
-  } else {
-    session.entries[existingIndex] = entry;
-  }
-  rebuildSessionTree(session, rootName);
 }
 
 async function removeSession(sessionId, reason = "manual") {
@@ -1046,24 +936,15 @@ async function runCommandCapture(command, args, options = {}) {
   });
 }
 
-async function extractWith7zip(archivePath, extractDir, password) {
-  const args = ["x", "-y", `-o${extractDir}`];
-  if (password) {
-    // NOTE: 7za has no supported mechanism (env var, stdin, or file) for
-    // passing passwords other than the -p command-line argument. On shared
-    // multi-user systems this arg is visible via /proc/<pid>/cmdline for the
-    // brief lifetime of the 7za process. This app is intended for personal /
-    // isolated single-user deployments; avoid exposing it on shared hosts.
-    args.push(`-p${password}`);
-  }
-  args.push(archivePath);
-  await runCommand(path7za, args);
+async function extractWith7zip(archivePath, extractDir) {
+  await runCommand(path7za, ["x", "-y", `-o${extractDir}`, archivePath]);
 }
 
 async function detectArchiveEncryption(archivePath) {
   if (!path7za) {
     return false;
   }
+
   const { stdout } = await runCommandCapture(
     path7za,
     ["l", "-slt", archivePath],
@@ -1439,7 +1320,12 @@ async function startPrioritySegmentWindow(
 function getSessionQualityOutputPath(session, normalizedPath, quality) {
   const safeQuality = String(quality || "720p").toLowerCase();
   const outputRelative = normalizedPath.replace(/\.[^.]+$/, ".mp4");
-  return path.join(session.extractDir, "quality", safeQuality, outputRelative);
+  return path.join(
+    session.workspaceDir,
+    "quality",
+    safeQuality,
+    outputRelative,
+  );
 }
 
 async function transcodeVideoToQuality({
@@ -1771,12 +1657,6 @@ async function processSessionJob(job, confirmOversize = false) {
     throw new Error("Only HTTP and HTTPS URLs are supported.");
   }
 
-  if (job.workspaceDir && !job.sessionId) {
-    await rm(job.workspaceDir, { recursive: true, force: true }).catch(
-      () => {},
-    );
-  }
-
   const workspaceDir = await mkdtemp(
     path.join(os.tmpdir(), "zip-image-viewer-"),
   );
@@ -1789,7 +1669,7 @@ async function processSessionJob(job, confirmOversize = false) {
   job.extractDir = extractDir;
   job.abortController = new AbortController();
 
-  const settings = normalizeDownloadSettings(job.downloadSettings);
+  const settings = downloadOptionsToSettings(job.downloadOptions);
   job.maxRetries = settings.maxRetries;
   job.threadMode = settings.threadMode;
   job.threadCount = settings.threadCount;
@@ -2035,75 +1915,16 @@ async function processSessionJob(job, confirmOversize = false) {
       lastExtractEmitAt = now;
     }
 
-    const archiveEncrypted =
-      detectedKind === "archive"
-        ? await detectArchiveEncryption(zipPath).catch(() => false)
-        : false;
-
-    if (archiveEncrypted) {
-      emitJob(
-        job,
-        {
-          status: "awaiting_password",
-          phase: "awaiting_password",
-          message:
-            "Archive is password protected. Provide password to extract.",
-          error: "",
-        },
-        "awaiting-password",
-      );
-
-      const sessionId = crypto.randomUUID();
-      const rootName = "session-files";
-      const encryptedName = path.basename(zipPath);
-      const entry = {
-        relativePath: `locked/${encryptedName}`,
-        type: "file",
-        size: (await stat(zipPath)).size,
-        modifiedAt: Date.now(),
-        locked: true,
-        archiveFormat: detectArchiveFormat(zipPath),
-      };
-      const { tree, firstFilePath, stats } = buildTree([entry], rootName);
-      sessionStore.set(sessionId, {
-        id: sessionId,
-        workspaceDir,
-        extractDir,
-        tree,
-        firstFilePath,
-        stats,
-        entries: [entry],
-        rootName,
-        selectedVideoQuality: settings.videoQuality,
-        pendingArchive: {
-          archivePath: zipPath,
-          extractDir,
-          format: detectArchiveFormat(zipPath),
-        },
-        transcodeStatus: {
-          quality: settings.videoQuality,
-          done: true,
-          completed: 0,
-          total: 0,
-        },
-        lastAccessedAt: Date.now(),
-      });
-
-      job.sessionId = sessionId;
-      closeJob(job, "awaiting_password");
-      for (const res of job.subscribers) {
-        res.end();
-      }
-      job.subscribers.clear();
-      for (const socket of job.socketSubscribers) {
-        socket.close(1000, "awaiting-password");
-      }
-      job.socketSubscribers.clear();
-      emitJob(job, { sessionId }, "awaiting-password");
-      return;
-    }
-
     if (detectedKind === "archive") {
+      const archiveEncrypted = await detectArchiveEncryption(zipPath).catch(
+        () => false,
+      );
+      if (archiveEncrypted) {
+        throw new Error(
+          "Password-protected archives are not currently supported in this flow.",
+        );
+      }
+
       emitJob(job, {
         status: "extracting",
         phase: "extracting",
@@ -2175,7 +1996,9 @@ async function processSessionJob(job, confirmOversize = false) {
 
     emitExtractionProgress(true);
 
-    const rootName = "session-files";
+    const archiveName = path.basename(parsedUrl.pathname) || "download";
+    const rootName =
+      archiveName.replace(/\.(zip|rar|7z|tar|gz|tgz)$/i, "") || archiveName;
     const { tree, firstFilePath, stats } = buildTree(
       extractedEntries,
       rootName,
@@ -2199,8 +2022,6 @@ async function processSessionJob(job, confirmOversize = false) {
       tree,
       firstFilePath,
       stats,
-      entries: [...extractedEntries],
-      rootName,
       selectedVideoQuality: settings.videoQuality,
       transcodeStatus: {
         quality: settings.videoQuality,
@@ -2265,13 +2086,9 @@ async function processSessionJob(job, confirmOversize = false) {
           message: `Transcoding videos to ${settings.videoQuality}: ${index} of ${videoEntries.length} (starting ${path.basename(entry.relativePath)})`,
         });
 
-        let sourceCopyPath = "";
         try {
-          sourceCopyPath = `${sourcePath}.transcode-source-${settings.videoQuality}`;
-          await copyFile(sourcePath, sourceCopyPath);
-
           await transcodeVideoToQuality({
-            sourcePath: sourceCopyPath,
+            sourcePath,
             outputPath,
             quality: settings.videoQuality,
             onProgress: (fraction) => {
@@ -2292,24 +2109,6 @@ async function processSessionJob(job, confirmOversize = false) {
               });
             },
           });
-
-          const relativeQualityPath = path
-            .relative(extractDir, outputPath)
-            .split(path.sep)
-            .join("/");
-          const qualityStats = await stat(outputPath).catch(() => null);
-          if (qualityStats?.isFile()) {
-            upsertSessionEntry(
-              session,
-              {
-                relativePath: relativeQualityPath,
-                type: "file",
-                size: qualityStats.size,
-                modifiedAt: qualityStats.mtimeMs,
-              },
-              rootName,
-            );
-          }
         } catch (error) {
           logEvent("warn", "video.transcode.entry.failed", {
             sessionId,
@@ -2317,10 +2116,6 @@ async function processSessionJob(job, confirmOversize = false) {
             path: entry.relativePath,
             error: error.message,
           });
-        } finally {
-          if (sourceCopyPath) {
-            await rm(sourceCopyPath, { force: true }).catch(() => {});
-          }
         }
 
         const completed = index + 1;
@@ -2380,24 +2175,6 @@ async function processSessionJob(job, confirmOversize = false) {
     });
 
     if (error.name === "AbortError") {
-      if (job.pauseRequested) {
-        emitJob(
-          job,
-          {
-            status: "paused",
-            phase: "paused",
-            error: "",
-            downloadSpeedBytesPerSec: 0,
-            averageSpeedBytesPerSec: 0,
-            etaSeconds: null,
-            isStalled: false,
-            stallDurationMs: 0,
-            message: "Job paused.",
-          },
-          "paused",
-        );
-        return;
-      }
       emitJob(
         job,
         {
@@ -2436,130 +2213,22 @@ async function processSessionJob(job, confirmOversize = false) {
   }
 }
 
-app.post("/api/extractor/sublinks", async (req, res) => {
-  const { url, depth = 1 } = req.body || {};
-  if (!url) {
-    return res.status(400).json({ error: "url is required." });
-  }
-
-  let parsed;
-  try {
-    parsed = new URL(String(url));
-  } catch {
-    return res.status(400).json({ error: "Invalid URL." });
-  }
-
-  if (!["http:", "https:"].includes(parsed.protocol)) {
-    return res
-      .status(400)
-      .json({ error: "Only HTTP and HTTPS are supported." });
-  }
-
-  try {
-    const result = await extractSublinks({
-      seedUrl: parsed.toString(),
-      depth: Number.parseInt(String(depth), 10) || 1,
-      maxDepth: 3,
-    });
-    return res.json(result);
-  } catch (error) {
-    return res
-      .status(500)
-      .json({ error: error.message || "Extraction failed." });
-  }
-});
-
-function scheduleQueue() {
-  if (queueState.running.size >= queueState.maxConcurrent) {
-    return;
-  }
-
-  while (queueState.running.size < queueState.maxConcurrent) {
-    const nextId = queueState.order.find((jobId) => {
-      const job = jobStore.get(jobId);
-      return canRunJob(job) && !queueState.running.has(jobId);
-    });
-
-    if (!nextId) {
-      break;
-    }
-
-    const job = jobStore.get(nextId);
-    if (!job) {
-      removeFromQueue(nextId);
-      continue;
-    }
-
-    queueState.running.add(nextId);
-    removeFromQueue(nextId);
-    refreshQueuePositions();
-
-    processSessionJob(job, Boolean(job.confirmTokenAccepted))
-      .catch((error) => {
-        logEvent("error", "job.process.unhandled", {
-          jobId: job.id,
-          error: error.message,
-          stack: error.stack,
-        });
-      })
-      .finally(() => {
-        queueState.running.delete(nextId);
-        refreshQueuePositions();
-        scheduleQueue();
-      });
-  }
-}
-
 app.post("/api/sessions", async (req, res) => {
   const {
     url,
     confirmOversize = false,
-    downloadSettings = {},
+    downloadOptions = null,
+    downloadSettings = null,
   } = req.body || {};
   if (!url) {
     return res.status(400).json({ error: "File URL is required." });
   }
-  const job = createJob(url, downloadSettings);
-  enqueueJob(job.id);
-  emitJob(job, {
-    status: "queued",
-    phase: "queued",
-    queuePosition: job.queuePosition,
-    message: "Queued archive request",
-  });
-  if (confirmOversize) {
-    job.confirmTokenAccepted = true;
-  }
-  scheduleQueue();
+  const job = createJob(url, downloadOptions || downloadSettings || {});
+
+  emitJob(job, { message: "Queued archive request" });
+  enqueueSessionJob(job, confirmOversize);
 
   return res.status(202).json({ jobId: job.id, ...sanitizeJob(job) });
-});
-
-app.post("/api/sessions/batch", async (req, res) => {
-  const { urls = [], downloadSettings = {} } = req.body || {};
-  if (!Array.isArray(urls) || urls.length === 0) {
-    return res.status(400).json({ error: "urls array is required." });
-  }
-
-  const jobs = [];
-  for (const rawUrl of urls) {
-    const nextUrl = String(rawUrl || "").trim();
-    if (!nextUrl) {
-      continue;
-    }
-    const job = createJob(nextUrl, downloadSettings);
-    enqueueJob(job.id);
-    emitJob(job, {
-      status: "queued",
-      phase: "queued",
-      queuePosition: job.queuePosition,
-      message: "Queued archive request",
-    });
-    jobs.push(sanitizeJob(job));
-  }
-
-  scheduleQueue();
-  return res.status(202).json({ jobs, queue: getQueueSnapshot() });
 });
 
 app.get("/api/session-jobs/:id", (req, res) => {
@@ -2569,84 +2238,6 @@ app.get("/api/session-jobs/:id", (req, res) => {
   }
 
   return res.json(sanitizeJob(job));
-});
-
-app.get("/api/session-jobs", (_req, res) => {
-  return res.json(getQueueSnapshot());
-});
-
-app.patch("/api/session-jobs/settings", (req, res) => {
-  const next = normalizeQueueConcurrency(req.body?.maxConcurrent);
-  queueState.maxConcurrent = next;
-  scheduleQueue();
-  return res.json(getQueueSnapshot());
-});
-
-app.post("/api/session-jobs/:id/pause", (req, res) => {
-  const job = jobStore.get(req.params.id);
-  if (!job) {
-    return res.status(404).json({ error: "Job not found." });
-  }
-
-  job.pauseRequested = true;
-  if (job.status === "queued" || job.status === "retrying") {
-    job.status = "paused";
-    job.phase = "paused";
-    removeFromQueue(job.id);
-    refreshQueuePositions();
-    emitJob(job, { message: "Paused", queuePosition: -1 }, "paused");
-  } else if (job.status === "downloading") {
-    job.abortController?.abort();
-    emitJob(job, { message: "Pause requested..." }, "pausing");
-  }
-
-  return res.json(sanitizeJob(job));
-});
-
-app.post("/api/session-jobs/:id/resume", (req, res) => {
-  const job = jobStore.get(req.params.id);
-  if (!job) {
-    return res.status(404).json({ error: "Job not found." });
-  }
-
-  if (isTerminalJobStatus(job.status)) {
-    return res.status(400).json({ error: "Cannot resume terminal job." });
-  }
-
-  job.pauseRequested = false;
-  if (job.status === "paused") {
-    job.status = "queued";
-    job.phase = "queued";
-    enqueueJob(job.id, true);
-    emitJob(
-      job,
-      { message: "Resumed and queued", queuePosition: job.queuePosition },
-      "resumed",
-    );
-    scheduleQueue();
-  }
-
-  return res.json(sanitizeJob(job));
-});
-
-app.post("/api/session-jobs/reorder", (req, res) => {
-  const { jobId, toIndex } = req.body || {};
-  const idx = Number.parseInt(String(toIndex), 10);
-  if (!jobId || !Number.isInteger(idx)) {
-    return res.status(400).json({ error: "jobId and toIndex are required." });
-  }
-
-  const currentIndex = queueState.order.indexOf(String(jobId));
-  if (currentIndex === -1) {
-    return res.status(404).json({ error: "Queued job not found." });
-  }
-
-  const bounded = Math.max(0, Math.min(queueState.order.length - 1, idx));
-  const [removed] = queueState.order.splice(currentIndex, 1);
-  queueState.order.splice(bounded, 0, removed);
-  refreshQueuePositions();
-
-  return res.json(getQueueSnapshot());
 });
 
 app.get("/api/session-jobs/:id/events", (req, res) => {
@@ -2677,6 +2268,10 @@ app.post("/api/session-jobs/:id/confirm", (req, res) => {
     return res.status(404).json({ error: "Job not found." });
   }
 
+  if (job.status !== "awaiting_confirmation") {
+    return res.status(400).json({ error: "Job is not awaiting confirmation." });
+  }
+
   if (!job.requiresConfirmation) {
     return res
       .status(400)
@@ -2685,13 +2280,7 @@ app.post("/api/session-jobs/:id/confirm", (req, res) => {
 
   job.requiresConfirmation = false;
   job.cleanupAt = 0;
-  job.confirmTokenAccepted = true;
-  if (job.status === "awaiting_confirmation") {
-    job.status = "queued";
-    job.phase = "queued";
-    enqueueJob(job.id, true);
-    scheduleQueue();
-  }
+  enqueueSessionJob(job, true);
 
   return res.json(sanitizeJob(job));
 });
@@ -2758,9 +2347,6 @@ app.delete("/api/session-jobs/:id", async (req, res) => {
   }
 
   job.abortController?.abort();
-  removeFromQueue(job.id);
-  queueState.running.delete(job.id);
-  refreshQueuePositions();
   emitJob(
     job,
     {
@@ -2796,77 +2382,7 @@ app.get("/api/sessions/:id/tree", (req, res) => {
     tree: session.tree,
     firstFilePath: session.firstFilePath,
     stats: session.stats,
-    pendingArchive: session.pendingArchive
-      ? {
-          format: session.pendingArchive.format,
-          locked: true,
-        }
-      : null,
   });
-});
-
-app.post("/api/sessions/:id/archive/unlock", async (req, res) => {
-  const session = touchSession(req.params.id);
-  if (!session) {
-    return res
-      .status(404)
-      .json({ error: "Session not found or already cleaned up." });
-  }
-
-  if (!session.pendingArchive?.archivePath) {
-    return res
-      .status(400)
-      .json({ error: "No locked archive in this session." });
-  }
-
-  const password = String(req.body?.password || "");
-  if (!password) {
-    return res.status(400).json({ error: "Password is required." });
-  }
-
-  try {
-    await rm(session.extractDir, { recursive: true, force: true }).catch(
-      () => {},
-    );
-    await mkdir(session.extractDir, { recursive: true });
-    await extractWith7zip(
-      session.pendingArchive.archivePath,
-      session.extractDir,
-      password,
-    );
-
-    const extractedEntries = await listExtractedEntries(session.extractDir);
-    session.entries = extractedEntries;
-    rebuildSessionTree(session, session.rootName || "session-files");
-    session.pendingArchive = null;
-    session.lastAccessedAt = Date.now();
-
-    return res.json({
-      ok: true,
-      tree: session.tree,
-      firstFilePath: session.firstFilePath,
-      stats: session.stats,
-    });
-  } catch (error) {
-    const message = String(error?.message || "").toLowerCase();
-    if (PASSWORD_ERROR_HINTS.some((hint) => message.includes(hint))) {
-      return res.status(400).json({
-        error: "Incorrect password. Try again.",
-        code: "INVALID_ARCHIVE_PASSWORD",
-      });
-    }
-
-    logEvent("error", "archive.unlock.failed", {
-      sessionId: req.params.id,
-      error: error?.message || "Unknown error",
-      stack: error?.stack,
-    });
-
-    return res.status(500).json({
-      error: "Failed to unlock archive. Please try again later.",
-      code: "ARCHIVE_EXTRACTION_FAILED",
-    });
-  }
 });
 
 app.get("/api/sessions/:id/video/play", async (req, res) => {
