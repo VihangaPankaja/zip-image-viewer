@@ -832,7 +832,7 @@ function App() {
   }, [flatData, sortedTree, sortMode]);
   const selectedVideoUrl =
     selectedNode?.type === "file" && selectedKind === "video"
-      ? `/api/sessions/${session?.id}/video/stream?${new URLSearchParams({
+      ? `/api/sessions/${session?.id}/video/play?${new URLSearchParams({
           path: selectedNode.path,
           quality: selectedVideoQuality,
         }).toString()}`
@@ -1137,6 +1137,7 @@ function App() {
         body: JSON.stringify({
           url,
           confirmOversize,
+          downloadOptions,
           downloadSettings,
         }),
       });

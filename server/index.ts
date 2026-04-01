@@ -108,6 +108,9 @@ const VIDEO_TRANSCODE_QUALITY_OPTIONS = [
 const DEFAULT_VIDEO_SEGMENT_SECONDS = 4;
 const VIDEO_PRIORITY_WINDOW_SECONDS = 24;
 const videoTranscodeStore = new Map();
+const MAX_ACTIVE_SESSION_JOBS = 2;
+let activeSessionJobCount = 0;
+const pendingSessionJobs = [];
 
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(distDir));
@@ -503,6 +506,16 @@ function createJob(url, downloadOptions = DEFAULT_DOWNLOAD_OPTIONS) {
 }
 
 function sanitizeJob(job) {
+  const safeDownloadOptions = job.downloadOptions
+    ? {
+        ...job.downloadOptions,
+        request: {
+          ...(job.downloadOptions.request || {}),
+          headers: {},
+        },
+      }
+    : null;
+
   return {
     id: job.id,
     url: job.url,
@@ -532,9 +545,40 @@ function sanitizeJob(job) {
     transcodedEntries: job.transcodedEntries,
     totalTranscodeEntries: job.totalTranscodeEntries,
     videoQuality: job.videoQuality,
-    downloadOptions: job.downloadOptions,
+    downloadOptions: safeDownloadOptions,
     updatedAt: job.updatedAt,
   };
+}
+
+function scheduleSessionJobs() {
+  while (
+    activeSessionJobCount < MAX_ACTIVE_SESSION_JOBS &&
+    pendingSessionJobs.length > 0
+  ) {
+    const next = pendingSessionJobs.shift();
+    if (!next) {
+      break;
+    }
+
+    activeSessionJobCount += 1;
+    processSessionJob(next.job, next.confirmOversize)
+      .catch((error) => {
+        logEvent("error", "job.process.unhandled", {
+          jobId: next.job.id,
+          error: error.message,
+          stack: error.stack,
+        });
+      })
+      .finally(() => {
+        activeSessionJobCount = Math.max(0, activeSessionJobCount - 1);
+        scheduleSessionJobs();
+      });
+  }
+}
+
+function enqueueSessionJob(job, confirmOversize) {
+  pendingSessionJobs.push({ job, confirmOversize });
+  scheduleSessionJobs();
 }
 
 function closeJob(job, terminalStatus) {
@@ -894,6 +938,24 @@ async function runCommandCapture(command, args, options = {}) {
 
 async function extractWith7zip(archivePath, extractDir) {
   await runCommand(path7za, ["x", "-y", `-o${extractDir}`, archivePath]);
+}
+
+async function detectArchiveEncryption(archivePath) {
+  if (!path7za) {
+    return false;
+  }
+
+  const { stdout } = await runCommandCapture(
+    path7za,
+    ["l", "-slt", archivePath],
+    {
+      allowNonZeroExit: true,
+    },
+  );
+  const output = String(stdout || "");
+  return (
+    /Encrypted\s*=\s*\+/i.test(output) || /Method\s*=\s*\w+\s+AES/i.test(output)
+  );
 }
 
 async function getVideoDimensions(videoPath) {
@@ -1854,6 +1916,15 @@ async function processSessionJob(job, confirmOversize = false) {
     }
 
     if (detectedKind === "archive") {
+      const archiveEncrypted = await detectArchiveEncryption(zipPath).catch(
+        () => false,
+      );
+      if (archiveEncrypted) {
+        throw new Error(
+          "Password-protected archives are not currently supported in this flow.",
+        );
+      }
+
       emitJob(job, {
         status: "extracting",
         phase: "extracting",
@@ -2155,13 +2226,7 @@ app.post("/api/sessions", async (req, res) => {
   const job = createJob(url, downloadOptions || downloadSettings || {});
 
   emitJob(job, { message: "Queued archive request" });
-  processSessionJob(job, confirmOversize).catch((error) => {
-    logEvent("error", "job.process.unhandled", {
-      jobId: job.id,
-      error: error.message,
-      stack: error.stack,
-    });
-  });
+  enqueueSessionJob(job, confirmOversize);
 
   return res.status(202).json({ jobId: job.id, ...sanitizeJob(job) });
 });
@@ -2203,6 +2268,10 @@ app.post("/api/session-jobs/:id/confirm", (req, res) => {
     return res.status(404).json({ error: "Job not found." });
   }
 
+  if (job.status !== "awaiting_confirmation") {
+    return res.status(400).json({ error: "Job is not awaiting confirmation." });
+  }
+
   if (!job.requiresConfirmation) {
     return res
       .status(400)
@@ -2211,13 +2280,7 @@ app.post("/api/session-jobs/:id/confirm", (req, res) => {
 
   job.requiresConfirmation = false;
   job.cleanupAt = 0;
-  processSessionJob(job, true).catch((error) => {
-    logEvent("error", "job.confirm.unhandled", {
-      jobId: job.id,
-      error: error.message,
-      stack: error.stack,
-    });
-  });
+  enqueueSessionJob(job, true);
 
   return res.json(sanitizeJob(job));
 });

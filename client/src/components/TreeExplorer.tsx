@@ -126,6 +126,16 @@ export function TreeExplorer({
     [rootNode, expanded],
   );
 
+  useEffect(() => {
+    setActiveIndex((current) => {
+      if (rows.length === 0) {
+        return 0;
+      }
+      return Math.max(0, Math.min(rows.length - 1, current));
+    });
+    itemRefs.current = itemRefs.current.slice(0, rows.length);
+  }, [rows.length]);
+
   function toggleExpanded(id: string) {
     setExpanded((current) => {
       const next = new Set(current);
