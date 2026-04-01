@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronRight,
   Folder,
@@ -115,6 +115,12 @@ export function TreeExplorer({
   const [activeIndex, setActiveIndex] = useState(0);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
+  const rootPath = rootNode?.path ?? null;
+  useEffect(() => {
+    setExpanded(new Set([String(rootPath || ".")]));
+    setActiveIndex(0);
+  }, [rootPath]);
+
   const rows = useMemo(
     () => flattenVisible(rootNode, expanded),
     [rootNode, expanded],
@@ -195,9 +201,10 @@ export function TreeExplorer({
 
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      onSelect(current.node);
-      if (current.hasChildren && event.key === " ") {
+      if (current.hasChildren) {
         toggleExpanded(current.id);
+      } else {
+        onSelect(current.node);
       }
     }
   }
@@ -232,13 +239,12 @@ export function TreeExplorer({
             className={`tree-item ${isSelected ? "selected" : ""}`}
             style={{ paddingInlineStart: `${10 + row.depth * 14}px` }}
             onFocus={() => setActiveIndex(index)}
-            onDoubleClick={() => {
+            onClick={() => {
               if (row.hasChildren) {
                 toggleExpanded(row.id);
+              } else {
+                onSelect(row.node);
               }
-            }}
-            onClick={() => {
-              onSelect(row.node);
             }}
           >
             <span className="tree-item-caret" aria-hidden="true">
