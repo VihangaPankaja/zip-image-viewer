@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Hls from "hls.js";
 import { CustomDropdown } from "../components/Common/CustomDropdown";
@@ -34,7 +34,6 @@ import {
   formatBytes,
   formatDate,
   formatEta,
-  formatMediaTime,
   formatSpeed,
   formatTransferBytes,
 } from "../lib/formatterUtils";
@@ -50,9 +49,11 @@ import {
   WorkspaceTabs,
   type WorkspaceTabId,
 } from "../components/WorkspaceTabs";
-import { ExplorerTablePanel } from "../components/ExplorerTablePanel";
 import { GlobalSettingsSheet } from "../components/GlobalSettingsSheet";
 import { TreeExplorer } from "../components/TreeExplorer";
+import { DownloadTabPage } from "../components/Pages/DownloadTabPage";
+import { PreviewTabPage } from "../components/Pages/PreviewTabPage";
+import { ExplorerTabPage } from "../components/Pages/ExplorerTabPage";
 
 function App() {
   const [zipUrl, setZipUrl] = useState("");
@@ -179,9 +180,12 @@ function App() {
   );
   const selectedNode = flatData?.nodesByPath.get(selectedPath) || null;
   const selectedKind = classifyNodeKind(selectedNode);
-  const currentFolderImages = selectedNode
-    ? flatData?.folderImages.get(selectedNode.parentPath) || []
-    : [];
+  const currentFolderImages = useMemo(() => {
+    if (!selectedNode) {
+      return [];
+    }
+    return flatData?.folderImages.get(selectedNode.parentPath) || [];
+  }, [flatData, selectedNode]);
   const currentImageIndex = selectedNode
     ? currentFolderImages.indexOf(selectedNode.path)
     : -1;
@@ -311,16 +315,16 @@ function App() {
     }
   }
 
-  function clearImagePreviewCache() {
+  const clearImagePreviewCache = useCallback(() => {
     imagePreviewCacheRef.current.forEach((value) => {
       if (value?.objectUrl) {
         URL.revokeObjectURL(value.objectUrl);
       }
     });
     imagePreviewCacheRef.current.clear();
-  }
+  }, []);
 
-  async function loadImagePreview(imagePath, quality) {
+  const loadImagePreview = useCallback(async (imagePath, quality) => {
     if (!session?.id || !imagePath) {
       return "";
     }
@@ -361,7 +365,7 @@ function App() {
       touchedAt: Date.now(),
     });
     return request;
-  }
+  }, [session?.id]);
 
   async function hydrateSession(sessionId, nextUrl) {
     if (!sessionId) {
@@ -689,6 +693,7 @@ function App() {
       cancelled = true;
     };
   }, [
+    loadImagePreview,
     previewQuality,
     selectedImagePreviewUrl,
     selectedKind,
@@ -893,11 +898,12 @@ function App() {
   }, [activeJob]);
 
   useEffect(() => {
+    const textPreviewCache = textPreviewCacheRef.current;
     return () => {
       closeJobEvents();
       stopJobPolling();
       clearImagePreviewCache();
-      textPreviewCacheRef.current.clear();
+      textPreviewCache.clear();
       if (latestSessionIdRef.current) {
         fetch(`/api/sessions/${latestSessionIdRef.current}`, {
           method: "DELETE",
@@ -911,7 +917,7 @@ function App() {
         }).catch(() => {});
       }
     };
-  }, []);
+  }, [clearImagePreviewCache]);
 
   useEffect(() => {
     function onKeyDown(event) {
@@ -1080,6 +1086,7 @@ function App() {
   }, [
     currentFolderImages,
     currentImageIndex,
+    loadImagePreview,
     previewQuality,
     selectedKind,
     session,
@@ -1442,614 +1449,91 @@ function App() {
         />
 
         {activeTab === "download" ? (
-          <section className="hero-panel">
-            <div className="hero-topbar">
-              <div>
-                <p className="eyebrow">ZIP image and file explorer</p>
-                <h1>Archive Atlas</h1>
-                <p className="hero-copy">
-                  Paste a public ZIP URL, let the server unpack it, then browse
-                  the folder structure with a fast viewer and image-first
-                  navigation.
-                </p>
-              </div>
-              <button
-                className="ghost-button theme-toggle"
-                type="button"
-                onClick={() =>
-                  setTheme((current) => (current === "dark" ? "light" : "dark"))
-                }
-              >
-                {theme === "dark" ? "Switch to light" : "Switch to dark"}
-              </button>
-            </div>
-
-            <form className="url-form" onSubmit={handleSubmit}>
-              <label className="input-shell" htmlFor="zip-url">
-                <span className="input-label">Public ZIP URL</span>
-                <input
-                  id="zip-url"
-                  type="url"
-                  placeholder="https://example.com/file-or-archive"
-                  value={zipUrl}
-                  onChange={(event) => setZipUrl(event.target.value)}
-                  autoComplete="off"
-                />
-              </label>
-
-              <button
-                className="primary-button"
-                type="submit"
-                disabled={isLoading}
-              >
-                {activeJob
-                  ? "Loading file..."
-                  : isLoading
-                    ? "Opening file..."
-                    : "Open file"}
-              </button>
-            </form>
-
-            <div className="message-card">
-              Download tuning, explorer columns, sorting defaults, and keyboard
-              shortcuts are now configured from the Global settings sheet.
-            </div>
-
-            {activeJob ? (
-              <div className="progress-card" aria-live="polite">
-                <div className="progress-card-head">
-                  <strong>
-                    {activeJob.phase === "transcoding"
-                      ? `Transcoding (${activeJob.videoQuality || downloadSettings.videoQuality})`
-                      : activeJob.phase === "extracting"
-                        ? "Preparing archive"
-                        : "Downloading archive"}
-                  </strong>
-                  <span>{visualPercentLabel}</span>
-                </div>
-                <div
-                  className={`progress-bar-shell ${visualPercent == null ? "indeterminate" : ""}`}
-                >
-                  <div
-                    className="progress-bar-fill"
-                    style={
-                      visualPercent == null
-                        ? undefined
-                        : { width: visualProgressWidth }
-                    }
-                  />
-                </div>
-                <div className="progress-stats-grid">
-                  <div className="progress-stat-cell">
-                    <span className="progress-stat-label">Transferred</span>
-                    <strong>{transferLabel}</strong>
-                  </div>
-                  <div className="progress-stat-cell">
-                    <span className="progress-stat-label">Speed</span>
-                    <strong>{speedLabel}</strong>
-                  </div>
-                  <div className="progress-stat-cell">
-                    <span className="progress-stat-label">ETA</span>
-                    <strong>{etaLabel}</strong>
-                  </div>
-                  <div className="progress-stat-cell">
-                    <span className="progress-stat-label">Mode</span>
-                    <strong>{`${modeLabel} (${threadLabel}x)`}</strong>
-                  </div>
-                  <div className="progress-stat-cell">
-                    <span className="progress-stat-label">Retries</span>
-                    <strong>{retryLabel}</strong>
-                  </div>
-                  <div className="progress-stat-cell">
-                    <span className="progress-stat-label">Status</span>
-                    <strong>
-                      {activeJob?.isStalled
-                        ? "Stalled"
-                        : activeJob?.phase === "transcoding"
-                          ? "Transcoding"
-                          : activeJob?.phase === "extracting"
-                            ? "Extracting"
-                            : "Downloading"}
-                    </strong>
-                  </div>
-                </div>
-                <div className="progress-meta-row">
-                  <span>{formatProgressMessage(activeJob)}</span>
-                  <button
-                    className="ghost-button compact-button"
-                    type="button"
-                    onClick={() => clearArchive(true)}
-                  >
-                    Cancel load
-                  </button>
-                </div>
-              </div>
-            ) : null}
-
-            <div className="status-row">
-              <div className="status-pill">Port 8080 ready</div>
-              <div className="status-pill">1 GB prompt threshold</div>
-              <div className="status-pill">Auto-cleanup enabled</div>
-              {session ? (
-                <button
-                  className="ghost-button compact-button"
-                  type="button"
-                  onClick={() => clearArchive(true)}
-                >
-                  Clear opened archive
-                </button>
-              ) : null}
-            </div>
-
-            {error ? <div className="message-card error">{error}</div> : null}
-            {oversizePrompt ? (
-              <div className="message-card warning">
-                <div>
-                  This archive reports{" "}
-                  {formatBytes(oversizePrompt.reportedSize)}. Continue
-                  downloading anyway?
-                </div>
-                <div className="message-actions">
-                  <button
-                    className="ghost-button"
-                    type="button"
-                    onClick={() => setOversizePrompt(null)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    className="primary-button"
-                    type="button"
-                    onClick={async () => {
-                      if (!oversizePrompt?.jobId) {
-                        return;
-                      }
-                      setIsLoading(true);
-                      setOversizePrompt(null);
-                      await fetch(
-                        `/api/session-jobs/${oversizePrompt.jobId}/confirm`,
-                        { method: "POST" },
-                      ).catch(() => {});
-                    }}
-                  >
-                    Proceed download
-                  </button>
-                </div>
-              </div>
-            ) : null}
-          </section>
+          <DownloadTabPage
+            theme={theme}
+            setTheme={setTheme}
+            zipUrl={zipUrl}
+            setZipUrl={setZipUrl}
+            handleSubmit={handleSubmit}
+            isLoading={isLoading}
+            activeJob={activeJob}
+            downloadSettings={downloadSettings}
+            visualPercent={visualPercent}
+            visualPercentLabel={visualPercentLabel}
+            visualProgressWidth={visualProgressWidth}
+            transferLabel={transferLabel}
+            speedLabel={speedLabel}
+            etaLabel={etaLabel}
+            modeLabel={modeLabel}
+            threadLabel={threadLabel}
+            retryLabel={retryLabel}
+            formatProgressMessage={formatProgressMessage}
+            clearArchive={clearArchive}
+            session={session}
+            error={error}
+            oversizePrompt={oversizePrompt}
+            setOversizePrompt={setOversizePrompt}
+            setIsLoading={setIsLoading}
+          />
         ) : null}
 
         {activeTab === "preview" ? (
-          <section className="viewer-grid">
-            <aside className="sidebar-panel">
-              <div className="panel-header panel-header-stackable explorer-header">
-                <div className="panel-title-group explorer-title-group">
-                  <p className="panel-label">Explorer</p>
-                  <h2 title={sortedTree?.name || "No archive loaded"}>
-                    {sortedTree?.name || "No archive loaded"}
-                  </h2>
-                </div>
-                <div className="sidebar-header-actions">
-                  {session ? (
-                    <span className="panel-chip">
-                      {session.stats.fileCount} files
-                    </span>
-                  ) : null}
-                </div>
-                <CustomDropdown
-                  id="sort-mode"
-                  label="Sort"
-                  value={sortMode}
-                  options={SORT_OPTIONS}
-                  onChange={(value) => setSortMode(String(value))}
-                  className="toolbar-select-shell-wide explorer-sort-shell"
-                />
-              </div>
-
-              <div className="sort-caption">
-                {sortMode === "natural-tail"
-                  ? "Number trail mode keeps names like file 2, file 10, file 11 in number order."
-                  : sortMode.startsWith("date")
-                    ? "Date sorting uses ZIP entry modified times when the archive provides them."
-                    : "Sorting affects explorer order, preview arrows, thumbnails, and slideshow navigation."}
-              </div>
-
-              <div className="tree-scroll">
-                {sortedTree ? (
-                  <TreeExplorer
-                    rootNode={sortedTree}
-                    selectedPath={selectedPath}
-                    onSelect={(node) => {
-                      if (node.type === "file") {
-                        setSelectedPath(node.path);
-                      }
-                    }}
-                  />
-                ) : (
-                  <div className="empty-card">
-                    <strong>Ready to unpack</strong>
-                    <p>
-                      Load a ZIP URL to inspect folders, preview images, and
-                      move across image sets with arrow keys.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </aside>
-
-            <section className="preview-panel">
-              <div className="panel-header">
-                <div className="panel-title-group">
-                  <p className="panel-label">Preview</p>
-                  <h2 title={selectedNode?.name || "Select a file"}>
-                    {selectedNode?.name || "Select a file"}
-                  </h2>
-                </div>
-                {selectedNode?.type === "file" ? (
-                  <div className="panel-actions">
-                    <button
-                      className="ghost-button"
-                      type="button"
-                      onClick={() => setExplorerModalOpen(true)}
-                    >
-                      Open explorer
-                    </button>
-                    {selectedKind === "image" ? (
-                      <button
-                        className="ghost-button"
-                        type="button"
-                        onClick={() => setSlideshowOpen(true)}
-                      >
-                        Slideshow
-                      </button>
-                    ) : null}
-                    <a
-                      className="ghost-button inline-link"
-                      href={selectedFileUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Open raw
-                    </a>
-                  </div>
-                ) : null}
-              </div>
-
-              {!selectedNode || selectedNode.type !== "file" ? (
-                <div className="empty-card preview-empty">
-                  <strong>Nothing selected</strong>
-                  <p>
-                    Choose a file from the sidebar to start previewing its
-                    contents.
-                  </p>
-                </div>
-              ) : null}
-
-              {selectedNode?.type === "file" && selectedKind === "image" ? (
-                <div className="preview-stage">
-                  <div className="preview-toolbar">
-                    <span>{formatBytes(selectedNode.size)}</span>
-                    <span>
-                      {currentImageIndex >= 0
-                        ? `${currentImageIndex + 1} / ${currentFolderImages.length} in folder`
-                        : "Single image"}
-                    </span>
-                    <CustomDropdown
-                      id="preview-quality"
-                      label="Preview quality"
-                      value={previewQuality}
-                      options={PREVIEW_QUALITY_OPTIONS}
-                      onChange={(value) => setPreviewQuality(String(value))}
-                    />
-                    <span>{formatDate(selectedNode.modifiedAt)}</span>
-                  </div>
-                  <div className="image-frame">
-                    <img
-                      src={selectedImageSrc || selectedImagePreviewUrl}
-                      alt={selectedNode.name}
-                    />
-                  </div>
-                  {currentFolderImageItems.length > 1 ? (
-                    <div
-                      className={`thumbnail-strip-shell ${thumbnailStripExpanded ? "expanded" : "collapsed"}`}
-                    >
-                      <div className="thumbnail-strip-header">
-                        <div>
-                          <strong>Folder thumbnails</strong>
-                          <div className="thumbnail-strip-copy">
-                            {thumbnailStripExpanded
-                              ? `Showing all ${currentFolderImageItems.length} sibling images.`
-                              : "Showing nearby images around the current selection."}
-                          </div>
-                        </div>
-                        <button
-                          className="ghost-button"
-                          type="button"
-                          onClick={() =>
-                            setThumbnailStripExpanded((current) => !current)
-                          }
-                        >
-                          {thumbnailStripExpanded
-                            ? "Collapse strip"
-                            : "Expand strip"}
-                        </button>
-                      </div>
-                      <div
-                        className={`thumbnail-strip ${thumbnailStripExpanded ? "expanded" : "collapsed"}`}
-                        role="list"
-                        aria-label="Folder images"
-                      >
-                        {visibleThumbnailItems.map((item) => (
-                          <button
-                            key={item.path}
-                            type="button"
-                            className={`thumbnail-card ${item.path === selectedPath ? "active" : ""}`}
-                            onClick={() => setSelectedPath(item.path)}
-                          >
-                            <img
-                              src={item.thumbnailUrl}
-                              alt={item.name}
-                              loading="lazy"
-                            />
-                            <span>{item.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                  <div className="navigation-hint">
-                    Use left and right arrow keys to move through sibling images
-                    in the active sort order.
-                  </div>
-                </div>
-              ) : null}
-
-              {selectedNode?.type === "file" && selectedKind === "text" ? (
-                <div className="text-preview">
-                  <div className="preview-toolbar">
-                    <span>{formatBytes(selectedNode.size)}</span>
-                    <span>{selectedNode.extension.toUpperCase()} preview</span>
-                    <span>{formatDate(selectedNode.modifiedAt)}</span>
-                  </div>
-                  <pre>{textPreview || "Loading file..."}</pre>
-                </div>
-              ) : null}
-
-              {selectedNode?.type === "file" && selectedKind === "video" ? (
-                <div className="preview-stage">
-                  <div className="preview-toolbar">
-                    <span>{formatBytes(selectedNode.size)}</span>
-                    <span>
-                      {selectedNode.extension.toUpperCase()} stream preview
-                    </span>
-                    <CustomDropdown
-                      id="video-quality"
-                      label="Quality"
-                      value={selectedVideoQuality}
-                      options={
-                        videoQualityOptions.length
-                          ? videoQualityOptions.map((item) => ({
-                              value: item.id,
-                              label: item.label,
-                            }))
-                          : [{ value: "source", label: "Original" }]
-                      }
-                      onChange={(value) =>
-                        setSelectedVideoQuality(String(value))
-                      }
-                    />
-                    <span>{formatDate(selectedNode.modifiedAt)}</span>
-                  </div>
-                  <div className="image-frame media-frame" ref={videoShellRef}>
-                    <video
-                      ref={videoRef}
-                      className="video-player"
-                      playsInline
-                      preload="metadata"
-                    >
-                      Your browser cannot play this video inline.
-                    </video>
-                    <div className="custom-video-controls">
-                      <button
-                        className="ghost-button compact-button"
-                        type="button"
-                        onClick={toggleVideoPlayback}
-                      >
-                        {videoIsPlaying ? "Pause" : "Play"}
-                      </button>
-                      <span className="video-time-label">
-                        {formatMediaTime(videoCurrentTime)} /{" "}
-                        {formatMediaTime(videoDuration)}
-                      </span>
-                      <div
-                        className="video-progress-shell"
-                        onMouseLeave={() => setVideoSeekHoverTime(null)}
-                      >
-                        <div className="video-buffer-track">
-                          <span
-                            className="video-buffer-value"
-                            style={{ width: `${videoBufferedPercent}%` }}
-                          />
-                          <span
-                            className="video-played-value"
-                            style={{ width: `${videoPlayedPercent}%` }}
-                          />
-                        </div>
-                        <input
-                          className="video-progress-range"
-                          type="range"
-                          min={0}
-                          max={Math.max(1, videoDuration)}
-                          step={0.05}
-                          value={Math.min(
-                            videoCurrentTime,
-                            Math.max(1, videoDuration),
-                          )}
-                          onChange={(event) =>
-                            seekVideoTo(Number(event.currentTarget.value) || 0)
-                          }
-                          onMouseMove={(event) => {
-                            const rect =
-                              event.currentTarget.getBoundingClientRect();
-                            const ratio = Math.max(
-                              0,
-                              Math.min(
-                                1,
-                                (event.clientX - rect.left) /
-                                  Math.max(1, rect.width),
-                              ),
-                            );
-                            setVideoSeekHoverTime((videoDuration || 0) * ratio);
-                          }}
-                        />
-                        {videoSeekHoverTime != null && videoSeekPreviewUrl ? (
-                          <div className="video-seek-preview">
-                            <img src={videoSeekPreviewUrl} alt="Seek preview" />
-                            <span>{formatMediaTime(videoSeekHoverTime)}</span>
-                          </div>
-                        ) : null}
-                      </div>
-                      <label className="video-volume-shell">
-                        Vol
-                        <input
-                          type="range"
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          value={videoVolume}
-                          onChange={(event) =>
-                            setVideoVolume(
-                              Number(event.currentTarget.value) || 0,
-                            )
-                          }
-                        />
-                      </label>
-                      <label className="video-volume-shell">
-                        Speed
-                        <input
-                          type="range"
-                          min={0.25}
-                          max={3}
-                          step={0.05}
-                          value={videoPlaybackRate}
-                          onChange={(event) =>
-                            setVideoPlaybackRate(
-                              Math.max(
-                                0.25,
-                                Math.min(
-                                  3,
-                                  Number(event.currentTarget.value) || 1,
-                                ),
-                              ),
-                            )
-                          }
-                        />
-                      </label>
-                      <button
-                        className="ghost-button compact-button"
-                        type="button"
-                        onClick={toggleVideoFullscreen}
-                      >
-                        {videoIsFullscreen ? "Exit Full" : "Full"}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="progress-meta-row">
-                    <span>
-                      Jump: {keyboardSettings.jumpSeconds}s | Rate step:{" "}
-                      {keyboardSettings.rateStep}x
-                    </span>
-                    <span>
-                      {activeJob?.phase === "transcoding"
-                        ? `Transcoding ${activeJob.videoQuality || selectedVideoQuality}: ${activeJob.transcodedEntries || 0}/${activeJob.totalTranscodeEntries || 0}`
-                        : `Playing ${selectedVideoQuality} quality`}
-                    </span>
-                    <div className="message-actions">
-                      <button
-                        className="ghost-button compact-button"
-                        type="button"
-                        onClick={() => {
-                          if (!videoRef.current) return;
-                          const nextRate = Math.max(
-                            0.25,
-                            videoRef.current.playbackRate -
-                              keyboardSettings.rateStep,
-                          );
-                          videoRef.current.playbackRate = nextRate;
-                          setVideoPlaybackRate(nextRate);
-                        }}
-                      >
-                        Slower
-                      </button>
-                      <button
-                        className="ghost-button compact-button"
-                        type="button"
-                        onClick={() => {
-                          if (!videoRef.current) return;
-                          const nextRate = Math.min(
-                            3,
-                            videoRef.current.playbackRate +
-                              keyboardSettings.rateStep,
-                          );
-                          videoRef.current.playbackRate = nextRate;
-                          setVideoPlaybackRate(nextRate);
-                        }}
-                      >
-                        Faster
-                      </button>
-                    </div>
-                  </div>
-                  <div className="navigation-hint">
-                    Arrow left and right seek by {keyboardSettings.jumpSeconds}
-                    s, arrow up and down changes volume, [ ] changes speed, and
-                    f toggles fullscreen. You can click the seek bar to jump.
-                  </div>
-                  {videoPlaybackError ? (
-                    <div className="navigation-hint" role="alert">
-                      Video error: {videoPlaybackError}
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-
-              {selectedNode?.type === "file" && selectedKind === "audio" ? (
-                <div className="preview-stage">
-                  <div className="preview-toolbar">
-                    <span>{formatBytes(selectedNode.size)}</span>
-                    <span>
-                      {selectedNode.extension.toUpperCase()} stream preview
-                    </span>
-                    <span>{formatDate(selectedNode.modifiedAt)}</span>
-                  </div>
-                  <div className="image-frame media-frame">
-                    <audio
-                      className="video-player"
-                      src={selectedFileUrl}
-                      controls
-                      preload="metadata"
-                    >
-                      Your browser cannot play this audio inline.
-                    </audio>
-                  </div>
-                </div>
-              ) : null}
-
-              {selectedNode?.type === "file" && selectedKind === "binary" ? (
-                <div className="empty-card preview-empty">
-                  <strong>Binary file</strong>
-                  <p>
-                    This file type does not have an inline preview yet. Open the
-                    raw file in a new tab or download it.
-                  </p>
-                </div>
-              ) : null}
-            </section>
-          </section>
+          <PreviewTabPage
+            sortedTree={sortedTree}
+            session={session}
+            sortMode={sortMode}
+            setSortMode={setSortMode}
+            sortOptions={SORT_OPTIONS}
+            selectedPath={selectedPath}
+            setSelectedPath={setSelectedPath}
+            selectedNode={selectedNode}
+            selectedKind={selectedKind}
+            setExplorerModalOpen={setExplorerModalOpen}
+            setSlideshowOpen={setSlideshowOpen}
+            selectedFileUrl={selectedFileUrl}
+            formatBytes={formatBytes}
+            formatDate={formatDate}
+            textPreview={textPreview}
+            currentImageIndex={currentImageIndex}
+            currentFolderImages={currentFolderImages}
+            previewQuality={previewQuality}
+            previewQualityOptions={PREVIEW_QUALITY_OPTIONS}
+            setPreviewQuality={setPreviewQuality}
+            selectedImageSrc={selectedImageSrc}
+            selectedImagePreviewUrl={selectedImagePreviewUrl}
+            currentFolderImageItems={currentFolderImageItems}
+            thumbnailStripExpanded={thumbnailStripExpanded}
+            setThumbnailStripExpanded={setThumbnailStripExpanded}
+            visibleThumbnailItems={visibleThumbnailItems}
+            videoQualityOptions={videoQualityOptions}
+            selectedVideoQuality={selectedVideoQuality}
+            setSelectedVideoQuality={setSelectedVideoQuality}
+            videoShellRef={videoShellRef}
+            videoRef={videoRef}
+            videoIsPlaying={videoIsPlaying}
+            toggleVideoPlayback={toggleVideoPlayback}
+            videoCurrentTime={videoCurrentTime}
+            videoDuration={videoDuration}
+            videoBufferedPercent={videoBufferedPercent}
+            videoPlayedPercent={videoPlayedPercent}
+            seekVideoTo={seekVideoTo}
+            setVideoSeekHoverTime={setVideoSeekHoverTime}
+            videoSeekHoverTime={videoSeekHoverTime}
+            videoSeekPreviewUrl={videoSeekPreviewUrl}
+            videoVolume={videoVolume}
+            setVideoVolume={setVideoVolume}
+            videoPlaybackRate={videoPlaybackRate}
+            setVideoPlaybackRate={setVideoPlaybackRate}
+            videoIsFullscreen={videoIsFullscreen}
+            toggleVideoFullscreen={toggleVideoFullscreen}
+            keyboardSettings={keyboardSettings}
+            activeJob={activeJob}
+            videoPlaybackError={videoPlaybackError}
+          />
         ) : null}
 
         {activeTab === "explorer" ? (
-          <ExplorerTablePanel
+          <ExplorerTabPage
             sortedTree={sortedTree}
             session={session}
             explorerRows={explorerRows}
@@ -2061,7 +1545,6 @@ function App() {
             explorerColumns={explorerColumns}
             formatDate={formatDate}
             formatBytes={formatBytes}
-            DropdownComponent={CustomDropdown}
           />
         ) : null}
       </main>
