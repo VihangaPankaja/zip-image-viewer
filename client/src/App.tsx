@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import videojs from "video.js";
+import Hls from "hls.js";
 import { openJobSocket } from "./lib/jobSocket";
 import { WorkspaceTabs, type WorkspaceTabId } from "./components/WorkspaceTabs";
 import { ExplorerTablePanel } from "./components/ExplorerTablePanel";
@@ -92,6 +92,32 @@ const NAME_COLLATOR = new Intl.Collator(undefined, {
   sensitivity: "base",
   numeric: false,
 });
+
+const VIDEO_MIME_BY_EXTENSION: Record<string, string> = {
+  mp4: "video/mp4",
+  m4v: "video/mp4",
+  webm: "video/webm",
+  ogv: "video/ogg",
+  mov: "video/quicktime",
+};
+
+function getVideoMimeType(extension: string | undefined) {
+  if (!extension) {
+    return "video/mp4";
+  }
+  return VIDEO_MIME_BY_EXTENSION[extension.toLowerCase()] || "video/mp4";
+}
+
+function formatMediaTime(totalSeconds: number) {
+  const value = Number.isFinite(totalSeconds) ? Math.max(0, totalSeconds) : 0;
+  const hours = Math.floor(value / 3600);
+  const minutes = Math.floor((value % 3600) / 60);
+  const seconds = Math.floor(value % 60);
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
 
 function formatBytes(value) {
   if (!Number.isFinite(value) || value <= 0) return "Unknown size";
@@ -678,6 +704,16 @@ function App() {
   const [activeJob, setActiveJob] = useState(null);
   const [videoPlaybackRate, setVideoPlaybackRate] = useState(1);
   const [videoVolume, setVideoVolume] = useState(0.9);
+  const [videoPlaybackError, setVideoPlaybackError] = useState("");
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [videoCurrentTime, setVideoCurrentTime] = useState(0);
+  const [videoBufferedEnd, setVideoBufferedEnd] = useState(0);
+  const [videoIsPlaying, setVideoIsPlaying] = useState(false);
+  const [videoIsFullscreen, setVideoIsFullscreen] = useState(false);
+  const [videoSeekHoverTime, setVideoSeekHoverTime] = useState<number | null>(
+    null,
+  );
+  const [videoSeekPreviewUrl, setVideoSeekPreviewUrl] = useState("");
   const [keyboardSettings, setKeyboardSettings] = useState(() => {
     if (typeof window === "undefined") {
       return { jumpSeconds: 5, rateStep: 0.25 };
@@ -740,7 +776,8 @@ function App() {
   const textPreviewCacheRef = useRef(new Map());
   const imagePreviewCacheRef = useRef(new Map());
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const videoPlayerRef = useRef<ReturnType<typeof videojs> | null>(null);
+  const hlsRef = useRef<Hls | null>(null);
+  const seekDebounceRef = useRef<number | null>(null);
   const videoShellRef = useRef<HTMLDivElement | null>(null);
   const [videoQualityOptions, setVideoQualityOptions] = useState<
     Array<{ id: string; label: string }>
@@ -830,9 +867,16 @@ function App() {
       .filter((node) => node.path !== sortedTree.path)
       .sort((left, right) => compareNodes(left, right, sortMode));
   }, [flatData, sortedTree, sortMode]);
-  const selectedVideoUrl =
+  const selectedVideoOriginalUrl =
     selectedNode?.type === "file" && selectedKind === "video"
       ? `/api/sessions/${session?.id}/video/play?${new URLSearchParams({
+          path: selectedNode.path,
+          quality: "source",
+        }).toString()}`
+      : "";
+  const selectedVideoHlsUrl =
+    selectedNode?.type === "file" && selectedKind === "video"
+      ? `/api/sessions/${session?.id}/video/hls/playlist?${new URLSearchParams({
           path: selectedNode.path,
           quality: selectedVideoQuality,
         }).toString()}`
@@ -1280,79 +1324,138 @@ function App() {
   }, [session]);
 
   useEffect(() => {
-    if (selectedKind !== "video" || !videoRef.current) {
-      videoPlayerRef.current?.dispose();
-      videoPlayerRef.current = null;
+    const videoElement = videoRef.current;
+    if (!videoElement || selectedKind !== "video") {
       return;
     }
 
-    if (videoPlayerRef.current) {
-      return;
+    function syncState() {
+      setVideoDuration(Number(videoElement.duration) || 0);
+      setVideoCurrentTime(Number(videoElement.currentTime) || 0);
+
+      const buffered = videoElement.buffered;
+      if (buffered.length > 0) {
+        setVideoBufferedEnd(buffered.end(buffered.length - 1));
+      } else {
+        setVideoBufferedEnd(0);
+      }
     }
 
-    const player = videojs(videoRef.current, {
-      controls: true,
-      fluid: true,
-      preload: "metadata",
-      playbackRates: [0.5, 0.75, 1, 1.25, 1.5, 2],
-      controlBar: {
-        pictureInPictureToggle: true,
-      },
-    });
-    videoPlayerRef.current = player;
-
-    function onRateChange() {
-      setVideoPlaybackRate(Number(player.playbackRate()) || 1);
+    function onPlay() {
+      setVideoIsPlaying(true);
     }
 
-    function onVolumeChange() {
-      setVideoVolume(Math.max(0, Math.min(1, Number(player.volume()) || 0)));
+    function onPause() {
+      setVideoIsPlaying(false);
     }
 
-    player.on("ratechange", onRateChange);
-    player.on("volumechange", onVolumeChange);
+    function onError() {
+      const mediaError = videoElement.error;
+      const detail =
+        mediaError?.message ||
+        (mediaError?.code
+          ? `Playback failed (code ${mediaError.code}).`
+          : "Playback failed.");
+      setVideoPlaybackError(detail);
+    }
 
-    player.volume(0.9);
-    player.playbackRate(1);
+    videoElement.addEventListener("timeupdate", syncState);
+    videoElement.addEventListener("progress", syncState);
+    videoElement.addEventListener("loadedmetadata", syncState);
+    videoElement.addEventListener("play", onPlay);
+    videoElement.addEventListener("pause", onPause);
+    videoElement.addEventListener("error", onError);
+    syncState();
 
     return () => {
-      player.off("ratechange", onRateChange);
-      player.off("volumechange", onVolumeChange);
-      player.dispose();
-      if (videoPlayerRef.current === player) {
-        videoPlayerRef.current = null;
-      }
+      videoElement.removeEventListener("timeupdate", syncState);
+      videoElement.removeEventListener("progress", syncState);
+      videoElement.removeEventListener("loadedmetadata", syncState);
+      videoElement.removeEventListener("play", onPlay);
+      videoElement.removeEventListener("pause", onPause);
+      videoElement.removeEventListener("error", onError);
     };
   }, [selectedKind]);
 
   useEffect(() => {
-    const player = videoPlayerRef.current;
-    if (!player || selectedKind !== "video" || !selectedVideoUrl) {
+    const videoElement = videoRef.current;
+    if (!videoElement || selectedKind !== "video" || !selectedNode) {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
       return;
     }
 
-    player.src({ src: selectedVideoUrl, type: "video/mp4" });
-  }, [selectedKind, selectedVideoUrl]);
+    const useOriginal = selectedVideoQuality === "source";
+    setVideoPlaybackError("");
+
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+
+    if (!useOriginal && Hls.isSupported()) {
+      const hls = new Hls({
+        lowLatencyMode: false,
+        maxBufferLength: 30,
+      });
+      hlsRef.current = hls;
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data?.fatal) {
+          setVideoPlaybackError(data?.details || "HLS playback failed.");
+        }
+      });
+      hls.loadSource(selectedVideoHlsUrl);
+      hls.attachMedia(videoElement);
+    } else if (
+      !useOriginal &&
+      videoElement.canPlayType("application/vnd.apple.mpegurl")
+    ) {
+      videoElement.src = selectedVideoHlsUrl;
+      videoElement.load();
+    } else {
+      videoElement.innerHTML = "";
+      const source = document.createElement("source");
+      source.src = selectedVideoOriginalUrl;
+      source.type = getVideoMimeType(selectedNode.extension);
+      videoElement.appendChild(source);
+      videoElement.load();
+    }
+
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
+  }, [
+    selectedKind,
+    selectedNode,
+    selectedVideoHlsUrl,
+    selectedVideoOriginalUrl,
+    selectedVideoQuality,
+  ]);
 
   useEffect(() => {
-    const player = videoPlayerRef.current;
-    if (!player || selectedKind !== "video") {
+    const videoElement = videoRef.current;
+    if (!videoElement || selectedKind !== "video") {
       return;
     }
 
-    if (Math.abs(player.volume() - videoVolume) > 0.01) {
-      player.volume(videoVolume);
+    if (Math.abs((videoElement.volume || 0) - videoVolume) > 0.01) {
+      videoElement.volume = videoVolume;
     }
   }, [selectedKind, videoVolume]);
 
   useEffect(() => {
-    const player = videoPlayerRef.current;
-    if (!player || selectedKind !== "video") {
+    const videoElement = videoRef.current;
+    if (!videoElement || selectedKind !== "video") {
       return;
     }
 
-    if (Math.abs((player.playbackRate() || 1) - videoPlaybackRate) > 0.01) {
-      player.playbackRate(videoPlaybackRate);
+    if (Math.abs((videoElement.playbackRate || 1) - videoPlaybackRate) > 0.01) {
+      videoElement.playbackRate = videoPlaybackRate;
     }
   }, [selectedKind, videoPlaybackRate]);
 
@@ -1449,8 +1552,8 @@ function App() {
         return;
       }
 
-      if (selectedKind === "video" && videoPlayerRef.current) {
-        const player = videoPlayerRef.current;
+      if (selectedKind === "video" && videoRef.current) {
+        const player = videoRef.current;
         const step = Math.max(1, Number(keyboardSettings.jumpSeconds) || 5);
         const rateStep = Math.max(
           0.05,
@@ -1459,36 +1562,36 @@ function App() {
 
         if (event.key === "ArrowRight") {
           event.preventDefault();
-          player.currentTime(Math.max(0, (player.currentTime() || 0) + step));
+          player.currentTime = Math.max(0, (player.currentTime || 0) + step);
           return;
         }
 
         if (event.key === "ArrowLeft") {
           event.preventDefault();
-          player.currentTime(Math.max(0, (player.currentTime() || 0) - step));
+          player.currentTime = Math.max(0, (player.currentTime || 0) - step);
           return;
         }
 
         if (event.key === "ArrowUp") {
           event.preventDefault();
-          const nextVolume = Math.min(1, (player.volume() || 0) + 0.05);
-          player.volume(nextVolume);
+          const nextVolume = Math.min(1, (player.volume || 0) + 0.05);
+          player.volume = nextVolume;
           setVideoVolume(nextVolume);
           return;
         }
 
         if (event.key === "ArrowDown") {
           event.preventDefault();
-          const nextVolume = Math.max(0, (player.volume() || 0) - 0.05);
-          player.volume(nextVolume);
+          const nextVolume = Math.max(0, (player.volume || 0) - 0.05);
+          player.volume = nextVolume;
           setVideoVolume(nextVolume);
           return;
         }
 
         if (event.key === "]") {
           event.preventDefault();
-          const nextRate = Math.min(3, (player.playbackRate() || 1) + rateStep);
-          player.playbackRate(nextRate);
+          const nextRate = Math.min(3, (player.playbackRate || 1) + rateStep);
+          player.playbackRate = nextRate;
           setVideoPlaybackRate(nextRate);
           return;
         }
@@ -1497,10 +1600,21 @@ function App() {
           event.preventDefault();
           const nextRate = Math.max(
             0.25,
-            (player.playbackRate() || 1) - rateStep,
+            (player.playbackRate || 1) - rateStep,
           );
-          player.playbackRate(nextRate);
+          player.playbackRate = nextRate;
           setVideoPlaybackRate(nextRate);
+          return;
+        }
+
+        if (event.key.toLowerCase() === "f") {
+          event.preventDefault();
+          const shell = videoShellRef.current;
+          if (document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+          } else {
+            shell?.requestFullscreen?.().catch(() => {});
+          }
           return;
         }
       }
@@ -1610,6 +1724,118 @@ function App() {
       document.body.style.overflow = originalOverflow;
     };
   }, [slideshowOpen]);
+
+  useEffect(() => {
+    function onFullscreenChange() {
+      const shell = videoShellRef.current;
+      setVideoIsFullscreen(
+        Boolean(shell && document.fullscreenElement === shell),
+      );
+    }
+
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () =>
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    if (
+      selectedKind !== "video" ||
+      selectedNode?.type !== "file" ||
+      !session?.id ||
+      videoSeekHoverTime == null
+    ) {
+      setVideoSeekPreviewUrl("");
+      return;
+    }
+
+    if (seekDebounceRef.current) {
+      window.clearTimeout(seekDebounceRef.current);
+    }
+
+    seekDebounceRef.current = window.setTimeout(() => {
+      const query = new URLSearchParams({
+        path: selectedNode.path,
+        quality: selectedVideoQuality,
+        time: String(videoSeekHoverTime),
+        width: "260",
+      });
+      const url = `/api/sessions/${session.id}/video/thumbnail?${query.toString()}`;
+      setVideoSeekPreviewUrl(url);
+    }, 140);
+
+    return () => {
+      if (seekDebounceRef.current) {
+        window.clearTimeout(seekDebounceRef.current);
+      }
+    };
+  }, [
+    session,
+    selectedKind,
+    selectedNode,
+    selectedVideoQuality,
+    videoSeekHoverTime,
+  ]);
+
+  const videoPlayedPercent =
+    videoDuration > 0
+      ? Math.max(0, Math.min(100, (videoCurrentTime / videoDuration) * 100))
+      : 0;
+  const videoBufferedPercent =
+    videoDuration > 0
+      ? Math.max(0, Math.min(100, (videoBufferedEnd / videoDuration) * 100))
+      : 0;
+
+  function toggleVideoPlayback() {
+    const videoElement = videoRef.current;
+    if (!videoElement) {
+      return;
+    }
+
+    if (videoElement.paused) {
+      videoElement.play().catch(() => {});
+    } else {
+      videoElement.pause();
+    }
+  }
+
+  function seekVideoTo(timeSeconds: number) {
+    const videoElement = videoRef.current;
+    if (!videoElement) {
+      return;
+    }
+
+    const bounded = Math.max(0, Math.min(videoDuration || 0, timeSeconds));
+
+    if (selectedVideoQuality !== "source") {
+      const hlsUrl = new URL(selectedVideoHlsUrl, window.location.origin);
+      hlsUrl.searchParams.set("seekSeconds", String(bounded));
+
+      if (hlsRef.current) {
+        hlsRef.current.loadSource(hlsUrl.pathname + hlsUrl.search);
+      } else if (videoElement.canPlayType("application/vnd.apple.mpegurl")) {
+        videoElement.src = hlsUrl.pathname + hlsUrl.search;
+        videoElement.load();
+      }
+    }
+
+    videoElement.currentTime = bounded;
+    setVideoCurrentTime(bounded);
+  }
+
+  function toggleVideoFullscreen() {
+    const shell = videoShellRef.current;
+    if (!shell) {
+      return;
+    }
+
+    if (document.fullscreenElement === shell) {
+      document.exitFullscreen().catch(() => {});
+      return;
+    }
+
+    shell.requestFullscreen?.().catch(() => {});
+  }
 
   const slideshowModal =
     slideshowOpen && selectedKind === "image" && selectedNode
@@ -2243,12 +2469,115 @@ function App() {
                     <video
                       ref={videoRef}
                       className="video-player"
-                      controls
                       playsInline
                       preload="metadata"
                     >
                       Your browser cannot play this video inline.
                     </video>
+                    <div className="custom-video-controls">
+                      <button
+                        className="ghost-button compact-button"
+                        type="button"
+                        onClick={toggleVideoPlayback}
+                      >
+                        {videoIsPlaying ? "Pause" : "Play"}
+                      </button>
+                      <span className="video-time-label">
+                        {formatMediaTime(videoCurrentTime)} /{" "}
+                        {formatMediaTime(videoDuration)}
+                      </span>
+                      <div
+                        className="video-progress-shell"
+                        onMouseLeave={() => setVideoSeekHoverTime(null)}
+                      >
+                        <div className="video-buffer-track">
+                          <span
+                            className="video-buffer-value"
+                            style={{ width: `${videoBufferedPercent}%` }}
+                          />
+                          <span
+                            className="video-played-value"
+                            style={{ width: `${videoPlayedPercent}%` }}
+                          />
+                        </div>
+                        <input
+                          className="video-progress-range"
+                          type="range"
+                          min={0}
+                          max={Math.max(1, videoDuration)}
+                          step={0.05}
+                          value={Math.min(
+                            videoCurrentTime,
+                            Math.max(1, videoDuration),
+                          )}
+                          onChange={(event) =>
+                            seekVideoTo(Number(event.currentTarget.value) || 0)
+                          }
+                          onMouseMove={(event) => {
+                            const rect =
+                              event.currentTarget.getBoundingClientRect();
+                            const ratio = Math.max(
+                              0,
+                              Math.min(
+                                1,
+                                (event.clientX - rect.left) /
+                                  Math.max(1, rect.width),
+                              ),
+                            );
+                            setVideoSeekHoverTime((videoDuration || 0) * ratio);
+                          }}
+                        />
+                        {videoSeekHoverTime != null && videoSeekPreviewUrl ? (
+                          <div className="video-seek-preview">
+                            <img src={videoSeekPreviewUrl} alt="Seek preview" />
+                            <span>{formatMediaTime(videoSeekHoverTime)}</span>
+                          </div>
+                        ) : null}
+                      </div>
+                      <label className="video-volume-shell">
+                        Vol
+                        <input
+                          type="range"
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          value={videoVolume}
+                          onChange={(event) =>
+                            setVideoVolume(
+                              Number(event.currentTarget.value) || 0,
+                            )
+                          }
+                        />
+                      </label>
+                      <label className="video-volume-shell">
+                        Speed
+                        <input
+                          type="range"
+                          min={0.25}
+                          max={3}
+                          step={0.05}
+                          value={videoPlaybackRate}
+                          onChange={(event) =>
+                            setVideoPlaybackRate(
+                              Math.max(
+                                0.25,
+                                Math.min(
+                                  3,
+                                  Number(event.currentTarget.value) || 1,
+                                ),
+                              ),
+                            )
+                          }
+                        />
+                      </label>
+                      <button
+                        className="ghost-button compact-button"
+                        type="button"
+                        onClick={toggleVideoFullscreen}
+                      >
+                        {videoIsFullscreen ? "Exit Full" : "Full"}
+                      </button>
+                    </div>
                   </div>
                   <div className="progress-meta-row">
                     <span>
@@ -2265,13 +2594,13 @@ function App() {
                         className="ghost-button compact-button"
                         type="button"
                         onClick={() => {
-                          if (!videoPlayerRef.current) return;
+                          if (!videoRef.current) return;
                           const nextRate = Math.max(
                             0.25,
-                            videoPlayerRef.current.playbackRate() -
+                            videoRef.current.playbackRate -
                               keyboardSettings.rateStep,
                           );
-                          videoPlayerRef.current.playbackRate(nextRate);
+                          videoRef.current.playbackRate = nextRate;
                           setVideoPlaybackRate(nextRate);
                         }}
                       >
@@ -2281,13 +2610,13 @@ function App() {
                         className="ghost-button compact-button"
                         type="button"
                         onClick={() => {
-                          if (!videoPlayerRef.current) return;
+                          if (!videoRef.current) return;
                           const nextRate = Math.min(
                             3,
-                            videoPlayerRef.current.playbackRate() +
+                            videoRef.current.playbackRate +
                               keyboardSettings.rateStep,
                           );
-                          videoPlayerRef.current.playbackRate(nextRate);
+                          videoRef.current.playbackRate = nextRate;
                           setVideoPlaybackRate(nextRate);
                         }}
                       >
@@ -2297,8 +2626,14 @@ function App() {
                   </div>
                   <div className="navigation-hint">
                     Arrow left and right seek by {keyboardSettings.jumpSeconds}
-                    s, arrow up and down changes volume, and [ ] changes speed.
+                    s, arrow up and down changes volume, [ ] changes speed, and
+                    f toggles fullscreen. You can click the seek bar to jump.
                   </div>
+                  {videoPlaybackError ? (
+                    <div className="navigation-hint" role="alert">
+                      Video error: {videoPlaybackError}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -2402,3 +2737,4 @@ function App() {
 }
 
 export default App;
+export { formatMediaTime };
