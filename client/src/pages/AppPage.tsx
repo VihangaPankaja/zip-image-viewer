@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import Hls from "hls.js";
 import { CustomDropdown } from "../components/Common/CustomDropdown";
@@ -324,48 +330,51 @@ function App() {
     imagePreviewCacheRef.current.clear();
   }, []);
 
-  const loadImagePreview = useCallback(async (imagePath, quality) => {
-    if (!session?.id || !imagePath) {
-      return "";
-    }
+  const loadImagePreview = useCallback(
+    async (imagePath, quality) => {
+      if (!session?.id || !imagePath) {
+        return "";
+      }
 
-    const cacheKey = getImageCacheKey(session.id, imagePath, quality);
-    const existing = imagePreviewCacheRef.current.get(cacheKey);
+      const cacheKey = getImageCacheKey(session.id, imagePath, quality);
+      const existing = imagePreviewCacheRef.current.get(cacheKey);
 
-    if (existing?.objectUrl) {
-      return existing.objectUrl;
-    }
+      if (existing?.objectUrl) {
+        return existing.objectUrl;
+      }
 
-    if (existing?.promise) {
-      return existing.promise;
-    }
+      if (existing?.promise) {
+        return existing.promise;
+      }
 
-    const request = fetch(
-      buildFileUrl(session.id, imagePath, { imagePreview: true, quality }),
-    )
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error("Could not load image preview.");
-        }
-        const blob = await response.blob();
-        const objectUrl = URL.createObjectURL(blob);
-        imagePreviewCacheRef.current.set(cacheKey, {
-          objectUrl,
-          touchedAt: Date.now(),
+      const request = fetch(
+        buildFileUrl(session.id, imagePath, { imagePreview: true, quality }),
+      )
+        .then(async (response) => {
+          if (!response.ok) {
+            throw new Error("Could not load image preview.");
+          }
+          const blob = await response.blob();
+          const objectUrl = URL.createObjectURL(blob);
+          imagePreviewCacheRef.current.set(cacheKey, {
+            objectUrl,
+            touchedAt: Date.now(),
+          });
+          return objectUrl;
+        })
+        .catch((error) => {
+          imagePreviewCacheRef.current.delete(cacheKey);
+          throw error;
         });
-        return objectUrl;
-      })
-      .catch((error) => {
-        imagePreviewCacheRef.current.delete(cacheKey);
-        throw error;
-      });
 
-    imagePreviewCacheRef.current.set(cacheKey, {
-      promise: request,
-      touchedAt: Date.now(),
-    });
-    return request;
-  }, [session?.id]);
+      imagePreviewCacheRef.current.set(cacheKey, {
+        promise: request,
+        touchedAt: Date.now(),
+      });
+      return request;
+    },
+    [session?.id],
+  );
 
   async function hydrateSession(sessionId, nextUrl) {
     if (!sessionId) {
