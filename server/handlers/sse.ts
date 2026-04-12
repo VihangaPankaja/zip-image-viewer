@@ -7,11 +7,11 @@ export function registerSseRoutes(app: Express) {
     res.setHeader("Connection", "keep-alive");
 
     res.write(
-      `event: ready\\ndata: ${JSON.stringify({ ok: true, channel: "sse" })}\\n\\n`,
+      `event: ready\ndata: ${JSON.stringify({ ok: true, channel: "sse" })}\n\n`,
     );
     const timer = setInterval(() => {
       res.write(
-        `event: heartbeat\\ndata: ${JSON.stringify({ timestamp: Date.now() })}\\n\\n`,
+        `event: heartbeat\ndata: ${JSON.stringify({ timestamp: Date.now() })}\n\n`,
       );
     }, 15000);
 
