@@ -53,7 +53,7 @@ export function normalizeDownloadSettings(value: unknown) {
       Number.parseInt(String(source.maxRetries), 10) === -1
         ? -1
         : clampNumber(
-        String(source.maxRetries ?? ""),
+            String(source.maxRetries ?? ""),
             0,
             8,
             DEFAULT_DOWNLOAD_SETTINGS.maxRetries,
@@ -93,12 +93,11 @@ export function normalizeDownloadOptions(value: unknown): DownloadOptions {
 
   return {
     transport: {
-      mode:
-        (transportSource.mode === "single" ||
-        transportSource.mode === "segmented" ||
-        transportSource.mode === "auto"
-          ? transportSource.mode
-          : legacy.threadMode) as DownloadOptions["transport"]["mode"],
+      mode: (transportSource.mode === "single" ||
+      transportSource.mode === "segmented" ||
+      transportSource.mode === "auto"
+        ? transportSource.mode
+        : legacy.threadMode) as DownloadOptions["transport"]["mode"],
       threads: clampNumber(
         String(transportSource.threads ?? ""),
         1,

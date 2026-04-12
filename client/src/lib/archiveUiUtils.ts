@@ -53,7 +53,9 @@ export function getWrappedPath(
   return items[nextIndex] || "";
 }
 
-export function formatProgressMessage(job: ArchiveJobLike | null | undefined): string {
+export function formatProgressMessage(
+  job: ArchiveJobLike | null | undefined,
+): string {
   if (!job) {
     return "";
   }

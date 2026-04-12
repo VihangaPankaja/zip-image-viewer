@@ -66,9 +66,8 @@ export function formatDate(
   if (!value) {
     return "Date unknown";
   }
-  
-  const normalized =
-    typeof value === "string" ? new Date(value) : value;
+
+  const normalized = typeof value === "string" ? new Date(value) : value;
 
   return new Intl.DateTimeFormat(undefined, {
     year: "numeric",
