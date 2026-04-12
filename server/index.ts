@@ -46,6 +46,7 @@ import {
   sessionStore,
   videoTranscodeStore,
 } from "./repositories/memoryStores.js";
+import { registerBaseRoutes } from "./bootstrap/registerRoutes.js";
 
 const require = createRequire(import.meta.url);
 const { path7za } = require("7zip-bin");
@@ -1457,8 +1458,9 @@ process.on("SIGINT", () => {
   });
 });
 
-app.get("/health", (_req, res) => {
-  res.json({ ok: true, sessions: sessionStore.size, jobs: jobStore.size });
+registerBaseRoutes(app, {
+  getSessionCount: () => sessionStore.size,
+  getJobCount: () => jobStore.size,
 });
 
 function isRetryableDownloadError(error) {

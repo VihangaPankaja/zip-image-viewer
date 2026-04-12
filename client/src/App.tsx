@@ -4,6 +4,7 @@ import Hls from "hls.js";
 import { openJobSocket } from "./lib/jobSocket";
 import { classifyNodeKind, getVideoMimeType } from "./lib/mimeTypeSystem";
 import { formatMediaTime } from "./lib/formatterUtils";
+import { fetchJson } from "./services/apiClient";
 import { WorkspaceTabs, type WorkspaceTabId } from "./components/WorkspaceTabs";
 import { ExplorerTablePanel } from "./components/ExplorerTablePanel";
 import { GlobalSettingsSheet } from "./components/GlobalSettingsSheet";
@@ -1418,13 +1419,10 @@ function App() {
     async function loadQualityOptions() {
       try {
         const query = new URLSearchParams({ path });
-        const response = await fetch(
-          `/api/sessions/${session.id}/video/qualities?${query.toString()}`,
-        );
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          throw new Error(payload.error || "Could not load video qualities.");
-        }
+        const payload = await fetchJson<{
+          options?: Array<{ id?: string; label?: string }>;
+          defaultQuality?: string;
+        }>(`/api/sessions/${session.id}/video/qualities?${query.toString()}`);
 
         const options = Array.isArray(payload.options)
           ? payload.options.map((option) => ({
