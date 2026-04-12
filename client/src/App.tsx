@@ -93,6 +93,21 @@ const NAME_COLLATOR = new Intl.Collator(undefined, {
   numeric: false,
 });
 
+const VIDEO_MIME_BY_EXTENSION: Record<string, string> = {
+  mp4: "video/mp4",
+  m4v: "video/mp4",
+  webm: "video/webm",
+  ogv: "video/ogg",
+  mov: "video/quicktime",
+};
+
+function getVideoMimeType(extension: string | undefined) {
+  if (!extension) {
+    return "video/mp4";
+  }
+  return VIDEO_MIME_BY_EXTENSION[extension.toLowerCase()] || "video/mp4";
+}
+
 function formatBytes(value) {
   if (!Number.isFinite(value) || value <= 0) return "Unknown size";
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -678,6 +693,7 @@ function App() {
   const [activeJob, setActiveJob] = useState(null);
   const [videoPlaybackRate, setVideoPlaybackRate] = useState(1);
   const [videoVolume, setVideoVolume] = useState(0.9);
+  const [videoPlaybackError, setVideoPlaybackError] = useState("");
   const [keyboardSettings, setKeyboardSettings] = useState(() => {
     if (typeof window === "undefined") {
       return { jumpSeconds: 5, rateStep: 0.25 };
@@ -1309,8 +1325,19 @@ function App() {
       setVideoVolume(Math.max(0, Math.min(1, Number(player.volume()) || 0)));
     }
 
+    function onError() {
+      const mediaError = player.error();
+      const detail =
+        mediaError?.message ||
+        (mediaError?.code
+          ? `Playback failed (code ${mediaError.code}).`
+          : "Playback failed.");
+      setVideoPlaybackError(detail);
+    }
+
     player.on("ratechange", onRateChange);
     player.on("volumechange", onVolumeChange);
+    player.on("error", onError);
 
     player.volume(0.9);
     player.playbackRate(1);
@@ -1318,6 +1345,7 @@ function App() {
     return () => {
       player.off("ratechange", onRateChange);
       player.off("volumechange", onVolumeChange);
+      player.off("error", onError);
       player.dispose();
       if (videoPlayerRef.current === player) {
         videoPlayerRef.current = null;
@@ -1331,8 +1359,12 @@ function App() {
       return;
     }
 
-    player.src({ src: selectedVideoUrl, type: "video/mp4" });
-  }, [selectedKind, selectedVideoUrl]);
+    setVideoPlaybackError("");
+    player.src({
+      src: selectedVideoUrl,
+      type: getVideoMimeType(selectedNode?.extension),
+    });
+  }, [selectedKind, selectedNode, selectedVideoUrl]);
 
   useEffect(() => {
     const player = videoPlayerRef.current;
@@ -2299,6 +2331,11 @@ function App() {
                     Arrow left and right seek by {keyboardSettings.jumpSeconds}
                     s, arrow up and down changes volume, and [ ] changes speed.
                   </div>
+                  {videoPlaybackError ? (
+                    <div className="navigation-hint" role="alert">
+                      Video error: {videoPlaybackError}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
