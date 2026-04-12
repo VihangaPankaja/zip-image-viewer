@@ -9,6 +9,7 @@ import {
   FileText,
   FileArchive,
 } from "lucide-react";
+import { classifyNodeKind } from "../lib/mimeTypeSystem";
 
 type ExplorerNode = {
   name: string;
@@ -18,39 +19,10 @@ type ExplorerNode = {
   children?: ExplorerNode[];
 };
 
-function classifyNode(node: ExplorerNode | null | undefined) {
-  if (!node || node.type === "directory") return "directory";
-  const ext = String(node.extension || "").toLowerCase();
-  if (["jpg", "jpeg", "png", "webp", "gif", "svg", "bmp", "avif"].includes(ext))
-    return "image";
-  if (["mp4", "webm", "mov", "m4v", "ogv", "mkv"].includes(ext)) return "video";
-  if (["mp3", "wav", "ogg", "aac", "m4a", "flac"].includes(ext)) return "audio";
-  if (
-    [
-      "txt",
-      "md",
-      "json",
-      "csv",
-      "log",
-      "xml",
-      "yml",
-      "yaml",
-      "js",
-      "jsx",
-      "ts",
-      "tsx",
-      "html",
-      "css",
-    ].includes(ext)
-  )
-    return "text";
-  return "binary";
-}
-
 function iconForNode(node: ExplorerNode | null | undefined) {
   if (!node || node.type === "directory") return Folder;
   const ext = String(node.extension || "").toLowerCase();
-  const kind = classifyNode(node);
+  const kind = classifyNodeKind(node);
   if (kind === "image") return FileImage;
   if (kind === "video") return FileVideo;
   if (kind === "audio") return FileAudio;
