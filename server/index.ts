@@ -457,6 +457,14 @@ function parseRangeHeader(rangeHeader, size) {
   };
 }
 
+function parseSeekSeconds(value) {
+  const parsed = Number.parseFloat(String(value ?? "0"));
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0;
+  }
+  return parsed;
+}
+
 function createJob(url, downloadOptions = DEFAULT_DOWNLOAD_OPTIONS) {
   const normalizedOptions = normalizeDownloadOptions(downloadOptions);
   const job = {
@@ -2336,6 +2344,7 @@ app.get("/api/sessions/:id/video/hls/playlist", async (req, res) => {
 
   const requestedPath = String(req.query.path || "");
   const requestedQuality = String(req.query.quality || "720p").toLowerCase();
+  const requestedSeekSeconds = parseSeekSeconds(req.query.seekSeconds);
   if (!requestedPath || requestedPath === ".") {
     return res.status(400).json({ error: "File path is required." });
   }
@@ -2374,6 +2383,18 @@ app.get("/api/sessions/:id/video/hls/playlist", async (req, res) => {
     "720p";
   const rendition = getRenditionState(entry, session, selectedQuality);
   await startRenditionTranscode(entry, session, rendition);
+  const requestedSegmentIndex = Math.max(
+    0,
+    Math.floor(requestedSeekSeconds / DEFAULT_VIDEO_SEGMENT_SECONDS),
+  );
+  if (requestedSegmentIndex > 0) {
+    await startPrioritySegmentWindow(
+      entry,
+      session,
+      rendition,
+      requestedSegmentIndex,
+    );
+  }
   await refreshRenditionAvailability(rendition);
 
   const segmentCount = Math.max(1, rendition.expectedSegments || 1);
@@ -2385,6 +2406,12 @@ app.get("/api/sessions/:id/video/hls/playlist", async (req, res) => {
     "#EXT-X-MEDIA-SEQUENCE:0",
     "#EXT-X-PLAYLIST-TYPE:VOD",
   ];
+
+  if (requestedSeekSeconds > 0) {
+    lines.push(
+      `#EXT-X-START:TIME-OFFSET=${requestedSeekSeconds.toFixed(3)},PRECISE=YES`,
+    );
+  }
 
   for (let index = 0; index < segmentCount; index += 1) {
     const remaining =
@@ -2413,7 +2440,101 @@ app.get("/api/sessions/:id/video/hls/playlist", async (req, res) => {
   res.setHeader("cache-control", "no-store");
   res.setHeader("content-type", "application/vnd.apple.mpegurl");
   res.setHeader("x-video-duration-seconds", String(entry.durationSeconds || 0));
+  res.setHeader("x-video-requested-seek-seconds", String(requestedSeekSeconds));
   return res.send(`${lines.join("\n")}\n`);
+});
+
+app.get("/api/sessions/:id/video/thumbnail", async (req, res) => {
+  const session = touchSession(req.params.id);
+  if (!session) {
+    return res
+      .status(404)
+      .json({ error: "Session not found or already cleaned up." });
+  }
+
+  if (!ffmpegPath) {
+    return res.status(503).json({ error: "Video transcoder is unavailable." });
+  }
+
+  const requestedPath = String(req.query.path || "");
+  if (!requestedPath || requestedPath === ".") {
+    return res.status(400).json({ error: "File path is required." });
+  }
+
+  const seekSeconds = parseSeekSeconds(req.query.time);
+  const quality = String(req.query.quality || "720p").toLowerCase();
+  const width = Math.max(
+    120,
+    Math.min(640, Number.parseInt(String(req.query.width || "240"), 10) || 240),
+  );
+
+  let normalizedPath;
+  try {
+    normalizedPath = sanitizeEntryPath(requestedPath);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const targetPath = path.resolve(
+    path.join(session.extractDir, normalizedPath),
+  );
+  const rootPath = path.resolve(session.extractDir);
+  if (
+    !targetPath.startsWith(`${rootPath}${path.sep}`) &&
+    targetPath !== rootPath
+  ) {
+    return res.status(400).json({ error: "Invalid file path." });
+  }
+
+  const fileStats = await stat(targetPath).catch(() => null);
+  if (!fileStats || !fileStats.isFile()) {
+    return res.status(404).json({ error: "File not found." });
+  }
+
+  const source = await getVideoMetadata(targetPath);
+  const { options } = buildVideoQualityOptions(source.height);
+  const selectedQuality =
+    options.find((option) => option.id === quality)?.id || "source";
+  const selectedHeight =
+    selectedQuality === "source"
+      ? 0
+      : Number.parseInt(selectedQuality.replace("p", ""), 10) || 0;
+
+  const thumbDir = path.join(session.workspaceDir, "video-thumbnails");
+  await mkdir(thumbDir, { recursive: true });
+  const roundedSeek = Math.max(0, Math.round(seekSeconds * 4) / 4);
+  const hash = crypto
+    .createHash("sha1")
+    .update(`${normalizedPath}:${selectedQuality}:${width}:${roundedSeek}`)
+    .digest("hex");
+  const thumbPath = path.join(thumbDir, `${hash}.jpg`);
+  const existing = await stat(thumbPath).catch(() => null);
+
+  if (!existing) {
+    const args = [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-ss",
+      String(roundedSeek),
+      "-i",
+      targetPath,
+    ];
+
+    if (selectedHeight > 0) {
+      args.push("-vf", `scale=-2:${selectedHeight},scale=${width}:-2`);
+    } else {
+      args.push("-vf", `scale=${width}:-2`);
+    }
+
+    args.push("-frames:v", "1", "-q:v", "4", thumbPath);
+    await runCommand(String(ffmpegPath), args);
+  }
+
+  res.setHeader("cache-control", "no-store");
+  res.type("image/jpeg");
+  return res.sendFile(thumbPath);
 });
 
 app.get("/api/sessions/:id/video/hls/segment", async (req, res) => {
