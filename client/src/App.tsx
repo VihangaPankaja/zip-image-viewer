@@ -1,624 +1,55 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Hls from "hls.js";
+import { CustomDropdown } from "./components/Common/CustomDropdown";
 import { openJobSocket } from "./lib/jobSocket";
 import { classifyNodeKind, getVideoMimeType } from "./lib/mimeTypeSystem";
-import { formatMediaTime } from "./lib/formatterUtils";
+import {
+  DOWNLOAD_RETRY_OPTIONS,
+  DOWNLOAD_THREAD_MODE_OPTIONS,
+  PREVIEW_QUALITY_OPTIONS,
+  SLIDESHOW_FIT_OPTIONS,
+  SORT_OPTIONS,
+  STRIP_THUMB_SIZE,
+  VIDEO_TRANSCODE_QUALITY_OPTIONS,
+  WORKSPACE_TABS,
+  DEFAULT_DOWNLOAD_OPTIONS,
+} from "./lib/appConstants";
+import {
+  getImageCacheKey,
+  getThumbnailWindow,
+  getWrappedPath,
+  isTerminalJobStatus,
+  formatProgressMessage,
+  wait,
+} from "./lib/archiveUiUtils";
+import {
+  clampNumber,
+  downloadOptionsToLegacySettings,
+  normalizeDownloadOptions,
+  normalizeDownloadSettings,
+} from "./lib/downloadOptions";
+import { buildFileUrl } from "./lib/fileUrl";
+import {
+  formatBytes,
+  formatDate,
+  formatEta,
+  formatMediaTime,
+  formatSpeed,
+  formatTransferBytes,
+} from "./lib/formatterUtils";
+import {
+  cloneAndSortTree,
+  compareNodes,
+  flattenTree,
+  getFirstFilePath,
+} from "./lib/treeUtils";
 import { fetchJson } from "./services/apiClient";
+import type { DownloadOptions } from "./types/download";
 import { WorkspaceTabs, type WorkspaceTabId } from "./components/WorkspaceTabs";
 import { ExplorerTablePanel } from "./components/ExplorerTablePanel";
 import { GlobalSettingsSheet } from "./components/GlobalSettingsSheet";
 import { TreeExplorer } from "./components/TreeExplorer";
-
-const STRIP_THUMB_SIZE = 220;
-const SORT_OPTIONS = [
-  { value: "name-asc", label: "Name A-Z" },
-  { value: "name-desc", label: "Name Z-A" },
-  { value: "date-asc", label: "Date oldest" },
-  { value: "date-desc", label: "Date newest" },
-  { value: "natural-tail", label: "Number trail" },
-];
-const PREVIEW_QUALITY_OPTIONS = [
-  { value: "low", label: "Low preview" },
-  { value: "balanced", label: "Balanced preview" },
-  { value: "high", label: "High preview" },
-];
-const SLIDESHOW_FIT_OPTIONS = [
-  { value: "best-fit", label: "Best fit" },
-  { value: "fit-width", label: "Fit width" },
-  { value: "fit-height", label: "Fit height" },
-];
-const DOWNLOAD_THREAD_MODE_OPTIONS = [
-  { value: "auto", label: "Auto (recommended)" },
-  { value: "single", label: "Single stream" },
-  { value: "segmented", label: "Segmented" },
-];
-const DOWNLOAD_RETRY_OPTIONS = [
-  { value: 0, label: "No retry" },
-  { value: 3, label: "3 retries" },
-  { value: 5, label: "5 retries" },
-  { value: 8, label: "8 retries" },
-  { value: -1, label: "Unlimited" },
-];
-const VIDEO_TRANSCODE_QUALITY_OPTIONS = [
-  { value: "720p", label: "720p (default)" },
-  { value: "480p", label: "480p" },
-  { value: "1080p", label: "1080p" },
-  { value: "1440p", label: "1440p" },
-  { value: "2160p", label: "2160p" },
-  { value: "360p", label: "360p" },
-  { value: "source", label: "Original source" },
-];
-const WORKSPACE_TABS: Array<{ value: WorkspaceTabId; label: string }> = [
-  { value: "download", label: "Download" },
-  { value: "preview", label: "Preview" },
-  { value: "explorer", label: "Explorer" },
-];
-const DEFAULT_DOWNLOAD_SETTINGS = {
-  threadMode: "auto",
-  threadCount: 3,
-  enableMultithread: true,
-  enableResume: true,
-  maxRetries: 3,
-  videoQuality: "720p",
-};
-const NAME_COLLATOR = new Intl.Collator(undefined, {
-  sensitivity: "base",
-  numeric: false,
-});
-
-function formatBytes(value) {
-  if (!Number.isFinite(value) || value <= 0) return "Unknown size";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let size = value;
-  let unitIndex = 0;
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex += 1;
-  }
-  return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
-}
-
-function formatTransferBytes(value) {
-  if (!Number.isFinite(value) || value < 0) return "--";
-  if (value === 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let size = value;
-  let unitIndex = 0;
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex += 1;
-  }
-  return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
-}
-
-function formatSpeed(bytesPerSec) {
-  if (!Number.isFinite(bytesPerSec) || bytesPerSec <= 0) return "--";
-  return `${formatTransferBytes(bytesPerSec)}/s`;
-}
-
-function clampNumber(value, min, max, fallback) {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed)) {
-    return fallback;
-  }
-  return Math.max(min, Math.min(max, parsed));
-}
-
-function normalizeDownloadSettings(value) {
-  const source = value && typeof value === "object" ? value : {};
-  const threadMode =
-    source.threadMode === "auto" ||
-    source.threadMode === "single" ||
-    source.threadMode === "segmented"
-      ? source.threadMode
-      : DEFAULT_DOWNLOAD_SETTINGS.threadMode;
-
-  return {
-    threadMode,
-    threadCount: clampNumber(
-      source.threadCount,
-      1,
-      8,
-      DEFAULT_DOWNLOAD_SETTINGS.threadCount,
-    ),
-    enableMultithread:
-      source.enableMultithread == null
-        ? DEFAULT_DOWNLOAD_SETTINGS.enableMultithread
-        : Boolean(source.enableMultithread),
-    enableResume:
-      source.enableResume == null
-        ? DEFAULT_DOWNLOAD_SETTINGS.enableResume
-        : Boolean(source.enableResume),
-    maxRetries:
-      Number.parseInt(source.maxRetries, 10) === -1
-        ? -1
-        : clampNumber(
-            source.maxRetries,
-            0,
-            8,
-            DEFAULT_DOWNLOAD_SETTINGS.maxRetries,
-          ),
-    videoQuality: VIDEO_TRANSCODE_QUALITY_OPTIONS.some(
-      (option) =>
-        option.value === String(source.videoQuality || "").toLowerCase(),
-    )
-      ? String(source.videoQuality).toLowerCase()
-      : DEFAULT_DOWNLOAD_SETTINGS.videoQuality,
-  };
-}
-
-function normalizeDownloadOptions(value): DownloadOptions {
-  const source = value && typeof value === "object" ? value : {};
-  const transportSource =
-    source.transport && typeof source.transport === "object"
-      ? source.transport
-      : {};
-  const retrySource =
-    source.retry && typeof source.retry === "object" ? source.retry : {};
-  const mediaSource =
-    source.media && typeof source.media === "object" ? source.media : {};
-  const extractionSource =
-    source.extraction && typeof source.extraction === "object"
-      ? source.extraction
-      : {};
-  const requestSource =
-    source.request && typeof source.request === "object" ? source.request : {};
-
-  const legacy = normalizeDownloadSettings(source);
-  const timeoutMs = clampNumber(retrySource.timeoutMs, 5000, 180000, 30000);
-  const headers =
-    requestSource.headers && typeof requestSource.headers === "object"
-      ? Object.fromEntries(
-          Object.entries(requestSource.headers)
-            .filter(([key, val]) => key && val != null)
-            .map(([key, val]) => [String(key), String(val)]),
-        )
-      : {};
-
-  return {
-    transport: {
-      mode:
-        transportSource.mode === "single" ||
-        transportSource.mode === "segmented" ||
-        transportSource.mode === "auto"
-          ? transportSource.mode
-          : legacy.threadMode,
-      threads: clampNumber(transportSource.threads, 1, 8, legacy.threadCount),
-      multithread:
-        transportSource.multithread == null
-          ? legacy.enableMultithread
-          : Boolean(transportSource.multithread),
-      resume:
-        transportSource.resume == null
-          ? legacy.enableResume
-          : Boolean(transportSource.resume),
-    },
-    retry: {
-      maxRetries:
-        Number.parseInt(retrySource.maxRetries, 10) === -1
-          ? -1
-          : clampNumber(retrySource.maxRetries, 0, 8, legacy.maxRetries),
-      timeoutMs,
-    },
-    media: {
-      videoQuality: VIDEO_TRANSCODE_QUALITY_OPTIONS.some(
-        (option) =>
-          option.value === String(mediaSource.videoQuality || "").toLowerCase(),
-      )
-        ? String(mediaSource.videoQuality).toLowerCase()
-        : legacy.videoQuality,
-    },
-    extraction: {
-      enabled:
-        extractionSource.enabled == null
-          ? DEFAULT_DOWNLOAD_OPTIONS.extraction.enabled
-          : Boolean(extractionSource.enabled),
-    },
-    request: {
-      headers,
-    },
-  };
-}
-
-function downloadOptionsToLegacySettings(options: DownloadOptions) {
-  return {
-    threadMode: options.transport.mode,
-    threadCount: options.transport.threads,
-    enableMultithread: options.transport.multithread,
-    enableResume: options.transport.resume,
-    maxRetries: options.retry.maxRetries,
-    videoQuality: options.media.videoQuality,
-  };
-}
-
-function formatEta(seconds) {
-  if (!Number.isFinite(seconds) || seconds < 0) {
-    return "--";
-  }
-
-  const total = Math.max(0, Math.floor(seconds));
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const secs = total % 60;
-
-  if (hours > 0) {
-    return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(secs).padStart(2, "0")}s`;
-  }
-  if (minutes > 0) {
-    return `${minutes}m ${String(secs).padStart(2, "0")}s`;
-  }
-  return `${secs}s`;
-}
-
-function formatDate(value) {
-  if (!value) {
-    return "Date unknown";
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).format(value);
-}
-
-function classifyNode(node) {
-  return classifyNodeKind(node);
-}
-
-type BuildFileUrlOptions = {
-  previewText?: boolean;
-  thumbnail?: boolean;
-  size?: number;
-  imagePreview?: boolean;
-  quality?: string;
-};
-
-type DownloadOptions = {
-  transport: {
-    mode: "auto" | "single" | "segmented";
-    threads: number;
-    multithread: boolean;
-    resume: boolean;
-  };
-  retry: {
-    maxRetries: number;
-    timeoutMs: number;
-  };
-  media: {
-    videoQuality: string;
-  };
-  extraction: {
-    enabled: boolean;
-  };
-  request: {
-    headers: Record<string, string>;
-  };
-};
-
-const DEFAULT_DOWNLOAD_OPTIONS: DownloadOptions = {
-  transport: {
-    mode: "auto",
-    threads: 3,
-    multithread: true,
-    resume: true,
-  },
-  retry: {
-    maxRetries: 3,
-    timeoutMs: 30000,
-  },
-  media: {
-    videoQuality: "720p",
-  },
-  extraction: {
-    enabled: true,
-  },
-  request: {
-    headers: {},
-  },
-};
-
-function buildFileUrl(sessionId, filePath, options: BuildFileUrlOptions = {}) {
-  if (!sessionId || !filePath) {
-    return "";
-  }
-
-  const params = new URLSearchParams({ path: filePath });
-  if (options.previewText) {
-    params.set("preview", "1");
-  }
-  if (options.thumbnail) {
-    params.set("thumbnail", "1");
-    params.set("size", String(options.size || STRIP_THUMB_SIZE));
-  }
-  if (options.imagePreview) {
-    params.set("imagePreview", "1");
-    params.set("quality", options.quality || "balanced");
-  }
-
-  return `/api/sessions/${sessionId}/file?${params.toString()}`;
-}
-
-function getNameBase(name) {
-  return String(name || "").replace(/\.[^.]+$/, "");
-}
-
-function parseTrailingNumber(name) {
-  const baseName = getNameBase(name).trim();
-  const match = baseName.match(/^(.*?)(?:[\s._-]*\(?([0-9]+)\)?)$/);
-  if (!match) {
-    return null;
-  }
-
-  return {
-    prefix: match[1].trim(),
-    number: Number(match[2]),
-  };
-}
-
-function compareByName(left, right) {
-  return NAME_COLLATOR.compare(left.name, right.name);
-}
-
-function compareByNaturalTail(left, right) {
-  const leftTail = parseTrailingNumber(left.name);
-  const rightTail = parseTrailingNumber(right.name);
-
-  if (leftTail && rightTail) {
-    const prefixCompare = NAME_COLLATOR.compare(
-      leftTail.prefix,
-      rightTail.prefix,
-    );
-    if (prefixCompare !== 0) {
-      return prefixCompare;
-    }
-    if (leftTail.number !== rightTail.number) {
-      return leftTail.number - rightTail.number;
-    }
-  }
-
-  return compareByName(left, right);
-}
-
-function compareByDate(left, right, direction) {
-  const leftValue = left.modifiedAt || 0;
-  const rightValue = right.modifiedAt || 0;
-  if (leftValue !== rightValue) {
-    return direction === "asc"
-      ? leftValue - rightValue
-      : rightValue - leftValue;
-  }
-  return compareByName(left, right);
-}
-
-function compareNodes(left, right, sortMode) {
-  if (left.type !== right.type) {
-    return left.type === "directory" ? -1 : 1;
-  }
-
-  switch (sortMode) {
-    case "name-desc":
-      return compareByName(right, left);
-    case "date-asc":
-      return compareByDate(left, right, "asc");
-    case "date-desc":
-      return compareByDate(left, right, "desc");
-    case "natural-tail":
-      return compareByNaturalTail(left, right);
-    case "name-asc":
-    default:
-      return compareByName(left, right);
-  }
-}
-
-function cloneAndSortTree(node, sortMode) {
-  if (node.type !== "directory") {
-    return { ...node };
-  }
-
-  const children = node.children.map((child) =>
-    cloneAndSortTree(child, sortMode),
-  );
-  children.sort((left, right) => compareNodes(left, right, sortMode));
-
-  return {
-    ...node,
-    children,
-  };
-}
-
-function flattenTree(tree) {
-  const nodesByPath = new Map();
-  const folderImages = new Map();
-  const folderPreview = new Map();
-
-  function walk(node) {
-    nodesByPath.set(node.path, node);
-    if (node.type === "directory") {
-      const imageChildren = node.children.filter(
-        (child) => classifyNode(child) === "image",
-      );
-      folderImages.set(
-        node.path,
-        imageChildren.map((child) => child.path),
-      );
-      folderPreview.set(node.path, imageChildren[0]?.path || "");
-      node.children.forEach(walk);
-    }
-  }
-
-  walk(tree);
-  return { nodesByPath, folderImages, folderPreview };
-}
-
-function getFirstFilePath(node) {
-  if (!node) {
-    return "";
-  }
-
-  if (node.type === "file") {
-    return node.path;
-  }
-
-  for (const child of node.children) {
-    const match = getFirstFilePath(child);
-    if (match) {
-      return match;
-    }
-  }
-
-  return node.path;
-}
-
-function getThumbnailWindow(items, currentPath, radius = 2) {
-  if (items.length <= radius * 2 + 1) {
-    return items;
-  }
-
-  const currentIndex = items.findIndex((item) => item.path === currentPath);
-  if (currentIndex === -1) {
-    return items.slice(0, radius * 2 + 1);
-  }
-
-  const visible = [];
-  for (let offset = -radius; offset <= radius; offset += 1) {
-    const index = (currentIndex + offset + items.length) % items.length;
-    visible.push(items[index]);
-  }
-  return visible;
-}
-
-function getImageCacheKey(sessionId, imagePath, quality) {
-  return `${sessionId}:${imagePath}:${quality}`;
-}
-
-function getWrappedPath(items, currentIndex, delta) {
-  if (!items.length || currentIndex === -1) {
-    return "";
-  }
-
-  const nextIndex = (currentIndex + delta + items.length) % items.length;
-  return items[nextIndex] || "";
-}
-
-function formatProgressMessage(job) {
-  if (!job) {
-    return "";
-  }
-
-  if (job.message) {
-    return job.message;
-  }
-
-  if (job.phase === "downloading" && job.reportedSize > 0) {
-    if (job.isStalled) {
-      return "Download stalled, waiting for data or retry.";
-    }
-    return `Downloading archive: ${formatTransferBytes(job.downloadedBytes)} of ${formatTransferBytes(job.reportedSize)}`;
-  }
-
-  if (job.phase === "downloading") {
-    return `Downloading archive: ${formatTransferBytes(job.downloadedBytes)} received`;
-  }
-
-  if (job.phase === "extracting") {
-    return `Extracting archive: ${job.extractedEntries || 0} of ${job.totalEntries || 0} entries`;
-  }
-
-  return "Working on archive...";
-}
-
-function wait(ms) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
-function isTerminalJobStatus(status) {
-  return status === "ready" || status === "error" || status === "cancelled";
-}
-
-function CustomDropdown({
-  id,
-  label,
-  value,
-  options,
-  onChange,
-  className = "",
-}) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef(null);
-  const activeOption =
-    options.find((option) => option.value === value) || options[0] || null;
-
-  useEffect(() => {
-    function onPointerDown(event) {
-      if (!rootRef.current?.contains(event.target)) {
-        setOpen(false);
-      }
-    }
-
-    function onEscape(event) {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    }
-
-    window.addEventListener("mousedown", onPointerDown);
-    window.addEventListener("keydown", onEscape);
-
-    return () => {
-      window.removeEventListener("mousedown", onPointerDown);
-      window.removeEventListener("keydown", onEscape);
-    };
-  }, []);
-
-  return (
-    <div
-      ref={rootRef}
-      className={`toolbar-select-shell custom-dropdown-shell ${className}`.trim()}
-    >
-      <span className="toolbar-label">{label}</span>
-      <button
-        type="button"
-        id={id}
-        className={`custom-dropdown-trigger ${open ? "open" : ""}`}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span>{activeOption?.label || "Select"}</span>
-        <span className="custom-dropdown-caret">{open ? "^" : "v"}</span>
-      </button>
-
-      {open ? (
-        <div
-          className="custom-dropdown-menu"
-          role="listbox"
-          aria-labelledby={id}
-        >
-          {options.map((option) => {
-            const isActive = option.value === value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                role="option"
-                aria-selected={isActive}
-                className={`custom-dropdown-option ${isActive ? "active" : ""}`}
-                onClick={() => {
-                  onChange(option.value);
-                  setOpen(false);
-                }}
-              >
-                {option.label}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
-    </div>
-  );
-}
 
 function App() {
   const [zipUrl, setZipUrl] = useState("");
@@ -744,7 +175,7 @@ function App() {
     [sortedTree],
   );
   const selectedNode = flatData?.nodesByPath.get(selectedPath) || null;
-  const selectedKind = classifyNode(selectedNode);
+  const selectedKind = classifyNodeKind(selectedNode);
   const currentFolderImages = selectedNode
     ? flatData?.folderImages.get(selectedNode.parentPath) || []
     : [];
@@ -1822,7 +1253,7 @@ function App() {
                     label="Fit mode"
                     value={slideshowFitMode}
                     options={SLIDESHOW_FIT_OPTIONS}
-                    onChange={setSlideshowFitMode}
+                    onChange={(value) => setSlideshowFitMode(String(value))}
                     className="slideshow-fit-shell"
                   />
 
@@ -2208,7 +1639,7 @@ function App() {
                   label="Sort"
                   value={sortMode}
                   options={SORT_OPTIONS}
-                  onChange={setSortMode}
+                  onChange={(value) => setSortMode(String(value))}
                   className="toolbar-select-shell-wide explorer-sort-shell"
                 />
               </div>
@@ -2306,7 +1737,7 @@ function App() {
                       label="Preview quality"
                       value={previewQuality}
                       options={PREVIEW_QUALITY_OPTIONS}
-                      onChange={setPreviewQuality}
+                      onChange={(value) => setPreviewQuality(String(value))}
                     />
                     <span>{formatDate(selectedNode.modifiedAt)}</span>
                   </div>
@@ -2401,7 +1832,9 @@ function App() {
                             }))
                           : [{ value: "source", label: "Original" }]
                       }
-                      onChange={setSelectedVideoQuality}
+                      onChange={(value) =>
+                        setSelectedVideoQuality(String(value))
+                      }
                     />
                     <span>{formatDate(selectedNode.modifiedAt)}</span>
                   </div>
