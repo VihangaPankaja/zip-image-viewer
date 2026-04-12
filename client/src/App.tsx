@@ -2,39 +2,12 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Hls from "hls.js";
 import { openJobSocket } from "./lib/jobSocket";
+import { classifyNodeKind, getVideoMimeType } from "./lib/mimeTypeSystem";
+import { formatMediaTime } from "./lib/formatterUtils";
 import { WorkspaceTabs, type WorkspaceTabId } from "./components/WorkspaceTabs";
 import { ExplorerTablePanel } from "./components/ExplorerTablePanel";
 import { GlobalSettingsSheet } from "./components/GlobalSettingsSheet";
 import { TreeExplorer } from "./components/TreeExplorer";
-
-const IMAGE_EXTENSIONS = new Set([
-  "jpg",
-  "jpeg",
-  "png",
-  "webp",
-  "gif",
-  "svg",
-  "bmp",
-  "avif",
-]);
-const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v", "ogv"]);
-const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "ogg", "aac", "m4a", "flac"]);
-const TEXT_EXTENSIONS = new Set([
-  "txt",
-  "md",
-  "json",
-  "csv",
-  "log",
-  "xml",
-  "yml",
-  "yaml",
-  "js",
-  "jsx",
-  "ts",
-  "tsx",
-  "html",
-  "css",
-]);
 
 const STRIP_THUMB_SIZE = 220;
 const SORT_OPTIONS = [
@@ -92,32 +65,6 @@ const NAME_COLLATOR = new Intl.Collator(undefined, {
   sensitivity: "base",
   numeric: false,
 });
-
-const VIDEO_MIME_BY_EXTENSION: Record<string, string> = {
-  mp4: "video/mp4",
-  m4v: "video/mp4",
-  webm: "video/webm",
-  ogv: "video/ogg",
-  mov: "video/quicktime",
-};
-
-function getVideoMimeType(extension: string | undefined) {
-  if (!extension) {
-    return "video/mp4";
-  }
-  return VIDEO_MIME_BY_EXTENSION[extension.toLowerCase()] || "video/mp4";
-}
-
-function formatMediaTime(totalSeconds: number) {
-  const value = Number.isFinite(totalSeconds) ? Math.max(0, totalSeconds) : 0;
-  const hours = Math.floor(value / 3600);
-  const minutes = Math.floor((value % 3600) / 60);
-  const seconds = Math.floor(value % 60);
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  }
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
 
 function formatBytes(value) {
   if (!Number.isFinite(value) || value <= 0) return "Unknown size";
@@ -316,12 +263,7 @@ function formatDate(value) {
 }
 
 function classifyNode(node) {
-  if (!node || node.type === "directory") return "directory";
-  if (IMAGE_EXTENSIONS.has(node.extension)) return "image";
-  if (VIDEO_EXTENSIONS.has(node.extension)) return "video";
-  if (AUDIO_EXTENSIONS.has(node.extension)) return "audio";
-  if (TEXT_EXTENSIONS.has(node.extension)) return "text";
-  return "binary";
+  return classifyNodeKind(node);
 }
 
 type BuildFileUrlOptions = {
@@ -2737,4 +2679,3 @@ function App() {
 }
 
 export default App;
-export { formatMediaTime };

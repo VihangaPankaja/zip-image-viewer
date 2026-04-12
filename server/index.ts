@@ -25,6 +25,27 @@ import { fileTypeFromFile } from "file-type";
 import { attachJobWebSocketServer } from "./realtime/jobSocketServer.js";
 import { downloadWithSegmentedManager } from "./services/segmentedDownloader.js";
 import { createDownloadProgressMonitor } from "./services/jobProgressMonitor.js";
+import {
+  CLEANUP_INTERVAL_MS,
+  CONFIRM_SIZE_BYTES,
+  DEFAULT_DOWNLOAD_OPTIONS,
+  DEFAULT_DOWNLOAD_SETTINGS,
+  JOB_TTL_MS,
+  MAX_THUMBNAIL_SIZE,
+  PORT,
+  PROGRESS_EMIT_INTERVAL_MS,
+  SESSION_TTL_MS,
+  TEXT_PREVIEW_LIMIT,
+} from "./config/runtimeConstants.js";
+import {
+  decrementActiveSessionJobCount,
+  getActiveSessionJobCount,
+  incrementActiveSessionJobCount,
+  jobStore,
+  pendingSessionJobs,
+  sessionStore,
+  videoTranscodeStore,
+} from "./repositories/memoryStores.js";
 
 const require = createRequire(import.meta.url);
 const { path7za } = require("7zip-bin");
@@ -32,47 +53,8 @@ const ffmpegPath = require("ffmpeg-static");
 
 const distDir = path.resolve(process.cwd(), "dist");
 const app = express();
-const sessionStore = new Map();
-const jobStore = new Map();
 let server;
 let isShuttingDown = false;
-
-const PORT = Number(process.env.PORT || 8080);
-const SESSION_TTL_MS = 30 * 60 * 1000;
-const JOB_TTL_MS = 30 * 60 * 1000;
-const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
-const CONFIRM_SIZE_BYTES = 1024 * 1024 * 1024;
-const TEXT_PREVIEW_LIMIT = 2 * 1024 * 1024;
-const PROGRESS_EMIT_INTERVAL_MS = 1000;
-const MAX_THUMBNAIL_SIZE = 320;
-const DEFAULT_DOWNLOAD_SETTINGS = {
-  threadMode: "auto",
-  threadCount: 3,
-  enableMultithread: true,
-  enableResume: true,
-  maxRetries: 3,
-};
-const DEFAULT_DOWNLOAD_OPTIONS = {
-  transport: {
-    mode: "auto",
-    threads: 3,
-    multithread: true,
-    resume: true,
-  },
-  retry: {
-    maxRetries: 3,
-    timeoutMs: 30000,
-  },
-  media: {
-    videoQuality: "720p",
-  },
-  extraction: {
-    enabled: true,
-  },
-  request: {
-    headers: {},
-  },
-};
 const MAX_THREAD_COUNT = 8;
 const MAX_RETRIES = 8;
 const UNLIMITED_RETRIES = -1;
@@ -107,10 +89,7 @@ const VIDEO_TRANSCODE_QUALITY_OPTIONS = [
 ];
 const DEFAULT_VIDEO_SEGMENT_SECONDS = 4;
 const VIDEO_PRIORITY_WINDOW_SECONDS = 24;
-const videoTranscodeStore = new Map();
 const MAX_ACTIVE_SESSION_JOBS = 2;
-let activeSessionJobCount = 0;
-const pendingSessionJobs = [];
 
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(distDir));
@@ -560,7 +539,7 @@ function sanitizeJob(job) {
 
 function scheduleSessionJobs() {
   while (
-    activeSessionJobCount < MAX_ACTIVE_SESSION_JOBS &&
+    getActiveSessionJobCount() < MAX_ACTIVE_SESSION_JOBS &&
     pendingSessionJobs.length > 0
   ) {
     const next = pendingSessionJobs.shift();
@@ -568,7 +547,7 @@ function scheduleSessionJobs() {
       break;
     }
 
-    activeSessionJobCount += 1;
+    incrementActiveSessionJobCount();
     processSessionJob(next.job, next.confirmOversize)
       .catch((error) => {
         logEvent("error", "job.process.unhandled", {
@@ -578,7 +557,7 @@ function scheduleSessionJobs() {
         });
       })
       .finally(() => {
-        activeSessionJobCount = Math.max(0, activeSessionJobCount - 1);
+        decrementActiveSessionJobCount();
         scheduleSessionJobs();
       });
   }
