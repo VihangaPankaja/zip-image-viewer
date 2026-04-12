@@ -29,10 +29,7 @@ export type SessionJob = {
 export type SessionJobRouteDependencies = {
   getJob: (_jobId: string) => SessionJob | undefined;
   sanitizeJob: (_job: SessionJob) => unknown;
-  enqueueSessionJob: (
-    _job: SessionJob,
-    _confirmOversize: boolean,
-  ) => void;
+  enqueueSessionJob: (_job: SessionJob, _confirmOversize: boolean) => void;
   parseRangeHeader: (
     _rangeHeader: string | undefined,
     _fileSize: number,
