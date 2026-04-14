@@ -19,7 +19,6 @@ import {
   STRIP_THUMB_SIZE,
   VIDEO_TRANSCODE_QUALITY_OPTIONS,
   WORKSPACE_TABS,
-  DEFAULT_DOWNLOAD_OPTIONS,
 } from "../lib/appConstants";
 import {
   getImageCacheKey,
@@ -35,6 +34,7 @@ import {
   normalizeDownloadOptions,
   normalizeDownloadSettings,
 } from "../lib/downloadOptions";
+import { useLocalStorageSettings } from "../hooks/useLocalStorageSettings";
 import { buildFileUrl } from "../lib/fileUrl";
 import {
   formatBytes,
@@ -50,7 +50,6 @@ import {
   getFirstFilePath,
 } from "../lib/treeUtils";
 import { fetchJson } from "../services/apiClient";
-import type { DownloadOptions } from "../types/download";
 import {
   WorkspaceTabs,
   type WorkspaceTabId,
@@ -66,12 +65,16 @@ function App() {
   const [activeTab, setActiveTab] = useState<WorkspaceTabId>("download");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [session, setSession] = useState(null);
-  const [theme, setTheme] = useState(() => {
-    if (typeof window === "undefined") {
-      return "dark";
-    }
-    return window.localStorage.getItem("zip-image-viewer-theme") || "dark";
-  });
+  const {
+    theme,
+    setTheme,
+    keyboardSettings,
+    setKeyboardSettings,
+    explorerColumns,
+    setExplorerColumns,
+    downloadOptions,
+    setDownloadOptions,
+  } = useLocalStorageSettings();
   const [selectedPath, setSelectedPath] = useState("");
   const [sortMode, setSortMode] = useState("natural-tail");
   const [previewQuality, setPreviewQuality] = useState("balanced");
@@ -98,61 +101,6 @@ function App() {
     null,
   );
   const [videoSeekPreviewUrl, setVideoSeekPreviewUrl] = useState("");
-  const [keyboardSettings, setKeyboardSettings] = useState(() => {
-    if (typeof window === "undefined") {
-      return { jumpSeconds: 5, rateStep: 0.25 };
-    }
-
-    try {
-      const raw = window.localStorage.getItem("zip-shortcut-settings");
-      const parsed = raw ? JSON.parse(raw) : null;
-      return {
-        jumpSeconds: clampNumber(parsed?.jumpSeconds, 1, 30, 5),
-        rateStep: Number(parsed?.rateStep) > 0 ? Number(parsed.rateStep) : 0.25,
-      };
-    } catch {
-      return { jumpSeconds: 5, rateStep: 0.25 };
-    }
-  });
-  const [explorerColumns, setExplorerColumns] = useState(() => {
-    if (typeof window === "undefined") {
-      return { type: true, size: true, date: true, path: true };
-    }
-
-    try {
-      const raw = window.localStorage.getItem("zip-explorer-columns");
-      const parsed = raw ? JSON.parse(raw) : null;
-      return {
-        type: parsed?.type !== false,
-        size: parsed?.size !== false,
-        date: parsed?.date !== false,
-        path: parsed?.path !== false,
-      };
-    } catch {
-      return { type: true, size: true, date: true, path: true };
-    }
-  });
-  const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>(
-    () => {
-      if (typeof window === "undefined") {
-        return DEFAULT_DOWNLOAD_OPTIONS;
-      }
-
-      try {
-        const raw = window.localStorage.getItem("zip-download-options");
-        const legacy = window.localStorage.getItem("zip-download-settings");
-        if (raw) {
-          return normalizeDownloadOptions(JSON.parse(raw));
-        }
-        if (legacy) {
-          return normalizeDownloadOptions(JSON.parse(legacy));
-        }
-        return DEFAULT_DOWNLOAD_OPTIONS;
-      } catch {
-        return DEFAULT_DOWNLOAD_OPTIONS;
-      }
-    },
-  );
   const downloadSettings = useMemo(
     () => downloadOptionsToLegacySettings(downloadOptions),
     [downloadOptions],
@@ -600,32 +548,6 @@ function App() {
     }
     await loadSession(zipUrl.trim(), false);
   }
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    window.localStorage.setItem("zip-image-viewer-theme", theme);
-  }, [theme]);
-
-  useEffect(() => {
-    window.localStorage.setItem(
-      "zip-download-options",
-      JSON.stringify(downloadOptions),
-    );
-  }, [downloadOptions]);
-
-  useEffect(() => {
-    window.localStorage.setItem(
-      "zip-explorer-columns",
-      JSON.stringify(explorerColumns),
-    );
-  }, [explorerColumns]);
-
-  useEffect(() => {
-    window.localStorage.setItem(
-      "zip-shortcut-settings",
-      JSON.stringify(keyboardSettings),
-    );
-  }, [keyboardSettings]);
 
   useEffect(() => {
     if (!flatData || !sortedTree) {
