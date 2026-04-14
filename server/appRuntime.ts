@@ -50,6 +50,13 @@ import { registerBaseRoutes } from "./bootstrap/registerRoutes.js";
 import { registerSessionRoutes } from "./handlers/sessions.js";
 import { registerVideoRoutes } from "./handlers/videoRoutes.js";
 import { registerFileRoutes } from "./handlers/fileRoutes.js";
+import {
+  formatBytes,
+  isTerminalJobStatus,
+  logEvent,
+  parseRangeHeader,
+  sanitizeEntryPath,
+} from "./infrastructure/runtime/runtimePrimitives.js";
 
 const require = createRequire(import.meta.url);
 const { path7za } = require("7zip-bin");
@@ -97,35 +104,6 @@ const MAX_ACTIVE_SESSION_JOBS = 2;
 
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(distDir));
-
-function logEvent(level, event, details = {}) {
-  const logger =
-    level === "error"
-      ? console.error
-      : level === "warn"
-        ? console.warn
-        : console.log;
-  const payload = Object.keys(details).length
-    ? ` ${JSON.stringify(details)}`
-    : "";
-  logger(
-    `[${new Date().toISOString()}] [${level.toUpperCase()}] ${event}${payload}`,
-  );
-}
-
-function formatBytes(bytes) {
-  if (!Number.isFinite(bytes) || bytes <= 0) {
-    return "0 B";
-  }
-
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  const exponent = Math.min(
-    Math.floor(Math.log(bytes) / Math.log(1024)),
-    units.length - 1,
-  );
-  const value = bytes / 1024 ** exponent;
-  return `${value >= 10 || exponent === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[exponent]}`;
-}
 
 function sleepWithSignal(ms, signal) {
   if (!Number.isFinite(ms) || ms <= 0) {
@@ -399,47 +377,6 @@ function shouldPreserveOriginalPreview(contentType) {
   return contentType === "image/svg+xml" || contentType === "image/gif";
 }
 
-function parseRangeHeader(rangeHeader, size) {
-  if (!rangeHeader || !rangeHeader.startsWith("bytes=")) {
-    return null;
-  }
-
-  const [rawStart, rawEnd] = rangeHeader.replace("bytes=", "").split("-");
-  if (rawStart.includes(",") || rawEnd?.includes(",")) {
-    return null;
-  }
-
-  let start;
-  let end;
-
-  if (rawStart === "") {
-    const suffixLength = Number(rawEnd);
-    if (!Number.isInteger(suffixLength) || suffixLength <= 0) {
-      return "invalid";
-    }
-    start = Math.max(size - suffixLength, 0);
-    end = size - 1;
-  } else {
-    start = Number(rawStart);
-    end = rawEnd === "" ? size - 1 : Number(rawEnd);
-  }
-
-  if (
-    !Number.isInteger(start) ||
-    !Number.isInteger(end) ||
-    start < 0 ||
-    end < start ||
-    start >= size
-  ) {
-    return "invalid";
-  }
-
-  return {
-    start,
-    end: Math.min(end, size - 1),
-  };
-}
-
 function parseSeekSeconds(value) {
   const parsed = Number.parseFloat(String(value ?? "0"));
   if (!Number.isFinite(parsed) || parsed < 0) {
@@ -607,10 +544,6 @@ function emitJob(job, patch = {}, eventName = "progress") {
   }
 }
 
-function isTerminalJobStatus(status) {
-  return status === "ready" || status === "error" || status === "cancelled";
-}
-
 async function cleanupJob(jobId, reason = "cleanup") {
   const job = jobStore.get(jobId);
   if (!job) {
@@ -661,22 +594,6 @@ app.use((req, res, next) => {
 
   next();
 });
-
-function sanitizeEntryPath(entryPath) {
-  const normalized = path.posix.normalize(
-    String(entryPath || "").replace(/\\/g, "/"),
-  );
-  const cleaned = normalized.replace(/^\/+/, "").replace(/\/+$/, "");
-  if (
-    !cleaned ||
-    cleaned === "." ||
-    cleaned.startsWith("../") ||
-    cleaned.includes("/../")
-  ) {
-    throw new Error(`Unsafe entry path: ${entryPath}`);
-  }
-  return cleaned;
-}
 
 function createNode(name, nodePath, type) {
   return {
