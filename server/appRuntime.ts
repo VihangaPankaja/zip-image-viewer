@@ -46,6 +46,7 @@ import {
   sessionStore,
   videoTranscodeStore,
 } from "./repositories/memoryStores.js";
+import { createServerContainer } from "./bootstrap/container.js";
 import { registerBaseRoutes } from "./bootstrap/registerRoutes.js";
 import { registerSessionRoutes } from "./handlers/sessions.js";
 import { registerVideoRoutes } from "./handlers/videoRoutes.js";
@@ -55,7 +56,6 @@ import {
   formatBytes,
   isTerminalJobStatus,
   logEvent,
-  parseRangeHeader,
   sanitizeEntryPath,
 } from "./infrastructure/runtime/runtimePrimitives.js";
 
@@ -65,6 +65,7 @@ const ffmpegPath = require("ffmpeg-static");
 
 const distDir = path.resolve(process.cwd(), "dist");
 const app = express();
+const container = createServerContainer();
 let server;
 let isShuttingDown = false;
 const MAX_THREAD_COUNT = 8;
@@ -1359,12 +1360,12 @@ process.on("SIGINT", () => {
 });
 
 registerBaseRoutes(app, {
-  getSessionCount: () => sessionStore.size,
-  getJobCount: () => jobStore.size,
+  getSessionCount: container.metrics.getSessionCount,
+  getJobCount: container.metrics.getJobCount,
   getJob: (jobId) => jobStore.get(jobId),
   sanitizeJob,
   enqueueSessionJob,
-  parseRangeHeader,
+  parseRangeHeader: container.runtime.parseRangeHeader,
   emitJob,
   closeJob,
   cleanupJob,
@@ -1892,7 +1893,7 @@ registerSessionRoutes(app, {
   enqueueSessionJob,
   sanitizeJob,
   touchSession,
-  logEvent,
+  logEvent: container.runtime.logEvent,
   sessionStore,
   removeSession,
 });
@@ -1900,9 +1901,9 @@ registerSessionRoutes(app, {
 registerVideoRoutes(app, {
   touchSession,
   ffmpegPath,
-  sanitizeEntryPath,
+  sanitizeEntryPath: container.runtime.sanitizeEntryPath,
   getSessionQualityOutputPath,
-  parseRangeHeader,
+  parseRangeHeader: container.runtime.parseRangeHeader,
   VIDEO_EXTENSIONS,
   getVideoMetadata,
   buildVideoQualityOptions,
@@ -1918,20 +1919,20 @@ registerVideoRoutes(app, {
   videoTranscodeStore,
   waitForFile,
   getVideoDimensions,
-  logEvent,
+  logEvent: container.runtime.logEvent,
 });
 
 registerFileRoutes(app, {
   touchSession,
-  logEvent,
-  sanitizeEntryPath,
-  formatBytes,
+  logEvent: container.runtime.logEvent,
+  sanitizeEntryPath: container.runtime.sanitizeEntryPath,
+  formatBytes: container.runtime.formatBytes,
   readPreviewChunk,
   classifyMimeType,
   ensureThumbnail,
   shouldPreserveOriginalPreview,
   ensureImagePreview,
-  parseRangeHeader,
+  parseRangeHeader: container.runtime.parseRangeHeader,
 });
 
 app.use("/api", (_req, res) => {
