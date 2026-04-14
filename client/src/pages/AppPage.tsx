@@ -1,10 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Hls from "hls.js";
 import { CustomDropdown } from "../components/Common/CustomDropdown";
@@ -20,7 +14,6 @@ import {
   WORKSPACE_TABS,
 } from "../lib/appConstants";
 import {
-  getImageCacheKey,
   isTerminalJobStatus,
   formatProgressMessage,
   wait,
@@ -31,8 +24,10 @@ import {
   normalizeDownloadOptions,
   normalizeDownloadSettings,
 } from "../lib/downloadOptions";
+import { useImagePreviewCache } from "../hooks/useImagePreviewCache";
 import { useLocalStorageSettings } from "../hooks/useLocalStorageSettings";
 import { usePreviewSelection } from "../hooks/usePreviewSelection";
+import { useTextPreview } from "../hooks/useTextPreview";
 import {
   formatBytes,
   formatDate,
@@ -40,7 +35,6 @@ import {
   formatSpeed,
   formatTransferBytes,
 } from "../lib/formatterUtils";
-import { buildFileUrl } from "../lib/fileUrl";
 import { getFirstFilePath } from "../lib/treeUtils";
 import { fetchJson } from "../services/apiClient";
 import {
@@ -72,8 +66,6 @@ function App() {
   const [sortMode, setSortMode] = useState("natural-tail");
   const [previewQuality, setPreviewQuality] = useState("balanced");
   const [thumbnailStripExpanded, setThumbnailStripExpanded] = useState(false);
-  const [textPreview, setTextPreview] = useState("");
-  const [selectedImageSrc, setSelectedImageSrc] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [oversizePrompt, setOversizePrompt] = useState(null);
@@ -98,8 +90,6 @@ function App() {
     () => downloadOptionsToLegacySettings(downloadOptions),
     [downloadOptions],
   );
-  const textPreviewCacheRef = useRef(new Map());
-  const imagePreviewCacheRef = useRef(new Map());
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const seekDebounceRef = useRef<number | null>(null);
@@ -138,6 +128,25 @@ function App() {
     previewQuality,
     thumbnailStripExpanded,
   });
+  const { textPreview, resetTextPreview, clearTextPreviewCache } =
+    useTextPreview({
+      selectedNode,
+      selectedKind,
+      selectedPreviewUrl,
+      sessionId: session?.id || "",
+    });
+  const {
+    selectedImageSrc,
+    resetSelectedImageSrc,
+    clearImagePreviewCache,
+    loadImagePreview,
+  } = useImagePreviewCache({
+    sessionId: session?.id || "",
+    selectedNode,
+    selectedKind,
+    previewQuality,
+    selectedImagePreviewUrl,
+  });
   const selectedVideoOriginalUrl =
     selectedNode?.type === "file" && selectedKind === "video"
       ? `/api/sessions/${session?.id}/video/play?${new URLSearchParams({
@@ -171,13 +180,13 @@ function App() {
     setSession(null);
     setActiveJob(null);
     setSelectedPath("");
-    setTextPreview("");
-    setSelectedImageSrc("");
+    resetTextPreview();
+    resetSelectedImageSrc();
     setOversizePrompt(null);
     setSlideshowOpen(false);
     setThumbnailStripExpanded(false);
     setIsLoading(false);
-    textPreviewCacheRef.current.clear();
+    clearTextPreviewCache();
     clearImagePreviewCache();
   }
 
@@ -204,61 +213,6 @@ function App() {
       }).catch(() => {});
     }
   }
-
-  const clearImagePreviewCache = useCallback(() => {
-    imagePreviewCacheRef.current.forEach((value) => {
-      if (value?.objectUrl) {
-        URL.revokeObjectURL(value.objectUrl);
-      }
-    });
-    imagePreviewCacheRef.current.clear();
-  }, []);
-
-  const loadImagePreview = useCallback(
-    async (imagePath, quality) => {
-      if (!session?.id || !imagePath) {
-        return "";
-      }
-
-      const cacheKey = getImageCacheKey(session.id, imagePath, quality);
-      const existing = imagePreviewCacheRef.current.get(cacheKey);
-
-      if (existing?.objectUrl) {
-        return existing.objectUrl;
-      }
-
-      if (existing?.promise) {
-        return existing.promise;
-      }
-
-      const request = fetch(
-        buildFileUrl(session.id, imagePath, { imagePreview: true, quality }),
-      )
-        .then(async (response) => {
-          if (!response.ok) {
-            throw new Error("Could not load image preview.");
-          }
-          const blob = await response.blob();
-          const objectUrl = URL.createObjectURL(blob);
-          imagePreviewCacheRef.current.set(cacheKey, {
-            objectUrl,
-            touchedAt: Date.now(),
-          });
-          return objectUrl;
-        })
-        .catch((error) => {
-          imagePreviewCacheRef.current.delete(cacheKey);
-          throw error;
-        });
-
-      imagePreviewCacheRef.current.set(cacheKey, {
-        promise: request,
-        touchedAt: Date.now(),
-      });
-      return request;
-    },
-    [session?.id],
-  );
 
   async function hydrateSession(sessionId, nextUrl) {
     if (!sessionId) {
@@ -291,11 +245,11 @@ function App() {
           setSession(payload);
           setZipUrl(nextUrl);
           setSelectedPath(payload.firstFilePath || payload.tree.path);
-          setTextPreview("");
-          setSelectedImageSrc("");
+          resetTextPreview();
+          resetSelectedImageSrc();
           setOversizePrompt(null);
           setError("");
-          textPreviewCacheRef.current.clear();
+          clearTextPreviewCache();
           clearImagePreviewCache();
           return payload;
         }
@@ -496,79 +450,6 @@ function App() {
   }, [flatData, selectedPath, sortedTree]);
 
   useEffect(() => {
-    if (!selectedNode || !session || selectedKind !== "text") {
-      setTextPreview("");
-      return;
-    }
-
-    let cancelled = false;
-    const cacheKey = `${session.id}:${selectedNode.path}`;
-
-    async function fetchTextPreview() {
-      try {
-        const cached = textPreviewCacheRef.current.get(cacheKey);
-        if (cached) {
-          if (!cancelled) {
-            setTextPreview(cached);
-          }
-          return;
-        }
-
-        const response = await fetch(selectedPreviewUrl);
-        if (!response.ok) {
-          throw new Error("Could not read this file.");
-        }
-        const content = await response.text();
-        textPreviewCacheRef.current.set(cacheKey, content);
-        if (!cancelled) {
-          setTextPreview(content);
-        }
-      } catch (previewError) {
-        if (!cancelled) {
-          setTextPreview(`Preview unavailable: ${previewError.message}`);
-        }
-      }
-    }
-
-    fetchTextPreview();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedKind, selectedNode, selectedPreviewUrl, session]);
-
-  useEffect(() => {
-    if (!selectedNode || !session || selectedKind !== "image") {
-      setSelectedImageSrc("");
-      return;
-    }
-
-    let cancelled = false;
-
-    loadImagePreview(selectedNode.path, previewQuality)
-      .then((objectUrl) => {
-        if (!cancelled) {
-          setSelectedImageSrc(objectUrl);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setSelectedImageSrc(selectedImagePreviewUrl);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    loadImagePreview,
-    previewQuality,
-    selectedImagePreviewUrl,
-    selectedKind,
-    selectedNode,
-    session,
-  ]);
-
-  useEffect(() => {
     latestSessionIdRef.current = session?.id || "";
   }, [session]);
 
@@ -765,12 +646,11 @@ function App() {
   }, [activeJob]);
 
   useEffect(() => {
-    const textPreviewCache = textPreviewCacheRef.current;
     return () => {
       closeJobEvents();
       stopJobPolling();
       clearImagePreviewCache();
-      textPreviewCache.clear();
+      clearTextPreviewCache();
       if (latestSessionIdRef.current) {
         fetch(`/api/sessions/${latestSessionIdRef.current}`, {
           method: "DELETE",
@@ -784,7 +664,7 @@ function App() {
         }).catch(() => {});
       }
     };
-  }, [clearImagePreviewCache]);
+  }, [clearImagePreviewCache, clearTextPreviewCache]);
 
   useEffect(() => {
     function onKeyDown(event) {
