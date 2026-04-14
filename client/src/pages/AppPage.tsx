@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Hls from "hls.js";
 import { CustomDropdown } from "../components/Common/CustomDropdown";
-import { openJobSocket } from "../lib/jobSocket";
 import { getVideoMimeType } from "../lib/mimeTypeSystem";
 import {
   DOWNLOAD_RETRY_OPTIONS,
@@ -13,11 +12,7 @@ import {
   VIDEO_TRANSCODE_QUALITY_OPTIONS,
   WORKSPACE_TABS,
 } from "../lib/appConstants";
-import {
-  isTerminalJobStatus,
-  formatProgressMessage,
-  wait,
-} from "../lib/archiveUiUtils";
+import { formatProgressMessage } from "../lib/archiveUiUtils";
 import {
   clampNumber,
   downloadOptionsToLegacySettings,
@@ -27,6 +22,7 @@ import {
 import { useImagePreviewCache } from "../hooks/useImagePreviewCache";
 import { useLocalStorageSettings } from "../hooks/useLocalStorageSettings";
 import { usePreviewSelection } from "../hooks/usePreviewSelection";
+import { useSessionLifecycle } from "../hooks/useSessionLifecycle";
 import { useTextPreview } from "../hooks/useTextPreview";
 import {
   formatBytes,
@@ -98,11 +94,6 @@ function App() {
     Array<{ id: string; label: string }>
   >([]);
   const [selectedVideoQuality, setSelectedVideoQuality] = useState("source");
-  const jobSocketRef = useRef(null);
-  const jobPollTimeoutRef = useRef(null);
-  const latestSessionIdRef = useRef("");
-  const latestJobIdRef = useRef("");
-  const hydrationRef = useRef({ sessionId: "", promise: null });
 
   const {
     sortedTree,
@@ -162,282 +153,26 @@ function App() {
         }).toString()}`
       : "";
 
-  function closeJobEvents() {
-    if (jobSocketRef.current) {
-      jobSocketRef.current.close();
-      jobSocketRef.current = null;
-    }
-  }
-
-  function stopJobPolling() {
-    if (jobPollTimeoutRef.current) {
-      window.clearTimeout(jobPollTimeoutRef.current);
-      jobPollTimeoutRef.current = null;
-    }
-  }
-
-  function resetArchiveView() {
-    setSession(null);
-    setActiveJob(null);
-    setSelectedPath("");
-    resetTextPreview();
-    resetSelectedImageSrc();
-    setOversizePrompt(null);
-    setSlideshowOpen(false);
-    setThumbnailStripExpanded(false);
-    setIsLoading(false);
-    clearTextPreviewCache();
-    clearImagePreviewCache();
-  }
-
-  async function clearArchive(removeRemoteSession = true) {
-    const activeSessionId = latestSessionIdRef.current;
-    const activeJobId = latestJobIdRef.current;
-
-    closeJobEvents();
-    stopJobPolling();
-    latestSessionIdRef.current = "";
-    latestJobIdRef.current = "";
-    hydrationRef.current = { sessionId: "", promise: null };
-    resetArchiveView();
-
-    if (removeRemoteSession && activeSessionId) {
-      await fetch(`/api/sessions/${activeSessionId}`, {
-        method: "DELETE",
-      }).catch(() => {});
-    }
-
-    if (activeJobId) {
-      await fetch(`/api/session-jobs/${activeJobId}`, {
-        method: "DELETE",
-      }).catch(() => {});
-    }
-  }
-
-  async function hydrateSession(sessionId, nextUrl) {
-    if (!sessionId) {
-      return null;
-    }
-
-    if (
-      hydrationRef.current.sessionId === sessionId &&
-      hydrationRef.current.promise
-    ) {
-      return hydrationRef.current.promise;
-    }
-
-    const previousSessionId = latestSessionIdRef.current;
-    const request = (async () => {
-      let lastError = null;
-
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        const response = await fetch(`/api/sessions/${sessionId}/tree`);
-        const payload = await response.json().catch(() => ({}));
-
-        if (response.ok) {
-          if (previousSessionId && previousSessionId !== sessionId) {
-            fetch(`/api/sessions/${previousSessionId}`, {
-              method: "DELETE",
-            }).catch(() => {});
-          }
-
-          latestSessionIdRef.current = payload.id;
-          setSession(payload);
-          setZipUrl(nextUrl);
-          setSelectedPath(payload.firstFilePath || payload.tree.path);
-          resetTextPreview();
-          resetSelectedImageSrc();
-          setOversizePrompt(null);
-          setError("");
-          clearTextPreviewCache();
-          clearImagePreviewCache();
-          return payload;
-        }
-
-        lastError = new Error(payload.error || "Could not open file URL.");
-        if (response.status !== 404 || attempt === 2) {
-          throw lastError;
-        }
-
-        await wait(250 * (attempt + 1));
-      }
-
-      throw lastError || new Error("Could not open file URL.");
-    })();
-
-    hydrationRef.current = { sessionId, promise: request };
-
-    try {
-      return await request;
-    } finally {
-      if (hydrationRef.current.sessionId === sessionId) {
-        hydrationRef.current = { sessionId: "", promise: null };
-      }
-    }
-  }
-
-  async function handleJobSnapshot(payload, nextUrl) {
-    latestJobIdRef.current = payload?.id || "";
-    setActiveJob(payload);
-
-    if (payload?.sessionId) {
-      await hydrateSession(payload.sessionId, nextUrl);
-    }
-
-    if (payload.status === "awaiting_confirmation") {
-      setOversizePrompt({
-        jobId: payload.id,
-        reportedSize: payload.reportedSize,
-        limit: 1024 * 1024 * 1024,
-      });
-      setIsLoading(false);
-      return;
-    }
-
-    if (payload.status === "ready") {
-      closeJobEvents();
-      stopJobPolling();
-      latestJobIdRef.current = "";
-      setOversizePrompt(null);
-      setActiveJob(null);
-      setIsLoading(false);
-      return;
-    }
-
-    if (payload.status === "error") {
-      closeJobEvents();
-      stopJobPolling();
-      latestJobIdRef.current = "";
-      setActiveJob(null);
-      setError(payload.error || "Could not process this file.");
-      setIsLoading(false);
-      return;
-    }
-
-    if (payload.status === "cancelled") {
-      closeJobEvents();
-      stopJobPolling();
-      latestJobIdRef.current = "";
-      setActiveJob(null);
-      setIsLoading(false);
-    }
-  }
-
-  function startJobPolling(jobId, nextUrl) {
-    stopJobPolling();
-
-    async function poll() {
-      if (!jobId || latestJobIdRef.current !== jobId) {
-        return;
-      }
-
-      try {
-        const response = await fetch(`/api/session-jobs/${jobId}`);
-
-        if (response.status === 404) {
-          stopJobPolling();
-          if (!latestSessionIdRef.current) {
-            setActiveJob(null);
-            setIsLoading(false);
-            setError(
-              "Archive loading was interrupted before the UI could refresh.",
-            );
-          }
-          return;
-        }
-
-        const payload = await response.json();
-        await handleJobSnapshot(payload, nextUrl);
-
-        if (
-          !isTerminalJobStatus(payload.status) &&
-          latestJobIdRef.current === jobId
-        ) {
-          jobPollTimeoutRef.current = window.setTimeout(poll, 1500);
-        }
-      } catch {
-        if (latestJobIdRef.current === jobId) {
-          jobPollTimeoutRef.current = window.setTimeout(poll, 2000);
-        }
-      }
-    }
-
-    jobPollTimeoutRef.current = window.setTimeout(poll, 1500);
-  }
-
-  function attachJobEvents(jobId, nextUrl) {
-    closeJobEvents();
-
-    const socket = openJobSocket(jobId, {
-      onJob: (payload) => {
-        handleJobSnapshot(payload, nextUrl).catch((jobError) => {
-          setError(jobError.message);
-          setIsLoading(false);
-        });
-      },
-      onMalformedPayload: () => {
-        setError("Realtime update failed.");
-        setIsLoading(false);
-      },
-      onSocketError: () => {
-        closeJobEvents();
-        startJobPolling(jobId, nextUrl);
-      },
-      onSocketClose: () => {
-        if (!latestJobIdRef.current || latestJobIdRef.current !== jobId) {
-          return;
-        }
-
-        startJobPolling(jobId, nextUrl);
-      },
-    });
-
-    jobSocketRef.current = socket;
-  }
-
-  async function loadSession(url, confirmOversize = false) {
-    setIsLoading(true);
-    setError("");
-    setOversizePrompt(null);
-    setSlideshowOpen(false);
-    setThumbnailStripExpanded(false);
-
-    try {
-      const response = await fetch("/api/sessions", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          url,
-          confirmOversize,
-          downloadOptions,
-          downloadSettings,
-        }),
-      });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.error || "Could not open file URL.");
-      }
-      latestJobIdRef.current = payload.jobId;
-      setActiveJob(payload);
-      attachJobEvents(payload.jobId, url);
-    } catch (requestError) {
-      setError(requestError.message);
-      latestJobIdRef.current = "";
-      setActiveJob(null);
-      stopJobPolling();
-      closeJobEvents();
-    }
-  }
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-    if (!zipUrl.trim()) {
-      setError("Paste a public ZIP URL to start browsing.");
-      return;
-    }
-    await loadSession(zipUrl.trim(), false);
-  }
+  const { clearArchive, handleSubmit } = useSessionLifecycle({
+    zipUrl,
+    setZipUrl,
+    session,
+    activeJob,
+    setSession,
+    setActiveJob,
+    setSelectedPath,
+    setOversizePrompt,
+    setError,
+    setIsLoading,
+    setSlideshowOpen,
+    setThumbnailStripExpanded,
+    resetTextPreview,
+    resetSelectedImageSrc,
+    clearTextPreviewCache,
+    clearImagePreviewCache,
+    downloadOptions,
+    downloadSettings,
+  });
 
   useEffect(() => {
     if (!flatData || !sortedTree) {
@@ -448,10 +183,6 @@ function App() {
       setSelectedPath(getFirstFilePath(sortedTree));
     }
   }, [flatData, selectedPath, sortedTree]);
-
-  useEffect(() => {
-    latestSessionIdRef.current = session?.id || "";
-  }, [session]);
 
   useEffect(() => {
     const videoElement = videoRef.current;
@@ -640,31 +371,6 @@ function App() {
       cancelled = true;
     };
   }, [selectedKind, selectedNode, session]);
-
-  useEffect(() => {
-    latestJobIdRef.current = activeJob?.id || "";
-  }, [activeJob]);
-
-  useEffect(() => {
-    return () => {
-      closeJobEvents();
-      stopJobPolling();
-      clearImagePreviewCache();
-      clearTextPreviewCache();
-      if (latestSessionIdRef.current) {
-        fetch(`/api/sessions/${latestSessionIdRef.current}`, {
-          method: "DELETE",
-          keepalive: true,
-        }).catch(() => {});
-      }
-      if (latestJobIdRef.current) {
-        fetch(`/api/session-jobs/${latestJobIdRef.current}`, {
-          method: "DELETE",
-          keepalive: true,
-        }).catch(() => {});
-      }
-    };
-  }, [clearImagePreviewCache, clearTextPreviewCache]);
 
   useEffect(() => {
     function onKeyDown(event) {
