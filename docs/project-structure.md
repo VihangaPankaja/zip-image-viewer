@@ -10,17 +10,32 @@
 
 ## Frontend (client/src)
 
-- App.tsx: app orchestration, tabs, job state, preview routing
+- App.tsx: root app bootstrap
+- pages/AppPage.tsx: thin page shell
+- pages/AppPageContainer.tsx: page orchestration and state composition
 - components/: focused UI blocks
   - WorkspaceTabs.tsx: Download/Preview/Explorer tabs
   - ExplorerTablePanel.tsx: file-manager style explorer table
   - GlobalSettingsSheet.tsx: global settings modal
+  - Preview/: preview-specific UI components (image/text/audio/video)
+- hooks/: application-level controllers
+  - useSessionLifecycle.ts
+  - usePreviewSelection.ts
+  - useTextPreview.ts
+  - useImagePreviewCache.ts
+  - useVideoPlaybackController.ts
+  - useKeyboardShortcuts.ts
 - lib/jobSocket.ts: websocket client adapter for job updates
 - styles.css: global app styles and player overlay styling
 
 ## Backend (server)
 
-- index.ts: API routes and runtime orchestration
+- index.ts: explicit runtime bootstrap entrypoint
+- appRuntime.ts: runtime shell
+- runtimeComposition.ts: runtime composition and orchestration
+- bootstrap/container.ts: composition container for runtime dependencies
+- application/jobs/sessionJobQueue.ts: application-layer queue orchestration
+- infrastructure/runtime/runtimePrimitives.ts: runtime utility primitives (logging, byte formatting, path/range safety)
 - realtime/jobSocketServer.ts: websocket server for job updates
 - services/segmentedDownloader.ts: segmented/resumable downloader service
 - services/jobProgressMonitor.ts: decoupled progress/speed/ETA monitor
