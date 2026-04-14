@@ -1,5 +1,5 @@
 import React from "react";
-import { CustomDropdown } from "../../Common/CustomDropdown";
+import { CustomDropdown } from "../Common/CustomDropdown";
 
 export function ImagePreviewContent({
   selectedNode,

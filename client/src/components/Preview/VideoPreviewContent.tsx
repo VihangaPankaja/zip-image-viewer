@@ -1,6 +1,6 @@
 import React from "react";
-import { CustomDropdown } from "../../Common/CustomDropdown";
-import { formatMediaTime } from "../../../lib/formatterUtils";
+import { CustomDropdown } from "../Common/CustomDropdown";
+import { formatMediaTime } from "../../lib/formatterUtils";
 
 export function VideoPreviewContent({
   selectedNode,
