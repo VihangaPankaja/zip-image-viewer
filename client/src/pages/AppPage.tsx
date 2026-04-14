@@ -9,21 +9,18 @@ import { createPortal } from "react-dom";
 import Hls from "hls.js";
 import { CustomDropdown } from "../components/Common/CustomDropdown";
 import { openJobSocket } from "../lib/jobSocket";
-import { classifyNodeKind, getVideoMimeType } from "../lib/mimeTypeSystem";
+import { getVideoMimeType } from "../lib/mimeTypeSystem";
 import {
   DOWNLOAD_RETRY_OPTIONS,
   DOWNLOAD_THREAD_MODE_OPTIONS,
   PREVIEW_QUALITY_OPTIONS,
   SLIDESHOW_FIT_OPTIONS,
   SORT_OPTIONS,
-  STRIP_THUMB_SIZE,
   VIDEO_TRANSCODE_QUALITY_OPTIONS,
   WORKSPACE_TABS,
 } from "../lib/appConstants";
 import {
   getImageCacheKey,
-  getThumbnailWindow,
-  getWrappedPath,
   isTerminalJobStatus,
   formatProgressMessage,
   wait,
@@ -35,7 +32,7 @@ import {
   normalizeDownloadSettings,
 } from "../lib/downloadOptions";
 import { useLocalStorageSettings } from "../hooks/useLocalStorageSettings";
-import { buildFileUrl } from "../lib/fileUrl";
+import { usePreviewSelection } from "../hooks/usePreviewSelection";
 import {
   formatBytes,
   formatDate,
@@ -43,12 +40,8 @@ import {
   formatSpeed,
   formatTransferBytes,
 } from "../lib/formatterUtils";
-import {
-  cloneAndSortTree,
-  compareNodes,
-  flattenTree,
-  getFirstFilePath,
-} from "../lib/treeUtils";
+import { buildFileUrl } from "../lib/fileUrl";
+import { getFirstFilePath } from "../lib/treeUtils";
 import { fetchJson } from "../services/apiClient";
 import {
   WorkspaceTabs,
@@ -121,87 +114,30 @@ function App() {
   const latestJobIdRef = useRef("");
   const hydrationRef = useRef({ sessionId: "", promise: null });
 
-  const sortedTree = useMemo(() => {
-    if (!session?.tree) {
-      return null;
-    }
-    return cloneAndSortTree(session.tree, sortMode);
-  }, [session, sortMode]);
-
-  const flatData = useMemo(
-    () => (sortedTree ? flattenTree(sortedTree) : null),
-    [sortedTree],
-  );
-  const selectedNode = flatData?.nodesByPath.get(selectedPath) || null;
-  const selectedKind = classifyNodeKind(selectedNode);
-  const currentFolderImages = useMemo(() => {
-    if (!selectedNode) {
-      return [];
-    }
-    return flatData?.folderImages.get(selectedNode.parentPath) || [];
-  }, [flatData, selectedNode]);
-  const currentImageIndex = selectedNode
-    ? currentFolderImages.indexOf(selectedNode.path)
-    : -1;
-  const selectedFileUrl =
-    session && selectedNode && selectedNode.type === "file"
-      ? buildFileUrl(session.id, selectedNode.path)
-      : "";
-  const selectedImagePreviewUrl =
-    session &&
-    selectedNode &&
-    selectedNode.type === "file" &&
-    selectedKind === "image"
-      ? buildFileUrl(session.id, selectedNode.path, {
-          imagePreview: true,
-          quality: previewQuality,
-        })
-      : "";
-  const selectedPreviewUrl =
-    session && selectedNode && selectedNode.type === "file"
-      ? buildFileUrl(session.id, selectedNode.path, { previewText: true })
-      : "";
-  const currentFolderImageItems = currentFolderImages.map((imagePath) => ({
-    path: imagePath,
-    name:
-      flatData?.nodesByPath.get(imagePath)?.name ||
-      imagePath.split("/").at(-1) ||
-      imagePath,
-    url: buildFileUrl(session?.id, imagePath),
-    previewUrl: buildFileUrl(session?.id, imagePath, {
-      imagePreview: true,
-      quality: previewQuality,
-    }),
-    thumbnailUrl: buildFileUrl(session?.id, imagePath, {
-      thumbnail: true,
-      size: STRIP_THUMB_SIZE,
-    }),
-  }));
-  const visibleThumbnailItems = thumbnailStripExpanded
-    ? currentFolderImageItems
-    : getThumbnailWindow(currentFolderImageItems, selectedPath, 2);
-  const previousImagePath = getWrappedPath(
+  const {
+    sortedTree,
+    flatData,
+    selectedNode,
+    selectedKind,
     currentFolderImages,
     currentImageIndex,
-    -1,
-  );
-  const nextImagePath = getWrappedPath(
-    currentFolderImages,
-    currentImageIndex,
-    1,
-  );
-  const previousImageName =
-    flatData?.nodesByPath.get(previousImagePath)?.name || "";
-  const nextImageName = flatData?.nodesByPath.get(nextImagePath)?.name || "";
-  const explorerRows = useMemo(() => {
-    if (!flatData || !sortedTree) {
-      return [];
-    }
-
-    return Array.from(flatData.nodesByPath.values())
-      .filter((node) => node.path !== sortedTree.path)
-      .sort((left, right) => compareNodes(left, right, sortMode));
-  }, [flatData, sortedTree, sortMode]);
+    selectedFileUrl,
+    selectedImagePreviewUrl,
+    selectedPreviewUrl,
+    currentFolderImageItems,
+    visibleThumbnailItems,
+    previousImagePath,
+    nextImagePath,
+    previousImageName,
+    nextImageName,
+    explorerRows,
+  } = usePreviewSelection({
+    session,
+    sortMode,
+    selectedPath,
+    previewQuality,
+    thumbnailStripExpanded,
+  });
   const selectedVideoOriginalUrl =
     selectedNode?.type === "file" && selectedKind === "video"
       ? `/api/sessions/${session?.id}/video/play?${new URLSearchParams({
