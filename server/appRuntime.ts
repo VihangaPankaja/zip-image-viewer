@@ -50,6 +50,7 @@ import { registerBaseRoutes } from "./bootstrap/registerRoutes.js";
 import { registerSessionRoutes } from "./handlers/sessions.js";
 import { registerVideoRoutes } from "./handlers/videoRoutes.js";
 import { registerFileRoutes } from "./handlers/fileRoutes.js";
+import { createSessionJobQueue } from "./application/jobs/sessionJobQueue.js";
 import {
   formatBytes,
   isTerminalJobStatus,
@@ -478,36 +479,15 @@ function sanitizeJob(job) {
   };
 }
 
-function scheduleSessionJobs() {
-  while (
-    getActiveSessionJobCount() < MAX_ACTIVE_SESSION_JOBS &&
-    pendingSessionJobs.length > 0
-  ) {
-    const next = pendingSessionJobs.shift();
-    if (!next) {
-      break;
-    }
-
-    incrementActiveSessionJobCount();
-    processSessionJob(next.job, next.confirmOversize)
-      .catch((error) => {
-        logEvent("error", "job.process.unhandled", {
-          jobId: next.job.id,
-          error: error.message,
-          stack: error.stack,
-        });
-      })
-      .finally(() => {
-        decrementActiveSessionJobCount();
-        scheduleSessionJobs();
-      });
-  }
-}
-
-function enqueueSessionJob(job, confirmOversize) {
-  pendingSessionJobs.push({ job, confirmOversize });
-  scheduleSessionJobs();
-}
+const { enqueueSessionJob } = createSessionJobQueue({
+  pendingSessionJobs,
+  getActiveSessionJobCount,
+  incrementActiveSessionJobCount,
+  decrementActiveSessionJobCount,
+  maxActiveSessionJobs: MAX_ACTIVE_SESSION_JOBS,
+  processSessionJob,
+  logEvent,
+});
 
 function closeJob(job, terminalStatus) {
   job.status = terminalStatus;
