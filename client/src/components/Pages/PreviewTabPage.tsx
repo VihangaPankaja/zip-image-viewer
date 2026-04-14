@@ -1,6 +1,6 @@
 import React from "react";
-import { PreviewSidebar } from "./preview/PreviewSidebar";
-import { PreviewContent } from "./preview/PreviewContent";
+import { PreviewSidebar } from "../Preview/PreviewSidebar";
+import { PreviewContent } from "../Preview/PreviewContent";
 
 export function PreviewTabPage(props) {
   const {

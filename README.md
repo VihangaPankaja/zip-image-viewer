@@ -59,6 +59,29 @@ Open `http://localhost:8080`.
 - Live preview for direct video URLs while bytes are still downloading
 - On-demand video quality streaming via ffmpeg (no pre-generated variants)
 
+## Architecture Snapshot
+
+- Frontend page shell:
+  - `client/src/pages/AppPage.tsx` is a thin composition shell.
+  - `client/src/pages/AppPageContainer.tsx` owns orchestration and state wiring.
+- Frontend controller hooks:
+  - `client/src/hooks/useSessionLifecycle.ts`
+  - `client/src/hooks/usePreviewSelection.ts`
+  - `client/src/hooks/useTextPreview.ts`
+  - `client/src/hooks/useImagePreviewCache.ts`
+  - `client/src/hooks/useVideoPlaybackController.ts`
+  - `client/src/hooks/useKeyboardShortcuts.ts`
+- Preview UI boundaries:
+  - Preview components live under `client/src/components/Preview/`.
+  - Page wrappers stay under `client/src/components/Pages/`.
+- Backend runtime layering:
+  - `server/index.ts` is the bootstrap entrypoint.
+  - `server/appRuntime.ts` is a runtime shell.
+  - `server/runtimeComposition.ts` contains runtime composition/orchestration.
+  - `server/bootstrap/container.ts` provides containerized runtime dependencies.
+  - `server/application/jobs/sessionJobQueue.ts` contains session queue application logic.
+  - `server/infrastructure/runtime/runtimePrimitives.ts` contains shared runtime primitives.
+
 ## Video Quality Behavior
 
 - Videos are stored as original files only.

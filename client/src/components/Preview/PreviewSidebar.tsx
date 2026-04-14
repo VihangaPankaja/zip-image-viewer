@@ -1,6 +1,6 @@
 import React from "react";
-import { CustomDropdown } from "../../Common/CustomDropdown";
-import { TreeExplorer } from "../../TreeExplorer";
+import { CustomDropdown } from "../Common/CustomDropdown";
+import { TreeExplorer } from "../TreeExplorer";
 
 export function PreviewSidebar({
   sortedTree,
