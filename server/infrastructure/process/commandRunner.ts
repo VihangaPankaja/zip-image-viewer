@@ -1,4 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { constants } from "node:fs";
+import { access, chmod } from "node:fs/promises";
+import path from "node:path";
 
 function chunkText(chunk: unknown): string {
   if (typeof chunk === "string") return chunk;
@@ -13,11 +16,21 @@ function waitForClose(child: ChildProcess): Promise<number | null> {
   });
 }
 
+async function ensureExecutable(command: string): Promise<void> {
+  if (process.platform === "win32" || !path.isAbsolute(command)) return;
+  try {
+    await access(command, constants.X_OK);
+  } catch {
+    await chmod(command, 0o755);
+  }
+}
+
 export async function runCommand(
   command: string,
   args: string[],
   options: { cwd?: string } = {},
 ): Promise<void> {
+  await ensureExecutable(command);
   const child = spawn(command, args, {
     stdio: ["ignore", "ignore", "pipe"],
     ...options,
@@ -37,6 +50,7 @@ export async function runCommandCapture(
   args: string[],
   options: { allowNonZeroExit?: boolean; cwd?: string } = {},
 ): Promise<{ stdout: string; stderr: string }> {
+  await ensureExecutable(command);
   const { allowNonZeroExit = false, ...spawnOptions } = options;
   const child = spawn(command, args, {
     stdio: ["ignore", "pipe", "pipe"],
