@@ -1,12 +1,19 @@
-import React from "react";
-import { TreeExplorer } from "./TreeExplorer";
+import { CustomDropdown } from "./Common/CustomDropdown";
 
-/* eslint-disable no-unused-vars, @typescript-eslint/no-explicit-any */
+type ExplorerNode = {
+  children?: ExplorerNode[];
+  extension?: string;
+  modifiedAt?: number;
+  name: string;
+  path: string;
+  size?: number;
+  type: "file" | "directory";
+};
 
-type ExplorerTablePanelProps = {
-  sortedTree: any;
-  session: any;
-  explorerRows: any[];
+export type ExplorerTablePanelProps = {
+  sortedTree: ExplorerNode | null;
+  session: { id?: string } | null;
+  explorerRows: readonly ExplorerNode[];
   selectedPath: string;
   setSelectedPath: (value: string) => void;
   sortMode: string;
@@ -20,70 +27,96 @@ type ExplorerTablePanelProps = {
   };
   formatDate: (value: number) => string;
   formatBytes: (value: number) => string;
-  onUnlockArchive?: (row: any) => void;
-  DropdownComponent: any;
 };
 
-export function ExplorerTablePanel({
-  sortedTree,
-  session,
-  explorerRows,
-  selectedPath,
-  setSelectedPath,
-  sortMode,
-  setSortMode,
-  sortOptions,
-  explorerColumns: _explorerColumns,
-  formatDate: _formatDate,
-  formatBytes: _formatBytes,
-  onUnlockArchive: _onUnlockArchive,
-  DropdownComponent,
-}: ExplorerTablePanelProps) {
+function ExplorerPanelHeader(props: ExplorerTablePanelProps) {
   return (
-    <section className="explorer-table-panel">
-      <div className="panel-header panel-header-stackable explorer-header">
-        <div className="panel-title-group explorer-title-group">
-          <p className="panel-label">Explorer</p>
-          <h2 title={sortedTree?.name || "No archive loaded"}>
-            {sortedTree?.name || "No archive loaded"}
-          </h2>
-        </div>
-        <div className="sidebar-header-actions">
-          {session ? (
-            <span className="panel-chip">{explorerRows.length} entries</span>
-          ) : null}
-        </div>
-        <DropdownComponent
-          id="sort-mode-explorer"
-          label="Sort"
-          value={sortMode}
-          options={sortOptions}
-          onChange={setSortMode}
-          className="toolbar-select-shell-wide explorer-sort-shell"
-        />
+    <header className="panel-header panel-header-stackable explorer-header">
+      <div className="panel-title-group explorer-title-group">
+        <p className="panel-label">Explorer</p>
+        <h2
+          id="explorer-title"
+          title={props.sortedTree?.name || "No archive loaded"}
+        >
+          {props.sortedTree?.name || "No archive loaded"}
+        </h2>
       </div>
+      {props.session ? (
+        <span className="panel-chip">{props.explorerRows.length} entries</span>
+      ) : null}
+      <CustomDropdown
+        id="sort-mode-explorer"
+        label="Sort"
+        value={props.sortMode}
+        options={props.sortOptions}
+        onChange={(value) => props.setSortMode(String(value))}
+        className="toolbar-select-shell-wide explorer-sort-shell"
+      />
+    </header>
+  );
+}
 
-      {!sortedTree ? (
+function ExplorerTable(props: ExplorerTablePanelProps) {
+  const { explorerColumns: columns } = props;
+  return (
+    <div className="explorer-table-wrap">
+      <table className="explorer-table" aria-label="Archive files">
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            {columns.type ? <th scope="col">Type</th> : null}
+            {columns.size ? <th scope="col">Size</th> : null}
+            {columns.date ? <th scope="col">Modified</th> : null}
+            {columns.path ? <th scope="col">Path</th> : null}
+          </tr>
+        </thead>
+        <tbody>
+          {props.explorerRows.map((row) => (
+            <tr key={row.path}>
+              <td>
+                {row.type === "file" ? (
+                  <button
+                    className="explorer-file-button"
+                    type="button"
+                    aria-current={
+                      row.path === props.selectedPath ? "true" : undefined
+                    }
+                    aria-label={`Open ${row.name}`}
+                    onClick={() => props.setSelectedPath(row.path)}
+                  >
+                    {row.name}
+                  </button>
+                ) : (
+                  <span className="explorer-directory-name">{row.name}</span>
+                )}
+              </td>
+              {columns.type ? <td>{row.type}</td> : null}
+              {columns.size ? (
+                <td>{props.formatBytes(row.size ?? 0)}</td>
+              ) : null}
+              {columns.date ? (
+                <td>{props.formatDate(row.modifiedAt ?? 0)}</td>
+              ) : null}
+              {columns.path ? <td>{row.path}</td> : null}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function ExplorerTablePanel(props: ExplorerTablePanelProps) {
+  return (
+    <section className="explorer-table-panel" aria-labelledby="explorer-title">
+      <ExplorerPanelHeader {...props} />
+      {!props.sortedTree ? (
         <div className="empty-card">
           <strong>Explorer is ready</strong>
-          <p>
-            Open a URL from the Download tab to list files like a file manager
-            with sortable metadata.
-          </p>
+          <p>Add a public URL to queue an archive and list its files here.</p>
         </div>
       ) : (
-        <div className="explorer-tree-wrap">
-          <TreeExplorer
-            rootNode={sortedTree}
-            selectedPath={selectedPath}
-            onSelect={(node) => {
-              if (node?.type === "file") {
-                setSelectedPath(node.path);
-              }
-            }}
-            compact
-          />
-        </div>
+        <ExplorerTable {...props} />
       )}
     </section>
   );

@@ -1,0 +1,99 @@
+{
+  "$schema": "./node_modules/fallow/schema.json",
+  "entry": [
+    "server/index.ts",
+    "server/runtimeComposition.ts",
+    "client/src/main.tsx"
+  ],
+  "ignorePatterns": ["build/**", "dist/**", "coverage/**", "node_modules/**"],
+  "ignoreDependencies": ["7zip-bin", "ffmpeg-static"],
+  "rules": {
+    "unused-files": "error",
+    "unused-exports": "warn",
+    "unused-types": "warn",
+    "unused-dependencies": "error",
+    "unused-dev-dependencies": "warn",
+    "unresolved-imports": "error",
+    "unlisted-dependencies": "error",
+    "private-type-leaks": "off",
+    "boundary-violation": "warn"
+  },
+  "typeAware": {
+    "enabled": true,
+    "projects": [
+      "tsconfig.app.json",
+      "tsconfig.server.json",
+      "tsconfig.tests.json"
+    ],
+    "require": "complete"
+  },
+  "duplicates": {
+    "mode": "mild",
+    "minTokens": 50,
+    "minLines": 5,
+    "threshold": 0.1
+  },
+  "boundaries": {
+    "zones": [
+      {
+        "name": "client-shell",
+        "patterns": [
+          "client/src/main.tsx",
+          "client/src/App.tsx",
+          "client/src/pages/**"
+        ]
+      },
+      {
+        "name": "client-features",
+        "patterns": ["client/src/components/**", "client/src/hooks/**"]
+      },
+      {
+        "name": "client-shared",
+        "patterns": ["client/src/lib/**", "client/src/types/**"]
+      },
+      {
+        "name": "server-bootstrap",
+        "patterns": [
+          "server/index.ts",
+          "server/appRuntime.ts",
+          "server/runtimeComposition.ts",
+          "server/bootstrap/**"
+        ]
+      },
+      { "name": "server-http", "patterns": ["server/handlers/**"] },
+      {
+        "name": "server-application",
+        "patterns": ["server/application/**", "server/services/**"]
+      },
+      { "name": "server-domain", "patterns": ["server/domain/**"] },
+      {
+        "name": "server-infrastructure",
+        "patterns": ["server/infrastructure/**"]
+      }
+    ],
+    "rules": [
+      { "from": "client-shell", "allow": ["client-features", "client-shared"] },
+      { "from": "client-features", "allow": ["client-shared"] },
+      { "from": "client-shared", "allow": [] },
+      {
+        "from": "server-bootstrap",
+        "allow": [
+          "server-http",
+          "server-application",
+          "server-domain",
+          "server-infrastructure"
+        ]
+      },
+      {
+        "from": "server-http",
+        "allow": ["server-application", "server-domain"]
+      },
+      {
+        "from": "server-application",
+        "allow": ["server-domain", "server-infrastructure"]
+      },
+      { "from": "server-domain", "allow": [] },
+      { "from": "server-infrastructure", "allow": ["server-domain"] }
+    ]
+  }
+}

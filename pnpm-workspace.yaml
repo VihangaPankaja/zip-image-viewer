@@ -1,0 +1,16 @@
+packages:
+  - tooling/*
+resolvePeersFromWorkspaceRoot: false
+onlyBuiltDependencies:
+  - esbuild
+  - ffmpeg-static
+  - lefthook
+  - msw
+  - sharp
+minimumReleaseAge: 0
+allowBuilds:
+  esbuild: true
+  ffmpeg-static: true
+  lefthook: true
+  msw: true
+  sharp: true

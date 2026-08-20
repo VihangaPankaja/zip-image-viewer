@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { loadTextPreview } from "../features/workspace/textPreviewLoader";
 
 type TextPreviewNode = {
   path: string;
@@ -37,28 +38,15 @@ export function useTextPreview({
     let cancelled = false;
     const cacheKey = `${sessionId}:${selectedNode.path}`;
 
-    async function fetchTextPreview() {
-      try {
-        const cached = textPreviewCacheRef.current.get(cacheKey);
-        if (cached) {
-          if (!cancelled) {
-            setTextPreview(cached);
-          }
-          return;
-        }
-
-        const response = await fetch(selectedPreviewUrl);
-        if (!response.ok) {
-          throw new Error("Could not read this file.");
-        }
-
-        const content = await response.text();
-        textPreviewCacheRef.current.set(cacheKey, content);
-
-        if (!cancelled) {
-          setTextPreview(content);
-        }
-      } catch (previewError) {
+    void loadTextPreview({
+      cache: textPreviewCacheRef.current,
+      cacheKey,
+      previewUrl: selectedPreviewUrl,
+    }).then(
+      (content) => {
+        if (!cancelled) setTextPreview(content);
+      },
+      (previewError: unknown) => {
         if (!cancelled) {
           const message =
             previewError instanceof Error
@@ -66,10 +54,8 @@ export function useTextPreview({
               : "Unknown error.";
           setTextPreview(`Preview unavailable: ${message}`);
         }
-      }
-    }
-
-    fetchTextPreview();
+      },
+    );
 
     return () => {
       cancelled = true;

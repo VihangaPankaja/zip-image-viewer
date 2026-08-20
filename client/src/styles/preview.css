@@ -1,0 +1,329 @@
+.preview-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  min-height: 100%;
+  padding: var(--space-3);
+  background: var(--bg-panel);
+}
+
+.preview-panel > .panel-header {
+  padding: 3px 3px 0;
+}
+
+.preview-empty {
+  display: grid;
+  place-items: center;
+  min-height: 260px;
+  color: var(--text-muted);
+}
+
+.preview-stage {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 0;
+}
+
+.preview-toolbar,
+.progress-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  color: var(--text-dim);
+  font-size: 0.74rem;
+}
+
+.preview-toolbar .custom-dropdown-shell {
+  margin-inline-start: auto;
+}
+
+.image-frame {
+  display: grid;
+  min-height: clamp(300px, 58vh, 760px);
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-inset);
+}
+
+.image-frame > img {
+  width: 100%;
+  height: 100%;
+  max-height: 72vh;
+  object-fit: contain;
+}
+
+.text-preview {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  color: var(--text);
+}
+
+.text-preview pre {
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-4);
+  overflow: auto;
+  font:
+    0.82rem/1.55 "Cascadia Code",
+    Consolas,
+    monospace;
+  tab-size: 2;
+  white-space: pre-wrap;
+}
+
+.thumbnail-strip-shell {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-inset) 70%, transparent);
+}
+
+.thumbnail-strip-header {
+  padding: 10px 12px;
+  color: var(--text);
+  list-style: none;
+}
+
+.thumbnail-strip-header::-webkit-details-marker {
+  display: none;
+}
+
+.thumbnail-strip-header > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.thumbnail-strip-header::before {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-inline-end: 9px;
+  border-inline-end: 1.5px solid var(--text-dim);
+  border-block-end: 1.5px solid var(--text-dim);
+  content: "";
+  transform: rotate(-45deg);
+  transition: transform var(--transition-fast);
+}
+
+.thumbnail-strip-shell[open] .thumbnail-strip-header::before {
+  transform: rotate(45deg) translateY(-2px);
+}
+
+.thumbnail-strip-copy {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: 400;
+}
+
+.thumbnail-strip {
+  display: grid;
+  grid-auto-columns: 112px;
+  grid-auto-flow: column;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 0 10px 10px;
+  scroll-snap-type: inline proximity;
+}
+
+.thumbnail-card {
+  display: grid;
+  grid-template-rows: 72px auto;
+  gap: 5px;
+  width: 112px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg-inset);
+  color: var(--text-muted);
+  scroll-snap-align: start;
+  text-align: start;
+}
+
+.thumbnail-card.active {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.thumbnail-card img {
+  width: 100%;
+  height: 72px;
+  object-fit: cover;
+}
+
+.thumbnail-card span {
+  padding: 0 7px 7px;
+  overflow: hidden;
+  font-size: 0.7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navigation-hint {
+  padding: 9px 11px;
+  border-inline-start: 2px solid var(--border-strong);
+  color: var(--text-dim);
+  font-size: 0.72rem;
+}
+
+.slideshow-overlay {
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: #050808;
+  color: var(--text);
+}
+
+.slideshow-viewport,
+.slideshow-stage {
+  width: 100%;
+  height: 100%;
+}
+
+.slideshow-stage {
+  display: grid;
+  place-items: center;
+}
+
+.slideshow-stage img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.slideshow-fit-fit-width img {
+  width: 100%;
+  max-height: none;
+}
+
+.slideshow-fit-fit-height img {
+  height: 100%;
+  max-width: none;
+}
+
+.slideshow-floating {
+  position: absolute;
+  z-index: 1;
+  padding: var(--space-3);
+}
+
+.slideshow-floating-top {
+  inset: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.slideshow-floating-bottom {
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.slideshow-floating-nav {
+  inset: 50% 0 auto;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.slideshow-floating-nav button {
+  width: 46px;
+  min-height: 56px;
+  padding: 0;
+  pointer-events: auto;
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+}
+
+.slideshow-info-card,
+.slideshow-controls-card,
+.slideshow-neighbors-card {
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg-panel-strong) 94%, transparent);
+  box-shadow: var(--shadow-soft);
+}
+
+.slideshow-info-card h2 {
+  max-width: min(50vw, 560px);
+  margin: 3px 0 var(--space-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slideshow-meta,
+.slideshow-actions,
+.slideshow-neighbors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.slideshow-meta,
+.slideshow-neighbors {
+  color: var(--text-dim);
+  font-size: 0.74rem;
+}
+
+.slideshow-reveal-button {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  min-height: 40px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel-strong);
+  color: var(--text);
+}
+
+.slideshow-overlay.chrome-hidden .slideshow-floating {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .preview-toolbar .custom-dropdown-shell {
+    width: 100%;
+    margin-inline-start: 0;
+  }
+
+  .image-frame {
+    min-height: 48vh;
+  }
+
+  .slideshow-floating-top {
+    flex-direction: column;
+  }
+
+  .slideshow-controls-card {
+    align-self: flex-end;
+  }
+
+  .slideshow-neighbors-card .navigation-hint {
+    display: none;
+  }
+}

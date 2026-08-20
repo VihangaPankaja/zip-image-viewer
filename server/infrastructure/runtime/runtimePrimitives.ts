@@ -42,8 +42,10 @@ export function parseRangeHeader(
     return null;
   }
 
-  const [rawStart, rawEnd] = rangeHeader.replace("bytes=", "").split("-");
-  if (rawStart.includes(",") || rawEnd?.includes(",")) {
+  const [rawStart = "", rawEnd = ""] = rangeHeader
+    .replace("bytes=", "")
+    .split("-");
+  if (rawStart.includes(",") || rawEnd.includes(",")) {
     return null;
   }
 
@@ -79,9 +81,7 @@ export function parseRangeHeader(
 }
 
 export function sanitizeEntryPath(entryPath: string) {
-  const normalized = path.posix.normalize(
-    String(entryPath || "").replace(/\\/g, "/"),
-  );
+  const normalized = path.posix.normalize(entryPath.replace(/\\/g, "/"));
   const cleaned = normalized.replace(/^\/+/, "").replace(/\/+$/, "");
 
   if (

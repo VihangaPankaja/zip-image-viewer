@@ -1,41 +1,55 @@
-// @ts-nocheck
 import { createReadStream, createWriteStream } from "node:fs";
 import { stat, rm } from "node:fs/promises";
+import type { IncomingMessage } from "node:http";
 import { pipeline } from "node:stream/promises";
 import got from "got";
+import { sleepWithSignal } from "../infrastructure/runtime/mediaClassification.js";
 
 const UNLIMITED_RETRIES = -1;
 const RETRY_BASE_DELAY_MS = 1200;
 
-function sleepWithSignal(ms, signal) {
-  if (!Number.isFinite(ms) || ms <= 0) {
-    return Promise.resolve();
-  }
+type DownloadState = { downloadedBytes: number };
+type RemoteMetadata = { acceptRanges: boolean; size: number };
+type DownloadSettings = {
+  enableResume: boolean;
+  enableMultithread: boolean;
+  threadCount: number;
+  maxRetries: number;
+};
+type Segment = { index: number; start: number; end: number };
+type RangeRequest = {
+  url: string;
+  targetPath: string;
+  requestedStart: number;
+  requestedEnd: number;
+  state: DownloadState;
+  signal: AbortSignal;
+  strictRange: boolean;
+  responseHeader?: (_statusCode: number) => void;
+};
 
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(resolve, ms);
-    const onAbort = () => {
-      clearTimeout(timer);
-      reject(Object.assign(new Error("Aborted"), { name: "AbortError" }));
-    };
-
-    if (signal?.aborted) {
-      onAbort();
-      return;
-    }
-
-    signal?.addEventListener("abort", onAbort, { once: true });
-  });
+function getErrorProperty(error: unknown, property: "name" | "code"): string {
+  if (error instanceof Error && property === "name") return error.name;
+  if (typeof error !== "object" || error === null) return "";
+  const value =
+    property === "name"
+      ? "name" in error
+        ? error.name
+        : undefined
+      : "code" in error
+        ? error.code
+        : undefined;
+  return typeof value === "string" ? value : "";
 }
 
-function buildSegments(totalSize, segmentCount) {
+function buildSegments(totalSize: number, segmentCount: number): Segment[] {
   if (!Number.isFinite(totalSize) || totalSize <= 0 || segmentCount <= 1) {
     return [];
   }
 
   const safeCount = Math.max(1, Math.floor(segmentCount));
   const sizePerSegment = Math.floor(totalSize / safeCount);
-  const segments = [];
+  const segments: Segment[] = [];
 
   let start = 0;
   for (let i = 0; i < safeCount; i += 1) {
@@ -57,10 +71,10 @@ async function streamSingleRange({
   signal,
   strictRange,
   responseHeader,
-}) {
-  const headers = {};
+}: RangeRequest): Promise<void> {
+  const headers: Record<string, string> = {};
   if (Number.isFinite(requestedStart) && Number.isFinite(requestedEnd)) {
-    headers.Range = `bytes=${requestedStart}-${requestedEnd}`;
+    headers.Range = `bytes=${String(requestedStart)}-${String(requestedEnd)}`;
   }
 
   const request = got.stream(url, {
@@ -70,18 +84,18 @@ async function streamSingleRange({
     signal,
   });
 
-  let responseChecked = false;
-  request.once("response", (response) => {
-    responseChecked = true;
+  const responseState = { checked: false };
+  request.once("response", (response: IncomingMessage) => {
+    responseState.checked = true;
+    const statusCode = response.statusCode ?? 0;
 
-    if (response.statusCode >= 400) {
-      const err = new Error(`Download failed with HTTP ${response.statusCode}`);
-      err.statusCode = response.statusCode;
+    if (statusCode >= 400) {
+      const err = new Error(`Download failed with HTTP ${String(statusCode)}`);
       request.destroy(err);
       return;
     }
 
-    if (strictRange && headers.Range && response.statusCode !== 206) {
+    if (strictRange && headers.Range && statusCode !== 206) {
       const err = Object.assign(
         new Error(
           "Server does not support range requests for segmented download.",
@@ -93,11 +107,11 @@ async function streamSingleRange({
     }
 
     if (responseHeader) {
-      responseHeader(response.statusCode);
+      responseHeader(statusCode);
     }
   });
 
-  request.on("data", (chunk) => {
+  request.on("data", (chunk: Buffer) => {
     state.downloadedBytes += chunk.length;
   });
 
@@ -108,7 +122,7 @@ async function streamSingleRange({
     }),
   );
 
-  if (!responseChecked) {
+  if (!responseState.checked) {
     throw new Error("Download failed before response was received.");
   }
 }
@@ -120,7 +134,14 @@ async function downloadSingleWithResume({
   metadata,
   settings,
   signal,
-}) {
+}: {
+  url: string;
+  targetPath: string;
+  state: DownloadState;
+  metadata: RemoteMetadata;
+  settings: DownloadSettings;
+  signal: AbortSignal;
+}): Promise<void> {
   let existingBytes = 0;
   if (settings.enableResume) {
     existingBytes = (await stat(targetPath).catch(() => null))?.size || 0;
@@ -142,21 +163,23 @@ async function downloadSingleWithResume({
     state,
     signal,
     strictRange: shouldRangeResume,
-    responseHeader: async (statusCode) => {
+    responseHeader: (statusCode) => {
       if (shouldRangeResume && statusCode !== 206) {
-        await rm(targetPath, { force: true }).catch(() => {});
+        void rm(targetPath, { force: true }).catch(() => undefined);
       }
     },
   });
 }
 
-async function mergeSegmentParts(partPaths, targetPath) {
-  for (let i = 0; i < partPaths.length; i += 1) {
-    const sourcePath = partPaths[i];
+async function mergeSegmentParts(
+  partPaths: string[],
+  targetPath: string,
+): Promise<void> {
+  for (const [index, sourcePath] of partPaths.entries()) {
     await pipeline(
       createReadStream(sourcePath),
       createWriteStream(targetPath, {
-        flags: i === 0 ? "w" : "a",
+        flags: index === 0 ? "w" : "a",
       }),
     );
   }
@@ -169,15 +192,22 @@ async function downloadSegmentWithRetry({
   settings,
   state,
   signal,
-}) {
-  const partPath = `${targetPath}.part.${segment.index}`;
+}: {
+  url: string;
+  segment: Segment;
+  targetPath: string;
+  settings: DownloadSettings;
+  state: DownloadState;
+  signal: AbortSignal;
+}): Promise<string> {
+  const partPath = `${targetPath}.part.${String(segment.index)}`;
 
   for (
     let attempt = 0;
     settings.maxRetries === UNLIMITED_RETRIES || attempt <= settings.maxRetries;
     attempt += 1
   ) {
-    if (signal?.aborted) {
+    if (signal.aborted) {
       throw Object.assign(new Error("Aborted"), { name: "AbortError" });
     }
 
@@ -203,11 +233,11 @@ async function downloadSegmentWithRetry({
 
       return partPath;
     } catch (error) {
-      if (error.name === "AbortError") {
+      if (getErrorProperty(error, "name") === "AbortError") {
         throw error;
       }
 
-      if (error.code === "RANGE_UNSUPPORTED") {
+      if (getErrorProperty(error, "code") === "RANGE_UNSUPPORTED") {
         throw error;
       }
 
@@ -234,7 +264,14 @@ export async function downloadWithSegmentedManager({
   settings,
   state,
   metadata,
-}) {
+}: {
+  url: string;
+  targetPath: string;
+  signal: AbortSignal;
+  settings: DownloadSettings;
+  state: DownloadState;
+  metadata: RemoteMetadata;
+}): Promise<void> {
   const canUseSegments =
     settings.enableMultithread &&
     settings.threadCount > 1 &&
@@ -270,7 +307,9 @@ export async function downloadWithSegmentedManager({
   await mergeSegmentParts(partPaths, targetPath);
 
   await Promise.all(
-    partPaths.map((partPath) => rm(partPath, { force: true }).catch(() => {})),
+    partPaths.map((partPath) =>
+      rm(partPath, { force: true }).catch(() => undefined),
+    ),
   );
 
   const finishedStat = await stat(targetPath).catch(() => null);

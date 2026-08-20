@@ -20,6 +20,42 @@ type UseImagePreviewCacheParams = {
   selectedImagePreviewUrl: string;
 };
 
+function clearPreviewCache(cache: Map<string, ImagePreviewCacheEntry>): void {
+  cache.forEach((entry) => {
+    if (entry.objectUrl) {
+      URL.revokeObjectURL(entry.objectUrl);
+    }
+  });
+  cache.clear();
+}
+
+async function requestImagePreview(
+  cache: Map<string, ImagePreviewCacheEntry>,
+  cacheKey: string,
+  requestUrl: string,
+): Promise<string> {
+  try {
+    const response = await fetch(requestUrl);
+    if (!response.ok) {
+      throw new Error("Could not load image preview.");
+    }
+    const objectUrl = URL.createObjectURL(await response.blob());
+    cache.set(cacheKey, { objectUrl, touchedAt: Date.now() });
+    return objectUrl;
+  } catch (error) {
+    cache.delete(cacheKey);
+    throw error;
+  }
+}
+
+function getCachedPreview(
+  cache: Map<string, ImagePreviewCacheEntry>,
+  cacheKey: string,
+): string | Promise<string> | null {
+  const existing = cache.get(cacheKey);
+  return existing?.objectUrl ?? existing?.promise ?? null;
+}
+
 export function useImagePreviewCache({
   sessionId,
   selectedNode,
@@ -37,12 +73,7 @@ export function useImagePreviewCache({
   }, []);
 
   const clearImagePreviewCache = useCallback(() => {
-    imagePreviewCacheRef.current.forEach((value) => {
-      if (value?.objectUrl) {
-        URL.revokeObjectURL(value.objectUrl);
-      }
-    });
-    imagePreviewCacheRef.current.clear();
+    clearPreviewCache(imagePreviewCacheRef.current);
   }, []);
 
   const loadImagePreview = useCallback(
@@ -52,38 +83,15 @@ export function useImagePreviewCache({
       }
 
       const cacheKey = getImageCacheKey(sessionId, imagePath, quality);
-      const existing = imagePreviewCacheRef.current.get(cacheKey);
-
-      if (existing?.objectUrl) {
-        return existing.objectUrl;
+      const cached = getCachedPreview(imagePreviewCacheRef.current, cacheKey);
+      if (cached) {
+        return cached;
       }
-
-      if (existing?.promise) {
-        return existing.promise;
-      }
-
-      const request = fetch(
+      const request = requestImagePreview(
+        imagePreviewCacheRef.current,
+        cacheKey,
         buildFileUrl(sessionId, imagePath, { imagePreview: true, quality }),
-      )
-        .then(async (response) => {
-          if (!response.ok) {
-            throw new Error("Could not load image preview.");
-          }
-
-          const blob = await response.blob();
-          const objectUrl = URL.createObjectURL(blob);
-
-          imagePreviewCacheRef.current.set(cacheKey, {
-            objectUrl,
-            touchedAt: Date.now(),
-          });
-
-          return objectUrl;
-        })
-        .catch((error) => {
-          imagePreviewCacheRef.current.delete(cacheKey);
-          throw error;
-        });
+      );
 
       imagePreviewCacheRef.current.set(cacheKey, {
         promise: request,

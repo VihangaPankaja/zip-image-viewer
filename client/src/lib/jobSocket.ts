@@ -16,6 +16,25 @@ function getJobSocketUrl(jobId: string): string {
   return `${protocol}//${window.location.host}/ws/jobs?jobId=${encodeURIComponent(jobId)}`;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function parseJobSocketPacket(value: string): JobSocketPacket {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error("Malformed job update");
+  }
+  if (!isRecord(parsed)) throw new Error("Malformed job update");
+  return {
+    type: typeof parsed.type === "string" ? parsed.type : undefined,
+    job: parsed.job,
+    error: typeof parsed.error === "string" ? parsed.error : undefined,
+  };
+}
+
 export function openJobSocket(
   jobId: string,
   handlers: JobSocketHandlers,
@@ -24,8 +43,10 @@ export function openJobSocket(
 
   socket.addEventListener("message", (event) => {
     try {
-      const packet = JSON.parse(event.data) as JobSocketPacket;
-      if (packet?.job == null) {
+      if (typeof event.data !== "string")
+        throw new Error("Malformed job update");
+      const packet = parseJobSocketPacket(event.data);
+      if (packet.job == null) {
         return;
       }
       handlers.onJob(packet.job);
