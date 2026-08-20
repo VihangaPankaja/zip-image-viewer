@@ -1,12 +1,12 @@
 import { spawn } from "node:child_process";
 import type { ChildProcessByStdio } from "node:child_process";
 import type { Readable } from "node:stream";
-import type { Express, Request, RequestHandler, Response } from "express";
+import type { Express, Request, Response } from "express";
 import {
   queryText,
   requireTranscoder,
-  resolveVideoFileContext,
-  resolveVideoSession,
+  resolveVideoContext,
+  selectVideoQuality,
   type VideoContext,
 } from "./routeContext.js";
 import type { VideoRouteDependencies } from "./types.js";
@@ -72,37 +72,25 @@ function pipeTranscode(
   child.stdout.pipe(res);
 }
 
-function createStreamHandler(deps: VideoRouteDependencies): RequestHandler {
-  return async (req, res) => {
-    const session = resolveVideoSession(req, res, deps);
-    if (!session) return;
-    const ffmpegPath = requireTranscoder(res, deps);
-    if (!ffmpegPath) return;
-    const context = await resolveVideoFileContext(req, res, deps, session);
-    if (!context) return;
-    const quality = queryText(req.query.quality, "source").toLowerCase();
-    const sourceDimensions = await deps.getVideoDimensions(context.targetPath);
-    const { options } = deps.buildVideoQualityOptions(sourceDimensions.height);
-    const selectedQuality =
-      options.find(({ id }) => id === quality)?.id || "source";
-    const selectedHeight =
-      selectedQuality === "source"
-        ? 0
-        : Number.parseInt(selectedQuality.replace("p", ""), 10) || 0;
-    res.setHeader("cache-control", "no-store");
-    res.type("video/mp4");
-    const child = spawn(
-      ffmpegPath,
-      buildTranscodeArgs(context.targetPath, selectedHeight),
-      { stdio: ["ignore", "pipe", "pipe"] },
-    );
-    pipeTranscode(req, res, deps, context, selectedQuality, child);
-  };
-}
-
 export function registerVideoStreamRoute(
   app: Express,
   deps: VideoRouteDependencies,
 ): void {
-  app.get("/api/sessions/:id/video/stream", createStreamHandler(deps));
+  app.get("/api/sessions/:id/video/stream", async (req, res) => {
+    const context = await resolveVideoContext(req, res, deps);
+    const ffmpegPath = context && requireTranscoder(res, deps);
+    if (!context || !ffmpegPath) return;
+    const quality = queryText(req.query.quality, "source").toLowerCase();
+    const sourceDimensions = await deps.getVideoDimensions(context.targetPath);
+    const { options } = deps.buildVideoQualityOptions(sourceDimensions.height);
+    const selected = selectVideoQuality(options, quality);
+    res.setHeader("cache-control", "no-store");
+    res.type("video/mp4");
+    const child = spawn(
+      ffmpegPath,
+      buildTranscodeArgs(context.targetPath, selected.height),
+      { stdio: ["ignore", "pipe", "pipe"] },
+    );
+    pipeTranscode(req, res, deps, context, selected.quality, child);
+  });
 }

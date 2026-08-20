@@ -19,13 +19,13 @@ contents, and previewing files while work continues in the background.
 ## Requirements
 
 - Node.js 26.7.0
-- pnpm 11.21.0
+- pnpm 11.22.0
 - FFmpeg and 7-Zip are supplied by project dependencies for supported platforms.
 
 ```bash
 nvm install
 nvm use
-npm install --global pnpm@11.21.0
+npm install --global pnpm@11.22.0
 pnpm install --frozen-lockfile
 pnpm run dev
 ```
@@ -51,6 +51,9 @@ pnpm exec playwright install chromium
 pnpm run test:e2e
 pnpm run fallow:health
 pnpm run fallow:dead
+pnpm run fallow:duplicates
+pnpm run fallow:coverage-gaps
+pnpm run fallow:targets
 pnpm run fallow:audit
 pnpm run build
 ```
@@ -58,6 +61,10 @@ pnpm run build
 `pnpm run quality` runs the non-browser pull-request gate. Playwright covers the
 desktop workspace, mobile pane navigation, and automated Axe accessibility
 checks. Coverage output is written to `coverage/`.
+
+The application compiles with TypeScript 7. ESLint's TypeScript parser runs in
+the isolated `tooling/eslint` workspace on TypeScript 5.9, the newest compiler
+version its current peer range supports.
 
 ## Production
 

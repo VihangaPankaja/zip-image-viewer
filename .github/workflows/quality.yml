@@ -14,16 +14,15 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/setup@v2
         with:
-          version: 11.21.0
-      - uses: actions/setup-node@v4
+          cache: true
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run format:check
       - run: pnpm run lint
@@ -31,8 +30,12 @@ jobs:
       - run: pnpm run test:coverage
       - name: Fallow dead-code and dependency gate
         run: pnpm run fallow:dead
+      - name: Fallow duplication gate
+        run: pnpm run fallow:duplicates
       - name: Fallow health-score gate
         run: pnpm run fallow:health
+      - name: Fallow coverage-gap report
+        run: pnpm run fallow:coverage-gaps
       - name: Fallow branch review brief
         run: pnpm run fallow:audit
       - name: Render Fallow SARIF
@@ -42,7 +45,7 @@ jobs:
       - run: pnpm run build
       - name: Publish coverage and quality reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: quality-reports
           path: |
@@ -57,14 +60,13 @@ jobs:
       matrix:
         browser: ${{ (github.event_name == 'pull_request' && fromJSON('["chromium"]')) || fromJSON('["chromium","firefox","webkit"]') }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v6
+      - uses: pnpm/setup@v2
         with:
-          version: 11.21.0
-      - uses: actions/setup-node@v4
+          cache: true
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
       - run: pnpm run test:e2e -- --project=${{ matrix.browser }}

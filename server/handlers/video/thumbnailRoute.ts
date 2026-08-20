@@ -1,12 +1,12 @@
 import crypto from "node:crypto";
 import { mkdir, stat } from "node:fs/promises";
 import path from "node:path";
-import type { Express, RequestHandler } from "express";
+import type { Express } from "express";
 import {
   queryText,
   requireTranscoder,
-  resolveVideoFileContext,
-  resolveVideoSession,
+  resolveVideoContext,
+  selectVideoQuality,
 } from "./routeContext.js";
 import type { VideoRouteDependencies } from "./types.js";
 
@@ -35,14 +35,14 @@ function buildThumbnailArgs(
   return args;
 }
 
-function createThumbnailHandler(deps: VideoRouteDependencies): RequestHandler {
-  return async (req, res) => {
-    const session = resolveVideoSession(req, res, deps);
-    if (!session) return;
-    const ffmpegPath = requireTranscoder(res, deps);
-    if (!ffmpegPath) return;
-    const context = await resolveVideoFileContext(req, res, deps, session);
-    if (!context) return;
+export function registerVideoThumbnailRoute(
+  app: Express,
+  deps: VideoRouteDependencies,
+): void {
+  app.get("/api/sessions/:id/video/thumbnail", async (req, res) => {
+    const context = await resolveVideoContext(req, res, deps);
+    const ffmpegPath = context && requireTranscoder(res, deps);
+    if (!context || !ffmpegPath) return;
     const seekSeconds = deps.parseSeekSeconds(req.query.time);
     const quality = queryText(req.query.quality, "720p").toLowerCase();
     const requestedWidth =
@@ -50,19 +50,17 @@ function createThumbnailHandler(deps: VideoRouteDependencies): RequestHandler {
     const width = Math.max(120, Math.min(640, requestedWidth));
     const source = await deps.getVideoMetadata(context.targetPath);
     const { options } = deps.buildVideoQualityOptions(source.height);
-    const selectedQuality =
-      options.find(({ id }) => id === quality)?.id || "source";
-    const selectedHeight =
-      selectedQuality === "source"
-        ? 0
-        : Number.parseInt(selectedQuality.replace("p", ""), 10) || 0;
-    const thumbDir = path.join(session.workspaceDir, "video-thumbnails");
+    const selected = selectVideoQuality(options, quality);
+    const thumbDir = path.join(
+      context.session.workspaceDir,
+      "video-thumbnails",
+    );
     await mkdir(thumbDir, { recursive: true });
     const roundedSeek = Math.max(0, Math.round(seekSeconds * 4) / 4);
     const hash = crypto
       .createHash("sha1")
       .update(
-        `${context.normalizedPath}:${selectedQuality}:${String(width)}:${String(roundedSeek)}`,
+        `${context.normalizedPath}:${selected.quality}:${String(width)}:${String(roundedSeek)}`,
       )
       .digest("hex");
     const thumbPath = path.join(thumbDir, `${hash}.jpg`);
@@ -74,19 +72,12 @@ function createThumbnailHandler(deps: VideoRouteDependencies): RequestHandler {
           thumbPath,
           roundedSeek,
           width,
-          selectedHeight,
+          selected.height,
         ),
       );
     }
     res.setHeader("cache-control", "no-store");
     res.type("image/jpeg");
     res.sendFile(thumbPath);
-  };
-}
-
-export function registerVideoThumbnailRoute(
-  app: Express,
-  deps: VideoRouteDependencies,
-): void {
-  app.get("/api/sessions/:id/video/thumbnail", createThumbnailHandler(deps));
+  });
 }

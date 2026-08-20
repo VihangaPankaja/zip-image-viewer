@@ -1,7 +1,8 @@
 import { stat, type Stats } from "node:fs";
 import path from "node:path";
 import type { Request, Response } from "express";
-import type { Session } from "../../domain/models.js";
+import type { Session, VideoQualityOption } from "../../domain/models.js";
+import { errorMessage, isWithinRoot, queryText } from "../httpUtils.js";
 import type { VideoRouteDependencies } from "./types.js";
 
 export type VideoContext = {
@@ -11,14 +12,16 @@ export type VideoContext = {
   fileStats: Stats;
 };
 
-export function queryText(value: unknown, fallback = ""): string {
-  if (typeof value === "string") return value;
-  if (Array.isArray(value) && typeof value[0] === "string") return value[0];
-  return fallback;
-}
+export { queryText } from "../httpUtils.js";
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Unexpected video error.";
+export function selectVideoQuality(
+  options: VideoQualityOption[],
+  requested: string,
+): { quality: string; height: number } {
+  const selected = options.find(({ id }) => id === requested);
+  return selected && selected.id !== "source"
+    ? { quality: selected.id, height: selected.height ?? 0 }
+    : { quality: "source", height: 0 };
 }
 
 export function requireTranscoder(
@@ -30,7 +33,7 @@ export function requireTranscoder(
   return null;
 }
 
-export function resolveVideoSession(
+function resolveVideoSession(
   req: Request,
   res: Response,
   deps: VideoRouteDependencies,
@@ -41,7 +44,7 @@ export function resolveVideoSession(
   return null;
 }
 
-export async function resolveVideoFileContext(
+async function resolveVideoFileContext(
   req: Request,
   res: Response,
   deps: VideoRouteDependencies,
@@ -56,15 +59,14 @@ export async function resolveVideoFileContext(
   try {
     normalizedPath = deps.sanitizeEntryPath(requestedPath);
   } catch (error) {
-    res.status(400).json({ error: errorMessage(error) });
+    res.status(400).json({
+      error: errorMessage(error, "Unexpected video error."),
+    });
     return null;
   }
   const targetPath = path.resolve(session.extractDir, normalizedPath);
   const rootPath = path.resolve(session.extractDir);
-  if (
-    !targetPath.startsWith(`${rootPath}${path.sep}`) &&
-    targetPath !== rootPath
-  ) {
+  if (!isWithinRoot(targetPath, rootPath)) {
     res.status(400).json({ error: "Invalid file path." });
     return null;
   }

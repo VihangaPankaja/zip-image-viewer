@@ -56,8 +56,39 @@ type GlobalSettingsSheetProps = {
   ) => number;
 };
 
+type DownloadUpdateProps = Pick<
+  GlobalSettingsSheetProps,
+  "normalizeDownloadSettings" | "setDownloadSettings"
+>;
+type DownloadConfigurationProps = DownloadUpdateProps &
+  Pick<
+    GlobalSettingsSheetProps,
+    "downloadRetryOptions" | "downloadSettings" | "downloadThreadModeOptions"
+  >;
+type PreviewConfigurationProps = Pick<
+  GlobalSettingsSheetProps,
+  | "previewQuality"
+  | "previewQualityOptions"
+  | "setPreviewQuality"
+  | "setSortMode"
+  | "setVideoTranscodeQuality"
+  | "sortMode"
+  | "sortOptions"
+  | "videoTranscodeQuality"
+  | "videoTranscodeQualityOptions"
+>;
+type KeyboardConfigurationProps = Pick<
+  GlobalSettingsSheetProps,
+  "clampNumber" | "keyboardSettings" | "setKeyboardSettings"
+>;
+type ToggleConfigurationProps = DownloadUpdateProps &
+  Pick<
+    GlobalSettingsSheetProps,
+    "downloadSettings" | "explorerColumns" | "setExplorerColumns"
+  >;
+
 function updateDownloadSettings(
-  props: GlobalSettingsSheetProps,
+  props: DownloadUpdateProps,
   patch: Record<string, unknown>,
 ) {
   props.setDownloadSettings((current) =>
@@ -85,7 +116,7 @@ function SettingsHeader({
   );
 }
 
-function DownloadConfiguration(props: GlobalSettingsSheetProps) {
+function DownloadConfiguration(props: DownloadConfigurationProps) {
   const { downloadSettings } = props;
   return (
     <>
@@ -129,7 +160,7 @@ function DownloadConfiguration(props: GlobalSettingsSheetProps) {
   );
 }
 
-function PreviewConfiguration(props: GlobalSettingsSheetProps) {
+function PreviewConfiguration(props: PreviewConfigurationProps) {
   return (
     <>
       <CustomDropdown
@@ -157,7 +188,7 @@ function PreviewConfiguration(props: GlobalSettingsSheetProps) {
   );
 }
 
-function KeyboardConfiguration(props: GlobalSettingsSheetProps) {
+function KeyboardConfiguration(props: KeyboardConfigurationProps) {
   const { keyboardSettings, setKeyboardSettings } = props;
   return (
     <>
@@ -206,7 +237,7 @@ const EXPLORER_COLUMN_OPTIONS: Array<{
   { key: "path", label: "Show Path column" },
 ];
 
-function ToggleConfiguration(props: GlobalSettingsSheetProps) {
+function ToggleConfiguration(props: ToggleConfigurationProps) {
   return (
     <>
       <label className="toggle-row">

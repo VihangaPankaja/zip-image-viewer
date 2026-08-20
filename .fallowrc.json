@@ -15,12 +15,23 @@
     "unused-dev-dependencies": "warn",
     "unresolved-imports": "error",
     "unlisted-dependencies": "error",
+    "private-type-leaks": "off",
     "boundary-violation": "warn"
+  },
+  "typeAware": {
+    "enabled": true,
+    "projects": [
+      "tsconfig.app.json",
+      "tsconfig.server.json",
+      "tsconfig.tests.json"
+    ],
+    "require": "complete"
   },
   "duplicates": {
     "mode": "mild",
     "minTokens": 50,
-    "minLines": 5
+    "minLines": 5,
+    "threshold": 0.1
   },
   "boundaries": {
     "zones": [

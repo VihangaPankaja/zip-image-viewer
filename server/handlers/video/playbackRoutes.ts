@@ -2,6 +2,7 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import mime from "mime-types";
 import type { Express, RequestHandler, Response } from "express";
+import { applyByteRange } from "../httpUtils.js";
 import { queryText, resolveVideoContext } from "./routeContext.js";
 import type { VideoRouteDependencies } from "./types.js";
 
@@ -12,25 +13,13 @@ function pipeVideo(
   size: number,
   rangeHeader: string | undefined,
 ): void {
-  const range = deps.parseRangeHeader(rangeHeader, size);
-  if (range === "invalid") {
-    res.setHeader("content-range", `bytes */${String(size)}`);
-    res.status(416).end();
-    return;
-  }
-  if (range) {
-    const contentLength = range.end - range.start + 1;
-    res.status(206);
-    res.setHeader(
-      "content-range",
-      `bytes ${String(range.start)}-${String(range.end)}/${String(size)}`,
-    );
-    res.setHeader("content-length", String(contentLength));
-    createReadStream(targetPath, range).pipe(res);
-    return;
-  }
-  res.setHeader("content-length", String(size));
-  createReadStream(targetPath).pipe(res);
+  const range = applyByteRange(
+    res,
+    deps.parseRangeHeader(rangeHeader, size),
+    size,
+  );
+  if (range === null) return;
+  createReadStream(targetPath, range).pipe(res);
 }
 
 function createPlayHandler(deps: VideoRouteDependencies): RequestHandler {

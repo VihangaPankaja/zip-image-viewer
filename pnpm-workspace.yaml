@@ -1,3 +1,6 @@
+packages:
+  - tooling/*
+resolvePeersFromWorkspaceRoot: false
 onlyBuiltDependencies:
   - esbuild
   - ffmpeg-static

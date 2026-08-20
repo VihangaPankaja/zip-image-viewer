@@ -4,6 +4,12 @@ import path from "node:path";
 import mime from "mime-types";
 import type { Request, RequestHandler, Response } from "express";
 import type { Session } from "../../domain/models.js";
+import {
+  applyByteRange,
+  errorMessage,
+  isWithinRoot,
+  queryText,
+} from "../httpUtils.js";
 
 type ByteRange = { start: number; end: number };
 type FileContext = {
@@ -44,16 +50,6 @@ export type FileRouteDependencies = {
   ) => ByteRange | "invalid" | null;
 };
 
-function queryText(value: unknown, fallback = ""): string {
-  if (typeof value === "string") return value;
-  if (Array.isArray(value) && typeof value[0] === "string") return value[0];
-  return fallback;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Unexpected file error.";
-}
-
 async function resolveFileContext(
   req: Request,
   res: Response,
@@ -82,17 +78,16 @@ async function resolveFileContext(
     deps.logEvent("warn", "session.file.rejected", {
       sessionId: session.id,
       requestedPath,
-      reason: errorMessage(error),
+      reason: errorMessage(error, "Unexpected file error."),
     });
-    res.status(400).json({ error: errorMessage(error) });
+    res.status(400).json({
+      error: errorMessage(error, "Unexpected file error."),
+    });
     return null;
   }
   const targetPath = path.resolve(session.extractDir, normalizedPath);
   const rootPath = path.resolve(session.extractDir);
-  if (
-    !targetPath.startsWith(`${rootPath}${path.sep}`) &&
-    targetPath !== rootPath
-  ) {
+  if (!isWithinRoot(targetPath, rootPath)) {
     deps.logEvent("warn", "session.file.rejected", {
       sessionId: session.id,
       requestedPath,
@@ -144,7 +139,7 @@ async function serveThumbnail(
     deps.logEvent("warn", "session.thumbnail.failed", {
       sessionId: context.session.id,
       path: context.normalizedPath,
-      error: errorMessage(error),
+      error: errorMessage(error, "Unexpected file error."),
     });
     res.type(context.contentType);
     createReadStream(context.targetPath).pipe(res);
@@ -182,7 +177,7 @@ async function serveImagePreview(
       sessionId: context.session.id,
       path: context.normalizedPath,
       quality,
-      error: errorMessage(error),
+      error: errorMessage(error, "Unexpected file error."),
     });
     res.type(context.contentType);
     createReadStream(context.targetPath).pipe(res);
@@ -195,27 +190,14 @@ function serveFile(
   deps: FileRouteDependencies,
   context: FileContext,
 ): void {
-  res.setHeader("accept-ranges", "bytes");
   res.type(context.contentType);
-  const range = deps.parseRangeHeader(req.headers.range, context.size);
-  if (range === "invalid") {
-    res.setHeader("content-range", `bytes */${String(context.size)}`);
-    res.status(416).end();
-    return;
-  }
-  if (range) {
-    const contentLength = range.end - range.start + 1;
-    res.status(206);
-    res.setHeader(
-      "content-range",
-      `bytes ${String(range.start)}-${String(range.end)}/${String(context.size)}`,
-    );
-    res.setHeader("content-length", String(contentLength));
-    createReadStream(context.targetPath, range).pipe(res);
-    return;
-  }
-  res.setHeader("content-length", String(context.size));
-  createReadStream(context.targetPath).pipe(res);
+  const range = applyByteRange(
+    res,
+    deps.parseRangeHeader(req.headers.range, context.size),
+    context.size,
+  );
+  if (range === null) return;
+  createReadStream(context.targetPath, range).pipe(res);
 }
 
 export function createFileRouteHandler(

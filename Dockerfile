@@ -1,7 +1,8 @@
 FROM node:26.7.0-bookworm-slim AS build
 WORKDIR /app
-RUN npm install --global pnpm@11.21.0
+RUN npm install --global pnpm@11.22.0
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY tooling/eslint/package.json tooling/eslint/package.json
 RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm run build
@@ -12,10 +13,11 @@ ENV NODE_ENV=production
 RUN apt-get update \
   && apt-get install --yes --no-install-recommends tini \
   && rm -rf /var/lib/apt/lists/* \
-  && npm install --global pnpm@11.21.0 \
+  && npm install --global pnpm@11.22.0 \
   && groupadd --system app \
   && useradd --system --gid app --home-dir /app app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY tooling/eslint/package.json tooling/eslint/package.json
 RUN pnpm install --prod --frozen-lockfile
 COPY --from=build /app/build/server ./build/server
 COPY --from=build /app/dist ./dist

@@ -2,7 +2,13 @@ import { createReadStream } from "node:fs";
 import { access, stat } from "node:fs/promises";
 import path from "node:path";
 import type { Express, Request } from "express";
-import { ApplicationError, type Session } from "../domain/models.js";
+import {
+  ApplicationError,
+  type Session,
+  type VideoRendition,
+  type VideoTranscodeEntry,
+} from "../domain/models.js";
+import { queryText } from "./httpUtils.js";
 import {
   buildMasterPlaylist,
   buildVariantPlaylist,
@@ -14,12 +20,6 @@ type VideoContext = {
   normalizedPath: string;
   targetPath: string;
 };
-
-function queryText(value: unknown, fallback = ""): string {
-  if (typeof value === "string") return value;
-  if (Array.isArray(value) && typeof value[0] === "string") return value[0];
-  return fallback;
-}
 
 async function resolveVideoContext(
   deps: VideoRouteDependencies,
@@ -78,19 +78,38 @@ function requireTranscoder(deps: VideoRouteDependencies): void {
   }
 }
 
+async function resolveHlsEntry(
+  request: Request,
+  deps: VideoRouteDependencies,
+): Promise<{ context: VideoContext; entry: VideoTranscodeEntry }> {
+  requireTranscoder(deps);
+  const context = await resolveVideoContext(
+    deps,
+    queryText(request.params.id),
+    request.query.path,
+  );
+  const entry = await deps.ensureVideoTranscodeEntry(
+    context.session,
+    context.normalizedPath,
+    context.targetPath,
+  );
+  return { context, entry };
+}
+
+async function startRendition(
+  deps: VideoRouteDependencies,
+  context: VideoContext,
+  entry: VideoTranscodeEntry,
+  quality: string,
+): Promise<VideoRendition> {
+  const rendition = deps.getRenditionState(entry, context.session, quality);
+  await deps.startRenditionTranscode(entry, context.session, rendition);
+  return rendition;
+}
+
 function registerMasterRoute(app: Express, deps: VideoRouteDependencies): void {
   app.get("/api/sessions/:id/video/hls/master", async (request, response) => {
-    requireTranscoder(deps);
-    const context = await resolveVideoContext(
-      deps,
-      request.params.id,
-      request.query.path,
-    );
-    const entry = await deps.ensureVideoTranscodeEntry(
-      context.session,
-      context.normalizedPath,
-      context.targetPath,
-    );
+    const { context, entry } = await resolveHlsEntry(request, deps);
     const renditions = entry.qualities.map((quality) => ({
       id: quality.id,
       height: quality.height ?? entry.height,
@@ -119,17 +138,7 @@ function registerVariantRoute(
   deps: VideoRouteDependencies,
 ): void {
   app.get("/api/sessions/:id/video/hls/playlist", async (request, response) => {
-    requireTranscoder(deps);
-    const context = await resolveVideoContext(
-      deps,
-      request.params.id,
-      request.query.path,
-    );
-    const entry = await deps.ensureVideoTranscodeEntry(
-      context.session,
-      context.normalizedPath,
-      context.targetPath,
-    );
+    const { context, entry } = await resolveHlsEntry(request, deps);
     const requested = queryText(
       request.query.quality,
       entry.defaultQuality,
@@ -137,8 +146,7 @@ function registerVariantRoute(
     const quality = entry.qualities.some(({ id }) => id === requested)
       ? requested
       : entry.defaultQuality;
-    const rendition = deps.getRenditionState(entry, context.session, quality);
-    await deps.startRenditionTranscode(entry, context.session, rendition);
+    const rendition = await startRendition(deps, context, entry, quality);
     await deps.refreshRenditionAvailability(rendition);
     const playlist = buildVariantPlaylist({
       availableSegments: rendition.availableSegments,
@@ -162,23 +170,12 @@ function registerVariantRoute(
 
 function registerInitRoute(app: Express, deps: VideoRouteDependencies): void {
   app.get("/api/sessions/:id/video/hls/init", async (request, response) => {
-    requireTranscoder(deps);
-    const context = await resolveVideoContext(
-      deps,
-      request.params.id,
-      request.query.path,
-    );
-    const entry = await deps.ensureVideoTranscodeEntry(
-      context.session,
-      context.normalizedPath,
-      context.targetPath,
-    );
+    const { context, entry } = await resolveHlsEntry(request, deps);
     const quality = queryText(
       request.query.quality,
       entry.defaultQuality,
     ).toLowerCase();
-    const rendition = deps.getRenditionState(entry, context.session, quality);
-    await deps.startRenditionTranscode(entry, context.session, rendition);
+    const rendition = await startRendition(deps, context, entry, quality);
     const initPath = path.join(rendition.dir, "init.mp4");
     if (!(await deps.waitForFile(initPath, 14_000))) {
       return response
@@ -195,17 +192,7 @@ function registerSegmentRoute(
   deps: VideoRouteDependencies,
 ): void {
   app.get("/api/sessions/:id/video/hls/segment", async (request, response) => {
-    requireTranscoder(deps);
-    const context = await resolveVideoContext(
-      deps,
-      request.params.id,
-      request.query.path,
-    );
-    const entry = await deps.ensureVideoTranscodeEntry(
-      context.session,
-      context.normalizedPath,
-      context.targetPath,
-    );
+    const { context, entry } = await resolveHlsEntry(request, deps);
     const quality = queryText(
       request.query.quality,
       entry.defaultQuality,
@@ -214,8 +201,7 @@ function registerSegmentRoute(
       0,
       Number.parseInt(queryText(request.query.index, "0"), 10) || 0,
     );
-    const rendition = deps.getRenditionState(entry, context.session, quality);
-    await deps.startRenditionTranscode(entry, context.session, rendition);
+    const rendition = await startRendition(deps, context, entry, quality);
     const segmentPath = path.join(
       rendition.dir,
       `segment_${String(index).padStart(6, "0")}.m4s`,

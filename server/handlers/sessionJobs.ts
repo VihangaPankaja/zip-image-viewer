@@ -3,6 +3,7 @@ import { stat } from "node:fs/promises";
 import type { Express } from "express";
 import mime from "mime-types";
 import type { SessionJob } from "../domain/models.js";
+import { applyByteRange } from "./httpUtils.js";
 
 type RangeValue = { start: number; end: number };
 
@@ -94,26 +95,15 @@ function registerStreamRoute(
     } catch {
       contentType = mime.lookup(job.zipPath) || contentType;
     }
-    res.setHeader("accept-ranges", "bytes");
     res.setHeader("cache-control", "no-store");
     res.type(contentType);
-    const range = deps.parseRangeHeader(req.headers.range, fileStats.size);
-    if (range === "invalid") {
-      res.setHeader("content-range", `bytes */${String(fileStats.size)}`);
-      return res.status(416).end();
-    }
-    if (range) {
-      const contentLength = range.end - range.start + 1;
-      res.status(206);
-      res.setHeader(
-        "content-range",
-        `bytes ${String(range.start)}-${String(range.end)}/${String(fileStats.size)}`,
-      );
-      res.setHeader("content-length", String(contentLength));
-      return createReadStream(job.zipPath, range).pipe(res);
-    }
-    res.setHeader("content-length", String(fileStats.size));
-    return createReadStream(job.zipPath).pipe(res);
+    const range = applyByteRange(
+      res,
+      deps.parseRangeHeader(req.headers.range, fileStats.size),
+      fileStats.size,
+    );
+    if (range === null) return;
+    return createReadStream(job.zipPath, range).pipe(res);
   });
 }
 

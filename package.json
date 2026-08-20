@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.21.0",
+  "packageManager": "pnpm@11.22.0",
   "engines": {
     "node": ">=26 <27"
   },
@@ -34,9 +34,11 @@
     "fallow:health": "fallow health --coverage coverage/coverage-final.json --min-score 80 --score",
     "fallow:audit": "fallow audit --base origin/master --gate new-only --brief",
     "fallow:dead": "fallow dead-code",
-    "fallow:duplicates": "fallow dupes",
+    "fallow:duplicates": "fallow dupes --fail-on-issues",
+    "fallow:coverage-gaps": "fallow health --coverage-gaps --report-only",
+    "fallow:targets": "fallow health --targets --report-only",
     "fallow:fix:dry-run": "fallow fix --dry-run",
-    "quality": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test:coverage && pnpm run fallow:dead && pnpm run fallow:health && pnpm run build"
+    "quality": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test:coverage && pnpm run fallow:dead && pnpm run fallow:duplicates && pnpm run fallow:health && pnpm run build"
   },
   "dependencies": {
     "7zip-bin": "^5.2.0",
@@ -63,8 +65,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@zip-image-viewer/eslint-config": "workspace:*",
     "@axe-core/playwright": "^4.13.0",
-    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.1",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.0",
@@ -81,17 +83,13 @@
     "@vitest/coverage-v8": "^4.1.11",
     "concurrently": "^10.0.5",
     "eslint": "^10.0.1",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-react-hooks": "^7.1.1",
     "fallow": "^3.17.0",
-    "globals": "^17.11.0",
     "jsdom": "^30.0.1",
     "lefthook": "^2.1.10",
     "prettier": "^3.9.6",
     "supertest": "^7.2.0",
     "tsx": "^4.23.12",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.67.0",
+    "typescript": "^7.0.2",
     "vite": "^8.2.2",
     "vitest": "^4.1.11"
   }
