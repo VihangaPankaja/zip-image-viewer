@@ -1,5 +1,5 @@
 async function bootstrap() {
-  await import("./appRuntime.js");
+  await import("./runtimeComposition.js");
 }
 
 bootstrap().catch((error: unknown) => {

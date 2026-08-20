@@ -1,142 +1,157 @@
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
-html,
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  background: var(--bg);
+  scrollbar-color: var(--border-strong) var(--bg-inset);
+}
+
 body,
 #root {
   min-width: 0;
   min-height: 100%;
   margin: 0;
 }
+
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: Inter, "Segoe UI", sans-serif;
+  font-family: var(--font-body);
+  font-size: 15px;
   line-height: 1.45;
+  text-rendering: optimizeLegibility;
 }
+
 button,
 input,
 textarea,
 select {
   font: inherit;
 }
-button {
+
+button,
+summary,
+label[for] {
   cursor: pointer;
 }
-button:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-[tabindex="0"]:focus-visible {
+
+button,
+input,
+textarea,
+select,
+summary,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
   outline: 2px solid var(--accent-strong);
   outline-offset: 2px;
 }
+
+::selection {
+  background: var(--accent);
+  color: var(--bg-inset);
+}
+
+h1,
+h2,
+h3,
+p,
+dl,
+dd {
+  margin-block-start: 0;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-stretch: condensed;
+  letter-spacing: 0.01em;
+}
+
 .app-shell,
 .workspace {
-  min-height: 100vh;
+  min-height: 100dvh;
 }
+
 .workspace {
-  padding: 0 18px;
+  padding-inline: clamp(10px, 1.5vw, 22px);
 }
+
 .panel-label {
   margin: 0;
   color: var(--text-dim);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
+
 .panel-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
+
+.panel-title-group {
+  min-width: 0;
+}
+
 .panel-title-group h2 {
-  margin: 3px 0;
+  margin: 3px 0 0;
+  overflow: hidden;
   font-size: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.primary-button,
-.ghost-button,
-.nav-button {
-  min-height: 40px;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  background: transparent;
+
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
-.primary-button {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: #071111;
-  font-weight: 750;
-}
-.primary-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-.ghost-button:hover,
-.nav-button:hover {
-  background: var(--surface-highlight);
-  border-color: var(--border-strong);
-}
-.compact-button {
-  min-height: 40px;
-}
-.input-shell {
-  display: grid;
-  gap: 6px;
-}
-.input-label {
-  color: var(--text-muted);
-  font-size: 0.8rem;
-}
-.input-shell input,
-.toolbar-select-shell select,
-.custom-dropdown select {
-  min-height: 38px;
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-inset);
-  color: var(--text);
-}
+
 .empty-card {
-  padding: 20px;
+  display: grid;
+  place-content: center;
+  min-height: 180px;
+  padding: var(--space-6);
   color: var(--text-muted);
+  text-align: center;
 }
+
 .empty-card strong {
   color: var(--text);
+  font-family: var(--font-display);
+  font-size: 1rem;
 }
-.settings-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: grid;
-  place-items: start center;
-  padding: 24px;
-  overflow: auto;
-  background: var(--bg-overlay);
+
+.empty-card p {
+  max-width: 38ch;
+  margin: var(--space-2) auto 0;
 }
-.settings-sheet {
-  width: min(1080px, 100%);
-  margin: auto;
-  padding: 20px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  background: var(--bg-panel-strong);
-  box-shadow: var(--shadow);
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
-.download-settings-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 14px;
-  margin-top: 18px;
-}
-.toggle-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  color: var(--text-muted);
+
+@media (forced-colors: active) {
+  :focus-visible {
+    outline-color: CanvasText;
+  }
 }

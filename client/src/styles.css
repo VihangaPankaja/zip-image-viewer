@@ -1,7 +1,9 @@
-@import "./styles/tokens.css";
-@import "./styles/foundation.css";
-@import "./styles/workspace.css";
-@import "./styles/explorer.css";
-@import "./styles/preview.css";
-@import "./styles/player.css";
-@import "./styles/responsive.css";
+@layer reset, tokens, base, components, utilities;
+
+@import "./styles/tokens.css" layer(tokens);
+@import "./styles/foundation.css" layer(base);
+@import "./styles/controls.css" layer(components);
+@import "./styles/workspace.css" layer(components);
+@import "./styles/explorer.css" layer(components);
+@import "./styles/preview.css" layer(components);
+@import "./styles/player.css" layer(components);

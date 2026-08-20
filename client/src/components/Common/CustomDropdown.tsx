@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 
 type DropdownOptionValue = string | number;
 
@@ -12,7 +12,7 @@ type CustomDropdownProps = {
   label: string;
   value: DropdownOptionValue;
   options: DropdownOption[];
-  onChange: (_value: DropdownOptionValue) => void;
+  onChange: (value: DropdownOptionValue) => void;
   className?: string;
 };
 
@@ -24,77 +24,56 @@ export function CustomDropdown({
   onChange,
   className = "",
 }: CustomDropdownProps) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuId = `${id}-menu`;
   const activeOption =
-    options.find((option) => option.value === value) || options[0] || null;
-
-  useEffect(() => {
-    function onPointerDown(event: MouseEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-
-    function onEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    }
-
-    window.addEventListener("mousedown", onPointerDown);
-    window.addEventListener("keydown", onEscape);
-
-    return () => {
-      window.removeEventListener("mousedown", onPointerDown);
-      window.removeEventListener("keydown", onEscape);
-    };
-  }, []);
+    options.find((option) => option.value === value) ?? options[0];
 
   return (
     <div
-      ref={rootRef}
       className={`toolbar-select-shell custom-dropdown-shell ${className}`.trim()}
     >
       <span className="toolbar-label">{label}</span>
       <button
         type="button"
         id={id}
-        className={`custom-dropdown-trigger ${open ? "open" : ""}`}
+        className="custom-dropdown-trigger"
+        aria-label={label}
         aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
+        aria-controls={menuId}
+        popoverTarget={menuId}
       >
-        <span>{activeOption?.label || "Select"}</span>
-        <span className="custom-dropdown-caret">{open ? "^" : "v"}</span>
+        <span>{activeOption?.label ?? "Select"}</span>
+        <span className="custom-dropdown-caret" aria-hidden="true" />
       </button>
 
-      {open ? (
-        <div
-          className="custom-dropdown-menu"
-          role="listbox"
-          aria-labelledby={id}
-        >
-          {options.map((option) => {
-            const isActive = option.value === value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                role="option"
-                aria-selected={isActive}
-                className={`custom-dropdown-option ${isActive ? "active" : ""}`}
-                onClick={() => {
-                  onChange(option.value);
-                  setOpen(false);
-                }}
-              >
-                {option.label}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
+      <div
+        ref={menuRef}
+        id={menuId}
+        className="custom-dropdown-menu"
+        role="listbox"
+        aria-label={label}
+        popover="auto"
+      >
+        {options.map((option) => {
+          const isActive = option.value === value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="option"
+              aria-selected={isActive}
+              className={`custom-dropdown-option ${isActive ? "active" : ""}`}
+              onClick={() => {
+                onChange(option.value);
+                menuRef.current?.hidePopover();
+              }}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

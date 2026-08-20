@@ -16,7 +16,6 @@ type ArchiveResetParams = {
   setSelectedPath: Dispatch<SetStateAction<string>>;
   setSession: Dispatch<SetStateAction<SessionPayload | null>>;
   setSlideshowOpen: Dispatch<SetStateAction<boolean>>;
-  setThumbnailStripExpanded: Dispatch<SetStateAction<boolean>>;
 };
 
 export function useArchiveReset(params: ArchiveResetParams) {
@@ -31,7 +30,6 @@ export function useArchiveReset(params: ArchiveResetParams) {
     setSelectedPath,
     setSession,
     setSlideshowOpen,
-    setThumbnailStripExpanded,
   } = params;
   return useCallback(() => {
     setSession(null);
@@ -41,7 +39,6 @@ export function useArchiveReset(params: ArchiveResetParams) {
     resetSelectedImageSrc();
     setOversizePrompt(null);
     setSlideshowOpen(false);
-    setThumbnailStripExpanded(false);
     setIsLoading(false);
     clearTextPreviewCache();
     clearImagePreviewCache();
@@ -56,6 +53,5 @@ export function useArchiveReset(params: ArchiveResetParams) {
     setSelectedPath,
     setSession,
     setSlideshowOpen,
-    setThumbnailStripExpanded,
   ]);
 }

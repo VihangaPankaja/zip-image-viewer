@@ -1,4 +1,4 @@
-import type { Dispatch, RefObject, SetStateAction } from "react";
+import type { RefObject } from "react";
 
 export type PreviewNode = {
   extension?: string;
@@ -40,9 +40,6 @@ export type ImagePreviewProps = {
   selectedPath: string;
   setPreviewQuality: (value: string) => void;
   setSelectedPath: (value: string) => void;
-  setThumbnailStripExpanded: Dispatch<SetStateAction<boolean>>;
-  thumbnailStripExpanded: boolean;
-  visibleThumbnailItems: ThumbnailItem[];
 };
 
 export type VideoPreviewProps = {
@@ -50,27 +47,11 @@ export type VideoPreviewProps = {
   formatBytes: (value: number) => string;
   formatDate: (value: number) => string;
   keyboardSettings: KeyboardSettings;
-  seekVideoTo: (time: number) => void;
   selectedNode: PreviewFileNode;
   selectedVideoQuality: string;
   setSelectedVideoQuality: (value: string) => void;
-  setVideoPlaybackRate: (rate: number) => void;
-  setVideoSeekHoverTime: Dispatch<SetStateAction<number | null>>;
-  setVideoVolume: (volume: number) => void;
-  toggleVideoFullscreen: () => void;
-  toggleVideoPlayback: () => void;
-  videoBufferedPercent: number;
-  videoCurrentTime: number;
-  videoDuration: number;
-  videoIsFullscreen: boolean;
-  videoIsPlaying: boolean;
   videoPlaybackError: string;
-  videoPlaybackRate: number;
-  videoPlayedPercent: number;
   videoQualityOptions: PreviewOption[];
   videoRef: RefObject<HTMLVideoElement | null>;
-  videoSeekHoverTime: number | null;
-  videoSeekPreviewUrl: string;
   videoShellRef: RefObject<HTMLDivElement | null>;
-  videoVolume: number;
 };

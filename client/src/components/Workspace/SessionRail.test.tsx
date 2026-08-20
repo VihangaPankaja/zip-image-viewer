@@ -28,6 +28,8 @@ describe("SessionRail", () => {
       />,
     );
 
+    expect(screen.getByRole("list", { name: "Sessions" })).toBeInTheDocument();
+
     await user.click(
       screen.getByRole("button", { name: /open brand-kit.zip/i }),
     );

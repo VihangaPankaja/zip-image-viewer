@@ -29,7 +29,6 @@ type UseSessionLifecycleParams = {
   setError: Dispatch<SetStateAction<string>>;
   setIsLoading: Dispatch<SetStateAction<boolean>>;
   setSlideshowOpen: Dispatch<SetStateAction<boolean>>;
-  setThumbnailStripExpanded: Dispatch<SetStateAction<boolean>>;
   resetTextPreview: () => void;
   resetSelectedImageSrc: () => void;
   clearTextPreviewCache: () => void;

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { STRIP_THUMB_SIZE } from "../lib/appConstants";
-import { getThumbnailWindow, getWrappedPath } from "../lib/archiveUiUtils";
+import { getWrappedPath } from "../lib/archiveUiUtils";
 import { buildFileUrl } from "../lib/fileUrl";
 import { classifyNodeKind } from "../lib/mimeTypeSystem";
 import { cloneAndSortTree, compareNodes, flattenTree } from "../lib/treeUtils";
@@ -28,7 +28,6 @@ type UsePreviewSelectionParams = {
   sortMode: string;
   selectedPath: string;
   previewQuality: string;
-  thumbnailStripExpanded: boolean;
 };
 
 type FlatPreviewData = ReturnType<typeof flattenTree>;
@@ -100,7 +99,6 @@ export function usePreviewSelection({
   sortMode,
   selectedPath,
   previewQuality,
-  thumbnailStripExpanded,
 }: UsePreviewSelectionParams) {
   const sortedTree = useMemo(() => {
     if (!session?.tree) {
@@ -139,10 +137,6 @@ export function usePreviewSelection({
     previewQuality,
   );
 
-  const visibleThumbnailItems = thumbnailStripExpanded
-    ? currentFolderImageItems
-    : getThumbnailWindow(currentFolderImageItems, selectedPath, 2);
-
   const navigation = buildImageNavigation(
     currentFolderImages,
     currentImageIndex,
@@ -168,7 +162,6 @@ export function usePreviewSelection({
     currentImageIndex,
     ...urls,
     currentFolderImageItems,
-    visibleThumbnailItems,
     ...navigation,
     explorerRows,
   };

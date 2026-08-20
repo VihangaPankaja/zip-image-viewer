@@ -21,22 +21,26 @@ import {
 import { formatBytes, formatDate } from "../../../lib/formatterUtils";
 import type { WorkspacePageController } from "../useWorkspacePageController";
 import { WorkspaceAppBar } from "./WorkspaceAppBar";
+import { WorkspaceLayout } from "./WorkspaceLayout";
 import { WorkspaceOverlays } from "./WorkspaceOverlays";
-import { WorkspacePresentation } from "./WorkspacePresentation";
 
 type ViewProps = { controller: WorkspacePageController };
 
 export function WorkspacePageView({ controller }: ViewProps) {
   return (
-    <WorkspacePresentation
-      header={<WorkspaceHeader controller={controller} />}
-      sessions={<WorkspaceSessions controller={controller} />}
-      files={<WorkspaceFiles controller={controller} />}
-      preview={<WorkspacePreview controller={controller} />}
-      metadata={<WorkspaceMetadata controller={controller} />}
-      settings={<WorkspaceSettings controller={controller} />}
-      overlays={<WorkspacePageOverlays controller={controller} />}
-    />
+    <div className="app-shell">
+      <main className="workspace">
+        <WorkspaceLayout
+          header={<WorkspaceHeader controller={controller} />}
+          sessions={<WorkspaceSessions controller={controller} />}
+          files={<WorkspaceFiles controller={controller} />}
+          preview={<WorkspacePreview controller={controller} />}
+          metadata={<WorkspaceMetadata controller={controller} />}
+        />
+      </main>
+      <WorkspaceSettings controller={controller} />
+      <WorkspacePageOverlays controller={controller} />
+    </div>
   );
 }
 
@@ -105,24 +109,37 @@ function WorkspacePreview({ controller }: ViewProps) {
       setPreviewQuality={state.setPreviewQuality}
       setSelectedPath={state.setSelectedPath}
       setSlideshowOpen={state.setSlideshowOpen}
-      setThumbnailStripExpanded={state.setThumbnailStripExpanded}
       textPreview={text.textPreview}
-      thumbnailStripExpanded={state.thumbnailStripExpanded}
     />
   );
 }
 
 function WorkspaceMetadata({ controller }: ViewProps) {
   const { lifecycle, media, state } = controller;
+  const selected = media.selection.selectedNode;
   return (
-    <section className="workspace-metadata-panel">
-      <p className="panel-label">Details</p>
-      <h2>{media.selection.selectedNode?.name || "No file selected"}</h2>
-      <p>
-        {media.selection.selectedNode?.path ||
-          "Select a file to inspect its metadata."}
-      </p>
-      {state.activeJob ? <p>{formatProgressMessage(state.activeJob)}</p> : null}
+    <section
+      className="workspace-metadata-panel"
+      aria-labelledby="details-title"
+    >
+      <p className="panel-label">Selection</p>
+      <h2 id="details-title">Details</h2>
+      <dl>
+        <div>
+          <dt>File</dt>
+          <dd>{selected?.name || "No file selected"}</dd>
+        </div>
+        <div>
+          <dt>Path</dt>
+          <dd>{selected?.path || "Select a file to inspect its metadata."}</dd>
+        </div>
+        {state.activeJob ? (
+          <div>
+            <dt>Status</dt>
+            <dd>{formatProgressMessage(state.activeJob)}</dd>
+          </div>
+        ) : null}
+      </dl>
       {state.error ? <p role="alert">{state.error}</p> : null}
       {state.session ? (
         <button

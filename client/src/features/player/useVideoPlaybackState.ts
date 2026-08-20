@@ -6,14 +6,6 @@ export function useVideoPlaybackState() {
   const [videoPlaybackRate, setVideoPlaybackRate] = useState(1);
   const [videoVolume, setVideoVolume] = useState(0.9);
   const [videoPlaybackError, setVideoPlaybackError] = useState("");
-  const [videoDuration, setVideoDuration] = useState(0);
-  const [videoCurrentTime, setVideoCurrentTime] = useState(0);
-  const [videoBufferedEnd, setVideoBufferedEnd] = useState(0);
-  const [videoIsPlaying, setVideoIsPlaying] = useState(false);
-  const [videoIsFullscreen, setVideoIsFullscreen] = useState(false);
-  const [videoSeekHoverTime, setVideoSeekHoverTime] = useState<number | null>(
-    null,
-  );
   const [videoQualityOptions, setVideoQualityOptions] = useState<
     VideoQualityOption[]
   >([]);
@@ -32,25 +24,12 @@ export function useVideoPlaybackState() {
       videoVolume,
       setVideoVolume,
       videoPlaybackError,
-      videoDuration,
-      videoCurrentTime,
-      setVideoCurrentTime,
-      videoBufferedEnd,
-      videoIsPlaying,
-      videoIsFullscreen,
-      videoSeekHoverTime,
-      setVideoSeekHoverTime,
       videoQualityOptions,
       selectedVideoQuality,
       setSelectedVideoQuality,
     },
     setters: {
       setVideoPlaybackError,
-      setVideoDuration,
-      setVideoCurrentTime,
-      setVideoBufferedEnd,
-      setVideoIsPlaying,
-      setVideoIsFullscreen,
       setVideoQualityOptions,
       setSelectedVideoQuality,
     },

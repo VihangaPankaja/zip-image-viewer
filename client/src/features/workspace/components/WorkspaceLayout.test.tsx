@@ -16,7 +16,7 @@ describe("WorkspaceLayout", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Files" }));
+    await user.click(screen.getByRole("radio", { name: "Files" }));
 
     expect(
       screen.getByRole("navigation", { name: "Workspace views" }),
@@ -24,13 +24,6 @@ describe("WorkspaceLayout", () => {
     expect(
       screen.getByRole("heading", { name: "Media workspace" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Files" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    expect(screen.getByTestId("workspace-layout")).toHaveAttribute(
-      "data-mobile-pane",
-      "files",
-    );
+    expect(screen.getByRole("radio", { name: "Files" })).toBeChecked();
   });
 });

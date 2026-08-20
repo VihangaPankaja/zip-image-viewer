@@ -10,28 +10,6 @@ type ArchiveJobLike = {
   totalEntries?: number;
 };
 
-export function getThumbnailWindow<T extends { path: string }>(
-  items: T[],
-  currentPath: string,
-  radius = 2,
-): T[] {
-  if (items.length <= radius * 2 + 1) {
-    return items;
-  }
-
-  const currentIndex = items.findIndex((item) => item.path === currentPath);
-  if (currentIndex === -1) {
-    return items.slice(0, radius * 2 + 1);
-  }
-
-  const visible: T[] = [];
-  for (let offset = -radius; offset <= radius; offset += 1) {
-    const index = (currentIndex + offset + items.length) % items.length;
-    visible.push(items[index]);
-  }
-  return visible;
-}
-
 export function getImageCacheKey(
   sessionId: string,
   imagePath: string,

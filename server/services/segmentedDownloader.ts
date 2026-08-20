@@ -3,6 +3,7 @@ import { stat, rm } from "node:fs/promises";
 import type { IncomingMessage } from "node:http";
 import { pipeline } from "node:stream/promises";
 import got from "got";
+import { sleepWithSignal } from "../infrastructure/runtime/mediaClassification.js";
 
 const UNLIMITED_RETRIES = -1;
 const RETRY_BASE_DELAY_MS = 1200;
@@ -39,27 +40,6 @@ function getErrorProperty(error: unknown, property: "name" | "code"): string {
         ? error.code
         : undefined;
   return typeof value === "string" ? value : "";
-}
-
-function sleepWithSignal(ms: number, signal: AbortSignal): Promise<void> {
-  if (!Number.isFinite(ms) || ms <= 0) {
-    return Promise.resolve();
-  }
-
-  return new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(resolve, ms);
-    const onAbort = () => {
-      clearTimeout(timer);
-      reject(Object.assign(new Error("Aborted"), { name: "AbortError" }));
-    };
-
-    if (signal.aborted) {
-      onAbort();
-      return;
-    }
-
-    signal.addEventListener("abort", onAbort, { once: true });
-  });
 }
 
 function buildSegments(totalSize: number, segmentCount: number): Segment[] {

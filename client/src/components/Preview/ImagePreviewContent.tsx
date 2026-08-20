@@ -24,37 +24,21 @@ function ImagePreviewToolbar(props: ImagePreviewProps) {
 }
 
 function ThumbnailStrip(props: ImagePreviewProps) {
-  const { thumbnailStripExpanded: expanded } = props;
   if (props.currentFolderImageItems.length <= 1) {
     return null;
   }
   return (
-    <div
-      className={`thumbnail-strip-shell ${expanded ? "expanded" : "collapsed"}`}
-    >
-      <div className="thumbnail-strip-header">
-        <div>
+    <details className="thumbnail-strip-shell">
+      <summary className="thumbnail-strip-header">
+        <span>
           <strong>Folder thumbnails</strong>
-          <div className="thumbnail-strip-copy">
-            {expanded
-              ? `Showing all ${props.currentFolderImageItems.length} sibling images.`
-              : "Showing nearby images around the current selection."}
-          </div>
-        </div>
-        <button
-          className="ghost-button"
-          type="button"
-          onClick={() => props.setThumbnailStripExpanded((current) => !current)}
-        >
-          {expanded ? "Collapse strip" : "Expand strip"}
-        </button>
-      </div>
-      <div
-        className={`thumbnail-strip ${expanded ? "expanded" : "collapsed"}`}
-        role="list"
-        aria-label="Folder images"
-      >
-        {props.visibleThumbnailItems.map((item) => (
+          <span className="thumbnail-strip-copy">
+            {props.currentFolderImageItems.length} sibling images
+          </span>
+        </span>
+      </summary>
+      <div className="thumbnail-strip" role="list" aria-label="Folder images">
+        {props.currentFolderImageItems.map((item) => (
           <button
             key={item.path}
             type="button"
@@ -66,7 +50,7 @@ function ThumbnailStrip(props: ImagePreviewProps) {
           </button>
         ))}
       </div>
-    </div>
+    </details>
   );
 }
 

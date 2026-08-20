@@ -1,4 +1,3 @@
-import { createPortal } from "react-dom";
 import { CustomDropdown } from "../../../components/Common/CustomDropdown";
 import {
   TreeExplorer,
@@ -37,6 +36,10 @@ type WorkspaceOverlaysProps = {
   sortedTree: ExplorerNode | null;
 };
 
+function showModalDialog(dialog: HTMLDialogElement | null): void {
+  if (dialog && !dialog.open) dialog.showModal();
+}
+
 export function WorkspaceOverlays(props: WorkspaceOverlaysProps) {
   const { explorerModalOpen, slideshowOpen, sortedTree } = props;
   return (
@@ -53,16 +56,14 @@ function SlideshowOverlay(props: WorkspaceOverlaysProps) {
   const node = props.selectedNode;
   if (!node) return null;
   const lastPath = props.currentFolderImages.at(-1) || "";
-  return createPortal(
-    <div
+  return (
+    <dialog
+      ref={showModalDialog}
       className={`slideshow-overlay ${props.slideshowChromeHidden ? "chrome-hidden" : ""}`}
+      aria-label={`Slideshow for ${node.name}`}
+      onClose={props.onCloseSlideshow}
     >
-      <div
-        className="slideshow-viewport"
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Slideshow for ${node.name}`}
-      >
+      <div className="slideshow-viewport">
         <div
           className={`slideshow-stage slideshow-fit-${props.slideshowFitMode}`}
           onDoubleClick={() =>
@@ -80,6 +81,7 @@ function SlideshowOverlay(props: WorkspaceOverlaysProps) {
             className="nav-button nav-button-left"
             type="button"
             aria-label="Previous image"
+            data-tooltip="Previous image"
             onClick={() => props.onSelectPath(props.previousImagePath)}
           >
             {"<"}
@@ -88,6 +90,7 @@ function SlideshowOverlay(props: WorkspaceOverlaysProps) {
             className="nav-button nav-button-right"
             type="button"
             aria-label="Next image"
+            data-tooltip="Next image"
             onClick={() => props.onSelectPath(props.nextImagePath)}
           >
             {">"}
@@ -115,8 +118,7 @@ function SlideshowOverlay(props: WorkspaceOverlaysProps) {
           </button>
         ) : null}
       </div>
-    </div>,
-    document.body,
+    </dialog>
   );
 }
 
@@ -186,13 +188,20 @@ function SlideshowTools({
 
 function ExplorerOverlay(props: WorkspaceOverlaysProps) {
   if (!props.sortedTree) return null;
-  return createPortal(
-    <div className="settings-overlay" role="dialog" aria-modal="true">
+  return (
+    <dialog
+      ref={showModalDialog}
+      className="settings-dialog"
+      aria-labelledby="explorer-dialog-title"
+      onClose={props.onCloseExplorer}
+    >
       <div className="settings-sheet explorer-modal-sheet">
         <div className="panel-header">
           <div className="panel-title-group">
             <p className="panel-label">Explorer modal</p>
-            <h2 title={props.sortedTree.name}>{props.sortedTree.name}</h2>
+            <h2 id="explorer-dialog-title" title={props.sortedTree.name}>
+              {props.sortedTree.name}
+            </h2>
           </div>
           <button
             className="ghost-button compact-button"
@@ -215,7 +224,6 @@ function ExplorerOverlay(props: WorkspaceOverlaysProps) {
           />
         </div>
       </div>
-    </div>,
-    document.body,
+    </dialog>
   );
 }

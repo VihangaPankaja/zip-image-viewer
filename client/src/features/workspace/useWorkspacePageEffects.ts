@@ -15,9 +15,12 @@ export function useWorkspacePageEffects(
   selection: SelectionModel,
   loadImagePreview: (path: string, quality: string) => Promise<string>,
 ): void {
+  const { setSlideshowChromeHidden, slideshowOpen } = state;
   useSelectionFallback(state, selection);
   useImagePreloading(state, selection, loadImagePreview);
-  useSlideshowBodyLock(state.slideshowOpen, state.setSlideshowChromeHidden);
+  useEffect(() => {
+    if (!slideshowOpen) setSlideshowChromeHidden(false);
+  }, [setSlideshowChromeHidden, slideshowOpen]);
 }
 
 function useSelectionFallback(
@@ -68,21 +71,4 @@ function useImagePreloading(
     state.previewQuality,
     state.session,
   ]);
-}
-
-function useSlideshowBodyLock(
-  slideshowOpen: boolean,
-  setChromeHidden: (value: boolean) => void,
-): void {
-  useEffect(() => {
-    if (!slideshowOpen) {
-      setChromeHidden(false);
-      return undefined;
-    }
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, [setChromeHidden, slideshowOpen]);
 }

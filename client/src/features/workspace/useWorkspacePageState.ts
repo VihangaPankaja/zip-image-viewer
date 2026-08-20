@@ -12,7 +12,6 @@ export function useWorkspacePageState() {
   const [selectedPath, setSelectedPath] = useState("");
   const [sortMode, setSortMode] = useState("natural-tail");
   const [previewQuality, setPreviewQuality] = useState("balanced");
-  const [thumbnailStripExpanded, setThumbnailStripExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [, setOversizePrompt] = useState<OversizePrompt | null>(null);
@@ -44,13 +43,11 @@ export function useWorkspacePageState() {
     setSlideshowFitMode,
     setSlideshowOpen,
     setSortMode,
-    setThumbnailStripExpanded,
     setZipUrl,
     slideshowChromeHidden,
     slideshowFitMode,
     slideshowOpen,
     sortMode,
-    thumbnailStripExpanded,
     zipUrl,
   };
 }

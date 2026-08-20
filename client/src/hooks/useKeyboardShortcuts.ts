@@ -94,12 +94,10 @@ function handleKeyboardShortcut(
 }
 
 function isInteractiveTarget(element: Element | null): boolean {
-  const tagName = element?.tagName;
-  return (
-    tagName === "INPUT" ||
-    tagName === "TEXTAREA" ||
-    tagName === "SELECT" ||
-    Boolean(element?.closest(".custom-dropdown-shell"))
+  return Boolean(
+    element?.matches(
+      "a[href], audio, button, input, select, summary, textarea, video, [contenteditable]:not([contenteditable='false'])",
+    ),
   );
 }
 

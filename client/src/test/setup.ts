@@ -44,6 +44,28 @@ Object.defineProperty(globalThis, "ResizeObserver", {
   value: TestResizeObserver,
 });
 
+if (typeof HTMLDialogElement !== "undefined") {
+  if (!("showModal" in HTMLDialogElement.prototype)) {
+    Object.defineProperty(HTMLDialogElement.prototype, "showModal", {
+      value(this: HTMLDialogElement) {
+        this.open = true;
+      },
+    });
+  }
+  if (!("close" in HTMLDialogElement.prototype)) {
+    Object.defineProperty(HTMLDialogElement.prototype, "close", {
+      value(this: HTMLDialogElement) {
+        this.open = false;
+        this.dispatchEvent(new Event("close"));
+      },
+    });
+  }
+}
+
+if (typeof HTMLElement.prototype.hidePopover !== "function") {
+  HTMLElement.prototype.hidePopover = function hidePopover() {};
+}
+
 if (!window.matchMedia) {
   Object.defineProperty(window, "matchMedia", {
     writable: true,

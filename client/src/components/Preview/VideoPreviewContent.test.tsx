@@ -4,14 +4,13 @@ import { vi } from "vitest";
 import { VideoPreviewContent } from "./VideoPreviewContent";
 
 describe("VideoPreviewContent", () => {
-  it("exposes the seek control by its purpose", () => {
+  it("uses accessible native playback controls", () => {
     render(
       <VideoPreviewContent
         activeJob={null}
         formatBytes={(value) => `${value} bytes`}
         formatDate={(value) => String(value)}
         keyboardSettings={{ jumpSeconds: 5, rateStep: 0.25 }}
-        seekVideoTo={vi.fn()}
         selectedNode={{
           extension: "mp4",
           name: "sample.mp4",
@@ -21,30 +20,18 @@ describe("VideoPreviewContent", () => {
         }}
         selectedVideoQuality="auto"
         setSelectedVideoQuality={vi.fn()}
-        setVideoPlaybackRate={vi.fn()}
-        setVideoSeekHoverTime={vi.fn()}
-        setVideoVolume={vi.fn()}
-        toggleVideoFullscreen={vi.fn()}
-        toggleVideoPlayback={vi.fn()}
-        videoBufferedPercent={40}
-        videoCurrentTime={10}
-        videoDuration={60}
-        videoIsFullscreen={false}
-        videoIsPlaying={false}
         videoPlaybackError=""
-        videoPlaybackRate={1}
-        videoPlayedPercent={20}
         videoQualityOptions={[]}
         videoRef={createRef<HTMLVideoElement>()}
-        videoSeekHoverTime={null}
-        videoSeekPreviewUrl=""
         videoShellRef={createRef<HTMLDivElement>()}
-        videoVolume={0.8}
       />,
     );
 
+    const video = screen.getByLabelText("Video preview");
+    expect(video).toHaveAttribute("controls");
+    expect(video).toHaveAttribute("playsinline");
     expect(
-      screen.getByRole("slider", { name: "Seek video" }),
-    ).toBeInTheDocument();
+      screen.queryByRole("slider", { name: "Seek video" }),
+    ).not.toBeInTheDocument();
   });
 });

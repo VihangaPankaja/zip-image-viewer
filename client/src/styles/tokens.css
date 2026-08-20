@@ -7,21 +7,27 @@
   --bg-inset: #0b1012;
   --bg-panel: #151f22;
   --bg-panel-strong: #1a272a;
-  --bg-overlay: rgb(4 8 9 / 76%);
+  --bg-overlay: rgb(4 8 9 / 82%);
   --border: #2e4143;
   --border-strong: #476366;
+  --font-body: Aptos, "Segoe UI Variable", "Segoe UI", sans-serif;
+  --font-display: Bahnschrift, "Arial Narrow", sans-serif;
   --radius-lg: 16px;
   --radius-md: 12px;
   --radius-sm: 8px;
-  --shadow: 0 14px 28px rgb(0 0 0 / 24%);
-  --shadow-soft: 0 6px 16px rgb(0 0 0 / 20%);
+  --shadow: 0 18px 44px rgb(0 0 0 / 34%);
+  --shadow-soft: 0 8px 24px rgb(0 0 0 / 24%);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
   --surface-highlight: #19383a;
   --text: #edf5f3;
   --text-dim: #89a4a4;
   --text-muted: #b0c2c0;
-  --workspace-rail-width: 244px;
-  --workspace-files-width: minmax(230px, 300px);
-  --workspace-meta-width: minmax(190px, 250px);
+  --transition-fast: 140ms ease;
 }
 
 html[data-theme="light"] {
@@ -40,4 +46,6 @@ html[data-theme="light"] {
   --text: #1b2929;
   --text-dim: #627473;
   --text-muted: #4c5e5d;
+  --shadow: 0 18px 44px rgb(30 53 50 / 18%);
+  --shadow-soft: 0 8px 24px rgb(30 53 50 / 14%);
 }

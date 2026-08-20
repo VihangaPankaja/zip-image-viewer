@@ -23,7 +23,6 @@ type SessionRequestContext = Pick<
   setIsLoading: Dispatch<SetStateAction<boolean>>;
   setOversizePrompt: Dispatch<SetStateAction<OversizePrompt | null>>;
   setSlideshowOpen: Dispatch<SetStateAction<boolean>>;
-  setThumbnailStripExpanded: Dispatch<SetStateAction<boolean>>;
 };
 
 async function loadSessionRequest(
@@ -35,7 +34,6 @@ async function loadSessionRequest(
   context.setError("");
   context.setOversizePrompt(null);
   context.setSlideshowOpen(false);
-  context.setThumbnailStripExpanded(false);
   try {
     const response = await fetch("/api/sessions", {
       method: "POST",

@@ -26,6 +26,7 @@ export function AudioPreviewContent({
       </div>
       <div className="image-frame media-frame">
         <audio
+          aria-label="Audio preview"
           className="video-player"
           src={selectedFileUrl}
           controls

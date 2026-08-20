@@ -1,7 +1,5 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Group, Panel, Separator } from "react-resizable-panels";
-
-type WorkspaceMobilePane = "sessions" | "files" | "preview";
 
 type WorkspaceLayoutProps = {
   files: ReactNode;
@@ -12,7 +10,7 @@ type WorkspaceLayoutProps = {
 };
 
 const mobileViews: ReadonlyArray<{
-  id: WorkspaceMobilePane;
+  id: "sessions" | "files" | "preview";
   label: string;
 }> = [
   { id: "sessions", label: "Sessions" },
@@ -27,40 +25,28 @@ export function WorkspaceLayout({
   preview,
   sessions,
 }: WorkspaceLayoutProps) {
-  const [mobilePane, setMobilePane] = useState<WorkspaceMobilePane>("preview");
-
   return (
-    <section
-      className="unified-workspace"
-      data-mobile-pane={mobilePane}
-      data-testid="workspace-layout"
-    >
+    <section className="unified-workspace" data-testid="workspace-layout">
       <header className="unified-workspace-header">{header}</header>
       <Group className="workspace-panel-group" orientation="horizontal">
         <Panel defaultSize="19" minSize="14">
-          <aside
+          <section
             className="unified-workspace-sessions"
-            tabIndex={0}
             aria-label="Sessions panel"
           >
             {sessions}
-          </aside>
+          </section>
         </Panel>
         <Separator className="workspace-resize-handle" />
         <Panel defaultSize="23" minSize="17">
-          <aside
-            className="unified-workspace-files"
-            tabIndex={0}
-            aria-label="Files panel"
-          >
+          <section className="unified-workspace-files" aria-label="Files panel">
             {files}
-          </aside>
+          </section>
         </Panel>
         <Separator className="workspace-resize-handle" />
         <Panel defaultSize="40" minSize="32">
           <section
             className="unified-workspace-preview"
-            tabIndex={0}
             aria-label="Preview panel"
           >
             {preview}
@@ -70,7 +56,6 @@ export function WorkspaceLayout({
         <Panel defaultSize="18" minSize="14">
           <aside
             className="unified-workspace-metadata"
-            tabIndex={0}
             aria-label="Metadata panel"
           >
             {metadata}
@@ -79,15 +64,18 @@ export function WorkspaceLayout({
       </Group>
       <nav className="workspace-mobile-nav" aria-label="Workspace views">
         {mobileViews.map((view) => (
-          <button
-            key={view.id}
-            type="button"
-            aria-current={mobilePane === view.id ? "page" : undefined}
-            className={mobilePane === view.id ? "active" : ""}
-            onClick={() => setMobilePane(view.id)}
-          >
-            {view.label}
-          </button>
+          <div className="workspace-mobile-view" key={view.id}>
+            <input
+              className="workspace-pane-control"
+              type="radio"
+              name="workspace-pane"
+              id={`workspace-pane-${view.id}`}
+              defaultChecked={view.id === "preview"}
+            />
+            <label htmlFor={`workspace-pane-${view.id}`} data-pane={view.id}>
+              {view.label}
+            </label>
+          </div>
         ))}
       </nav>
     </section>

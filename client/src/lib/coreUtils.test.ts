@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   formatProgressMessage,
   getImageCacheKey,
-  getThumbnailWindow,
   getWrappedPath,
   isTerminalJobStatus,
 } from "./archiveUiUtils";
@@ -204,13 +203,6 @@ describe("display formatting helpers", () => {
   });
 
   it("selects wrapped image neighbors and terminal states", () => {
-    const items = Array.from({ length: 7 }, (_, index) => ({
-      path: `p${index}`,
-    }));
-    expect(getThumbnailWindow(items, "p0", 1).map((item) => item.path)).toEqual(
-      ["p6", "p0", "p1"],
-    );
-    expect(getThumbnailWindow(items.slice(0, 3), "missing", 1)).toHaveLength(3);
     expect(getWrappedPath(["a", "b"], 0, -1)).toBe("b");
     expect(getWrappedPath([], -1, 1)).toBe("");
     expect(getImageCacheKey("session", "image.jpg", "high")).toBe(

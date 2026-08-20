@@ -23,7 +23,6 @@ function useWorkspaceMedia(state: WorkspacePageState) {
     selectedPath: state.selectedPath,
     session: state.session,
     sortMode: state.sortMode,
-    thumbnailStripExpanded: state.thumbnailStripExpanded,
   });
   const text = useTextPreview({
     selectedKind: selection.selectedKind,
@@ -71,7 +70,6 @@ function useWorkspaceLifecycle(
     setSelectedPath: state.setSelectedPath,
     setSession: state.setSession,
     setSlideshowOpen: state.setSlideshowOpen,
-    setThumbnailStripExpanded: state.setThumbnailStripExpanded,
     setZipUrl: state.setZipUrl,
     zipUrl: state.zipUrl,
   });

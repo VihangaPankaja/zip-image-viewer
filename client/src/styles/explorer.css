@@ -1,74 +1,132 @@
 .explorer-table-panel {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 100%;
-  padding: 14px;
+  padding: var(--space-3);
   background: var(--bg-panel);
 }
+
 .explorer-header {
-  gap: 10px;
+  align-items: end;
+  gap: var(--space-2);
+  padding: 3px 3px var(--space-3);
 }
-.sidebar-header-actions {
+
+.explorer-header .panel-chip {
   margin-left: auto;
 }
-.panel-chip,
-.session-count {
+
+.panel-chip {
   display: inline-grid;
   min-width: 26px;
   min-height: 26px;
   place-items: center;
+  border: 1px solid var(--border);
   border-radius: 99px;
-  background: var(--surface-highlight);
-  color: var(--text);
+  background: var(--bg-inset);
+  color: var(--text-muted);
   font-size: 0.75rem;
 }
+
+.explorer-sort-shell {
+  min-width: 132px;
+}
+
 .explorer-table-wrap {
   min-height: 0;
-  margin-top: 12px;
   overflow: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
+  background: var(--bg-inset);
 }
+
 .explorer-table {
   width: 100%;
   border-collapse: collapse;
+  border-spacing: 0;
   font-size: 0.85rem;
 }
+
 .explorer-table th,
 .explorer-table td {
-  padding: 9px 10px;
+  padding: 0;
   border-bottom: 1px solid var(--border);
   text-align: left;
+  vertical-align: middle;
 }
+
 .explorer-table th {
   position: sticky;
   top: 0;
+  z-index: 1;
+  padding: 9px 10px;
   background: var(--bg-panel-strong);
   color: var(--text-dim);
   font-size: 0.7rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.explorer-table tr {
-  cursor: pointer;
+
+.explorer-table td:not(:first-child) {
+  padding: 9px 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
+
+.explorer-table tbody tr {
+  content-visibility: auto;
+  contain-intrinsic-size: 40px;
+}
+
 .explorer-table tbody tr:hover,
-.explorer-table tbody tr.active {
+.explorer-table tbody tr:has(.explorer-file-button[aria-current="true"]) {
   background: var(--surface-highlight);
 }
+
+.explorer-file-button {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 10px;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.explorer-file-button[aria-current="true"] {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.explorer-directory-name {
+  display: block;
+  min-height: 40px;
+  padding: 9px 10px;
+  color: var(--text-muted);
+}
+
 .explorer-modal-sheet {
   max-width: 980px;
 }
+
 .explorer-modal-body {
   max-height: 70vh;
+  margin-block-start: var(--space-4);
   overflow: auto;
 }
+
 .tree-shell {
   display: grid;
   gap: 3px;
 }
+
 .tree-item {
   display: grid;
   grid-template-columns: 18px 18px minmax(0, 1fr) auto;
-  gap: 7px;
+  gap: var(--space-2);
   width: 100%;
   min-height: 36px;
   padding: 6px 8px;
@@ -78,17 +136,39 @@
   color: var(--text);
   text-align: left;
 }
+
 .tree-item:hover,
 .tree-item.selected {
   background: var(--surface-highlight);
   border-color: var(--border);
 }
+
+.tree-item.selected {
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--border));
+  color: var(--accent-strong);
+}
+
 .tree-item-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .tree-item-meta {
   color: var(--text-dim);
   font-size: 0.72rem;
+}
+
+@media (max-width: 760px) {
+  .explorer-table {
+    min-width: 620px;
+  }
+
+  .explorer-header {
+    flex-wrap: wrap;
+  }
+
+  .explorer-sort-shell {
+    flex-basis: 100%;
+  }
 }

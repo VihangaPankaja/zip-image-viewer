@@ -1,4 +1,4 @@
-import React, { type Dispatch, type SetStateAction } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { CustomDropdown } from "./Common/CustomDropdown";
 
 type DownloadSettings = {
@@ -119,7 +119,8 @@ function SettingsHeader({
 function DownloadConfiguration(props: DownloadConfigurationProps) {
   const { downloadSettings } = props;
   return (
-    <>
+    <fieldset className="settings-group">
+      <legend>Downloads</legend>
       <CustomDropdown
         id="settings-download-thread-mode"
         label="Thread mode"
@@ -156,13 +157,14 @@ function DownloadConfiguration(props: DownloadConfigurationProps) {
           updateDownloadSettings(props, { maxRetries: value })
         }
       />
-    </>
+    </fieldset>
   );
 }
 
 function PreviewConfiguration(props: PreviewConfigurationProps) {
   return (
-    <>
+    <fieldset className="settings-group">
+      <legend>Preview and explorer</legend>
       <CustomDropdown
         id="settings-sort-mode"
         label="Default sort"
@@ -184,14 +186,15 @@ function PreviewConfiguration(props: PreviewConfigurationProps) {
         options={props.videoTranscodeQualityOptions}
         onChange={(value) => props.setVideoTranscodeQuality(String(value))}
       />
-    </>
+    </fieldset>
   );
 }
 
 function KeyboardConfiguration(props: KeyboardConfigurationProps) {
   const { keyboardSettings, setKeyboardSettings } = props;
   return (
-    <>
+    <fieldset className="settings-group">
+      <legend>Keyboard</legend>
       <label className="input-shell">
         <span className="input-label">Seek jump seconds</span>
         <input
@@ -223,7 +226,7 @@ function KeyboardConfiguration(props: KeyboardConfigurationProps) {
           }
         />
       </label>
-    </>
+    </fieldset>
   );
 }
 
@@ -239,7 +242,8 @@ const EXPLORER_COLUMN_OPTIONS: Array<{
 
 function ToggleConfiguration(props: ToggleConfigurationProps) {
   return (
-    <>
+    <fieldset className="settings-group">
+      <legend>Behavior and columns</legend>
       <label className="toggle-row">
         <input
           type="checkbox"
@@ -279,8 +283,12 @@ function ToggleConfiguration(props: ToggleConfigurationProps) {
           <span>{label}</span>
         </label>
       ))}
-    </>
+    </fieldset>
   );
+}
+
+function showModalDialog(dialog: HTMLDialogElement | null): void {
+  if (dialog && !dialog.open) dialog.showModal();
 }
 
 export function GlobalSettingsSheet(props: GlobalSettingsSheetProps) {
@@ -289,11 +297,11 @@ export function GlobalSettingsSheet(props: GlobalSettingsSheetProps) {
   }
 
   return (
-    <div
-      className="settings-overlay"
-      role="dialog"
+    <dialog
+      ref={showModalDialog}
+      className="settings-dialog"
       aria-labelledby="global-settings-title"
-      aria-modal="true"
+      onClose={() => props.setSettingsOpen(false)}
     >
       <div className="settings-sheet">
         <SettingsHeader setSettingsOpen={props.setSettingsOpen} />
@@ -304,6 +312,6 @@ export function GlobalSettingsSheet(props: GlobalSettingsSheetProps) {
           <ToggleConfiguration {...props} />
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
