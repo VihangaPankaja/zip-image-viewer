@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { classifyNodeKind } from "../lib/mimeTypeSystem";
 
-type ExplorerNode = {
+export type ExplorerNode = {
   name: string;
   path: string;
   type: "file" | "directory";
@@ -20,19 +20,19 @@ type ExplorerNode = {
 };
 
 function iconForNode(node: ExplorerNode | null | undefined) {
-  if (!node || node.type === "directory") return Folder;
+  if (!node || node.type === "directory") return <Folder size={14} />;
   const ext = String(node.extension || "").toLowerCase();
   const kind = classifyNodeKind(node);
-  if (kind === "image") return FileImage;
-  if (kind === "video") return FileVideo;
-  if (kind === "audio") return FileAudio;
-  if (kind === "text") return FileText;
+  if (kind === "image") return <FileImage size={14} />;
+  if (kind === "video") return <FileVideo size={14} />;
+  if (kind === "audio") return <FileAudio size={14} />;
+  if (kind === "text") return <FileText size={14} />;
   if (["zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz"].includes(ext))
-    return FileArchive;
-  return File;
+    return <FileArchive size={14} />;
+  return <File size={14} />;
 }
 
-type TreeExplorerProps = {
+export type TreeExplorerProps = {
   rootNode: ExplorerNode | null;
   selectedPath: string;
   onSelect: (_node: ExplorerNode) => void;
@@ -55,24 +55,212 @@ function flattenVisible(
 ): FlatTreeItem[] {
   if (!node) return [];
   const id = String(node.path || "");
-  const hasChildren = node.type === "directory" && Array.isArray(node.children);
+  const children = node.children ?? [];
+  const hasChildren = node.type === "directory" && children.length > 0;
   const rows: FlatTreeItem[] = [
     {
       node,
       depth,
       id,
       parentId,
-      hasChildren: Boolean(hasChildren && node.children.length),
+      hasChildren,
     },
   ];
 
   if (hasChildren && expanded.has(id)) {
-    for (const child of node.children || []) {
+    for (const child of children) {
       rows.push(...flattenVisible(child, expanded, depth + 1, id));
     }
   }
 
   return rows;
+}
+
+type TreeNavigation = {
+  activeIndex: number;
+  expanded: Set<string>;
+  focusItem: (index: number) => void;
+  onSelect: (node: ExplorerNode) => void;
+  rows: FlatTreeItem[];
+  setActiveIndex: React.Dispatch<React.SetStateAction<number>>;
+  setItemRef: (index: number, element: HTMLButtonElement | null) => void;
+  toggleExpanded: (id: string) => void;
+};
+
+function focusRow(navigation: TreeNavigation, index: number) {
+  navigation.setActiveIndex(index);
+  navigation.focusItem(index);
+}
+
+function handlePositionKey(
+  event: React.KeyboardEvent<HTMLDivElement>,
+  navigation: TreeNavigation,
+): boolean {
+  const { activeIndex, rows } = navigation;
+  const targets: Record<string, number> = {
+    ArrowDown: Math.min(rows.length - 1, activeIndex + 1),
+    ArrowUp: Math.max(0, activeIndex - 1),
+    Home: 0,
+    End: rows.length - 1,
+  };
+  const target = targets[event.key];
+  if (target === undefined) return false;
+  event.preventDefault();
+  focusRow(navigation, target);
+  return true;
+}
+
+function handleHierarchyKey(
+  event: React.KeyboardEvent<HTMLDivElement>,
+  current: FlatTreeItem,
+  navigation: TreeNavigation,
+): boolean {
+  if (event.key === "ArrowRight") {
+    event.preventDefault();
+    if (current.hasChildren && !navigation.expanded.has(current.id)) {
+      navigation.toggleExpanded(current.id);
+    }
+    return true;
+  }
+  if (event.key !== "ArrowLeft") return false;
+  event.preventDefault();
+  if (current.hasChildren && navigation.expanded.has(current.id)) {
+    navigation.toggleExpanded(current.id);
+    return true;
+  }
+  const parentIndex = navigation.rows.findIndex(
+    (item) => item.id === current.parentId,
+  );
+  if (current.parentId && parentIndex >= 0) {
+    focusRow(navigation, parentIndex);
+  }
+  return true;
+}
+
+function handleTreeKeyDown(
+  event: React.KeyboardEvent<HTMLDivElement>,
+  navigation: TreeNavigation,
+) {
+  if (!navigation.rows.length || handlePositionKey(event, navigation)) return;
+  const index = Math.max(
+    0,
+    Math.min(navigation.rows.length - 1, navigation.activeIndex),
+  );
+  const current = navigation.rows[index];
+  if (handleHierarchyKey(event, current, navigation)) return;
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  if (current.hasChildren) {
+    navigation.toggleExpanded(current.id);
+  } else {
+    navigation.onSelect(current.node);
+  }
+}
+
+function useTreeNavigation(
+  rootNode: ExplorerNode | null,
+  onSelect: (node: ExplorerNode) => void,
+): TreeNavigation {
+  const rootPath = rootNode?.path ?? null;
+  const [expanded, setExpanded] = useState<Set<string>>(
+    () => new Set([String(rootPath || ".")]),
+  );
+  const [activeIndex, setActiveIndex] = useState(0);
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  useEffect(() => {
+    setExpanded(new Set([String(rootPath || ".")]));
+    setActiveIndex(0);
+  }, [rootPath]);
+  const rows = useMemo(
+    () => (rootNode ? flattenVisible(rootNode, expanded) : []),
+    [rootNode, expanded],
+  );
+  useEffect(() => {
+    setActiveIndex((current) =>
+      rows.length ? Math.max(0, Math.min(rows.length - 1, current)) : 0,
+    );
+    itemRefs.current = itemRefs.current.slice(0, rows.length);
+  }, [rows.length]);
+  function toggleExpanded(id: string) {
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function focusItem(index: number) {
+    itemRefs.current[index]?.focus();
+  }
+  function setItemRef(index: number, element: HTMLButtonElement | null) {
+    itemRefs.current[index] = element;
+  }
+  return {
+    activeIndex,
+    expanded,
+    focusItem,
+    onSelect,
+    rows,
+    setActiveIndex,
+    setItemRef,
+    toggleExpanded,
+  };
+}
+
+function TreeItem({
+  row,
+  index,
+  selectedPath,
+  navigation,
+}: {
+  row: FlatTreeItem;
+  index: number;
+  selectedPath: string;
+  navigation: TreeNavigation;
+}) {
+  const isExpanded = navigation.expanded.has(row.id);
+  const isSelected = row.id === selectedPath;
+  function activate() {
+    if (row.hasChildren) navigation.toggleExpanded(row.id);
+    else navigation.onSelect(row.node);
+  }
+  return (
+    <button
+      ref={(element) => {
+        navigation.setItemRef(index, element);
+      }}
+      type="button"
+      role="treeitem"
+      aria-level={row.depth + 1}
+      aria-expanded={row.hasChildren ? isExpanded : undefined}
+      aria-selected={isSelected}
+      tabIndex={index === navigation.activeIndex ? 0 : -1}
+      className={`tree-item ${isSelected ? "selected" : ""}`}
+      style={{ paddingInlineStart: `${10 + row.depth * 14}px` }}
+      onFocus={() => navigation.setActiveIndex(index)}
+      onClick={activate}
+    >
+      <span className="tree-item-caret" aria-hidden="true">
+        {row.hasChildren ? (
+          <ChevronRight
+            size={14}
+            style={{
+              transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
+            }}
+          />
+        ) : null}
+      </span>
+      <span className="tree-item-icon" aria-hidden="true">
+        {iconForNode(row.node)}
+      </span>
+      <span className="tree-item-label">{row.node.name}</span>
+      <span className="tree-item-meta">
+        {row.node.type === "directory"
+          ? "Folder"
+          : row.node.extension || "file"}
+      </span>
+    </button>
+  );
 }
 
 export function TreeExplorer({
@@ -81,116 +269,7 @@ export function TreeExplorer({
   onSelect,
   compact = false,
 }: TreeExplorerProps) {
-  const [expanded, setExpanded] = useState<Set<string>>(
-    () => new Set([String(rootNode?.path || ".")]),
-  );
-  const [activeIndex, setActiveIndex] = useState(0);
-  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
-
-  const rootPath = rootNode?.path ?? null;
-  useEffect(() => {
-    setExpanded(new Set([String(rootPath || ".")]));
-    setActiveIndex(0);
-  }, [rootPath]);
-
-  const rows = useMemo(
-    () => flattenVisible(rootNode, expanded),
-    [rootNode, expanded],
-  );
-
-  useEffect(() => {
-    setActiveIndex((current) => {
-      if (rows.length === 0) {
-        return 0;
-      }
-      return Math.max(0, Math.min(rows.length - 1, current));
-    });
-    itemRefs.current = itemRefs.current.slice(0, rows.length);
-  }, [rows.length]);
-
-  function toggleExpanded(id: string) {
-    setExpanded((current) => {
-      const next = new Set(current);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }
-
-  function onTreeKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
-    if (!rows.length) return;
-    const current = rows[Math.max(0, Math.min(rows.length - 1, activeIndex))];
-
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      const nextIndex = Math.min(rows.length - 1, activeIndex + 1);
-      setActiveIndex(nextIndex);
-      itemRefs.current[nextIndex]?.focus();
-      return;
-    }
-
-    if (event.key === "ArrowUp") {
-      event.preventDefault();
-      const nextIndex = Math.max(0, activeIndex - 1);
-      setActiveIndex(nextIndex);
-      itemRefs.current[nextIndex]?.focus();
-      return;
-    }
-
-    if (event.key === "Home") {
-      event.preventDefault();
-      setActiveIndex(0);
-      itemRefs.current[0]?.focus();
-      return;
-    }
-
-    if (event.key === "End") {
-      event.preventDefault();
-      const nextIndex = rows.length - 1;
-      setActiveIndex(nextIndex);
-      itemRefs.current[nextIndex]?.focus();
-      return;
-    }
-
-    if (event.key === "ArrowRight") {
-      event.preventDefault();
-      if (current.hasChildren && !expanded.has(current.id)) {
-        toggleExpanded(current.id);
-      }
-      return;
-    }
-
-    if (event.key === "ArrowLeft") {
-      event.preventDefault();
-      if (current.hasChildren && expanded.has(current.id)) {
-        toggleExpanded(current.id);
-        return;
-      }
-      if (current.parentId) {
-        const parentIndex = rows.findIndex(
-          (item) => item.id === current.parentId,
-        );
-        if (parentIndex >= 0) {
-          setActiveIndex(parentIndex);
-          itemRefs.current[parentIndex]?.focus();
-        }
-      }
-      return;
-    }
-
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      if (current.hasChildren) {
-        toggleExpanded(current.id);
-      } else {
-        onSelect(current.node);
-      }
-    }
-  }
-
+  const navigation = useTreeNavigation(rootNode, onSelect);
   if (!rootNode) {
     return null;
   }
@@ -200,57 +279,17 @@ export function TreeExplorer({
       className={`tree-shell ${compact ? "compact" : ""}`}
       role="tree"
       aria-label="Explorer tree"
-      onKeyDown={onTreeKeyDown}
+      onKeyDown={(event) => handleTreeKeyDown(event, navigation)}
     >
-      {rows.map((row, index) => {
-        const Icon = iconForNode(row.node);
-        const isExpanded = expanded.has(row.id);
-        const isSelected = row.id === selectedPath;
-        return (
-          <button
-            key={row.id}
-            ref={(element) => {
-              itemRefs.current[index] = element;
-            }}
-            type="button"
-            role="treeitem"
-            aria-level={row.depth + 1}
-            aria-expanded={row.hasChildren ? isExpanded : undefined}
-            aria-selected={isSelected}
-            tabIndex={index === activeIndex ? 0 : -1}
-            className={`tree-item ${isSelected ? "selected" : ""}`}
-            style={{ paddingInlineStart: `${10 + row.depth * 14}px` }}
-            onFocus={() => setActiveIndex(index)}
-            onClick={() => {
-              if (row.hasChildren) {
-                toggleExpanded(row.id);
-              } else {
-                onSelect(row.node);
-              }
-            }}
-          >
-            <span className="tree-item-caret" aria-hidden="true">
-              {row.hasChildren ? (
-                <ChevronRight
-                  size={14}
-                  style={{
-                    transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
-                  }}
-                />
-              ) : null}
-            </span>
-            <span className="tree-item-icon" aria-hidden="true">
-              <Icon size={14} />
-            </span>
-            <span className="tree-item-label">{row.node.name}</span>
-            <span className="tree-item-meta">
-              {row.node.type === "directory"
-                ? "Folder"
-                : row.node.extension || "file"}
-            </span>
-          </button>
-        );
-      })}
+      {navigation.rows.map((row, index) => (
+        <TreeItem
+          key={row.id}
+          row={row}
+          index={index}
+          selectedPath={selectedPath}
+          navigation={navigation}
+        />
+      ))}
     </div>
   );
 }

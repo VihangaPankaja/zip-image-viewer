@@ -1,0 +1,4 @@
+.preview-panel video,
+.preview-panel audio {
+  accent-color: var(--accent);
+}

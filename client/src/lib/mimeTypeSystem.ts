@@ -1,6 +1,6 @@
 import type { FileNodeLike, PreviewKind } from "../types/preview";
 
-export const IMAGE_EXTENSIONS = new Set([
+const IMAGE_EXTENSIONS = new Set([
   "jpg",
   "jpeg",
   "png",
@@ -11,23 +11,9 @@ export const IMAGE_EXTENSIONS = new Set([
   "avif",
 ]);
 
-export const VIDEO_EXTENSIONS = new Set([
-  "mp4",
-  "webm",
-  "mov",
-  "m4v",
-  "ogv",
-  "mkv",
-]);
-export const AUDIO_EXTENSIONS = new Set([
-  "mp3",
-  "wav",
-  "ogg",
-  "aac",
-  "m4a",
-  "flac",
-]);
-export const TEXT_EXTENSIONS = new Set([
+const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v", "ogv", "mkv"]);
+const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "ogg", "aac", "m4a", "flac"]);
+const TEXT_EXTENSIONS = new Set([
   "txt",
   "md",
   "json",

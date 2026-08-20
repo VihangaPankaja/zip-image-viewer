@@ -16,16 +16,16 @@
 ## Common Commands
 
 ```bash
-npm install
-npm run dev
-npm run lint
-npm run typecheck
-npm run format
-npm run format:check
-npm run build
-npm run test
-npm run test:e2e
-npm start
+pnpm install --frozen-lockfile
+pnpm run dev
+pnpm run lint
+pnpm run typecheck
+pnpm run format
+pnpm run format:check
+pnpm run build
+pnpm run test
+pnpm run test:e2e
+pnpm start
 ```
 
 ## Repo Conventions
@@ -33,19 +33,19 @@ npm start
 - Do not commit `node_modules/`, `dist/`, or `sessions/`
 - Keep changes focused and preserve existing app structure
 - Follow the current plain, minimal style unless asked for a redesign
-- Bump the app version in `package.json` and `package-lock.json` before opening a PR to `master`
+- Bump the app version in `package.json` before opening a PR to `master`
 - For multi-step feature work, create a commit after each major implementation step
-- Before each major commit, run `npm run format`, `npm run lint`, `npm run typecheck`, and `npm run build`
+- Before each major commit, run `pnpm run format`, `pnpm run lint`, `pnpm run typecheck`, and `pnpm run build`
 - Keep formatter, lint, and typecheck configurations current with repo scripts
 - Keep test tooling current: Vitest for unit/component and Playwright for e2e smoke/regression
 
 ## Tooling Rule
 
-- Always run `npm run format`, `npm run lint`, `npm run typecheck`, and `npm run build` before each major commit and before opening a PR
-- Always run `npm run test` and `npm run test:e2e` before opening a PR (or document why skipped)
-- Formatting is mandatory for every commit: run `npm run format` immediately before `git commit` (no exceptions)
+- Always run `pnpm run format`, `pnpm run lint`, `pnpm run typecheck`, and `pnpm run build` before each major commit and before opening a PR
+- Always run `pnpm run test` and `pnpm run test:e2e` before opening a PR (or document why skipped)
+- Formatting is mandatory for every commit: run `pnpm run format` immediately before `git commit` (no exceptions)
 - If any step fails, fix the issue before committing
-- Never run long-lived scripts (for example `npm run dev`, `npm run dev:client`, `npm run dev:server`, or any watch mode) as a blocking foreground command in agent sessions. Use non-blocking/background patterns or explicit short timeouts for health checks so the session never hangs waiting forever.
+- Never run long-lived scripts (for example `pnpm run dev`, `pnpm run dev:client`, `pnpm run dev:server`, or any watch mode) as a blocking foreground command in agent sessions. Use non-blocking/background patterns or explicit short timeouts for health checks so the session never hangs waiting forever.
 
 ## CI/PR Workflow Snapshot
 
@@ -53,10 +53,9 @@ npm start
   - `version-check.yml` (PRs to `master`)
   - `docker-build.yml` (pushes to `master`)
 - Scripts now available for local/CI enforcement:
-  - `npm run lint`
-  - `npm run typecheck`
-  - `npm run format:check`
-  - `npm run test`
-  - `npm run test:e2e`
-  - `npm run build`
-- Keep `package.json` and `package-lock.json` versions aligned.
+  - `pnpm run lint`
+  - `pnpm run typecheck`
+  - `pnpm run format:check`
+  - `pnpm run test`
+  - `pnpm run test:e2e`
+  - `pnpm run build`

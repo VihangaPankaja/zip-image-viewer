@@ -1,0 +1,14 @@
+@media (max-width: 760px) {
+  .workspace {
+    padding: 0 10px;
+  }
+  .settings-overlay {
+    padding: 10px;
+  }
+  .settings-sheet {
+    padding: 14px;
+  }
+  .explorer-table {
+    min-width: 620px;
+  }
+}

@@ -1,110 +1,103 @@
-# ZIP Image Viewer
+# Media Workspace
 
-Fast web app for opening public archive/file URLs, browsing extracted content, and streaming media with realtime progress.
+A type-safe workspace for downloading public archives and media, browsing their
+contents, and previewing files while work continues in the background.
 
-## Quick Start
+## What changed in 2.0
 
-Requirements:
+- A unified desktop workspace replaces the old Download / Preview / Explorer
+  tab flow. Sessions, files, preview, and metadata remain visible together.
+- Batch enqueue accepts 1–50 newline-separated public URLs. The queue runs at
+  most two downloads concurrently and keeps completed sessions available.
+- The shared Zod + oRPC contract gives the React client and Express server one
+  validated API surface with typed errors.
+- Video uses adaptive fMP4 HLS. A source-aware rendition ladder is generated on
+  demand, `hls.js` selects quality automatically, and users can choose a level.
+- Strict TypeScript, type-aware ESLint, Fallow, Lefthook, Vitest, Playwright,
+  Axe, and coverage reporting are part of the normal quality workflow.
 
-- Node.js 20+
-- npm
+## Requirements
 
-Run locally:
-
-```bash
-npm install
-npm run dev
-```
-
-- frontend: <http://localhost:5173>
-- backend: <http://localhost:8080>
-
-Production build:
-
-```bash
-npm run build
-npm start
-```
-
-Docker:
+- Node.js 26.7.0
+- pnpm 11.21.0
+- FFmpeg and 7-Zip are supplied by project dependencies for supported platforms.
 
 ```bash
-docker build -t zip-image-viewer .
-docker run -p 8080:8080 zip-image-viewer
+nvm install
+nvm use
+npm install --global pnpm@11.21.0
+pnpm install --frozen-lockfile
+pnpm run dev
 ```
 
-Use the published Docker Hub image:
+On nvm-windows, run `nvm install 26.7.0` followed by `nvm use 26.7.0`;
+nvm-windows does not read `.nvmrc` automatically.
+
+- Client: <http://localhost:5173>
+- API: <http://localhost:8080>
+
+## Quality commands
 
 ```bash
-docker pull vihangapankaja/zip-image-viewer:latest
-docker run -p 8080:8080 vihangapankaja/zip-image-viewer:latest
+pnpm run format:check
+pnpm run lint
+pnpm run typecheck
+pnpm run test:unit
+pnpm run test:integration
+pnpm run test:component
+pnpm run test:ui
+pnpm run test:coverage
+pnpm exec playwright install chromium
+pnpm run test:e2e
+pnpm run fallow:health
+pnpm run fallow:dead
+pnpm run fallow:audit
+pnpm run build
 ```
 
-Versioned image example:
+`pnpm run quality` runs the non-browser pull-request gate. Playwright covers the
+desktop workspace, mobile pane navigation, and automated Axe accessibility
+checks. Coverage output is written to `coverage/`.
+
+## Production
 
 ```bash
-docker pull vihangapankaja/zip-image-viewer:1.2.3
-docker run -p 8080:8080 vihangapankaja/zip-image-viewer:1.2.3
+pnpm run build
+pnpm start
 ```
 
-Open `http://localhost:8080`.
+Or use the hardened multi-stage image:
 
-## Highlights
+```bash
+docker build -t media-workspace .
+docker run --init -p 8080:8080 media-workspace
+```
 
-- Realtime job updates over WebSocket
-- Segmented/resumable downloader with retry and ETA/speed monitoring
-- Tabbed UX: Download, Preview, Explorer
-- Explorer table with sortable metadata and configurable columns
-- Inline image/text/audio/video previews
-- Live preview for direct video URLs while bytes are still downloading
-- On-demand video quality streaming via ffmpeg (no pre-generated variants)
+## Architecture
 
-## Architecture Snapshot
+The React application is organized by workspace and player features. TanStack
+Query owns remote queue/session state, TanStack Table renders the file view,
+TanStack Virtual keeps large session lists responsive, and resizable panels form
+the desktop layout.
 
-- Frontend page shell:
-  - `client/src/pages/AppPage.tsx` is a thin composition shell.
-  - `client/src/pages/AppPageContainer.tsx` owns orchestration and state wiring.
-- Frontend controller hooks:
-  - `client/src/hooks/useSessionLifecycle.ts`
-  - `client/src/hooks/usePreviewSelection.ts`
-  - `client/src/hooks/useTextPreview.ts`
-  - `client/src/hooks/useImagePreviewCache.ts`
-  - `client/src/hooks/useVideoPlaybackController.ts`
-  - `client/src/hooks/useKeyboardShortcuts.ts`
-- Preview UI boundaries:
-  - Preview components live under `client/src/components/Preview/`.
-  - Page wrappers stay under `client/src/components/Pages/`.
-- Backend runtime layering:
-  - `server/index.ts` is the bootstrap entrypoint.
-  - `server/appRuntime.ts` is a runtime shell.
-  - `server/runtimeComposition.ts` contains runtime composition/orchestration.
-  - `server/bootstrap/container.ts` provides containerized runtime dependencies.
-  - `server/application/jobs/sessionJobQueue.ts` contains session queue application logic.
-  - `server/infrastructure/runtime/runtimePrimitives.ts` contains shared runtime primitives.
+The server separates contracts, application services, HTTP/RPC adapters,
+infrastructure, and domain models. Downloads and transcodes have independent
+concurrency limits. HLS renditions are lazy and source-bounded rather than being
+pre-generated during download.
 
-## Video Quality Behavior
+See [docs/architecture.md](docs/architecture.md) for boundaries and request
+flows, and [docs/project-structure.md](docs/project-structure.md) for the source
+map.
 
-- Videos are stored as original files only.
-- Quality variants are NOT generated during download/extract.
-- When a user opens a video, quality options are fetched dynamically based on source resolution.
-- Quality options include `Original` plus valid levels up to source height:
-  - 360p, 480p, 720p, 1080p, 1440p, 2160p
-- Default quality:
-  - 720p if source is at least 720p
-  - Original if source is below 720p
-- Reduced qualities are transcoded in realtime through ffmpeg only when selected.
+## Core API
 
-## API (Core)
+- `POST /rpc/*` - typed oRPC list, batch enqueue, cancel, and retry procedures
+- `GET /api/session-jobs` - queue snapshots
+- `GET /api/sessions` - ready session summaries
+- `POST /api/sessions` - legacy-compatible single enqueue
+- `GET /api/sessions/:id/tree` - extracted file tree
+- `GET /api/sessions/:id/file?path=...` - range/raw file serving
+- `GET /api/sessions/:id/video/hls/master.m3u8?path=...` - adaptive HLS master
+- `WS /ws/jobs?jobId=...` - realtime job progress
 
-- `POST /api/sessions` start async load job
-- `GET /api/session-jobs/:id` get job snapshot
-- `WS /ws/jobs?jobId=...` realtime job updates
-- `GET /api/session-jobs/:id/stream` stream currently downloaded bytes for active direct job
-- `GET /api/sessions/:id/tree` get ready explorer tree
-- `GET /api/sessions/:id/file?path=...` range/raw file serving
-- `GET /api/sessions/:id/video/qualities?path=...` get available quality options for selected video
-- `GET /api/sessions/:id/video/stream?path=...&quality=...` realtime ffmpeg transcode stream
-
-## Project Structure
-
-See [docs/project-structure.md](docs/project-structure.md).
+Only public HTTP(S) URLs and safe relative paths pass contract validation.

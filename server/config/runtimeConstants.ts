@@ -1,4 +1,17 @@
-export const PORT = Number(process.env.PORT || 8080);
+import { z } from "zod";
+
+const runtimeEnvironmentSchema = z.object({
+  PORT: z.coerce.number().int().min(1).max(65_535).default(8080),
+});
+
+export function parseRuntimeEnvironment(
+  environment: Readonly<Record<string, string | undefined>>,
+): { port: number } {
+  const parsed = runtimeEnvironmentSchema.parse(environment);
+  return { port: parsed.PORT };
+}
+
+export const PORT = parseRuntimeEnvironment(process.env).port;
 export const SESSION_TTL_MS = 30 * 60 * 1000;
 export const JOB_TTL_MS = 30 * 60 * 1000;
 export const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;

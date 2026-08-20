@@ -3,13 +3,17 @@ export async function fetchJson<T>(
   init?: RequestInit,
 ) {
   const response = await fetch(input, init);
-  const payload = await response.json().catch(() => ({}));
+  const payload: unknown = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+    const error =
+      typeof payload === "object" && payload !== null && "error" in payload
+        ? payload.error
+        : undefined;
     const message =
-      typeof payload === "object" && payload && "error" in payload
-        ? String(payload.error || "Request failed")
-        : `Request failed (${response.status})`;
+      typeof error === "string" && error
+        ? error
+        : `Request failed (${String(response.status)})`;
     throw new Error(message);
   }
 

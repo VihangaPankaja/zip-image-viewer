@@ -1,8 +1,14 @@
-export const sessionStore = new Map();
-export const jobStore = new Map();
-export const videoTranscodeStore = new Map();
+import type {
+  Session,
+  SessionJob,
+  VideoTranscodeEntry,
+} from "../domain/models.js";
+
+export const sessionStore = new Map<string, Session>();
+export const jobStore = new Map<string, SessionJob>();
+export const videoTranscodeStore = new Map<string, VideoTranscodeEntry>();
 export const pendingSessionJobs: Array<{
-  job: unknown;
+  job: SessionJob;
   confirmOversize: boolean;
 }> = [];
 

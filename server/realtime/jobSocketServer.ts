@@ -1,6 +1,16 @@
+import type { Server } from "node:http";
 import { WebSocketServer } from "ws";
+import type { SessionJob } from "../domain/models.js";
 
-export function attachJobWebSocketServer(httpServer, options) {
+type JobSocketOptions = {
+  jobStore: ReadonlyMap<string, SessionJob>;
+  sanitizeJob: (_job: SessionJob) => unknown;
+};
+
+export function attachJobWebSocketServer(
+  httpServer: Server,
+  options: JobSocketOptions,
+): WebSocketServer {
   const { jobStore, sanitizeJob } = options;
 
   const socketServer = new WebSocketServer({

@@ -1,7 +1,11 @@
 node_modules/
+.vite-cache/
+.npm-cache/
+.pnpm-store/
 dist/
 build/
 sessions/
+.superpowers/
 
 # logs
 npm-debug.log*

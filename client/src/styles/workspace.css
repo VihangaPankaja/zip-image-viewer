@@ -1,0 +1,202 @@
+.unified-workspace {
+  display: grid;
+  grid-template-columns:
+    var(--workspace-rail-width) var(--workspace-files-width)
+    minmax(0, 1fr) var(--workspace-meta-width);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 14px;
+  min-height: calc(100vh - 40px);
+}
+
+.unified-workspace-header {
+  grid-column: 1 / -1;
+}
+
+.workspace-panel-group {
+  grid-column: 1 / -1;
+  min-height: 0;
+}
+
+.workspace-resize-handle {
+  width: 7px;
+  background: transparent;
+  cursor: col-resize;
+}
+
+.workspace-resize-handle::after {
+  display: block;
+  width: 1px;
+  height: 100%;
+  margin: auto;
+  background: var(--border);
+  content: "";
+}
+
+.workspace-appbar {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.45fr) minmax(320px, 1fr) auto;
+  align-items: end;
+  gap: 16px;
+  padding: 12px 0 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.workspace-brand h1,
+.workspace-metadata-panel h2 {
+  margin: 2px 0 0;
+  font-size: 1.15rem;
+}
+
+.workspace-url-action {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.workspace-url-action label {
+  grid-column: 1 / -1;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.workspace-url-action textarea {
+  min-width: 0;
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-inset);
+  color: var(--text);
+  resize: vertical;
+}
+
+.workspace-url-status {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.workspace-metadata-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-panel);
+  color: var(--text-muted);
+}
+
+.workspace-metadata-panel p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.unified-workspace-sessions,
+.unified-workspace-files,
+.unified-workspace-preview,
+.unified-workspace-metadata {
+  min-height: 0;
+}
+
+.unified-workspace-preview {
+  overflow: auto;
+}
+
+.workspace-mobile-nav {
+  display: none;
+}
+
+@media (max-width: 1180px) {
+  .unified-workspace {
+    grid-template-columns:
+      var(--workspace-rail-width) var(--workspace-files-width)
+      minmax(0, 1fr);
+  }
+
+  .unified-workspace-metadata {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .unified-workspace {
+    display: block;
+    min-height: 100dvh;
+    padding-bottom: 72px;
+  }
+
+  .workspace-panel-group {
+    display: block;
+  }
+
+  .workspace-panel-group > [data-panel] {
+    display: none;
+  }
+
+  .unified-workspace[data-mobile-pane="sessions"]
+    .workspace-panel-group
+    > [data-panel]:has(.unified-workspace-sessions),
+  .unified-workspace[data-mobile-pane="files"]
+    .workspace-panel-group
+    > [data-panel]:has(.unified-workspace-files),
+  .unified-workspace[data-mobile-pane="preview"]
+    .workspace-panel-group
+    > [data-panel]:has(.unified-workspace-preview) {
+    display: block;
+  }
+
+  .unified-workspace-header {
+    display: block;
+  }
+
+  .workspace-appbar {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+
+  .workspace-url-action {
+    grid-column: 1 / -1;
+  }
+
+  .unified-workspace-sessions,
+  .unified-workspace-files,
+  .unified-workspace-preview,
+  .unified-workspace-metadata {
+    display: none;
+  }
+
+  .unified-workspace[data-mobile-pane="sessions"] .unified-workspace-sessions,
+  .unified-workspace[data-mobile-pane="files"] .unified-workspace-files,
+  .unified-workspace[data-mobile-pane="preview"] .unified-workspace-preview {
+    display: block;
+  }
+
+  .workspace-mobile-nav {
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 6px;
+    border: 1px solid var(--border-strong);
+    border-radius: 16px;
+    background: var(--bg-panel-strong);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .workspace-mobile-nav button {
+    min-height: 42px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-muted);
+  }
+
+  .workspace-mobile-nav button.active {
+    background: var(--surface-highlight);
+    color: var(--text);
+  }
+}

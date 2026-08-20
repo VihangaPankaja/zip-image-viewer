@@ -4,6 +4,7 @@ import {
   type RefObject,
   type SetStateAction,
 } from "react";
+import { getImageNavigationTarget } from "../features/workspace/imageNavigation";
 
 type KeyboardSettings = {
   jumpSeconds?: number;
@@ -42,134 +43,23 @@ export function useKeyboardShortcuts({
   setSlideshowOpen,
 }: UseKeyboardShortcutsParams) {
   useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      const activeElement = document.activeElement;
-      const activeTag = activeElement?.tagName;
-      if (
-        activeTag === "INPUT" ||
-        activeTag === "TEXTAREA" ||
-        activeTag === "SELECT" ||
-        activeElement?.closest?.(".custom-dropdown-shell")
-      ) {
-        return;
-      }
-
-      if (selectedKind === "video" && videoRef.current) {
-        const player = videoRef.current;
-        const step = Math.max(1, Number(keyboardSettings.jumpSeconds) || 5);
-        const rateStep = Math.max(
-          0.05,
-          Number(keyboardSettings.rateStep) || 0.25,
-        );
-
-        if (event.key === "ArrowRight") {
-          event.preventDefault();
-          player.currentTime = Math.max(0, (player.currentTime || 0) + step);
-          return;
-        }
-
-        if (event.key === "ArrowLeft") {
-          event.preventDefault();
-          player.currentTime = Math.max(0, (player.currentTime || 0) - step);
-          return;
-        }
-
-        if (event.key === "ArrowUp") {
-          event.preventDefault();
-          const nextVolume = Math.min(1, (player.volume || 0) + 0.05);
-          player.volume = nextVolume;
-          setVideoVolume(nextVolume);
-          return;
-        }
-
-        if (event.key === "ArrowDown") {
-          event.preventDefault();
-          const nextVolume = Math.max(0, (player.volume || 0) - 0.05);
-          player.volume = nextVolume;
-          setVideoVolume(nextVolume);
-          return;
-        }
-
-        if (event.key === "]") {
-          event.preventDefault();
-          const nextRate = Math.min(3, (player.playbackRate || 1) + rateStep);
-          player.playbackRate = nextRate;
-          setVideoPlaybackRate(nextRate);
-          return;
-        }
-
-        if (event.key === "[") {
-          event.preventDefault();
-          const nextRate = Math.max(
-            0.25,
-            (player.playbackRate || 1) - rateStep,
-          );
-          player.playbackRate = nextRate;
-          setVideoPlaybackRate(nextRate);
-          return;
-        }
-
-        if (event.key.toLowerCase() === "f") {
-          event.preventDefault();
-          const shell = videoShellRef.current;
-          if (document.fullscreenElement) {
-            document.exitFullscreen().catch(() => {});
-          } else {
-            shell?.requestFullscreen?.().catch(() => {});
-          }
-          return;
-        }
-      }
-
-      if (currentImageIndex === -1) {
-        if (event.key === "Escape") {
-          setSlideshowOpen(false);
-        }
-        return;
-      }
-
-      if (event.key === "ArrowRight") {
-        if (nextImagePath) {
-          event.preventDefault();
-          setSelectedPath(nextImagePath);
-        }
-      }
-
-      if (event.key === "ArrowLeft") {
-        if (previousImagePath) {
-          event.preventDefault();
-          setSelectedPath(previousImagePath);
-        }
-      }
-
-      if (slideshowOpen && event.key === "Home" && currentFolderImages[0]) {
-        event.preventDefault();
-        setSelectedPath(currentFolderImages[0]);
-      }
-
-      if (
-        slideshowOpen &&
-        event.key === "End" &&
-        currentFolderImages[currentFolderImages.length - 1]
-      ) {
-        event.preventDefault();
-        setSelectedPath(currentFolderImages[currentFolderImages.length - 1]);
-      }
-
-      if (
-        !slideshowOpen &&
-        selectedKind === "image" &&
-        (event.key === "Enter" || event.key.toLowerCase() === "f")
-      ) {
-        event.preventDefault();
-        setSlideshowOpen(true);
-      }
-
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setSlideshowOpen(false);
-      }
-    }
+    const context = {
+      currentFolderImages,
+      currentImageIndex,
+      keyboardSettings,
+      nextImagePath,
+      previousImagePath,
+      selectedKind,
+      setSelectedPath,
+      setSlideshowOpen,
+      setVideoPlaybackRate,
+      setVideoVolume,
+      slideshowOpen,
+      videoRef,
+      videoShellRef,
+    };
+    const onKeyDown = (event: KeyboardEvent) =>
+      handleKeyboardShortcut(event, context);
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -188,4 +78,121 @@ export function useKeyboardShortcuts({
     videoRef,
     videoShellRef,
   ]);
+}
+
+function handleKeyboardShortcut(
+  event: KeyboardEvent,
+  context: UseKeyboardShortcutsParams,
+): void {
+  if (isInteractiveTarget(document.activeElement)) {
+    return;
+  }
+  if (handleVideoShortcut(event, context)) {
+    return;
+  }
+  handleImageShortcut(event, context);
+}
+
+function isInteractiveTarget(element: Element | null): boolean {
+  const tagName = element?.tagName;
+  return (
+    tagName === "INPUT" ||
+    tagName === "TEXTAREA" ||
+    tagName === "SELECT" ||
+    Boolean(element?.closest(".custom-dropdown-shell"))
+  );
+}
+
+function handleVideoShortcut(
+  event: KeyboardEvent,
+  context: UseKeyboardShortcutsParams,
+): boolean {
+  const player = context.videoRef.current;
+  if (context.selectedKind !== "video" || !player) {
+    return false;
+  }
+  const jump = Math.max(1, Number(context.keyboardSettings.jumpSeconds) || 5);
+  const rateStep = Math.max(
+    0.05,
+    Number(context.keyboardSettings.rateStep) || 0.25,
+  );
+  const key = event.key.toLowerCase();
+  if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+    const direction = event.key === "ArrowRight" ? 1 : -1;
+    player.currentTime = Math.max(
+      0,
+      (player.currentTime || 0) + jump * direction,
+    );
+  } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+    const direction = event.key === "ArrowUp" ? 1 : -1;
+    const nextVolume = Math.max(
+      0,
+      Math.min(1, (player.volume || 0) + 0.05 * direction),
+    );
+    player.volume = nextVolume;
+    context.setVideoVolume(nextVolume);
+  } else if (event.key === "]" || event.key === "[") {
+    const direction = event.key === "]" ? 1 : -1;
+    const nextRate = Math.max(
+      0.25,
+      Math.min(3, (player.playbackRate || 1) + rateStep * direction),
+    );
+    player.playbackRate = nextRate;
+    context.setVideoPlaybackRate(nextRate);
+  } else if (key === "f") {
+    toggleFullscreen(context.videoShellRef.current);
+  } else {
+    return false;
+  }
+  event.preventDefault();
+  return true;
+}
+
+function toggleFullscreen(shell: HTMLDivElement | null): void {
+  if (document.fullscreenElement) {
+    void document.exitFullscreen().catch(() => undefined);
+    return;
+  }
+  void shell?.requestFullscreen?.().catch(() => undefined);
+}
+
+function handleImageShortcut(
+  event: KeyboardEvent,
+  context: UseKeyboardShortcutsParams,
+): void {
+  const { currentFolderImages, currentImageIndex, slideshowOpen } = context;
+  if (currentImageIndex === -1) {
+    if (event.key === "Escape") {
+      context.setSlideshowOpen(false);
+    }
+    return;
+  }
+  const isBoundaryKey = event.key === "Home" || event.key === "End";
+  const target =
+    !isBoundaryKey || slideshowOpen
+      ? getImageNavigationTarget(
+          event.key,
+          currentFolderImages,
+          currentImageIndex,
+          context.nextImagePath,
+          context.previousImagePath,
+        )
+      : "";
+  if (target) {
+    event.preventDefault();
+    context.setSelectedPath(target);
+  }
+  if (
+    currentImageIndex !== -1 &&
+    !slideshowOpen &&
+    context.selectedKind === "image" &&
+    (event.key === "Enter" || event.key.toLowerCase() === "f")
+  ) {
+    event.preventDefault();
+    context.setSlideshowOpen(true);
+  }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    context.setSlideshowOpen(false);
+  }
 }

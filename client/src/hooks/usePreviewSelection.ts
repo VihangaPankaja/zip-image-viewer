@@ -31,6 +31,70 @@ type UsePreviewSelectionParams = {
   thumbnailStripExpanded: boolean;
 };
 
+type FlatPreviewData = ReturnType<typeof flattenTree>;
+
+function buildPreviewUrls(
+  sessionId: string,
+  node: PreviewTreeNode | null,
+  selectedKind: string,
+  quality: string,
+) {
+  if (!node || node.type !== "file") {
+    return {
+      selectedFileUrl: "",
+      selectedImagePreviewUrl: "",
+      selectedPreviewUrl: "",
+    };
+  }
+  return {
+    selectedFileUrl: buildFileUrl(sessionId, node.path),
+    selectedImagePreviewUrl:
+      selectedKind === "image"
+        ? buildFileUrl(sessionId, node.path, { imagePreview: true, quality })
+        : "",
+    selectedPreviewUrl: buildFileUrl(sessionId, node.path, {
+      previewText: true,
+    }),
+  };
+}
+
+function buildImageItems(
+  paths: readonly string[],
+  flatData: FlatPreviewData | null,
+  sessionId: string,
+  quality: string,
+) {
+  return paths.map((path) => ({
+    path,
+    name:
+      flatData?.nodesByPath.get(path)?.name || path.split("/").at(-1) || path,
+    url: buildFileUrl(sessionId, path),
+    previewUrl: buildFileUrl(sessionId, path, {
+      imagePreview: true,
+      quality,
+    }),
+    thumbnailUrl: buildFileUrl(sessionId, path, {
+      thumbnail: true,
+      size: STRIP_THUMB_SIZE,
+    }),
+  }));
+}
+
+function buildImageNavigation(
+  paths: string[],
+  currentIndex: number,
+  flatData: FlatPreviewData | null,
+) {
+  const previousImagePath = getWrappedPath(paths, currentIndex, -1);
+  const nextImagePath = getWrappedPath(paths, currentIndex, 1);
+  return {
+    previousImagePath,
+    nextImagePath,
+    previousImageName: flatData?.nodesByPath.get(previousImagePath)?.name || "",
+    nextImageName: flatData?.nodesByPath.get(nextImagePath)?.name || "",
+  };
+}
+
 export function usePreviewSelection({
   session,
   sortMode,
@@ -54,75 +118,36 @@ export function usePreviewSelection({
   const selectedNode = flatData?.nodesByPath.get(selectedPath) || null;
   const selectedKind = classifyNodeKind(selectedNode);
 
-  const currentFolderImages = useMemo(() => {
-    if (!selectedNode) {
-      return [];
-    }
-
-    return flatData?.folderImages.get(selectedNode.parentPath) || [];
-  }, [flatData, selectedNode]);
+  const currentFolderImages = selectedNode
+    ? flatData?.folderImages.get(selectedNode.parentPath || "") || []
+    : [];
 
   const currentImageIndex = selectedNode
     ? currentFolderImages.indexOf(selectedNode.path)
     : -1;
 
-  const selectedFileUrl =
-    session && selectedNode && selectedNode.type === "file"
-      ? buildFileUrl(session.id, selectedNode.path)
-      : "";
-
-  const selectedImagePreviewUrl =
-    session &&
-    selectedNode &&
-    selectedNode.type === "file" &&
-    selectedKind === "image"
-      ? buildFileUrl(session.id, selectedNode.path, {
-          imagePreview: true,
-          quality: previewQuality,
-        })
-      : "";
-
-  const selectedPreviewUrl =
-    session && selectedNode && selectedNode.type === "file"
-      ? buildFileUrl(session.id, selectedNode.path, { previewText: true })
-      : "";
-
-  const currentFolderImageItems = currentFolderImages.map((imagePath) => ({
-    path: imagePath,
-    name:
-      flatData?.nodesByPath.get(imagePath)?.name ||
-      imagePath.split("/").at(-1) ||
-      imagePath,
-    url: buildFileUrl(session?.id, imagePath),
-    previewUrl: buildFileUrl(session?.id, imagePath, {
-      imagePreview: true,
-      quality: previewQuality,
-    }),
-    thumbnailUrl: buildFileUrl(session?.id, imagePath, {
-      thumbnail: true,
-      size: STRIP_THUMB_SIZE,
-    }),
-  }));
+  const urls = buildPreviewUrls(
+    session?.id || "",
+    selectedNode,
+    selectedKind,
+    previewQuality,
+  );
+  const currentFolderImageItems = buildImageItems(
+    currentFolderImages,
+    flatData,
+    session?.id || "",
+    previewQuality,
+  );
 
   const visibleThumbnailItems = thumbnailStripExpanded
     ? currentFolderImageItems
     : getThumbnailWindow(currentFolderImageItems, selectedPath, 2);
 
-  const previousImagePath = getWrappedPath(
+  const navigation = buildImageNavigation(
     currentFolderImages,
     currentImageIndex,
-    -1,
+    flatData,
   );
-
-  const nextImagePath = getWrappedPath(
-    currentFolderImages,
-    currentImageIndex,
-    1,
-  );
-
-  const previousImageName =
-    flatData?.nodesByPath.get(previousImagePath)?.name || "";
-  const nextImageName = flatData?.nodesByPath.get(nextImagePath)?.name || "";
 
   const explorerRows = useMemo(() => {
     if (!flatData || !sortedTree) {
@@ -141,15 +166,10 @@ export function usePreviewSelection({
     selectedKind,
     currentFolderImages,
     currentImageIndex,
-    selectedFileUrl,
-    selectedImagePreviewUrl,
-    selectedPreviewUrl,
+    ...urls,
     currentFolderImageItems,
     visibleThumbnailItems,
-    previousImagePath,
-    nextImagePath,
-    previousImageName,
-    nextImageName,
+    ...navigation,
     explorerRows,
   };
 }

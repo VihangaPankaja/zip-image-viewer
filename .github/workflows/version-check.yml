@@ -21,7 +21,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
 
       - name: Fetch base branch
         run: git fetch origin "${{ github.base_ref }}" --depth=1
@@ -50,14 +50,9 @@ jobs:
           }
 
           const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          const packageLock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
           const basePackageJson = JSON.parse(
             execSync(`git show origin/${process.env.BASE_REF}:package.json`, { encoding: 'utf8' })
           );
-
-          if (packageJson.version !== packageLock.version || packageJson.version !== packageLock.packages[''].version) {
-            throw new Error('package.json and package-lock.json versions must match.');
-          }
 
           const headVersion = parseVersion(packageJson.version);
           const baseVersion = parseVersion(basePackageJson.version);

@@ -1,0 +1,94 @@
+.explorer-table-panel {
+  display: grid;
+  min-height: 100%;
+  padding: 14px;
+  background: var(--bg-panel);
+}
+.explorer-header {
+  gap: 10px;
+}
+.sidebar-header-actions {
+  margin-left: auto;
+}
+.panel-chip,
+.session-count {
+  display: inline-grid;
+  min-width: 26px;
+  min-height: 26px;
+  place-items: center;
+  border-radius: 99px;
+  background: var(--surface-highlight);
+  color: var(--text);
+  font-size: 0.75rem;
+}
+.explorer-table-wrap {
+  min-height: 0;
+  margin-top: 12px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.explorer-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.explorer-table th,
+.explorer-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.explorer-table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-panel-strong);
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+.explorer-table tr {
+  cursor: pointer;
+}
+.explorer-table tbody tr:hover,
+.explorer-table tbody tr.active {
+  background: var(--surface-highlight);
+}
+.explorer-modal-sheet {
+  max-width: 980px;
+}
+.explorer-modal-body {
+  max-height: 70vh;
+  overflow: auto;
+}
+.tree-shell {
+  display: grid;
+  gap: 3px;
+}
+.tree-item {
+  display: grid;
+  grid-template-columns: 18px 18px minmax(0, 1fr) auto;
+  gap: 7px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+.tree-item:hover,
+.tree-item.selected {
+  background: var(--surface-highlight);
+  border-color: var(--border);
+}
+.tree-item-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tree-item-meta {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+}

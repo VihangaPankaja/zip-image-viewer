@@ -2,13 +2,49 @@ import {
   DEFAULT_DOWNLOAD_OPTIONS,
   DEFAULT_DOWNLOAD_SETTINGS,
   VIDEO_TRANSCODE_QUALITY_OPTIONS,
+  type DownloadSettings,
 } from "./appConstants";
 import type { DownloadOptions } from "../types/download";
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object"
-    ? (value as Record<string, unknown>)
+    ? Object.fromEntries(Object.entries(value))
     : {};
+}
+
+function asInputText(value: unknown): string {
+  return typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+    ? String(value)
+    : "";
+}
+
+function isThreadMode(value: unknown): value is DownloadSettings["threadMode"] {
+  return value === "auto" || value === "single" || value === "segmented";
+}
+
+function normalizeRequestHeaders(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(
+        ([key, entry]) =>
+          key.length > 0 &&
+          (typeof entry === "string" ||
+            typeof entry === "number" ||
+            typeof entry === "boolean"),
+      )
+      .map(([key, entry]) => [key, asInputText(entry)]),
+  );
+}
+
+function normalizeRetryCount(value: unknown, fallback: number): number {
+  return Number.parseInt(asInputText(value), 10) === -1
+    ? -1
+    : clampNumber(asInputText(value), 0, 8, fallback);
 }
 
 export function clampNumber(
@@ -24,19 +60,16 @@ export function clampNumber(
   return Math.max(min, Math.min(max, parsed));
 }
 
-export function normalizeDownloadSettings(value: unknown) {
+export function normalizeDownloadSettings(value: unknown): DownloadSettings {
   const source = asRecord(value);
-  const threadMode =
-    source.threadMode === "auto" ||
-    source.threadMode === "single" ||
-    source.threadMode === "segmented"
-      ? source.threadMode
-      : DEFAULT_DOWNLOAD_SETTINGS.threadMode;
+  const threadMode = isThreadMode(source.threadMode)
+    ? source.threadMode
+    : DEFAULT_DOWNLOAD_SETTINGS.threadMode;
 
   return {
     threadMode,
     threadCount: clampNumber(
-      String(source.threadCount ?? ""),
+      asInputText(source.threadCount),
       1,
       8,
       DEFAULT_DOWNLOAD_SETTINGS.threadCount,
@@ -49,20 +82,15 @@ export function normalizeDownloadSettings(value: unknown) {
       source.enableResume == null
         ? DEFAULT_DOWNLOAD_SETTINGS.enableResume
         : Boolean(source.enableResume),
-    maxRetries:
-      Number.parseInt(String(source.maxRetries), 10) === -1
-        ? -1
-        : clampNumber(
-            String(source.maxRetries ?? ""),
-            0,
-            8,
-            DEFAULT_DOWNLOAD_SETTINGS.maxRetries,
-          ),
+    maxRetries: normalizeRetryCount(
+      source.maxRetries,
+      DEFAULT_DOWNLOAD_SETTINGS.maxRetries,
+    ),
     videoQuality: VIDEO_TRANSCODE_QUALITY_OPTIONS.some(
       (option) =>
-        option.value === String(source.videoQuality || "").toLowerCase(),
+        option.value === asInputText(source.videoQuality).toLowerCase(),
     )
-      ? String(source.videoQuality).toLowerCase()
+      ? asInputText(source.videoQuality).toLowerCase()
       : DEFAULT_DOWNLOAD_SETTINGS.videoQuality,
   };
 }
@@ -77,29 +105,23 @@ export function normalizeDownloadOptions(value: unknown): DownloadOptions {
 
   const legacy = normalizeDownloadSettings(source);
   const timeoutMs = clampNumber(
-    String(retrySource.timeoutMs ?? ""),
+    asInputText(retrySource.timeoutMs),
     5000,
     180000,
     30000,
   );
-  const headers =
-    requestSource.headers && typeof requestSource.headers === "object"
-      ? Object.fromEntries(
-          Object.entries(requestSource.headers as Record<string, unknown>)
-            .filter(([key, val]) => key && val != null)
-            .map(([key, val]) => [String(key), String(val)]),
-        )
-      : {};
+  const headers = normalizeRequestHeaders(requestSource.headers);
 
   return {
     transport: {
-      mode: (transportSource.mode === "single" ||
-      transportSource.mode === "segmented" ||
-      transportSource.mode === "auto"
-        ? transportSource.mode
-        : legacy.threadMode) as DownloadOptions["transport"]["mode"],
+      mode:
+        transportSource.mode === "single" ||
+        transportSource.mode === "segmented" ||
+        transportSource.mode === "auto"
+          ? transportSource.mode
+          : legacy.threadMode,
       threads: clampNumber(
-        String(transportSource.threads ?? ""),
+        asInputText(transportSource.threads),
         1,
         8,
         legacy.threadCount,
@@ -114,23 +136,18 @@ export function normalizeDownloadOptions(value: unknown): DownloadOptions {
           : Boolean(transportSource.resume),
     },
     retry: {
-      maxRetries:
-        Number.parseInt(String(retrySource.maxRetries), 10) === -1
-          ? -1
-          : clampNumber(
-              String(retrySource.maxRetries ?? ""),
-              0,
-              8,
-              legacy.maxRetries,
-            ),
+      maxRetries: normalizeRetryCount(
+        retrySource.maxRetries,
+        legacy.maxRetries,
+      ),
       timeoutMs,
     },
     media: {
       videoQuality: VIDEO_TRANSCODE_QUALITY_OPTIONS.some(
         (option) =>
-          option.value === String(mediaSource.videoQuality || "").toLowerCase(),
+          option.value === asInputText(mediaSource.videoQuality).toLowerCase(),
       )
-        ? String(mediaSource.videoQuality).toLowerCase()
+        ? asInputText(mediaSource.videoQuality).toLowerCase()
         : legacy.videoQuality,
     },
     extraction: {

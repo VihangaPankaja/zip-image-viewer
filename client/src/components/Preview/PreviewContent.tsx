@@ -4,59 +4,138 @@ import { TextPreviewContent } from "./TextPreviewContent";
 import { VideoPreviewContent } from "./VideoPreviewContent";
 import { AudioPreviewContent } from "./AudioPreviewContent";
 import { BinaryPreviewContent } from "./BinaryPreviewContent";
+import type {
+  ImagePreviewProps,
+  PreviewFileNode,
+  PreviewNode,
+  VideoPreviewProps,
+} from "../../features/workspace/types";
+import type { AudioPreviewContentProps } from "./AudioPreviewContent";
+import type { TextPreviewContentProps } from "./TextPreviewContent";
+import type { PreviewKind } from "../../types/preview";
 
-export function PreviewContent(props) {
+export type PreviewContentProps = Omit<ImagePreviewProps, "selectedNode"> &
+  Omit<VideoPreviewProps, "selectedNode"> &
+  Omit<AudioPreviewContentProps, "selectedNode"> &
+  Omit<TextPreviewContentProps, "selectedNode"> & {
+    selectedKind: PreviewKind;
+    selectedNode: PreviewNode | null;
+    setExplorerModalOpen: (value: boolean) => void;
+    setSlideshowOpen: (value: boolean) => void;
+  };
+
+function isPreviewFileNode(node: PreviewNode | null): node is PreviewFileNode {
+  return node?.type === "file";
+}
+
+function PreviewHeader({
+  selectedNode,
+  selectedFile,
+  selectedKind,
+  selectedFileUrl,
+  setExplorerModalOpen,
+  setSlideshowOpen,
+}: Pick<
+  PreviewContentProps,
+  | "selectedNode"
+  | "selectedKind"
+  | "selectedFileUrl"
+  | "setExplorerModalOpen"
+  | "setSlideshowOpen"
+> & { selectedFile: PreviewFileNode | null }) {
+  return (
+    <div className="panel-header">
+      <div className="panel-title-group">
+        <p className="panel-label">Preview</p>
+        <h2 title={selectedNode?.name || "Select a file"}>
+          {selectedNode?.name || "Select a file"}
+        </h2>
+      </div>
+      {selectedFile ? (
+        <div className="panel-actions">
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={() => setExplorerModalOpen(true)}
+          >
+            Open explorer
+          </button>
+          {selectedKind === "image" ? (
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={() => setSlideshowOpen(true)}
+            >
+              Slideshow
+            </button>
+          ) : null}
+          <a
+            className="ghost-button inline-link"
+            href={selectedFileUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open raw
+          </a>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SelectedPreview({
+  props,
+  selectedFile,
+}: {
+  props: PreviewContentProps;
+  selectedFile: PreviewFileNode;
+}) {
   const {
-    selectedNode,
     selectedKind,
-    setExplorerModalOpen,
-    setSlideshowOpen,
     selectedFileUrl,
     formatBytes,
     formatDate,
     textPreview,
   } = props;
+  if (selectedKind === "image") {
+    return <ImagePreviewContent {...props} selectedNode={selectedFile} />;
+  }
+  if (selectedKind === "text") {
+    return (
+      <TextPreviewContent
+        selectedNode={selectedFile}
+        formatBytes={formatBytes}
+        formatDate={formatDate}
+        textPreview={textPreview}
+      />
+    );
+  }
+  if (selectedKind === "video") {
+    return <VideoPreviewContent {...props} selectedNode={selectedFile} />;
+  }
+  if (selectedKind === "audio") {
+    return (
+      <AudioPreviewContent
+        selectedNode={selectedFile}
+        selectedFileUrl={selectedFileUrl}
+        formatBytes={formatBytes}
+        formatDate={formatDate}
+      />
+    );
+  }
+  return selectedKind === "binary" ? <BinaryPreviewContent /> : null;
+}
+
+export function PreviewContent(props: PreviewContentProps) {
+  const selectedFile = isPreviewFileNode(props.selectedNode)
+    ? props.selectedNode
+    : null;
 
   return (
     <section className="preview-panel">
-      <div className="panel-header">
-        <div className="panel-title-group">
-          <p className="panel-label">Preview</p>
-          <h2 title={selectedNode?.name || "Select a file"}>
-            {selectedNode?.name || "Select a file"}
-          </h2>
-        </div>
-        {selectedNode?.type === "file" ? (
-          <div className="panel-actions">
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={() => setExplorerModalOpen(true)}
-            >
-              Open explorer
-            </button>
-            {selectedKind === "image" ? (
-              <button
-                className="ghost-button"
-                type="button"
-                onClick={() => setSlideshowOpen(true)}
-              >
-                Slideshow
-              </button>
-            ) : null}
-            <a
-              className="ghost-button inline-link"
-              href={selectedFileUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Open raw
-            </a>
-          </div>
-        ) : null}
-      </div>
+      <PreviewHeader {...props} selectedFile={selectedFile} />
 
-      {!selectedNode || selectedNode.type !== "file" ? (
+      {!selectedFile ? (
         <div className="empty-card preview-empty">
           <strong>Nothing selected</strong>
           <p>
@@ -65,34 +144,8 @@ export function PreviewContent(props) {
         </div>
       ) : null}
 
-      {selectedNode?.type === "file" && selectedKind === "image" ? (
-        <ImagePreviewContent {...props} />
-      ) : null}
-
-      {selectedNode?.type === "file" && selectedKind === "text" ? (
-        <TextPreviewContent
-          selectedNode={selectedNode}
-          formatBytes={formatBytes}
-          formatDate={formatDate}
-          textPreview={textPreview}
-        />
-      ) : null}
-
-      {selectedNode?.type === "file" && selectedKind === "video" ? (
-        <VideoPreviewContent {...props} />
-      ) : null}
-
-      {selectedNode?.type === "file" && selectedKind === "audio" ? (
-        <AudioPreviewContent
-          selectedNode={selectedNode}
-          selectedFileUrl={selectedFileUrl}
-          formatBytes={formatBytes}
-          formatDate={formatDate}
-        />
-      ) : null}
-
-      {selectedNode?.type === "file" && selectedKind === "binary" ? (
-        <BinaryPreviewContent />
+      {selectedFile ? (
+        <SelectedPreview props={props} selectedFile={selectedFile} />
       ) : null}
     </section>
   );

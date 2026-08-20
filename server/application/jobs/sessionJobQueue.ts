@@ -1,5 +1,7 @@
+import type { SessionJob } from "../../domain/models.js";
+
 type QueueItem = {
-  job: { id: string };
+  job: SessionJob;
   confirmOversize: boolean;
 };
 
@@ -29,6 +31,14 @@ export function createSessionJobQueue({
   processSessionJob,
   logEvent,
 }: SessionJobQueueDeps) {
+  if (
+    !Number.isInteger(maxActiveSessionJobs) ||
+    maxActiveSessionJobs < 1 ||
+    maxActiveSessionJobs > 2
+  ) {
+    throw new RangeError("Session job concurrency must be one or two.");
+  }
+
   function scheduleSessionJobs() {
     while (
       getActiveSessionJobCount() < maxActiveSessionJobs &&

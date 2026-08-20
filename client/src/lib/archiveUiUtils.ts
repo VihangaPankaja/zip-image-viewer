@@ -64,15 +64,18 @@ export function formatProgressMessage(
     return job.message;
   }
 
-  if (job.phase === "downloading" && job.reportedSize > 0) {
+  const reportedSize = job.reportedSize ?? 0;
+  const downloadedBytes = job.downloadedBytes ?? 0;
+
+  if (job.phase === "downloading" && reportedSize > 0) {
     if (job.isStalled) {
       return "Download stalled, waiting for data or retry.";
     }
-    return `Downloading archive: ${formatTransferBytes(job.downloadedBytes)} of ${formatTransferBytes(job.reportedSize)}`;
+    return `Downloading archive: ${formatTransferBytes(downloadedBytes)} of ${formatTransferBytes(reportedSize)}`;
   }
 
   if (job.phase === "downloading") {
-    return `Downloading archive: ${formatTransferBytes(job.downloadedBytes)} received`;
+    return `Downloading archive: ${formatTransferBytes(downloadedBytes)} received`;
   }
 
   if (job.phase === "extracting") {

@@ -46,16 +46,16 @@ export const VIDEO_TRANSCODE_QUALITY_OPTIONS = [
   { value: "source", label: "Original source" },
 ];
 
-export const WORKSPACE_TABS: Array<{
-  value: "download" | "preview" | "explorer";
-  label: string;
-}> = [
-  { value: "download", label: "Download" },
-  { value: "preview", label: "Preview" },
-  { value: "explorer", label: "Explorer" },
-];
+export type DownloadSettings = {
+  threadMode: DownloadOptions["transport"]["mode"];
+  threadCount: number;
+  enableMultithread: boolean;
+  enableResume: boolean;
+  maxRetries: number;
+  videoQuality: string;
+};
 
-export const DEFAULT_DOWNLOAD_SETTINGS = {
+export const DEFAULT_DOWNLOAD_SETTINGS: DownloadSettings = {
   threadMode: "auto",
   threadCount: 3,
   enableMultithread: true,
