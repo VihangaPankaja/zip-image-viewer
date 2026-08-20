@@ -19,7 +19,7 @@ RUN apt-get update \
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY tooling/eslint/package.json tooling/eslint/package.json
 RUN pnpm install --prod --frozen-lockfile
-COPY --from=build /app/build/server ./build/server
+COPY --from=build /app/build ./build
 COPY --from=build /app/dist ./dist
 RUN chown -R app:app /app
 USER app
