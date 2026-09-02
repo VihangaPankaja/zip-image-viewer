@@ -1,7 +1,8 @@
 import type { ComponentProps } from "react";
-import { ExplorerTablePanel } from "../../../components/ExplorerTablePanel";
+import { CustomDropdown } from "../../../components/Common/CustomDropdown";
 import { GlobalSettingsSheet } from "../../../components/GlobalSettingsSheet";
 import { PreviewContent } from "../../../components/Preview/PreviewContent";
+import { TreeExplorer } from "../../../components/TreeExplorer";
 import { SessionRail } from "../../../components/Workspace/SessionRail";
 import {
   DOWNLOAD_RETRY_OPTIONS,
@@ -23,36 +24,75 @@ import type { WorkspacePageController } from "../useWorkspacePageController";
 import { WorkspaceAppBar } from "./WorkspaceAppBar";
 import { WorkspaceLayout } from "./WorkspaceLayout";
 import { WorkspaceOverlays } from "./WorkspaceOverlays";
+import { DownloadDialog, DownloadManager } from "./DownloadManager";
 
 type ViewProps = { controller: WorkspacePageController };
 
 export function WorkspacePageView({ controller }: ViewProps) {
+  const { queue, settings, state } = controller;
+  const downloads = (
+    <DownloadManager
+      jobs={queue.jobs}
+      maxConcurrent={queue.maxConcurrent}
+      onCancel={(id) => void queue.cancel(id)}
+      onOpenSession={(jobId) => {
+        const sessionId = queue.jobs.find(({ id }) => id === jobId)?.sessionId;
+        if (sessionId) void controller.actions.openSession(sessionId);
+      }}
+      onPause={(id) => void queue.pause(id)}
+      onRemove={(id) => void queue.remove(id)}
+      onReorder={(ids) => void queue.reorder(ids)}
+      onResume={(id) => void queue.resume(id)}
+      onRetry={(id) => void queue.retry(id)}
+      onSetConcurrency={(value) => void queue.setMaxConcurrent(value)}
+    />
+  );
   return (
     <div className="app-shell">
       <main className="workspace">
-        <WorkspaceLayout
-          header={<WorkspaceHeader controller={controller} />}
-          sessions={<WorkspaceSessions controller={controller} />}
-          files={<WorkspaceFiles controller={controller} />}
-          preview={<WorkspacePreview controller={controller} />}
-          metadata={<WorkspaceMetadata controller={controller} />}
-        />
+        {state.activeView === "downloads" ? (
+          <section className="unified-workspace downloads-workspace">
+            <header className="unified-workspace-header">
+              <WorkspaceHeader controller={controller} />
+            </header>
+            {downloads}
+          </section>
+        ) : (
+          <WorkspaceLayout
+            header={<WorkspaceHeader controller={controller} />}
+            sessions={<WorkspaceSessions controller={controller} />}
+            files={<WorkspaceFiles controller={controller} />}
+            preview={<WorkspacePreview controller={controller} />}
+            metadata={<WorkspaceMetadata controller={controller} />}
+          />
+        )}
       </main>
       <WorkspaceSettings controller={controller} />
-      <WorkspacePageOverlays controller={controller} />
+      <DownloadDialog
+        defaultOptions={settings.downloadOptions}
+        open={state.downloadDialogOpen}
+        onClose={() => state.setDownloadDialogOpen(false)}
+        onSubmit={(items) => {
+          void queue
+            .enqueue(items)
+            .then(() => state.setDownloadDialogOpen(false));
+        }}
+      />
+      {state.activeView === "explore" ? (
+        <WorkspacePageOverlays controller={controller} />
+      ) : null}
     </div>
   );
 }
 
 function WorkspaceHeader({ controller }: ViewProps) {
-  const { actions, queue, state } = controller;
+  const { state } = controller;
   return (
     <WorkspaceAppBar
-      isLoading={state.isLoading || queue.isEnqueueing}
+      activeView={state.activeView}
+      onAddDownloads={() => state.setDownloadDialogOpen(true)}
       onOpenSettings={() => state.setSettingsOpen(true)}
-      onSubmit={(urls) => void actions.submit(urls)}
-      setUrl={state.setZipUrl}
-      url={state.zipUrl}
+      onSelectView={state.setActiveView}
     />
   );
 }
@@ -70,23 +110,45 @@ function WorkspaceSessions({ controller }: ViewProps) {
 
 function WorkspaceFiles({ controller }: ViewProps) {
   const { selection } = controller.media;
-  const { explorerColumns } = controller.settings;
   const { selectedPath, session, setSelectedPath, setSortMode, sortMode } =
     controller.state;
   return (
-    <ExplorerTablePanel
-      explorerColumns={explorerColumns}
-      explorerRows={selection.explorerRows}
-      formatBytes={formatBytes}
-      formatDate={formatDate}
-      selectedPath={selectedPath}
-      session={session}
-      setSelectedPath={setSelectedPath}
-      setSortMode={setSortMode}
-      sortMode={sortMode}
-      sortOptions={SORT_OPTIONS}
-      sortedTree={selection.sortedTree}
-    />
+    <section className="explorer-tree-panel" aria-labelledby="explorer-title">
+      <header className="panel-header explorer-header">
+        <div className="panel-title-group">
+          <p className="panel-label">Files</p>
+          <h2 id="explorer-title">
+            {selection.sortedTree?.name || "Explorer"}
+          </h2>
+        </div>
+        {session ? (
+          <span className="panel-chip">{selection.explorerRows.length}</span>
+        ) : null}
+        <CustomDropdown
+          id="sort-mode-explorer"
+          label="Sort"
+          value={sortMode}
+          options={SORT_OPTIONS}
+          onChange={(value) => setSortMode(String(value))}
+          className="explorer-sort-shell"
+        />
+      </header>
+      {selection.sortedTree ? (
+        <TreeExplorer
+          compact
+          rootNode={selection.sortedTree}
+          selectedPath={selectedPath}
+          onSelect={(node) => {
+            if (node.type === "file") setSelectedPath(node.path);
+          }}
+        />
+      ) : (
+        <div className="empty-card">
+          <strong>No session selected</strong>
+          <p>Open a completed download to explore its files.</p>
+        </div>
+      )}
+    </section>
   );
 }
 

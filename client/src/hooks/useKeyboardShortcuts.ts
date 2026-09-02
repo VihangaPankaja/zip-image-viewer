@@ -115,12 +115,14 @@ function handleVideoShortcut(
     Number(context.keyboardSettings.rateStep) || 0.25,
   );
   const key = event.key.toLowerCase();
-  if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
-    const direction = event.key === "ArrowRight" ? 1 : -1;
+  if ((key === "j" || key === "l") && document.fullscreenElement) {
+    const direction = key === "l" ? 1 : -1;
     player.currentTime = Math.max(
       0,
       (player.currentTime || 0) + jump * direction,
     );
+  } else if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+    return false;
   } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
     const direction = event.key === "ArrowUp" ? 1 : -1;
     const nextVolume = Math.max(

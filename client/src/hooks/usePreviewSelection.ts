@@ -123,6 +123,12 @@ export function usePreviewSelection({
   const currentImageIndex = selectedNode
     ? currentFolderImages.indexOf(selectedNode.path)
     : -1;
+  const currentFolderPreviewables = selectedNode
+    ? flatData?.folderPreviewables.get(selectedNode.parentPath || "") || []
+    : [];
+  const currentPreviewIndex = selectedNode
+    ? currentFolderPreviewables.indexOf(selectedNode.path)
+    : -1;
 
   const urls = buildPreviewUrls(
     session?.id || "",
@@ -140,6 +146,11 @@ export function usePreviewSelection({
   const navigation = buildImageNavigation(
     currentFolderImages,
     currentImageIndex,
+    flatData,
+  );
+  const previewNavigation = buildImageNavigation(
+    currentFolderPreviewables,
+    currentPreviewIndex,
     flatData,
   );
 
@@ -160,9 +171,13 @@ export function usePreviewSelection({
     selectedKind,
     currentFolderImages,
     currentImageIndex,
+    currentFolderPreviewables,
+    currentPreviewIndex,
     ...urls,
     currentFolderImageItems,
     ...navigation,
+    nextPreviewPath: previewNavigation.nextImagePath,
+    previousPreviewPath: previewNavigation.previousImagePath,
     explorerRows,
   };
 }

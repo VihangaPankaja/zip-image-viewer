@@ -127,20 +127,23 @@ export function createProcessSessionJob(deps: ProcessorDependencies) {
     confirmOversize = false,
   ): Promise<void> {
     const sourceUrl = parseSourceUrl(job.url);
-    const workspaceDir = await mkdtemp(
-      path.join(os.tmpdir(), "zip-image-viewer-"),
-    );
-    const zipPath = path.join(
-      workspaceDir,
-      path.basename(sourceUrl.pathname) || "download.bin",
-    );
-    const extractDir = path.join(workspaceDir, "extracted");
+    const workspaceDir =
+      job.workspaceDir ||
+      (await mkdtemp(path.join(os.tmpdir(), "zip-image-viewer-")));
+    const zipPath =
+      job.zipPath ||
+      path.join(
+        workspaceDir,
+        path.basename(sourceUrl.pathname) || "download.bin",
+      );
+    const extractDir = job.extractDir || path.join(workspaceDir, "extracted");
     await mkdir(extractDir, { recursive: true });
     Object.assign(job, {
       workspaceDir,
       zipPath,
       extractDir,
       abortController: new AbortController(),
+      pauseRequested: false,
     });
     const settings = configureJob(job);
     try {
@@ -179,6 +182,7 @@ export function createProcessSessionJob(deps: ProcessorDependencies) {
           percent: 100,
           message: "Archive is ready to browse.",
           requiresConfirmation: false,
+          canPause: false,
         },
         "ready",
       );
@@ -190,6 +194,23 @@ export function createProcessSessionJob(deps: ProcessorDependencies) {
       });
     } catch (error) {
       const jobError = errorFromUnknown(error);
+      const paused =
+        jobError.name === "AbortError" && job.pauseRequested && job.canResume;
+      if (paused) {
+        deps.emitJob(
+          job,
+          {
+            status: "paused",
+            phase: "paused",
+            canPause: false,
+            pauseRequested: false,
+            abortController: null,
+            message: "Download paused. Partial data is preserved.",
+          },
+          "paused",
+        );
+        return;
+      }
       await rm(workspaceDir, { recursive: true, force: true });
       deps.logEvent("error", "session.create.failed", {
         jobId: job.id,

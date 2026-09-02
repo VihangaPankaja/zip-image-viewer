@@ -75,28 +75,9 @@ function useWorkspaceLifecycle(
   });
 }
 
-type WorkspaceLifecycle = ReturnType<typeof useWorkspaceLifecycle>;
 type WorkspaceQueue = ReturnType<typeof useWorkspaceQueue>;
 
-function useWorkspaceActions(
-  state: WorkspacePageState,
-  lifecycle: WorkspaceLifecycle,
-  queue: WorkspaceQueue,
-) {
-  const submit = useCallback(
-    async (urls: readonly string[]) => {
-      const firstUrl = urls[0];
-      if (!firstUrl) return;
-      try {
-        await queue.enqueue(urls);
-        state.setZipUrl("");
-      } catch {
-        state.setZipUrl(firstUrl);
-        await lifecycle.loadSession(firstUrl);
-      }
-    },
-    [lifecycle, queue, state],
-  );
+function useWorkspaceActions(state: WorkspacePageState, queue: WorkspaceQueue) {
   const openSession = useCallback(
     async (sessionId: string) => {
       if (
@@ -119,10 +100,11 @@ function useWorkspaceActions(
         parsed.data.firstFilePath || parsed.data.tree?.path || "",
       );
       state.setError("");
+      state.setActiveView("explore");
     },
     [queue.sessions, state],
   );
-  return { openSession, submit };
+  return { openSession };
 }
 
 function useWorkspaceKeyboard(
@@ -131,11 +113,11 @@ function useWorkspaceKeyboard(
   media: WorkspaceMedia,
 ): void {
   useKeyboardShortcuts({
-    currentFolderImages: media.selection.currentFolderImages,
-    currentImageIndex: media.selection.currentImageIndex,
+    currentFolderImages: media.selection.currentFolderPreviewables,
+    currentImageIndex: media.selection.currentPreviewIndex,
     keyboardSettings: settings.keyboardSettings,
-    nextImagePath: media.selection.nextImagePath,
-    previousImagePath: media.selection.previousImagePath,
+    nextImagePath: media.selection.nextPreviewPath,
+    previousImagePath: media.selection.previousPreviewPath,
     selectedKind: media.selection.selectedKind,
     setSelectedPath: state.setSelectedPath,
     setSlideshowOpen: state.setSlideshowOpen,
@@ -162,7 +144,7 @@ export function useWorkspacePageController() {
     downloadSettings,
   );
   const queue = useWorkspaceQueue();
-  const actions = useWorkspaceActions(state, lifecycle, queue);
+  const actions = useWorkspaceActions(state, queue);
   useWorkspacePageEffects(state, media.selection, media.image.loadImagePreview);
   useWorkspaceKeyboard(state, settings, media);
   const progress = buildWorkspaceProgress(state.activeJob);

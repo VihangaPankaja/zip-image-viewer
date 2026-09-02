@@ -1,75 +1,70 @@
-import type { FormEvent } from "react";
-import {
-  getBatchValidationMessage,
-  MAX_BATCH_URLS,
-  parseWorkspaceUrls,
-} from "../workspaceUrls";
+import { Download, FolderTree, Plus, Settings } from "lucide-react";
 
+export type WorkspaceView = "downloads" | "explore";
 type WorkspaceAppBarProps = {
-  isLoading: boolean;
+  activeView: WorkspaceView;
+  onAddDownloads: () => void;
   onOpenSettings: () => void;
-  onSubmit: (urls: readonly string[]) => void;
-  setUrl: (value: string) => void;
-  url: string;
+  onSelectView: (view: WorkspaceView) => void;
 };
 
 export function WorkspaceAppBar({
-  isLoading,
+  activeView,
+  onAddDownloads,
   onOpenSettings,
-  onSubmit,
-  setUrl,
-  url,
+  onSelectView,
 }: WorkspaceAppBarProps) {
-  const urls = parseWorkspaceUrls(url);
-  const validationMessage = getBatchValidationMessage(urls);
-  const isDisabled = isLoading || Boolean(validationMessage);
-
-  function submitBatch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!validationMessage) {
-      onSubmit(urls);
-    }
-  }
-
   return (
     <div className="workspace-appbar">
-      <div className="workspace-brand">
-        <p className="panel-label">ZIP Image Viewer</p>
-        <h1>Media workspace</h1>
+      <div className="workspace-brand" aria-label="ZIP Image Viewer">
+        <span className="workspace-brand-mark" aria-hidden="true">
+          ZV
+        </span>
+        <div>
+          <p className="panel-label">ZIP Image Viewer</p>
+          <h1>Transfer desk</h1>
+        </div>
       </div>
-      <form className="workspace-url-action" onSubmit={submitBatch}>
-        <label htmlFor="workspace-url">Add public URLs</label>
-        <textarea
-          id="workspace-url"
-          value={url}
-          placeholder="Paste public ZIP or media URLs, one per line"
-          rows={2}
-          onChange={(event) => setUrl(event.currentTarget.value)}
-          aria-describedby="workspace-url-status"
-        />
-        <p
-          id="workspace-url-status"
-          className="workspace-url-status"
-          aria-live="polite"
+      <nav className="workspace-tabs" role="tablist" aria-label="Workspace">
+        <button
+          className={activeView === "downloads" ? "active" : ""}
+          type="button"
+          role="tab"
+          aria-selected={activeView === "downloads"}
+          onClick={() => onSelectView("downloads")}
         >
-          {validationMessage ||
-            `${urls.length} of ${MAX_BATCH_URLS} URLs ready to queue.`}
-        </p>
+          <Download size={16} aria-hidden="true" />
+          Downloads
+        </button>
+        <button
+          className={activeView === "explore" ? "active" : ""}
+          type="button"
+          role="tab"
+          aria-selected={activeView === "explore"}
+          onClick={() => onSelectView("explore")}
+        >
+          <FolderTree size={16} aria-hidden="true" />
+          Explore
+        </button>
+      </nav>
+      <div className="workspace-appbar-actions">
         <button
           className="primary-button compact-button"
-          type="submit"
-          disabled={isDisabled}
+          type="button"
+          onClick={onAddDownloads}
         >
-          {isLoading ? "Adding…" : "Add to queue"}
+          <Plus size={16} aria-hidden="true" />
+          Add downloads
         </button>
-      </form>
-      <button
-        className="ghost-button compact-button"
-        type="button"
-        onClick={onOpenSettings}
-      >
-        Settings
-      </button>
+        <button
+          className="icon-button"
+          type="button"
+          aria-label="Settings"
+          onClick={onOpenSettings}
+        >
+          <Settings size={17} aria-hidden="true" />
+        </button>
+      </div>
     </div>
   );
 }

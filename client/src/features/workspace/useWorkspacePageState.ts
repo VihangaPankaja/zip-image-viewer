@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { WorkspaceView } from "./components/WorkspaceAppBar";
 import type {
   JobPayload,
   OversizePrompt,
@@ -7,6 +8,8 @@ import type {
 
 export function useWorkspacePageState() {
   const [zipUrl, setZipUrl] = useState("");
+  const [activeView, setActiveView] = useState<WorkspaceView>("downloads");
+  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [session, setSession] = useState<SessionPayload | null>(null);
   const [selectedPath, setSelectedPath] = useState("");
@@ -23,6 +26,8 @@ export function useWorkspacePageState() {
 
   return {
     activeJob,
+    activeView,
+    downloadDialogOpen,
     error,
     explorerModalOpen,
     isLoading,
@@ -31,6 +36,8 @@ export function useWorkspacePageState() {
     session,
     settingsOpen,
     setActiveJob,
+    setActiveView,
+    setDownloadDialogOpen,
     setError,
     setExplorerModalOpen,
     setIsLoading,

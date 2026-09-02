@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-test("renders the unified media workspace and opens settings", async ({
+test("manages downloads and opens the Explore workspace", async ({
   page,
 }, testInfo) => {
   const consoleErrors: string[] = [];
@@ -11,71 +11,88 @@ test("renders the unified media workspace and opens settings", async ({
   await page.goto("/");
 
   await expect(
-    page.getByRole("heading", { name: "Media workspace" }),
+    page.getByRole("heading", { name: "Transfer desk" }),
+  ).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Downloads" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(
+    page.getByRole("heading", { name: "Downloads", exact: true }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Add downloads" }).click();
+  await page
+    .getByRole("textbox", { name: "Paste download URLs" })
+    .fill("https://example.com/a.zip\nhttps://example.com/b.zip");
+  await page.getByRole("button", { name: "Review links" }).click();
+  await expect(page.getByLabel("Download URL", { exact: true })).toHaveCount(2);
+  await page.getByRole("button", { name: "Close" }).click();
+
+  await page.getByRole("tab", { name: "Explore" }).click();
+  await expect(
+    page.getByRole("region", { name: "Explorer sidebar" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("region", { name: "Sessions", exact: true }),
+    page.getByRole("region", { name: "Preview panel" }),
   ).toBeVisible();
-  await expect(page.getByLabel("Add public URLs")).toBeVisible();
+  const sidebar = await page
+    .getByRole("region", { name: "Explorer sidebar" })
+    .boundingBox();
+  const preview = await page
+    .getByRole("region", { name: "Preview panel" })
+    .boundingBox();
+  expect(sidebar?.width ?? 0).toBeGreaterThan(220);
+  expect(preview?.width ?? 0).toBeGreaterThan(420);
 
-  const panelMinimums = [
-    { label: "Sessions panel", minimum: 180 },
-    { label: "Files panel", minimum: 220 },
-    { label: "Preview panel", minimum: 400 },
-    { label: "Metadata panel", minimum: 170 },
-  ] as const;
-  for (const panel of panelMinimums) {
-    const bounds = await page.getByLabel(panel.label).boundingBox();
-    expect(
-      bounds?.width ?? 0,
-      `${panel.label} should not collapse`,
-    ).toBeGreaterThan(panel.minimum);
-  }
-
-  const screenshot = await page.screenshot({
+  await page.screenshot({
     animations: "disabled",
     path: testInfo.outputPath("workspace-desktop.png"),
   });
-  expect(screenshot.byteLength).toBeGreaterThan(10_000);
-
   await page.getByRole("button", { name: "Settings" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
-  await page.getByRole("button", { name: "Thread mode" }).click();
-  await expect(
-    page.getByRole("listbox", { name: "Thread mode" }),
-  ).toBeVisible();
-  await page.screenshot({
-    animations: "disabled",
-    path: testInfo.outputPath("workspace-settings.png"),
-  });
-  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Close" }).click();
-  await expect(page.getByRole("dialog")).toBeHidden();
   expect(consoleErrors).toEqual([]);
 });
 
-test("mobile navigation switches workspace panes", async ({
+test("mobile uses a full-screen add sheet and tree-to-preview navigation", async ({
   page,
 }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
 
-  await page.locator('label[for="workspace-pane-files"]').click();
+  await page.getByRole("button", { name: "Add downloads" }).click();
+  const dialogBounds = await page.getByRole("dialog").boundingBox();
+  const viewport = await page.evaluate(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
+  expect(dialogBounds?.width ?? 0).toBeGreaterThanOrEqual(viewport.width - 1);
+  expect(dialogBounds?.height ?? 0).toBeGreaterThanOrEqual(viewport.height - 1);
+  await page.getByRole("button", { name: "Close" }).click();
+
+  await page.getByRole("tab", { name: "Explore" }).click();
+  await expect(page.getByRole("radio", { name: "Files" })).toBeChecked();
   await expect(
-    page.getByRole("radio", { name: "Files", exact: true }),
-  ).toBeChecked();
-  await expect(page.getByLabel("Files panel")).toBeVisible();
-  await expect(page.getByLabel("Sessions panel")).toBeHidden();
+    page.getByRole("region", { name: "Explorer sidebar" }),
+  ).toBeVisible();
+  await page.locator('label[for="workspace-pane-preview"]').click();
+  await expect(
+    page.getByRole("region", { name: "Preview panel" }),
+  ).toBeVisible();
+  await page.getByText("Back to files").click();
+  await expect(page.getByRole("radio", { name: "Files" })).toBeChecked();
   await page.screenshot({
     animations: "disabled",
     path: testInfo.outputPath("workspace-mobile.png"),
   });
 });
 
-test("has no automatically detectable accessibility violations", async ({
+test("both workspaces have no automatically detectable accessibility violations", async ({
   page,
 }) => {
   await page.goto("/");
-  const results = await new AxeBuilder({ page }).analyze();
-  expect(results.violations).toEqual([]);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.getByRole("tab", { name: "Explore" }).click();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 });

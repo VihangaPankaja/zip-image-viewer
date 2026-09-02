@@ -108,15 +108,31 @@ const processSessionJob = createProcessSessionJob({
   logEvent,
 });
 
-const { enqueueSessionJob } = createSessionJobQueue({
+const sessionJobQueue = createSessionJobQueue({
   pendingSessionJobs,
   getActiveSessionJobCount,
   incrementActiveSessionJobCount,
   decrementActiveSessionJobCount,
   maxActiveSessionJobs: MAX_ACTIVE_SESSION_JOBS,
   processSessionJob,
+  pauseJob: (job) => {
+    job.pauseRequested = true;
+    job.abortController?.abort();
+    emitJob(
+      job,
+      {
+        status: "paused",
+        phase: "paused",
+        canPause: false,
+        message: "Pausing download...",
+      },
+      "paused",
+    );
+    return Promise.resolve();
+  },
   logEvent,
 });
+const { enqueueSessionJob } = sessionJobQueue;
 
 const app = createRuntimeApp({
   metrics: container.metrics,
@@ -126,8 +142,18 @@ const app = createRuntimeApp({
   sanitizeJob,
   createJob,
   enqueueJob: enqueueSessionJob,
+  listOrderedJobs: sessionJobQueue.getOrderedJobs,
+  pauseJob: sessionJobQueue.pauseSessionJob,
+  resumeJob: sessionJobQueue.resumeSessionJob,
+  cancelJob: sessionJobQueue.cancelSessionJob,
+  removeJob: sessionJobQueue.removeSessionJob,
+  reorderJobs: sessionJobQueue.reorderSessionJobs,
+  getSchedulerSettings: sessionJobQueue.getSchedulerState,
+  updateSchedulerSettings: sessionJobQueue.setMaxActiveSessionJobs,
   closeJob,
   emitJob,
+  removeSession: async (id, reason) => removeSession(id, reason),
+  cleanupJob,
 });
 
 app.use((req, res, next) => {
