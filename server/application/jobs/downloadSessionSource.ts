@@ -203,6 +203,7 @@ export async function downloadSessionSource(
       : settings.threadMode;
   job.threadCount = job.threadMode === "segmented" ? settings.threadCount : 1;
   job.canResume = settings.enableResume && metadata.acceptRanges;
+  job.canPause = job.canResume;
   monitor.start();
   try {
     const result = await retryDownload(

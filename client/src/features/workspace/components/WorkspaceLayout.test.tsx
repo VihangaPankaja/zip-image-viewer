@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { WorkspaceLayout } from "./WorkspaceLayout";
 
 describe("WorkspaceLayout", () => {
-  it("offers accessible mobile navigation between sessions, files, and preview", async () => {
+  it("keeps sessions and the file tree together beside preview", async () => {
     const user = userEvent.setup();
 
     render(
@@ -25,5 +25,15 @@ describe("WorkspaceLayout", () => {
       screen.getByRole("heading", { name: "Media workspace" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "Files" })).toBeChecked();
+    expect(
+      screen.getByRole("region", { name: "Explorer sidebar" }),
+    ).toHaveTextContent("Sessions paneFiles pane");
+    expect(
+      screen.queryByRole("radio", { name: "Sessions" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Back to files")).toHaveAttribute(
+      "for",
+      "workspace-pane-files",
+    );
   });
 });

@@ -10,10 +10,9 @@ type WorkspaceLayoutProps = {
 };
 
 const mobileViews: ReadonlyArray<{
-  id: "sessions" | "files" | "preview";
+  id: "files" | "preview";
   label: string;
 }> = [
-  { id: "sessions", label: "Sessions" },
   { id: "files", label: "Files" },
   { id: "preview", label: "Preview" },
 ];
@@ -29,37 +28,33 @@ export function WorkspaceLayout({
     <section className="unified-workspace" data-testid="workspace-layout">
       <header className="unified-workspace-header">{header}</header>
       <Group className="workspace-panel-group" orientation="horizontal">
-        <Panel defaultSize="19" minSize="14">
-          <section
-            className="unified-workspace-sessions"
-            aria-label="Sessions panel"
-          >
-            {sessions}
+        <Panel defaultSize="30" minSize="20">
+          <section className="explore-sidebar" aria-label="Explorer sidebar">
+            <div className="unified-workspace-sessions">{sessions}</div>
+            <div className="unified-workspace-files">{files}</div>
           </section>
         </Panel>
         <Separator className="workspace-resize-handle" />
-        <Panel defaultSize="23" minSize="17">
-          <section className="unified-workspace-files" aria-label="Files panel">
-            {files}
-          </section>
-        </Panel>
-        <Separator className="workspace-resize-handle" />
-        <Panel defaultSize="40" minSize="32">
+        <Panel defaultSize="70" minSize="40">
           <section
             className="unified-workspace-preview"
             aria-label="Preview panel"
+            tabIndex={0}
           >
+            <label
+              className="mobile-back-action"
+              htmlFor="workspace-pane-files"
+            >
+              Back to files
+            </label>
             {preview}
+            <aside
+              className="unified-workspace-metadata"
+              aria-label="Metadata panel"
+            >
+              {metadata}
+            </aside>
           </section>
-        </Panel>
-        <Separator className="workspace-resize-handle" />
-        <Panel defaultSize="18" minSize="14">
-          <aside
-            className="unified-workspace-metadata"
-            aria-label="Metadata panel"
-          >
-            {metadata}
-          </aside>
         </Panel>
       </Group>
       <nav className="workspace-mobile-nav" aria-label="Workspace views">
@@ -70,7 +65,8 @@ export function WorkspaceLayout({
               type="radio"
               name="workspace-pane"
               id={`workspace-pane-${view.id}`}
-              defaultChecked={view.id === "preview"}
+              aria-label={view.label}
+              defaultChecked={view.id === "files"}
             />
             <label htmlFor={`workspace-pane-${view.id}`} data-pane={view.id}>
               {view.label}

@@ -7,6 +7,7 @@ export type JobStatus =
   | "downloading"
   | "extracting"
   | "awaiting_confirmation"
+  | "paused"
   | "ready"
   | "cancelled"
   | "error";
@@ -16,6 +17,7 @@ export type JobPhase =
   | "downloading"
   | "extracting"
   | "confirm"
+  | "paused"
   | "ready"
   | "cancelled"
   | "error";
@@ -80,6 +82,9 @@ export type SessionJob = {
   retryCount: number;
   maxRetries: number;
   canResume: boolean;
+  canPause: boolean;
+  queuePosition: number;
+  pauseRequested: boolean;
   threadMode: ThreadMode;
   threadCount: number;
   enableMultithread: boolean;

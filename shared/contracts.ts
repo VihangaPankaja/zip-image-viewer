@@ -66,6 +66,7 @@ const jobStatusSchema = z.enum([
   "downloading",
   "extracting",
   "awaiting_confirmation",
+  "paused",
   "ready",
   "cancelled",
   "error",
@@ -76,6 +77,7 @@ const jobPhaseSchema = z.enum([
   "downloading",
   "extracting",
   "confirm",
+  "paused",
   "ready",
   "cancelled",
   "error",
@@ -87,6 +89,22 @@ export const jobSchema = z.object({
   status: jobStatusSchema,
   phase: jobPhaseSchema,
   percent: z.number().min(0).max(100).nullable(),
+  downloadedBytes: z.number().nonnegative().default(0),
+  reportedSize: z.number().nonnegative().default(0),
+  downloadSpeedBytesPerSec: z.number().nonnegative().default(0),
+  averageSpeedBytesPerSec: z.number().nonnegative().default(0),
+  etaSeconds: z.number().nonnegative().nullable().default(null),
+  retryCount: z.number().int().nonnegative().default(0),
+  maxRetries: z.number().int().min(-1).max(8).default(3),
+  canResume: z.boolean().default(false),
+  canPause: z.boolean().default(false),
+  queuePosition: z.number().int().nonnegative().default(0),
+  threadMode: z.enum(["single", "segmented", "auto"]).default("auto"),
+  threadCount: z.number().int().min(1).max(8).default(1),
+  message: z.string().default(""),
+  error: z.string().default(""),
+  sessionId: z.uuid().or(z.literal("")).default(""),
+  requiresConfirmation: z.boolean().default(false),
   createdAt: z.number().int().nonnegative(),
   updatedAt: z.number().int().nonnegative(),
 });
@@ -106,9 +124,16 @@ export const createSessionInputSchema = z.object({
 });
 
 export const enqueueSessionsInputSchema = z.object({
-  urls: z.array(publicHttpUrlSchema).min(1).max(50),
+  items: z
+    .array(
+      z.object({
+        url: publicHttpUrlSchema,
+        downloadOptions: z.unknown().optional(),
+      }),
+    )
+    .min(1)
+    .max(50),
   confirmOversize: z.boolean().default(false),
-  downloadOptions: z.unknown().optional(),
 });
 
 export const mediaPathQuerySchema = z.object({
@@ -148,18 +173,58 @@ const retryJobContract = oc
   .route({ method: "POST", path: "/session-jobs/{id}/retry" })
   .input(jobControlInputSchema)
   .output(jobSchema);
+const pauseJobContract = oc
+  .route({ method: "POST", path: "/session-jobs/{id}/pause" })
+  .input(jobControlInputSchema)
+  .output(jobSchema);
+const resumeJobContract = oc
+  .route({ method: "POST", path: "/session-jobs/{id}/resume" })
+  .input(jobControlInputSchema)
+  .output(jobSchema);
+const removeJobContract = oc
+  .route({ method: "DELETE", path: "/session-jobs/{id}" })
+  .input(jobControlInputSchema)
+  .output(z.void());
+const reorderJobsContract = oc
+  .route({ method: "POST", path: "/session-jobs/reorder" })
+  .input(z.object({ jobIds: z.array(z.uuid()).min(1).max(50) }))
+  .output(z.array(jobSchema));
+const schedulerSettingsSchema = z.object({
+  activeCount: z.number().int().nonnegative(),
+  maxConcurrent: z.number().int().min(1).max(8),
+});
+const getSchedulerContract = oc
+  .route({ method: "GET", path: "/scheduler" })
+  .output(schedulerSettingsSchema);
+const updateSchedulerContract = oc
+  .route({ method: "PATCH", path: "/scheduler" })
+  .input(schedulerSettingsSchema.pick({ maxConcurrent: true }))
+  .output(schedulerSettingsSchema);
+const removeSessionContract = oc
+  .route({ method: "DELETE", path: "/sessions/{id}" })
+  .input(z.object({ id: z.uuid() }))
+  .output(z.void());
 
 export const serverContract = {
   sessions: {
     create: createSessionContract,
     get: getSessionContract,
     list: listSessionsContract,
+    remove: removeSessionContract,
   },
   jobs: {
     list: listJobsContract,
     enqueue: enqueueSessionsContract,
     cancel: cancelJobContract,
     retry: retryJobContract,
+    pause: pauseJobContract,
+    resume: resumeJobContract,
+    remove: removeJobContract,
+    reorder: reorderJobsContract,
+  },
+  scheduler: {
+    get: getSchedulerContract,
+    update: updateSchedulerContract,
   },
 };
 
@@ -167,3 +232,4 @@ export type CreateSessionInput = z.infer<typeof createSessionInputSchema>;
 export type EnqueueSessionsInput = z.infer<typeof enqueueSessionsInputSchema>;
 export type Job = z.infer<typeof jobSchema>;
 export type SessionSummary = z.infer<typeof sessionSchema>;
+export type SchedulerSettings = z.infer<typeof schedulerSettingsSchema>;

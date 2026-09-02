@@ -79,24 +79,38 @@ describe("server contracts", () => {
     ).toBe(false);
   });
 
+  it("accepts paused jobs with queue controls", () => {
+    expect(
+      jobSchema.parse({
+        id: crypto.randomUUID(),
+        url: "https://example.com/photos.zip",
+        status: "paused",
+        phase: "paused",
+        percent: 40,
+        canPause: true,
+        queuePosition: 2,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }),
+    ).toMatchObject({ status: "paused", canPause: true, queuePosition: 2 });
+  });
+
   it("exports oRPC contract procedures backed by the schemas", () => {
     expect(serverContract.sessions.create["~orpc"]).toBeDefined();
   });
 
   it("accepts batches of one to fifty public URLs", () => {
-    const urls = Array.from(
-      { length: 50 },
-      (_, index) => `https://example.com/archive-${String(index)}.zip`,
-    );
-    expect(enqueueSessionsInputSchema.parse({ urls }).urls).toHaveLength(50);
+    const items = Array.from({ length: 50 }, (_, index) => ({
+      url: `https://example.com/archive-${String(index)}.zip`,
+      downloadOptions: { transport: { threads: (index % 8) + 1 } },
+    }));
+    expect(enqueueSessionsInputSchema.parse({ items }).items).toHaveLength(50);
   });
 
-  it.each([[], Array.from({ length: 51 }, () => "https://example.com/a.zip")])(
-    "rejects a batch outside the supported bounds",
-    (urls) => {
-      expect(enqueueSessionsInputSchema.safeParse({ urls }).success).toBe(
-        false,
-      );
-    },
-  );
+  it.each([
+    [],
+    Array.from({ length: 51 }, () => ({ url: "https://example.com/a.zip" })),
+  ])("rejects a batch outside the supported bounds", (items) => {
+    expect(enqueueSessionsInputSchema.safeParse({ items }).success).toBe(false);
+  });
 });

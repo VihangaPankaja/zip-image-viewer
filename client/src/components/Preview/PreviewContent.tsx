@@ -60,6 +60,19 @@ function PreviewHeader({
           >
             Open explorer
           </button>
+          {selectedKind !== "binary" && selectedKind !== "directory" ? (
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={(event) =>
+                void event.currentTarget
+                  .closest<HTMLElement>(".preview-panel")
+                  ?.requestFullscreen?.()
+              }
+            >
+              Maximize preview
+            </button>
+          ) : null}
           {selectedKind === "image" ? (
             <button
               className="ghost-button"

@@ -4,26 +4,23 @@ import { describe, expect, it, vi } from "vitest";
 import { WorkspaceAppBar } from "./WorkspaceAppBar";
 
 describe("WorkspaceAppBar", () => {
-  it("submits a newline-separated batch and reports its parsed count", async () => {
-    const onSubmit = vi.fn();
+  it("switches workspace views and opens the download composer", async () => {
+    const onSelectView = vi.fn();
+    const onAddDownloads = vi.fn();
     const user = userEvent.setup();
     render(
       <WorkspaceAppBar
-        isLoading={false}
+        activeView="downloads"
+        onAddDownloads={onAddDownloads}
         onOpenSettings={vi.fn()}
-        onSubmit={onSubmit}
-        setUrl={vi.fn()}
-        url={"https://example.com/a.zip\nhttps://example.com/b.zip"}
+        onSelectView={onSelectView}
       />,
     );
 
-    expect(
-      screen.getByText("2 of 50 URLs ready to queue."),
-    ).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Add to queue" }));
-    expect(onSubmit).toHaveBeenCalledWith([
-      "https://example.com/a.zip",
-      "https://example.com/b.zip",
-    ]);
+    await user.click(screen.getByRole("tab", { name: "Explore" }));
+    await user.click(screen.getByRole("button", { name: "Add downloads" }));
+
+    expect(onSelectView).toHaveBeenCalledWith("explore");
+    expect(onAddDownloads).toHaveBeenCalledOnce();
   });
 });

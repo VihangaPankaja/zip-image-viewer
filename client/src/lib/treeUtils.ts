@@ -116,6 +116,7 @@ export function cloneAndSortTree(node: TreeNode, sortMode: string): TreeNode {
 export function flattenTree(tree: TreeNode) {
   const nodesByPath = new Map<string, TreeNode>();
   const folderImages = new Map<string, string[]>();
+  const folderPreviewables = new Map<string, string[]>();
   const folderPreview = new Map<string, string>();
 
   function walk(node: TreeNode) {
@@ -129,13 +130,22 @@ export function flattenTree(tree: TreeNode) {
         node.path,
         imageChildren.map((child) => child.path),
       );
+      folderPreviewables.set(
+        node.path,
+        directoryChildren
+          .filter((child) => {
+            const kind = classifyNodeKind(child);
+            return kind !== "directory" && kind !== "binary";
+          })
+          .map((child) => child.path),
+      );
       folderPreview.set(node.path, imageChildren[0]?.path || "");
       directoryChildren.forEach(walk);
     }
   }
 
   walk(tree);
-  return { nodesByPath, folderImages, folderPreview };
+  return { nodesByPath, folderImages, folderPreviewables, folderPreview };
 }
 
 export function getFirstFilePath(node: TreeNode | null | undefined): string {
