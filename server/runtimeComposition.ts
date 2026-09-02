@@ -27,6 +27,7 @@ import { registerSessionRoutes } from "./handlers/sessions.js";
 import { registerVideoRoutes } from "./handlers/videoRoutes.js";
 import { registerFileRoutes } from "./handlers/fileRoutes.js";
 import { createSessionJobQueue } from "./application/jobs/sessionJobQueue.js";
+import { createWebTorrentAdapter } from "./application/torrents/torrentDownloader.js";
 import { createProcessSessionJob } from "./application/jobs/processSessionJob.js";
 import { createJobManager } from "./application/jobs/jobManager.js";
 import { createSessionManager } from "./application/sessions/sessionManager.js";
@@ -97,6 +98,7 @@ const {
 
 const { createJob, sanitizeJob, closeJob, emitJob, cleanupJob } =
   createJobManager(jobStore, logEvent);
+const torrentAdapter = createWebTorrentAdapter();
 const processSessionJob = createProcessSessionJob({
   sessionStore,
   emitJob,
@@ -106,6 +108,7 @@ const processSessionJob = createProcessSessionJob({
   extractWith7zip,
   listExtractedEntries,
   logEvent,
+  torrentAdapter,
 });
 
 const sessionJobQueue = createSessionJobQueue({
@@ -262,6 +265,7 @@ registerRuntimeLifecycle({
   removeSession,
   cleanupJob,
   logEvent,
+  shutdownServices: [() => torrentAdapter.close()],
 });
 
 registerBaseRoutes(app, {

@@ -126,4 +126,42 @@ describe("DownloadDialog", () => {
       screen.getByRole("button", { name: "Add 2 downloads" }),
     ).toBeDisabled();
   });
+
+  it("accepts a magnet and exposes its transport override", async () => {
+    const onSubmit = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <DownloadDialog
+        defaultOptions={{
+          transport: {
+            mode: "auto",
+            threads: 2,
+            multithread: true,
+            resume: true,
+          },
+          retry: { maxRetries: 3, timeoutMs: 30_000 },
+          media: { videoQuality: "720p" },
+          extraction: { enabled: true },
+          request: { headers: {} },
+        }}
+        open
+        onClose={vi.fn()}
+        onSubmit={onSubmit}
+      />,
+    );
+    const magnet =
+      "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567";
+    await user.type(
+      screen.getByRole("textbox", { name: "Paste download URLs" }),
+      magnet,
+    );
+    await user.click(screen.getByRole("button", { name: "Review links" }));
+    await user.click(screen.getByText("Per-download settings"));
+    await user.selectOptions(screen.getByLabelText("Source type"), "torrent");
+    await user.click(screen.getByRole("button", { name: "Add 1 downloads" }));
+
+    expect(onSubmit).toHaveBeenCalledWith([
+      expect.objectContaining({ url: magnet, sourcePreference: "torrent" }),
+    ]);
+  });
 });

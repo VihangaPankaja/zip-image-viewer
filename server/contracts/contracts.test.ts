@@ -107,6 +107,19 @@ describe("server contracts", () => {
     expect(enqueueSessionsInputSchema.parse({ items }).items).toHaveLength(50);
   });
 
+  it("accepts valid magnets and rejects malformed info hashes", () => {
+    const valid =
+      "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567";
+    expect(
+      enqueueSessionsInputSchema.parse({ items: [{ url: valid }] }).items[0],
+    ).toMatchObject({ url: valid, sourcePreference: "auto" });
+    expect(
+      enqueueSessionsInputSchema.safeParse({
+        items: [{ url: "magnet:?xt=urn:btih:nope" }],
+      }).success,
+    ).toBe(false);
+  });
+
   it.each([
     [],
     Array.from({ length: 51 }, () => ({ url: "https://example.com/a.zip" })),

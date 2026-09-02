@@ -11,6 +11,10 @@ import {
   normalizeDownloadSettings,
 } from "../downloads/downloadOptions.js";
 import { isTerminalJobStatus } from "../../infrastructure/runtime/runtimePrimitives.js";
+import {
+  detectSourceKind,
+  type SourcePreference,
+} from "../torrents/torrentSource.js";
 
 type LogEvent = (
   _level: "info" | "warn" | "error",
@@ -27,12 +31,15 @@ class JobManager {
   createJob = (
     url: string,
     downloadOptions: unknown = DEFAULT_DOWNLOAD_OPTIONS,
+    sourcePreference: SourcePreference = "auto",
   ): SessionJob => {
     const defaults = normalizeDownloadSettings(DEFAULT_DOWNLOAD_SETTINGS);
     const now = Date.now();
     const job: SessionJob = {
       id: crypto.randomUUID(),
       url,
+      sourceKind: detectSourceKind(url, sourcePreference),
+      sourcePreference,
       status: "queued",
       phase: "queued",
       downloadedBytes: 0,
@@ -53,6 +60,10 @@ class JobManager {
       pauseRequested: false,
       threadMode: defaults.threadMode,
       threadCount: defaults.threadCount,
+      peerCount: 0,
+      verifiedBytes: 0,
+      uploadedBytes: 0,
+      uploadSpeedBytesPerSec: 0,
       enableMultithread: defaults.enableMultithread,
       enableResume: defaults.enableResume,
       message: "Waiting to start",
@@ -81,6 +92,8 @@ class JobManager {
     return {
       id: job.id,
       url: job.url,
+      sourceKind: job.sourceKind,
+      sourcePreference: job.sourcePreference,
       status: job.status,
       phase: job.phase,
       downloadedBytes: job.downloadedBytes,
@@ -100,6 +113,10 @@ class JobManager {
       queuePosition: job.queuePosition,
       threadMode: job.threadMode,
       threadCount: job.threadCount,
+      peerCount: job.peerCount,
+      verifiedBytes: job.verifiedBytes,
+      uploadedBytes: job.uploadedBytes,
+      uploadSpeedBytesPerSec: job.uploadSpeedBytesPerSec,
       enableMultithread: job.enableMultithread,
       enableResume: job.enableResume,
       message: job.message,

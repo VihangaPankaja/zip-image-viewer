@@ -14,7 +14,9 @@ export type JobStatus =
 
 export type JobPhase =
   | "queued"
+  | "resolving"
   | "downloading"
+  | "indexing"
   | "extracting"
   | "confirm"
   | "paused"
@@ -67,6 +69,8 @@ export type DownloadOptions = {
 export type SessionJob = {
   id: string;
   url: string;
+  sourceKind: "http" | "torrent";
+  sourcePreference: "auto" | "http" | "torrent";
   status: JobStatus;
   phase: JobPhase;
   percent: number | null;
@@ -87,6 +91,10 @@ export type SessionJob = {
   pauseRequested: boolean;
   threadMode: ThreadMode;
   threadCount: number;
+  peerCount: number;
+  verifiedBytes: number;
+  uploadedBytes: number;
+  uploadSpeedBytesPerSec: number;
   enableMultithread: boolean;
   enableResume: boolean;
   message: string;

@@ -48,6 +48,22 @@ const publicHttpUrlSchema = z
     }
   });
 
+const magnetUrlSchema = z
+  .string()
+  .max(8_192)
+  .refine((value) => {
+    if (!value.startsWith("magnet:") || !URL.canParse(value)) return false;
+    return new URL(value).searchParams
+      .getAll("xt")
+      .some((item) => /^urn:btih:(?:[a-f\d]{40}|[a-z2-7]{32})$/i.test(item));
+  }, "A valid BitTorrent magnet link is required.");
+
+export const downloadSourceSchema = z.union([
+  publicHttpUrlSchema,
+  magnetUrlSchema,
+]);
+export const sourcePreferenceSchema = z.enum(["auto", "http", "torrent"]);
+
 const safeRelativePathSchema = z
   .string()
   .min(1)
@@ -74,7 +90,9 @@ const jobStatusSchema = z.enum([
 
 const jobPhaseSchema = z.enum([
   "queued",
+  "resolving",
   "downloading",
+  "indexing",
   "extracting",
   "confirm",
   "paused",
@@ -85,7 +103,9 @@ const jobPhaseSchema = z.enum([
 
 export const jobSchema = z.object({
   id: z.uuid(),
-  url: publicHttpUrlSchema,
+  url: downloadSourceSchema,
+  sourceKind: z.enum(["http", "torrent"]).default("http"),
+  sourcePreference: sourcePreferenceSchema.default("auto"),
   status: jobStatusSchema,
   phase: jobPhaseSchema,
   percent: z.number().min(0).max(100).nullable(),
@@ -101,6 +121,10 @@ export const jobSchema = z.object({
   queuePosition: z.number().int().nonnegative().default(0),
   threadMode: z.enum(["single", "segmented", "auto"]).default("auto"),
   threadCount: z.number().int().min(1).max(8).default(1),
+  peerCount: z.number().int().nonnegative().default(0),
+  verifiedBytes: z.number().nonnegative().default(0),
+  uploadedBytes: z.number().nonnegative().default(0),
+  uploadSpeedBytesPerSec: z.number().nonnegative().default(0),
   message: z.string().default(""),
   error: z.string().default(""),
   sessionId: z.uuid().or(z.literal("")).default(""),
@@ -127,7 +151,8 @@ export const enqueueSessionsInputSchema = z.object({
   items: z
     .array(
       z.object({
-        url: publicHttpUrlSchema,
+        url: downloadSourceSchema,
+        sourcePreference: sourcePreferenceSchema.default("auto"),
         downloadOptions: z.unknown().optional(),
       }),
     )

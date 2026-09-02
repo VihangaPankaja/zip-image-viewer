@@ -10,7 +10,11 @@ type Dependencies = {
   jobs: Map<string, SessionJob>;
   sessions: Map<string, Session>;
   sanitizeJob: (_job: SessionJob) => Job;
-  createJob: (_url: string, _options: unknown) => SessionJob;
+  createJob: (
+    _url: string,
+    _options: unknown,
+    _sourcePreference?: "auto" | "http" | "torrent",
+  ) => SessionJob;
   enqueueJob: (_job: SessionJob, _confirmOversize: boolean) => void;
   listOrderedJobs: () => readonly SessionJob[];
   pauseJob: (_id: string) => Promise<SessionJob>;
@@ -60,8 +64,8 @@ export function createRuntimeApp(deps: Dependencies) {
         return deps.sanitizeJob(job);
       },
       enqueueJobs: (input) =>
-        input.items.map(({ url, downloadOptions }) => {
-          const job = deps.createJob(url, downloadOptions);
+        input.items.map(({ url, downloadOptions, sourcePreference }) => {
+          const job = deps.createJob(url, downloadOptions, sourcePreference);
           deps.enqueueJob(job, input.confirmOversize);
           return deps.sanitizeJob(job);
         }),
@@ -101,7 +105,11 @@ export function createRuntimeApp(deps: Dependencies) {
             409,
           );
         }
-        const job = deps.createJob(previous.url, previous.downloadOptions);
+        const job = deps.createJob(
+          previous.url,
+          previous.downloadOptions,
+          previous.sourcePreference,
+        );
         deps.enqueueJob(job, false);
         return deps.sanitizeJob(job);
       },

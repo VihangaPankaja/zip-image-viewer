@@ -196,9 +196,26 @@ export function DownloadManager(props: DownloadManagerProps) {
                   <div>
                     <dt>Threads</dt>
                     <dd>
-                      {job.threadMode} · {job.threadCount}
+                      {job.sourceKind === "torrent"
+                        ? "Torrent"
+                        : `${job.threadMode} · ${String(job.threadCount)}`}
                     </dd>
                   </div>
+                  {job.sourceKind === "torrent" ? (
+                    <div>
+                      <dt>Peers</dt>
+                      <dd>{job.peerCount}</dd>
+                    </div>
+                  ) : null}
+                  {job.sourceKind === "torrent" ? (
+                    <div>
+                      <dt>Uploaded</dt>
+                      <dd>
+                        {formatTransferBytes(job.uploadedBytes)} ·{" "}
+                        {formatSpeed(job.uploadSpeedBytesPerSec)}
+                      </dd>
+                    </div>
+                  ) : null}
                 </dl>
                 <code>{job.url}</code>
               </div>
@@ -211,7 +228,11 @@ export function DownloadManager(props: DownloadManagerProps) {
   );
 }
 
-type DownloadItem = { url: string; downloadOptions: DownloadOptions };
+type DownloadItem = {
+  url: string;
+  downloadOptions: DownloadOptions;
+  sourcePreference: "auto" | "http" | "torrent";
+};
 type DownloadDraft = DownloadItem & { id: string };
 type DownloadDialogProps = {
   defaultOptions: DownloadOptions;
@@ -234,16 +255,30 @@ function parseDrafts(
       id: `download-${String(startId + index)}`,
       url,
       downloadOptions: structuredClone(options),
+      sourcePreference: "auto",
     }));
 }
 
 function validHttpUrl(value: string): boolean {
+  if (value.startsWith("magnet:")) {
+    if (!URL.canParse(value)) return false;
+    return new URL(value).searchParams
+      .getAll("xt")
+      .some((item) => /^urn:btih:(?:[a-f\d]{40}|[a-z2-7]{32})$/i.test(item));
+  }
   try {
     const url = new URL(value);
     return url.protocol === "http:" || url.protocol === "https:";
   } catch {
     return false;
   }
+}
+
+function validDraft(draft: DownloadDraft): boolean {
+  return (
+    validHttpUrl(draft.url) &&
+    !(draft.url.startsWith("magnet:") && draft.sourcePreference === "http")
+  );
 }
 
 export function DownloadDialog({
@@ -260,7 +295,7 @@ export function DownloadDialog({
   drafts.forEach(({ url }) =>
     urlCounts.set(url, (urlCounts.get(url) ?? 0) + 1),
   );
-  const invalidCount = drafts.filter(({ url }) => !validHttpUrl(url)).length;
+  const invalidCount = drafts.filter((draft) => !validDraft(draft)).length;
   const duplicateCount = drafts.filter(
     ({ url }) => (urlCounts.get(url) ?? 0) > 1,
   ).length;
@@ -279,9 +314,10 @@ export function DownloadDialog({
           event.preventDefault();
           if (!invalidCount && !duplicateCount && drafts.length)
             onSubmit(
-              drafts.map(({ url, downloadOptions }) => ({
+              drafts.map(({ url, downloadOptions, sourcePreference }) => ({
                 url,
                 downloadOptions,
+                sourcePreference,
               })),
             );
         }}
@@ -327,7 +363,7 @@ export function DownloadDialog({
           {drafts.map((draft, index) => (
             <article
               className={
-                validHttpUrl(draft.url) && (urlCounts.get(draft.url) ?? 0) === 1
+                validDraft(draft) && (urlCounts.get(draft.url) ?? 0) === 1
                   ? "download-draft"
                   : "download-draft invalid"
               }
@@ -341,23 +377,45 @@ export function DownloadDialog({
                 <input
                   value={draft.url}
                   aria-invalid={
-                    !validHttpUrl(draft.url) ||
-                    (urlCounts.get(draft.url) ?? 0) > 1
+                    !validDraft(draft) || (urlCounts.get(draft.url) ?? 0) > 1
                   }
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    const url = event.currentTarget.value;
                     setDrafts((current) =>
                       current.map((item) =>
-                        item.id === draft.id
-                          ? { ...item, url: event.currentTarget.value }
-                          : item,
+                        item.id === draft.id ? { ...item, url } : item,
                       ),
-                    )
-                  }
+                    );
+                  }}
                 />
               </label>
               <details>
                 <summary>Per-download settings</summary>
                 <div className="draft-settings">
+                  <label>
+                    <span>Source type</span>
+                    <select
+                      value={draft.sourcePreference}
+                      onChange={(event) => {
+                        const sourcePreference = event.currentTarget
+                          .value as DownloadItem["sourcePreference"];
+                        setDrafts((current) =>
+                          current.map((item) =>
+                            item.id === draft.id
+                              ? {
+                                  ...item,
+                                  sourcePreference,
+                                }
+                              : item,
+                          ),
+                        );
+                      }}
+                    >
+                      <option value="auto">Auto detect</option>
+                      <option value="http">HTTP Direct</option>
+                      <option value="torrent">Torrent</option>
+                    </select>
+                  </label>
                   <label>
                     <span>Threads</span>
                     <input
@@ -365,7 +423,8 @@ export function DownloadDialog({
                       min="1"
                       max="8"
                       value={draft.downloadOptions.transport.threads}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        const threads = Number(event.currentTarget.value);
                         setDrafts((current) =>
                           current.map((item) =>
                             item.id === draft.id
@@ -375,16 +434,14 @@ export function DownloadDialog({
                                     ...item.downloadOptions,
                                     transport: {
                                       ...item.downloadOptions.transport,
-                                      threads: Number(
-                                        event.currentTarget.value,
-                                      ),
+                                      threads,
                                     },
                                   },
                                 }
                               : item,
                           ),
-                        )
-                      }
+                        );
+                      }}
                     />
                   </label>
                   <label>
@@ -394,7 +451,8 @@ export function DownloadDialog({
                       min="0"
                       max="8"
                       value={draft.downloadOptions.retry.maxRetries}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        const maxRetries = Number(event.currentTarget.value);
                         setDrafts((current) =>
                           current.map((item) =>
                             item.id === draft.id
@@ -404,16 +462,14 @@ export function DownloadDialog({
                                     ...item.downloadOptions,
                                     retry: {
                                       ...item.downloadOptions.retry,
-                                      maxRetries: Number(
-                                        event.currentTarget.value,
-                                      ),
+                                      maxRetries,
                                     },
                                   },
                                 }
                               : item,
                           ),
-                        )
-                      }
+                        );
+                      }}
                     />
                   </label>
                 </div>
