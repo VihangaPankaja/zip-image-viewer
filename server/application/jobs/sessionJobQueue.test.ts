@@ -331,6 +331,9 @@ describe("createSessionJobQueue", () => {
     queue.enqueueSessionJob(first, false);
     queue.enqueueSessionJob(second, false);
 
+    expect(() => queue.removeSessionJob(second.id)).toThrow(
+      "Only completed jobs can be removed.",
+    );
     expect(queue.cancelSessionJob(second.id).status).toBe("cancelled");
     release?.();
     await vi.waitFor(() =>
