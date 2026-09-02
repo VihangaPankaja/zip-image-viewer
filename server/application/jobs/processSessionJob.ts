@@ -17,8 +17,11 @@ import {
   type DownloadSourceDependencies,
 } from "./downloadSessionSource.js";
 import { extractSessionSource } from "./extractSessionSource.js";
+import { downloadTorrentSource } from "../torrents/downloadTorrentSource.js";
+import type { TorrentAdapter } from "../torrents/torrentDownloader.js";
 
 type ProcessorDependencies = DownloadSourceDependencies & {
+  torrentAdapter: TorrentAdapter;
   sessionStore: Map<string, Session>;
   detectEncryption: (_archivePath: string) => Promise<boolean>;
   extractWith7zip: (_archivePath: string, _extractDir: string) => Promise<void>;
@@ -59,10 +62,10 @@ function configureJob(
 function createSession(
   workspaceDir: string,
   extractDir: string,
-  sourceUrl: URL,
+  sourceName: string,
   entries: Awaited<ReturnType<typeof extractSessionSource>>,
 ): Session {
-  const archiveName = path.basename(sourceUrl.pathname) || "download";
+  const archiveName = path.basename(sourceName) || "download";
   const rootName =
     archiveName.replace(/\.(zip|rar|7z|tar|gz|tgz)$/i, "") || archiveName;
   const { tree, firstFilePath, stats } = buildTree(entries, rootName);
@@ -87,6 +90,67 @@ function createSession(
     },
     lastAccessedAt: Date.now(),
   };
+}
+
+const ARCHIVE_EXTENSION = /\.(zip|rar|7z|tar|gz|tgz)$/i;
+
+function torrentDisplayName(source: string): string {
+  if (!source.startsWith("magnet:")) return new URL(source).pathname;
+  return new URL(source).searchParams.get("dn") || "torrent";
+}
+
+async function prepareTorrentEntries(
+  job: SessionJob,
+  torrentDir: string,
+  extractDir: string,
+  deps: ProcessorDependencies,
+) {
+  const entries = await deps.listExtractedEntries(torrentDir);
+  const files = entries.filter(({ type }) => type === "file");
+  if (
+    files.length === 1 &&
+    ARCHIVE_EXTENSION.test(files[0]?.relativePath ?? "")
+  ) {
+    return {
+      entries: await extractSessionSource(
+        job,
+        path.join(torrentDir, files[0]?.relativePath ?? ""),
+        extractDir,
+        deps,
+      ),
+      sessionDir: extractDir,
+    };
+  }
+  return { entries, sessionDir: torrentDir };
+}
+
+function completeSession(
+  job: SessionJob,
+  session: Session,
+  message: string,
+  deps: ProcessorDependencies,
+): void {
+  deps.sessionStore.set(session.id, session);
+  Object.assign(job, { workspaceDir: "", extractDir: "", zipPath: "" });
+  deps.emitJob(
+    job,
+    {
+      status: "ready",
+      phase: "ready",
+      sessionId: session.id,
+      percent: 100,
+      message,
+      requiresConfirmation: false,
+      canPause: false,
+    },
+    "ready",
+  );
+  deps.closeJob(job, "ready");
+  deps.logEvent("info", "session.create.complete", {
+    jobId: job.id,
+    sessionId: session.id,
+    fileCount: session.stats.fileCount,
+  });
 }
 
 function emitFailure(
@@ -126,17 +190,21 @@ export function createProcessSessionJob(deps: ProcessorDependencies) {
     job: SessionJob,
     confirmOversize = false,
   ): Promise<void> {
-    const sourceUrl = parseSourceUrl(job.url);
     const workspaceDir =
       job.workspaceDir ||
       (await mkdtemp(path.join(os.tmpdir(), "zip-image-viewer-")));
+    const sourceUrl =
+      job.sourceKind === "http" ? parseSourceUrl(job.url) : null;
     const zipPath =
       job.zipPath ||
-      path.join(
-        workspaceDir,
-        path.basename(sourceUrl.pathname) || "download.bin",
-      );
+      (sourceUrl
+        ? path.join(
+            workspaceDir,
+            path.basename(sourceUrl.pathname) || "download.bin",
+          )
+        : "");
     const extractDir = job.extractDir || path.join(workspaceDir, "extracted");
+    const torrentDir = path.join(workspaceDir, "torrent");
     await mkdir(extractDir, { recursive: true });
     Object.assign(job, {
       workspaceDir,
@@ -147,6 +215,33 @@ export function createProcessSessionJob(deps: ProcessorDependencies) {
     });
     const settings = configureJob(job);
     try {
+      if (job.sourceKind === "torrent") {
+        await mkdir(torrentDir, { recursive: true });
+        const result = await downloadTorrentSource(
+          job,
+          settings,
+          { downloadDir: torrentDir, confirmOversize },
+          { adapter: deps.torrentAdapter, emitJob: deps.emitJob },
+        );
+        if (result === "paused") {
+          deps.closeJob(job, "awaiting_confirmation");
+          return;
+        }
+        const prepared = await prepareTorrentEntries(
+          job,
+          torrentDir,
+          extractDir,
+          deps,
+        );
+        const session = createSession(
+          workspaceDir,
+          prepared.sessionDir,
+          torrentDisplayName(job.url),
+          prepared.entries,
+        );
+        completeSession(job, session, "Torrent is ready to browse.", deps);
+        return;
+      }
       const downloadResult = await downloadSessionSource(
         job,
         settings,
@@ -168,30 +263,10 @@ export function createProcessSessionJob(deps: ProcessorDependencies) {
       const session = createSession(
         workspaceDir,
         extractDir,
-        sourceUrl,
+        sourceUrl?.pathname || "download",
         entries,
       );
-      deps.sessionStore.set(session.id, session);
-      Object.assign(job, { workspaceDir: "", extractDir: "", zipPath: "" });
-      deps.emitJob(
-        job,
-        {
-          status: "ready",
-          phase: "ready",
-          sessionId: session.id,
-          percent: 100,
-          message: "Archive is ready to browse.",
-          requiresConfirmation: false,
-          canPause: false,
-        },
-        "ready",
-      );
-      deps.closeJob(job, "ready");
-      deps.logEvent("info", "session.create.complete", {
-        jobId: job.id,
-        sessionId: session.id,
-        fileCount: session.stats.fileCount,
-      });
+      completeSession(job, session, "Archive is ready to browse.", deps);
     } catch (error) {
       const jobError = errorFromUnknown(error);
       const paused =

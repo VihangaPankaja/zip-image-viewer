@@ -52,7 +52,11 @@ export function useWorkspaceQueue() {
   return {
     cancel: (id: string) => control(cancelMutation.mutateAsync({ id })),
     enqueue: (
-      items: readonly { url: string; downloadOptions: DownloadOptions }[],
+      items: readonly {
+        url: string;
+        downloadOptions: DownloadOptions;
+        sourcePreference: "auto" | "http" | "torrent";
+      }[],
     ) => control(enqueueMutation.mutateAsync({ items: [...items] })),
     isEnqueueing: enqueueMutation.isPending,
     jobs: jobsQuery.data?.items ?? ([] as Job[]),

@@ -16,6 +16,7 @@ type Dependencies = {
   getServer: () => Server | undefined;
   removeSession: (_id: string, _reason: string) => Promise<void>;
   cleanupJob: (_id: string, _reason: string) => Promise<void>;
+  shutdownServices?: Array<() => Promise<void>>;
   logEvent: LogEvent;
 };
 
@@ -72,6 +73,7 @@ export function registerRuntimeLifecycle(deps: Dependencies): void {
     await Promise.all(
       [...deps.jobs.keys()].map((id) => deps.cleanupJob(id, "shutdown")),
     );
+    await Promise.all((deps.shutdownServices ?? []).map((close) => close()));
     deps.logEvent("info", "shutdown.complete");
     process.exit(0);
   }
