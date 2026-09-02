@@ -1,23 +1,72 @@
 import path from "node:path";
 
-export function logEvent(
-  level: "info" | "warn" | "error",
-  event: string,
-  details: Record<string, unknown> = {},
-) {
+export type LogLevel = "info" | "warn" | "error";
+export type LogEntry = {
+  timestamp: number;
+  level: LogLevel;
+  event: string;
+  details: Record<string, unknown>;
+  jobId: string;
+  sessionId: string;
+};
+
+const LOG_LIMIT = 1_000;
+const logEntries: LogEntry[] = [];
+const logSubscribers = new Set<(_entry: LogEntry) => void>();
+let plainLoggingEnabled = true;
+
+function detailId(details: Record<string, unknown>, key: string): string {
+  const value = details[key];
+  return typeof value === "string" ? value : "";
+}
+
+function writeLogLine(entry: LogEntry): void {
   const logger =
-    level === "error"
+    entry.level === "error"
       ? console.error
-      : level === "warn"
+      : entry.level === "warn"
         ? console.warn
         : console.log;
-  const payload = Object.keys(details).length
-    ? ` ${JSON.stringify(details)}`
+  const payload = Object.keys(entry.details).length
+    ? ` ${JSON.stringify(entry.details)}`
     : "";
-
   logger(
-    `[${new Date().toISOString()}] [${level.toUpperCase()}] ${event}${payload}`,
+    `[${new Date(entry.timestamp).toISOString()}] [${entry.level.toUpperCase()}] ${entry.event}${payload}`,
   );
+}
+
+export function logEvent(
+  level: LogLevel,
+  event: string,
+  details: Record<string, unknown> = {},
+): void {
+  const entry = {
+    timestamp: Date.now(),
+    level,
+    event,
+    details,
+    jobId: detailId(details, "jobId"),
+    sessionId: detailId(details, "sessionId"),
+  } satisfies LogEntry;
+  logEntries.push(entry);
+  if (logEntries.length > LOG_LIMIT) logEntries.shift();
+  if (plainLoggingEnabled) writeLogLine(entry);
+  for (const subscriber of logSubscribers) subscriber(entry);
+}
+
+export function getLogEntries(): readonly LogEntry[] {
+  return [...logEntries];
+}
+
+export function subscribeLogEvents(
+  subscriber: (_entry: LogEntry) => void,
+): () => void {
+  logSubscribers.add(subscriber);
+  return () => logSubscribers.delete(subscriber);
+}
+
+export function setPlainLoggingEnabled(enabled: boolean): void {
+  plainLoggingEnabled = enabled;
 }
 
 export function formatBytes(bytes: number) {

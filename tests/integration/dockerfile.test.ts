@@ -7,4 +7,13 @@ describe("Docker runtime image", () => {
 
     expect(dockerfile).toContain("COPY --from=build /app/build ./build");
   });
+
+  it("requires detached containers to retain plain startup logs", async () => {
+    const workflow = await readFile(
+      ".github/workflows/docker-build.yml",
+      "utf8",
+    );
+
+    expect(workflow).toContain("[INFO] server.started");
+  });
 });

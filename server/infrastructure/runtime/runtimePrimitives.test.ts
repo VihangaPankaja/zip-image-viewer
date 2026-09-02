@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   formatBytes,
+  getLogEntries,
   isTerminalJobStatus,
   logEvent,
   parseRangeHeader,
   sanitizeEntryPath,
+  setPlainLoggingEnabled,
+  subscribeLogEvents,
 } from "./runtimePrimitives.js";
 
 describe("runtime primitives", () => {
@@ -47,5 +50,40 @@ describe("runtime primitives", () => {
       expect.stringContaining('[WARN] fixture {"jobId":"job-1"}'),
     );
     warn.mockRestore();
+  });
+
+  it("publishes tagged events to subscribers and the bounded ring", () => {
+    const subscriber = vi.fn();
+    const unsubscribe = subscribeLogEvents(subscriber);
+
+    logEvent("info", "download.progress", {
+      jobId: "job-1",
+      sessionId: "session-1",
+    });
+    unsubscribe();
+
+    expect(subscriber).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "download.progress",
+        jobId: "job-1",
+        sessionId: "session-1",
+      }),
+    );
+    expect(getLogEntries().at(-1)).toMatchObject({
+      event: "download.progress",
+      jobId: "job-1",
+      sessionId: "session-1",
+    });
+  });
+
+  it("keeps only the latest one thousand structured log entries", () => {
+    setPlainLoggingEnabled(false);
+    for (let index = 0; index < 1_005; index += 1) {
+      logEvent("info", `ring-${String(index)}`);
+    }
+    setPlainLoggingEnabled(true);
+
+    expect(getLogEntries()).toHaveLength(1_000);
+    expect(getLogEntries()[0]?.event).toBe("ring-5");
   });
 });

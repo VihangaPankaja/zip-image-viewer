@@ -58,11 +58,8 @@ const magnetUrlSchema = z
       .some((item) => /^urn:btih:(?:[a-f\d]{40}|[a-z2-7]{32})$/i.test(item));
   }, "A valid BitTorrent magnet link is required.");
 
-export const downloadSourceSchema = z.union([
-  publicHttpUrlSchema,
-  magnetUrlSchema,
-]);
-export const sourcePreferenceSchema = z.enum(["auto", "http", "torrent"]);
+const downloadSourceSchema = z.union([publicHttpUrlSchema, magnetUrlSchema]);
+const sourcePreferenceSchema = z.enum(["auto", "http", "torrent"]);
 
 const safeRelativePathSchema = z
   .string()
