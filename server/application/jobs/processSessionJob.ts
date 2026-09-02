@@ -124,6 +124,35 @@ async function prepareTorrentEntries(
   return { entries, sessionDir: torrentDir };
 }
 
+function completeSession(
+  job: SessionJob,
+  session: Session,
+  message: string,
+  deps: ProcessorDependencies,
+): void {
+  deps.sessionStore.set(session.id, session);
+  Object.assign(job, { workspaceDir: "", extractDir: "", zipPath: "" });
+  deps.emitJob(
+    job,
+    {
+      status: "ready",
+      phase: "ready",
+      sessionId: session.id,
+      percent: 100,
+      message,
+      requiresConfirmation: false,
+      canPause: false,
+    },
+    "ready",
+  );
+  deps.closeJob(job, "ready");
+  deps.logEvent("info", "session.create.complete", {
+    jobId: job.id,
+    sessionId: session.id,
+    fileCount: session.stats.fileCount,
+  });
+}
+
 function emitFailure(
   job: SessionJob,
   error: Error,
@@ -210,27 +239,7 @@ export function createProcessSessionJob(deps: ProcessorDependencies) {
           torrentDisplayName(job.url),
           prepared.entries,
         );
-        deps.sessionStore.set(session.id, session);
-        Object.assign(job, { workspaceDir: "", extractDir: "", zipPath: "" });
-        deps.emitJob(
-          job,
-          {
-            status: "ready",
-            phase: "ready",
-            sessionId: session.id,
-            percent: 100,
-            message: "Torrent is ready to browse.",
-            requiresConfirmation: false,
-            canPause: false,
-          },
-          "ready",
-        );
-        deps.closeJob(job, "ready");
-        deps.logEvent("info", "session.create.complete", {
-          jobId: job.id,
-          sessionId: session.id,
-          fileCount: session.stats.fileCount,
-        });
+        completeSession(job, session, "Torrent is ready to browse.", deps);
         return;
       }
       const downloadResult = await downloadSessionSource(
@@ -257,27 +266,7 @@ export function createProcessSessionJob(deps: ProcessorDependencies) {
         sourceUrl?.pathname || "download",
         entries,
       );
-      deps.sessionStore.set(session.id, session);
-      Object.assign(job, { workspaceDir: "", extractDir: "", zipPath: "" });
-      deps.emitJob(
-        job,
-        {
-          status: "ready",
-          phase: "ready",
-          sessionId: session.id,
-          percent: 100,
-          message: "Archive is ready to browse.",
-          requiresConfirmation: false,
-          canPause: false,
-        },
-        "ready",
-      );
-      deps.closeJob(job, "ready");
-      deps.logEvent("info", "session.create.complete", {
-        jobId: job.id,
-        sessionId: session.id,
-        fileCount: session.stats.fileCount,
-      });
+      completeSession(job, session, "Archive is ready to browse.", deps);
     } catch (error) {
       const jobError = errorFromUnknown(error);
       const paused =
