@@ -64,7 +64,10 @@ jobs:
           trap 'docker logs "$container_id"; docker rm --force "$container_id"' EXIT
           for attempt in {1..30}; do
             status=$(docker inspect --format '{{.State.Health.Status}}' "$container_id")
-            if [ "$status" = healthy ]; then exit 0; fi
+            if [ "$status" = healthy ]; then
+              docker logs "$container_id" 2>&1 | grep --fixed-strings "[INFO] server.started"
+              exit 0
+            fi
             if [ "$status" = unhealthy ]; then exit 1; fi
             sleep 1
           done

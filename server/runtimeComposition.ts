@@ -21,7 +21,7 @@ import {
 import { createServerContainer } from "./bootstrap/container.js";
 import { createRuntimeApp } from "./bootstrap/createRuntimeApp.js";
 import { registerRuntimeLifecycle } from "./bootstrap/runtimeLifecycle.js";
-import type { Session } from "./domain/models.js";
+import type { Session, SessionJob } from "./domain/models.js";
 import { registerBaseRoutes } from "./bootstrap/registerRoutes.js";
 import { registerSessionRoutes } from "./handlers/sessions.js";
 import { registerVideoRoutes } from "./handlers/videoRoutes.js";
@@ -32,7 +32,17 @@ import { createProcessSessionJob } from "./application/jobs/processSessionJob.js
 import { createJobManager } from "./application/jobs/jobManager.js";
 import { createSessionManager } from "./application/sessions/sessionManager.js";
 import type { DownloadSettings } from "./application/downloads/downloadOptions.js";
-import { logEvent } from "./infrastructure/runtime/runtimePrimitives.js";
+import {
+  getLogEntries,
+  isTerminalJobStatus,
+  logEvent,
+  setPlainLoggingEnabled,
+  subscribeLogEvents,
+} from "./infrastructure/runtime/runtimePrimitives.js";
+import {
+  createTerminalDashboard,
+  shouldUseTerminalDashboard,
+} from "./tui/dashboard.js";
 import {
   VIDEO_EXTENSIONS,
   classifyMimeType,
@@ -137,6 +147,28 @@ const sessionJobQueue = createSessionJobQueue({
 });
 const { enqueueSessionJob } = sessionJobQueue;
 
+function cancelSessionJob(job: SessionJob) {
+  sessionJobQueue.cancelSessionJob(job.id);
+  closeJob(job, "cancelled");
+  emitJob(job, { phase: "cancelled", message: "Cancelled" }, "cancelled");
+  return job;
+}
+
+function retrySessionJob(previous: SessionJob) {
+  const job = createJob(
+    previous.url,
+    previous.downloadOptions,
+    previous.sourcePreference,
+  );
+  enqueueSessionJob(job, false);
+  return job;
+}
+
+async function removeSessionJob(jobId: string): Promise<void> {
+  sessionJobQueue.removeSessionJob(jobId);
+  await cleanupJob(jobId, "removed");
+}
+
 const app = createRuntimeApp({
   metrics: container.metrics,
   distDir,
@@ -148,15 +180,13 @@ const app = createRuntimeApp({
   listOrderedJobs: sessionJobQueue.getOrderedJobs,
   pauseJob: sessionJobQueue.pauseSessionJob,
   resumeJob: sessionJobQueue.resumeSessionJob,
-  cancelJob: sessionJobQueue.cancelSessionJob,
-  removeJob: sessionJobQueue.removeSessionJob,
+  cancelJob: cancelSessionJob,
+  retryJob: retrySessionJob,
+  removeJob: removeSessionJob,
   reorderJobs: sessionJobQueue.reorderSessionJobs,
   getSchedulerSettings: sessionJobQueue.getSchedulerState,
   updateSchedulerSettings: sessionJobQueue.setMaxActiveSessionJobs,
-  closeJob,
-  emitJob,
   removeSession: async (id, reason) => removeSession(id, reason),
-  cleanupJob,
 });
 
 app.use((req, res, next) => {
@@ -190,6 +220,44 @@ const { removeSession, touchSession } = createSessionManager(
   videoTranscodeStore,
   logEvent,
 );
+const dashboard = shouldUseTerminalDashboard({
+  inputTTY: process.stdin.isTTY,
+  outputTTY: process.stdout.isTTY,
+  nodeEnv: process.env.NODE_ENV,
+  lifecycleEvent: process.env.npm_lifecycle_event,
+})
+  ? createTerminalDashboard({
+      input: process.stdin,
+      output: process.stdout,
+      getJobs: sessionJobQueue.getOrderedJobs,
+      getSessions: () => [...sessionStore.values()],
+      getSchedulerState: sessionJobQueue.getSchedulerState,
+      getLogs: getLogEntries,
+      subscribeLogs: subscribeLogEvents,
+      setPlainLogging: setPlainLoggingEnabled,
+      actions: {
+        pause: sessionJobQueue.pauseSessionJob,
+        resume: sessionJobQueue.resumeSessionJob,
+        cancel: (id) => {
+          const job = jobStore.get(id);
+          if (!job || isTerminalJobStatus(job.status))
+            throw new Error("Job cannot be cancelled.");
+          cancelSessionJob(job);
+        },
+        retry: (id) => {
+          const job = jobStore.get(id);
+          if (!job || (job.status !== "error" && job.status !== "cancelled"))
+            throw new Error("Only failed or cancelled jobs can be retried.");
+          retrySessionJob(job);
+        },
+        removeJob: removeSessionJob,
+        removeSession: (id) => removeSession(id, "tui"),
+        reorder: sessionJobQueue.reorderSessionJobs,
+        setMaxConcurrent: sessionJobQueue.setMaxActiveSessionJobs,
+      },
+      interrupt: () => process.kill(process.pid, "SIGINT"),
+    })
+  : undefined;
 async function ensureThumbnail(
   session: Session,
   normalizedPath: string,
@@ -265,7 +333,13 @@ registerRuntimeLifecycle({
   removeSession,
   cleanupJob,
   logEvent,
-  shutdownServices: [() => torrentAdapter.close()],
+  shutdownServices: [
+    () => {
+      dashboard?.close();
+      return Promise.resolve();
+    },
+    () => torrentAdapter.close(),
+  ],
 });
 
 registerBaseRoutes(app, {
@@ -338,6 +412,8 @@ app.get(/.*/, (_req, res) => {
 
 server = createServer(app);
 attachJobWebSocketServer(server, { jobStore, sanitizeJob });
+
+dashboard?.start();
 
 server.listen(PORT, "0.0.0.0", () => {
   logEvent("info", "server.started", {

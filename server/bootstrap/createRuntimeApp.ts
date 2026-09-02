@@ -19,19 +19,13 @@ type Dependencies = {
   listOrderedJobs: () => readonly SessionJob[];
   pauseJob: (_id: string) => Promise<SessionJob>;
   resumeJob: (_id: string) => SessionJob;
-  cancelJob: (_id: string) => SessionJob;
-  removeJob: (_id: string) => SessionJob;
+  cancelJob: (_job: SessionJob) => SessionJob;
+  retryJob: (_job: SessionJob) => SessionJob;
+  removeJob: (_id: string) => Promise<void>;
   reorderJobs: (_ids: readonly string[]) => void;
   getSchedulerSettings: () => { activeCount: number; maxConcurrent: number };
   updateSchedulerSettings: (_value: number) => void;
   removeSession: (_id: string, _reason: string) => Promise<void>;
-  cleanupJob: (_id: string, _reason: string) => Promise<void>;
-  closeJob: (_job: SessionJob, _status: SessionJob["status"]) => void;
-  emitJob: (
-    _job: SessionJob,
-    _patch: Partial<SessionJob>,
-    _event?: string,
-  ) => void;
 };
 
 function summarizeSession(session: Session) {
@@ -85,14 +79,7 @@ export function createRuntimeApp(deps: Dependencies) {
             409,
           );
         }
-        deps.cancelJob(id);
-        deps.closeJob(job, "cancelled");
-        deps.emitJob(
-          job,
-          { phase: "cancelled", message: "Cancelled" },
-          "cancelled",
-        );
-        return deps.sanitizeJob(job);
+        return deps.sanitizeJob(deps.cancelJob(job));
       },
       retryJob: (id) => {
         const previous = deps.jobs.get(id);
@@ -105,20 +92,11 @@ export function createRuntimeApp(deps: Dependencies) {
             409,
           );
         }
-        const job = deps.createJob(
-          previous.url,
-          previous.downloadOptions,
-          previous.sourcePreference,
-        );
-        deps.enqueueJob(job, false);
-        return deps.sanitizeJob(job);
+        return deps.sanitizeJob(deps.retryJob(previous));
       },
       pauseJob: async (id) => deps.sanitizeJob(await deps.pauseJob(id)),
       resumeJob: (id) => deps.sanitizeJob(deps.resumeJob(id)),
-      removeJob: async (id) => {
-        deps.removeJob(id);
-        await deps.cleanupJob(id, "removed");
-      },
+      removeJob: deps.removeJob,
       reorderJobs: (ids) => {
         deps.reorderJobs(ids);
         return listJobs();
