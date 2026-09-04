@@ -1,4 +1,4 @@
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>();
