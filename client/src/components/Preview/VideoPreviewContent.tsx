@@ -17,7 +17,7 @@ function VideoPreviewToolbar(props: VideoPreviewDetailsProps) {
     <div className="preview-toolbar">
       <span>{props.formatBytes(props.selectedNode.size ?? 0)}</span>
       <span>
-        {String(props.selectedNode.extension || "video").toUpperCase()} stream
+        {(props.selectedNode.extension || "video").toUpperCase()} stream
       </span>
       <CustomDropdown
         id="video-quality"

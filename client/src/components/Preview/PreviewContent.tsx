@@ -67,7 +67,7 @@ function PreviewHeader({
               onClick={(event) =>
                 void event.currentTarget
                   .closest<HTMLElement>(".preview-panel")
-                  ?.requestFullscreen?.()
+                  ?.requestFullscreen()
               }
             >
               Maximize preview

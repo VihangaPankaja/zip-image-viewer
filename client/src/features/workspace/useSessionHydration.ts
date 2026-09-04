@@ -2,7 +2,7 @@ import {
   useCallback,
   useMemo,
   type Dispatch,
-  type MutableRefObject,
+  type RefObject,
   type SetStateAction,
 } from "react";
 import { wait } from "../../lib/archiveUiUtils";
@@ -15,11 +15,11 @@ import {
 type HydrationParams = {
   clearImagePreviewCache: () => void;
   clearTextPreviewCache: () => void;
-  hydrationRef: MutableRefObject<{
+  hydrationRef: RefObject<{
     sessionId: string;
     promise: Promise<SessionPayload | null> | null;
   }>;
-  latestSessionIdRef: MutableRefObject<string>;
+  latestSessionIdRef: RefObject<string>;
   resetSelectedImageSrc: () => void;
   resetTextPreview: () => void;
   setError: Dispatch<SetStateAction<string>>;

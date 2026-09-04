@@ -153,7 +153,7 @@ function toggleFullscreen(shell: HTMLDivElement | null): void {
     void document.exitFullscreen().catch(() => undefined);
     return;
   }
-  void shell?.requestFullscreen?.().catch(() => undefined);
+  void shell?.requestFullscreen().catch(() => undefined);
 }
 
 function handleImageShortcut(

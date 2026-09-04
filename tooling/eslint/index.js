@@ -24,7 +24,7 @@ export default [
     ],
   },
   js.configs.recommended,
-  ...tseslint.configs.recommendedTypeChecked,
+  ...tseslint.configs.strictTypeChecked,
   {
     files: [
       "*.config.ts",
@@ -44,8 +44,9 @@ export default [
     },
     plugins: { "react-hooks": reactHooks },
     rules: {
-      "@typescript-eslint/ban-ts-comment": "off",
       "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/no-confusing-void-expression": "off",
+      "@typescript-eslint/restrict-template-expressions": "off",
       "prefer-const": "off",
       "no-unused-vars": "off",
       "@typescript-eslint/no-unused-vars": [
@@ -60,20 +61,13 @@ export default [
     files: ["client/src/**/*.{ts,tsx}", "server/**/*.ts"],
     rules: {
       "max-lines": [
-        "warn",
+        "error",
         { max: 350, skipBlankLines: true, skipComments: true },
       ],
       "max-lines-per-function": [
-        "warn",
+        "error",
         { max: 80, skipBlankLines: true, skipComments: true },
       ],
-    },
-  },
-  {
-    files: ["server/runtimeComposition.ts"],
-    rules: {
-      "max-lines": "warn",
-      "max-lines-per-function": "warn",
     },
   },
   {
@@ -82,7 +76,7 @@ export default [
   },
   {
     files: ["**/*.test.{ts,tsx}", "tests/**/*.{ts,tsx}"],
-    rules: { "max-lines-per-function": "off" },
+    rules: { "max-lines": "off", "max-lines-per-function": "off" },
   },
   {
     ...tseslint.configs.disableTypeChecked,

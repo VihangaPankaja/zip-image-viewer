@@ -1,11 +1,11 @@
-import { useCallback, useEffect, type MutableRefObject } from "react";
+import { useCallback, useEffect, type RefObject } from "react";
 
 type ArchiveCleanupParams = {
   clearImagePreviewCache: () => void;
   clearTextPreviewCache: () => void;
   closeJobEvents: () => void;
-  latestJobIdRef: MutableRefObject<string>;
-  latestSessionIdRef: MutableRefObject<string>;
+  latestJobIdRef: RefObject<string>;
+  latestSessionIdRef: RefObject<string>;
   resetArchiveView: () => void;
   resetHydration: () => void;
   stopJobPolling: () => void;

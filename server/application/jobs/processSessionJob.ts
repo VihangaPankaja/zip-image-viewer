@@ -185,113 +185,146 @@ function emitFailure(
   deps.closeJob(job, "error");
 }
 
-export function createProcessSessionJob(deps: ProcessorDependencies) {
-  return async function processSessionJob(
-    job: SessionJob,
-    confirmOversize = false,
-  ): Promise<void> {
-    const workspaceDir =
-      job.workspaceDir ||
-      (await mkdtemp(path.join(os.tmpdir(), "zip-image-viewer-")));
-    const sourceUrl =
-      job.sourceKind === "http" ? parseSourceUrl(job.url) : null;
-    const zipPath =
-      job.zipPath ||
-      (sourceUrl
-        ? path.join(
-            workspaceDir,
-            path.basename(sourceUrl.pathname) || "download.bin",
-          )
-        : "");
-    const extractDir = job.extractDir || path.join(workspaceDir, "extracted");
-    const torrentDir = path.join(workspaceDir, "torrent");
-    await mkdir(extractDir, { recursive: true });
-    Object.assign(job, {
-      workspaceDir,
-      zipPath,
-      extractDir,
-      abortController: new AbortController(),
-      pauseRequested: false,
-    });
-    const settings = configureJob(job);
-    try {
-      if (job.sourceKind === "torrent") {
-        await mkdir(torrentDir, { recursive: true });
-        const result = await downloadTorrentSource(
-          job,
-          settings,
-          { downloadDir: torrentDir, confirmOversize },
-          { adapter: deps.torrentAdapter, emitJob: deps.emitJob },
-        );
-        if (result === "paused") {
-          deps.closeJob(job, "awaiting_confirmation");
-          return;
-        }
-        const prepared = await prepareTorrentEntries(
-          job,
-          torrentDir,
-          extractDir,
-          deps,
-        );
-        const session = createSession(
+async function processTorrentJob(
+  job: SessionJob,
+  workspaceDir: string,
+  extractDir: string,
+  torrentDir: string,
+  confirmOversize: boolean,
+  settings: ReturnType<typeof normalizeDownloadSettings>,
+  deps: ProcessorDependencies,
+): Promise<void> {
+  await mkdir(torrentDir, { recursive: true });
+  const result = await downloadTorrentSource(
+    job,
+    settings,
+    { downloadDir: torrentDir, confirmOversize },
+    { adapter: deps.torrentAdapter, emitJob: deps.emitJob },
+  );
+  if (result === "paused") {
+    deps.closeJob(job, "awaiting_confirmation");
+    return;
+  }
+  const prepared = await prepareTorrentEntries(
+    job,
+    torrentDir,
+    extractDir,
+    deps,
+  );
+  const session = createSession(
+    workspaceDir,
+    prepared.sessionDir,
+    torrentDisplayName(job.url),
+    prepared.entries,
+  );
+  completeSession(job, session, "Torrent is ready to browse.", deps);
+}
+
+async function processHttpJob(
+  job: SessionJob,
+  sourceUrl: URL,
+  workspaceDir: string,
+  extractDir: string,
+  zipPath: string,
+  confirmOversize: boolean,
+  settings: ReturnType<typeof normalizeDownloadSettings>,
+  deps: ProcessorDependencies,
+): Promise<void> {
+  const result = await downloadSessionSource(
+    job,
+    settings,
+    { url: job.url, zipPath, workspaceDir, confirmOversize },
+    deps,
+  );
+  if (result === "paused") return;
+  const entries = await extractSessionSource(job, zipPath, extractDir, deps);
+  const session = createSession(
+    workspaceDir,
+    extractDir,
+    sourceUrl.pathname || "download",
+    entries,
+  );
+  completeSession(job, session, "Archive is ready to browse.", deps);
+}
+
+async function processSessionJob(
+  deps: ProcessorDependencies,
+  job: SessionJob,
+  confirmOversize: boolean,
+): Promise<void> {
+  const workspaceDir =
+    job.workspaceDir ||
+    (await mkdtemp(path.join(os.tmpdir(), "zip-image-viewer-")));
+  const sourceUrl = job.sourceKind === "http" ? parseSourceUrl(job.url) : null;
+  const zipPath =
+    job.zipPath ||
+    (sourceUrl
+      ? path.join(
           workspaceDir,
-          prepared.sessionDir,
-          torrentDisplayName(job.url),
-          prepared.entries,
-        );
-        completeSession(job, session, "Torrent is ready to browse.", deps);
-        return;
-      }
-      const downloadResult = await downloadSessionSource(
+          path.basename(sourceUrl.pathname) || "download.bin",
+        )
+      : "");
+  const extractDir = job.extractDir || path.join(workspaceDir, "extracted");
+  const torrentDir = path.join(workspaceDir, "torrent");
+  await mkdir(extractDir, { recursive: true });
+  Object.assign(job, {
+    workspaceDir,
+    zipPath,
+    extractDir,
+    abortController: new AbortController(),
+    pauseRequested: false,
+  });
+  const settings = configureJob(job);
+  try {
+    if (sourceUrl) {
+      await processHttpJob(
         job,
-        settings,
-        {
-          url: job.url,
-          zipPath,
-          workspaceDir,
-          confirmOversize,
-        },
-        deps,
-      );
-      if (downloadResult === "paused") return;
-      const entries = await extractSessionSource(
-        job,
-        zipPath,
-        extractDir,
-        deps,
-      );
-      const session = createSession(
+        sourceUrl,
         workspaceDir,
         extractDir,
-        sourceUrl?.pathname || "download",
-        entries,
+        zipPath,
+        confirmOversize,
+        settings,
+        deps,
       );
-      completeSession(job, session, "Archive is ready to browse.", deps);
-    } catch (error) {
-      const jobError = errorFromUnknown(error);
-      const paused =
-        jobError.name === "AbortError" && job.pauseRequested && job.canResume;
-      if (paused) {
-        deps.emitJob(
-          job,
-          {
-            status: "paused",
-            phase: "paused",
-            canPause: false,
-            pauseRequested: false,
-            abortController: null,
-            message: "Download paused. Partial data is preserved.",
-          },
-          "paused",
-        );
-        return;
-      }
-      await rm(workspaceDir, { recursive: true, force: true });
-      deps.logEvent("error", "session.create.failed", {
-        jobId: job.id,
-        error: jobError.message,
-      });
-      emitFailure(job, jobError, deps);
+    } else {
+      await processTorrentJob(
+        job,
+        workspaceDir,
+        extractDir,
+        torrentDir,
+        confirmOversize,
+        settings,
+        deps,
+      );
     }
-  };
+  } catch (error) {
+    const jobError = errorFromUnknown(error);
+    if (jobError.name === "AbortError" && job.pauseRequested && job.canResume) {
+      deps.emitJob(
+        job,
+        {
+          status: "paused",
+          phase: "paused",
+          canPause: false,
+          pauseRequested: false,
+          abortController: null,
+          message: "Download paused. Partial data is preserved.",
+        },
+        "paused",
+      );
+      return;
+    }
+    await rm(workspaceDir, { recursive: true, force: true });
+    deps.logEvent("error", "session.create.failed", {
+      jobId: job.id,
+      error: jobError.message,
+    });
+    emitFailure(job, jobError, deps);
+  }
+}
+
+export function createProcessSessionJob(deps: ProcessorDependencies) {
+  return (job: SessionJob, confirmOversize = false) =>
+    processSessionJob(deps, job, confirmOversize);
 }

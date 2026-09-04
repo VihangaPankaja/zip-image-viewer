@@ -11,7 +11,7 @@
     "dev": "concurrently \"pnpm run dev:server\" \"pnpm run dev:client\"",
     "dev:server": "tsx watch server/index.ts",
     "dev:client": "vite --configLoader runner",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0",
     "typecheck": "pnpm run typecheck:client && pnpm run typecheck:server && pnpm run typecheck:tests",
     "typecheck:client": "tsc --noEmit -p tsconfig.app.json",
     "typecheck:server": "tsc --noEmit -p tsconfig.server.json",

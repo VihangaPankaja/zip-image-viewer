@@ -36,6 +36,41 @@ type WorkspaceOverlaysProps = {
   sortedTree: ExplorerNode | null;
 };
 
+type SlideshowToolsProps = Pick<
+  WorkspaceOverlaysProps,
+  | "currentFolderImages"
+  | "currentImageIndex"
+  | "formatBytes"
+  | "formatDate"
+  | "onCloseSlideshow"
+  | "onSelectPath"
+  | "setSlideshowChromeHidden"
+  | "setSlideshowFitMode"
+  | "slideshowFitMode"
+  | "slideshowFitOptions"
+>;
+
+type SlideshowOverlayProps = SlideshowToolsProps &
+  Pick<
+    WorkspaceOverlaysProps,
+    | "nextImageName"
+    | "nextImagePath"
+    | "previousImageName"
+    | "previousImagePath"
+    | "selectedImageUrl"
+    | "selectedNode"
+    | "slideshowChromeHidden"
+  >;
+
+type ExplorerOverlayProps = Pick<
+  WorkspaceOverlaysProps,
+  | "onCloseExplorer"
+  | "onSelectPath"
+  | "selectedPath"
+  | "setExplorerModalOpen"
+  | "sortedTree"
+>;
+
 function showModalDialog(dialog: HTMLDialogElement | null): void {
   if (dialog && !dialog.open) dialog.showModal();
 }
@@ -52,7 +87,7 @@ export function WorkspaceOverlays(props: WorkspaceOverlaysProps) {
   );
 }
 
-function SlideshowOverlay(props: WorkspaceOverlaysProps) {
+function SlideshowOverlay(props: SlideshowOverlayProps) {
   const node = props.selectedNode;
   if (!node) return null;
   const lastPath = props.currentFolderImages.at(-1) || "";
@@ -126,7 +161,7 @@ function SlideshowTools({
   node,
   lastPath,
   ...props
-}: WorkspaceOverlaysProps & { node: ImageNode; lastPath: string }) {
+}: SlideshowToolsProps & { node: ImageNode; lastPath: string }) {
   return (
     <div className="slideshow-floating slideshow-floating-top">
       <div className="slideshow-info-card">
@@ -186,7 +221,7 @@ function SlideshowTools({
   );
 }
 
-function ExplorerOverlay(props: WorkspaceOverlaysProps) {
+function ExplorerOverlay(props: ExplorerOverlayProps) {
   if (!props.sortedTree) return null;
   return (
     <dialog

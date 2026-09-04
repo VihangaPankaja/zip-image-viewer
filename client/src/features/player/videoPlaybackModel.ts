@@ -21,7 +21,7 @@ export function buildVideoPlaybackUrls({
   if (selectedNode?.type !== "file" || selectedKind !== "video") {
     return { hlsUrl: "", originalUrl: "" };
   }
-  const path = String(selectedNode.path ?? "");
+  const path = selectedNode.path ?? "";
   const originalQuery = new URLSearchParams({ path, quality: "source" });
   const hlsQuery = new URLSearchParams({ path, quality });
   return {
@@ -36,8 +36,8 @@ export function normalizeVideoQualityOptions(
   options: readonly RawVideoQualityOption[] | undefined,
 ): VideoQualityOption[] {
   return (options ?? []).map((option) => {
-    const id = String(option.id);
-    return { id, label: String(option.label || id) };
+    const id = option.id ?? "";
+    return { id, label: option.label || id };
   });
 }
 
@@ -48,7 +48,7 @@ export function chooseVideoQuality(
   return (
     options.find((item) => item.id === defaultQuality)?.id ??
     options.find((item) => item.id === "source")?.id ??
-    options[0]?.id ??
+    options.at(0)?.id ??
     "source"
   );
 }

@@ -18,9 +18,7 @@ export function TextPreviewContent({
     <div className="text-preview">
       <div className="preview-toolbar">
         <span>{formatBytes(selectedNode.size ?? 0)}</span>
-        <span>
-          {String(selectedNode.extension || "text").toUpperCase()} preview
-        </span>
+        <span>{(selectedNode.extension || "text").toUpperCase()} preview</span>
         <span>{formatDate(selectedNode.modifiedAt ?? 0)}</span>
       </div>
       <pre>{textPreview || "Loading file..."}</pre>

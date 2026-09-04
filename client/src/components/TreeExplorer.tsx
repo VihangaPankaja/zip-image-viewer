@@ -21,7 +21,7 @@ export type ExplorerNode = {
 
 function iconForNode(node: ExplorerNode | null | undefined) {
   if (!node || node.type === "directory") return <Folder size={14} />;
-  const ext = String(node.extension || "").toLowerCase();
+  const ext = (node.extension || "").toLowerCase();
   const kind = classifyNodeKind(node);
   if (kind === "image") return <FileImage size={14} />;
   if (kind === "video") return <FileVideo size={14} />;
@@ -53,8 +53,7 @@ function flattenVisible(
   depth = 0,
   parentId = "",
 ): FlatTreeItem[] {
-  if (!node) return [];
-  const id = String(node.path || "");
+  const id = node.path;
   const children = node.children ?? [];
   const hasChildren = node.type === "directory" && children.length > 0;
   const rows: FlatTreeItem[] = [
@@ -97,7 +96,7 @@ function handlePositionKey(
   navigation: TreeNavigation,
 ): boolean {
   const { activeIndex, rows } = navigation;
-  const targets: Record<string, number> = {
+  const targets: Partial<Record<string, number>> = {
     ArrowDown: Math.min(rows.length - 1, activeIndex + 1),
     ArrowUp: Math.max(0, activeIndex - 1),
     Home: 0,
@@ -163,12 +162,12 @@ function useTreeNavigation(
 ): TreeNavigation {
   const rootPath = rootNode?.path ?? null;
   const [expanded, setExpanded] = useState<Set<string>>(
-    () => new Set([String(rootPath || ".")]),
+    () => new Set([rootPath || "."]),
   );
   const [activeIndex, setActiveIndex] = useState(0);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   useEffect(() => {
-    setExpanded(new Set([String(rootPath || ".")]));
+    setExpanded(new Set([rootPath || "."]));
     setActiveIndex(0);
   }, [rootPath]);
   const rows = useMemo(

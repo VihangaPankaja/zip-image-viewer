@@ -24,7 +24,7 @@ class MemoryStorage implements Storage {
   }
 
   setItem(key: string, value: string) {
-    this.values.set(key, String(value));
+    this.values.set(key, value);
   }
 }
 
@@ -66,18 +66,16 @@ if (typeof HTMLElement.prototype.hidePopover !== "function") {
   HTMLElement.prototype.hidePopover = function hidePopover() {};
 }
 
-if (!window.matchMedia) {
-  Object.defineProperty(window, "matchMedia", {
-    writable: true,
-    value: (query: string) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addListener: () => {},
-      removeListener: () => {},
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      dispatchEvent: () => false,
-    }),
-  });
-}
+Object.defineProperty(window, "matchMedia", {
+  writable: true,
+  value: (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  }),
+});

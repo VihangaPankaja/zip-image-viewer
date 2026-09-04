@@ -1,5 +1,6 @@
 {
   "$schema": "./node_modules/fallow/schema.json",
+  "minimumVersion": "3.22.0",
   "entry": [
     "server/index.ts",
     "server/runtimeComposition.ts",
@@ -9,14 +10,24 @@
   "ignoreDependencies": ["7zip-bin", "ffmpeg-static"],
   "rules": {
     "unused-files": "error",
-    "unused-exports": "warn",
-    "unused-types": "warn",
+    "unused-exports": "error",
+    "unused-types": "error",
     "unused-dependencies": "error",
-    "unused-dev-dependencies": "warn",
+    "unused-dev-dependencies": "error",
+    "unused-optional-dependencies": "error",
+    "unrendered-components": "error",
+    "unused-component-props": "error",
     "unresolved-imports": "error",
     "unlisted-dependencies": "error",
     "private-type-leaks": "off",
-    "boundary-violation": "warn"
+    "type-only-dependencies": "error",
+    "test-only-dependencies": "error",
+    "dev-dependencies-in-production": "error",
+    "re-export-cycle": "error",
+    "stale-suppressions": "error",
+    "require-suppression-reason": "error",
+    "boundary-violation": "error",
+    "css-broken-reference": "error"
   },
   "typeAware": {
     "enabled": true,
