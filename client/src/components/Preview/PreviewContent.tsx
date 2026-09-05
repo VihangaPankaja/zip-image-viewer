@@ -65,9 +65,11 @@ function PreviewHeader({
               className="ghost-button"
               type="button"
               onClick={(event) =>
-                void event.currentTarget
-                  .closest<HTMLElement>(".preview-panel")
-                  ?.requestFullscreen()
+                void (
+                  event.currentTarget.closest<HTMLElement>(
+                    ".preview-panel",
+                  ) as { requestFullscreen?: () => Promise<void> } | null
+                )?.requestFullscreen?.()
               }
             >
               Maximize preview

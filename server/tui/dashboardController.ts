@@ -273,7 +273,10 @@ class TerminalDashboard {
   private handleData = (chunk: string | Buffer): void => {
     const key = chunk.toString();
     const current = this.selectedJob();
-    if (key === "\u0003") return this.deps.interrupt();
+    if (key === "\u0003") {
+      this.deps.interrupt();
+      return;
+    }
     if (key === "\t") this.paneIndex = (this.paneIndex + 1) % panes.length;
     else if (key === "\u001b[A") this.moveSelection(-1);
     else if (key === "\u001b[B") this.moveSelection(1);

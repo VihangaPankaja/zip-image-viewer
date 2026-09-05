@@ -45,8 +45,14 @@ export default [
     plugins: { "react-hooks": reactHooks },
     rules: {
       "@typescript-eslint/no-explicit-any": "error",
-      "@typescript-eslint/no-confusing-void-expression": "off",
-      "@typescript-eslint/restrict-template-expressions": "off",
+      "@typescript-eslint/no-confusing-void-expression": [
+        "error",
+        { ignoreArrowShorthand: true },
+      ],
+      "@typescript-eslint/restrict-template-expressions": [
+        "error",
+        { allowNumber: true },
+      ],
       "prefer-const": "off",
       "no-unused-vars": "off",
       "@typescript-eslint/no-unused-vars": [

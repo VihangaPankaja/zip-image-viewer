@@ -24,9 +24,10 @@ export function buildVideoPlaybackUrls({
   const path = selectedNode.path ?? "";
   const originalQuery = new URLSearchParams({ path, quality: "source" });
   const hlsQuery = new URLSearchParams({ path, quality });
+  const encodedSessionId = String(sessionId);
   return {
-    hlsUrl: `/api/sessions/${sessionId}/video/hls/playlist?${hlsQuery.toString()}`,
-    originalUrl: `/api/sessions/${sessionId}/video/play?${originalQuery.toString()}`,
+    hlsUrl: `/api/sessions/${encodedSessionId}/video/hls/playlist?${hlsQuery.toString()}`,
+    originalUrl: `/api/sessions/${encodedSessionId}/video/play?${originalQuery.toString()}`,
   };
 }
 

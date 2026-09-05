@@ -56,55 +56,108 @@
       },
       {
         "name": "client-features",
-        "patterns": ["client/src/components/**", "client/src/hooks/**"]
+        "patterns": [
+          "client/src/components/**",
+          "client/src/features/**",
+          "client/src/hooks/**"
+        ]
       },
       {
         "name": "client-shared",
-        "patterns": ["client/src/lib/**", "client/src/types/**"]
+        "patterns": [
+          "client/src/lib/**",
+          "client/src/services/**",
+          "client/src/styles/**",
+          "client/src/styles.css",
+          "client/src/types/**"
+        ]
       },
+      { "name": "shared-contract", "patterns": ["shared/**"] },
       {
         "name": "server-bootstrap",
         "patterns": [
           "server/index.ts",
           "server/appRuntime.ts",
+          "server/runtimeAdapters.ts",
           "server/runtimeComposition.ts",
           "server/bootstrap/**"
         ]
       },
-      { "name": "server-http", "patterns": ["server/handlers/**"] },
+      {
+        "name": "server-http",
+        "patterns": [
+          "server/handlers/**",
+          "server/realtime/**",
+          "server/rpc/**",
+          "server/tui/**"
+        ]
+      },
       {
         "name": "server-application",
         "patterns": ["server/application/**", "server/services/**"]
       },
-      { "name": "server-domain", "patterns": ["server/domain/**"] },
+      {
+        "name": "server-domain",
+        "patterns": ["server/config/**", "server/domain/**"]
+      },
       {
         "name": "server-infrastructure",
-        "patterns": ["server/infrastructure/**"]
+        "patterns": [
+          "server/infrastructure/**",
+          "server/media/**",
+          "server/repositories/**"
+        ]
       }
     ],
     "rules": [
-      { "from": "client-shell", "allow": ["client-features", "client-shared"] },
-      { "from": "client-features", "allow": ["client-shared"] },
-      { "from": "client-shared", "allow": [] },
+      {
+        "from": "client-shell",
+        "allow": ["client-features", "client-shared", "shared-contract"]
+      },
+      {
+        "from": "client-features",
+        "allow": ["client-shared", "shared-contract"]
+      },
+      { "from": "client-shared", "allow": ["shared-contract"] },
+      { "from": "shared-contract", "allow": [] },
       {
         "from": "server-bootstrap",
         "allow": [
           "server-http",
           "server-application",
           "server-domain",
-          "server-infrastructure"
+          "server-infrastructure",
+          "shared-contract"
         ]
       },
       {
         "from": "server-http",
-        "allow": ["server-application", "server-domain"]
+        "allow": [
+          "server-application",
+          "server-domain",
+          "server-infrastructure",
+          "shared-contract"
+        ]
       },
       {
         "from": "server-application",
-        "allow": ["server-domain", "server-infrastructure"]
+        "allow": ["server-domain", "server-infrastructure", "shared-contract"]
       },
-      { "from": "server-domain", "allow": [] },
-      { "from": "server-infrastructure", "allow": ["server-domain"] }
-    ]
+      { "from": "server-domain", "allow": ["shared-contract"] },
+      {
+        "from": "server-infrastructure",
+        "allow": ["server-domain", "shared-contract"]
+      }
+    ],
+    "coverage": {
+      "requireAllFiles": true,
+      "allowUnmatched": [
+        "**/*.test.*",
+        "client/src/test/**",
+        "tests/**",
+        "tooling/**",
+        "*.config.*"
+      ]
+    }
   }
 }

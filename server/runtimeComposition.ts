@@ -184,7 +184,8 @@ app.use((req, res, next) => {
   const isTrackedRequest =
     req.path === "/health" || req.path.startsWith("/api");
   if (!isTrackedRequest) {
-    return next();
+    next();
+    return;
   }
 
   const startedAt = Date.now();
