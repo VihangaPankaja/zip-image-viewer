@@ -18,7 +18,7 @@ type TreeNode = {
 };
 
 function getNameBase(name: string): string {
-  return String(name || "").replace(/\.[^.]+$/, "");
+  return name.replace(/\.[^.]+$/, "");
 }
 
 function parseTrailingNumber(name: string) {

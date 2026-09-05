@@ -29,7 +29,17 @@ export type ExplorerTablePanelProps = {
   formatBytes: (value: number) => string;
 };
 
-function ExplorerPanelHeader(props: ExplorerTablePanelProps) {
+function ExplorerPanelHeader(
+  props: Pick<
+    ExplorerTablePanelProps,
+    | "sortedTree"
+    | "session"
+    | "explorerRows"
+    | "sortMode"
+    | "setSortMode"
+    | "sortOptions"
+  >,
+) {
   return (
     <header className="panel-header panel-header-stackable explorer-header">
       <div className="panel-title-group explorer-title-group">
@@ -56,7 +66,17 @@ function ExplorerPanelHeader(props: ExplorerTablePanelProps) {
   );
 }
 
-function ExplorerTable(props: ExplorerTablePanelProps) {
+function ExplorerTable(
+  props: Pick<
+    ExplorerTablePanelProps,
+    | "explorerRows"
+    | "selectedPath"
+    | "setSelectedPath"
+    | "explorerColumns"
+    | "formatDate"
+    | "formatBytes"
+  >,
+) {
   const { explorerColumns: columns } = props;
   return (
     <div className="explorer-table-wrap">

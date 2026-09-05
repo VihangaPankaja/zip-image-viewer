@@ -2,7 +2,6 @@ import type Hls from "hls.js";
 import {
   useEffect,
   type Dispatch,
-  type MutableRefObject,
   type RefObject,
   type SetStateAction,
 } from "react";
@@ -16,7 +15,7 @@ import {
 
 type VideoSourceParams = {
   extension?: string;
-  hlsRef: MutableRefObject<Hls | null>;
+  hlsRef: RefObject<Hls | null>;
   hlsUrl: string;
   originalUrl: string;
   selectedKind: string;
@@ -26,7 +25,7 @@ type VideoSourceParams = {
   videoRef: RefObject<HTMLVideoElement | null>;
 };
 
-function destroyHls(hlsRef: MutableRefObject<Hls | null>) {
+function destroyHls(hlsRef: RefObject<Hls | null>) {
   hlsRef.current?.destroy();
   hlsRef.current = null;
 }
@@ -39,7 +38,7 @@ function attachOriginalSource(
   player.innerHTML = "";
   const source = document.createElement("source");
   source.src = originalUrl;
-  source.type = getVideoMimeType(String(extension ?? ""));
+  source.type = getVideoMimeType(extension ?? "");
   player.appendChild(source);
   player.load();
 }
@@ -65,8 +64,8 @@ async function attachAdaptiveSource(
   const hls = new HlsConstructor(createAdaptiveHlsConfig());
   params.hlsRef.current = hls;
   hls.on(HlsConstructor.Events.ERROR, (_event, data) => {
-    if (data?.fatal) {
-      params.setPlaybackError(data.details || "HLS playback failed.");
+    if (data.fatal) {
+      params.setPlaybackError(data.details);
     }
   });
   hls.on(HlsConstructor.Events.MANIFEST_PARSED, () => {

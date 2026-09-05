@@ -42,7 +42,7 @@ const VIDEO_MIME_BY_EXTENSION: Record<string, string> = {
 export function classifyExtension(
   extension: string | undefined | null,
 ): PreviewKind {
-  const ext = String(extension || "").toLowerCase();
+  const ext = (extension || "").toLowerCase();
   if (IMAGE_EXTENSIONS.has(ext)) return "image";
   if (VIDEO_EXTENSIONS.has(ext)) return "video";
   if (AUDIO_EXTENSIONS.has(ext)) return "audio";
@@ -60,6 +60,6 @@ export function classifyNodeKind(
 }
 
 export function getVideoMimeType(extension: string | undefined | null): string {
-  const ext = String(extension || "").toLowerCase();
+  const ext = (extension || "").toLowerCase();
   return VIDEO_MIME_BY_EXTENSION[ext] || "video/mp4";
 }

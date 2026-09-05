@@ -27,7 +27,7 @@ export function CustomDropdown({
   const menuRef = useRef<HTMLDivElement>(null);
   const menuId = `${id}-menu`;
   const activeOption =
-    options.find((option) => option.value === value) ?? options[0];
+    options.find((option) => option.value === value) ?? options.at(0);
 
   return (
     <div
@@ -43,7 +43,7 @@ export function CustomDropdown({
         aria-controls={menuId}
         popoverTarget={menuId}
       >
-        <span>{activeOption?.label ?? "Select"}</span>
+        <span>{activeOption ? activeOption.label : "Select"}</span>
         <span className="custom-dropdown-caret" aria-hidden="true" />
       </button>
 

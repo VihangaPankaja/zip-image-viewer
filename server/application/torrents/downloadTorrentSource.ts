@@ -29,6 +29,44 @@ function errorCode(error: unknown): string {
     : "";
 }
 
+function handleMetadata(
+  job: SessionJob,
+  confirmOversize: boolean,
+  emitJob: EmitJob,
+  metadata: TorrentMetadata,
+): void {
+  if (metadata.length > CONFIRM_SIZE_BYTES && !confirmOversize) {
+    throw confirmationError();
+  }
+  emitJob(job, {
+    phase: "downloading",
+    reportedSize: metadata.length,
+    message: `Downloading ${metadata.name}`,
+  });
+}
+
+function emitProgress(
+  job: SessionJob,
+  emitJob: EmitJob,
+  progress: TorrentProgress,
+): void {
+  emitJob(job, {
+    downloadedBytes: progress.downloadedBytes,
+    verifiedBytes: progress.downloadedBytes,
+    reportedSize: Math.max(job.reportedSize, progress.downloadedBytes),
+    percent: Math.min(100, progress.progress * 100),
+    peerCount: progress.peerCount,
+    downloadSpeedBytesPerSec: progress.downloadSpeedBytesPerSec,
+    uploadedBytes: progress.uploadedBytes,
+    uploadSpeedBytesPerSec: progress.uploadSpeedBytesPerSec,
+    isStalled: progress.peerCount === 0,
+    message:
+      progress.peerCount === 0
+        ? "Torrent stalled: waiting for peers."
+        : `Downloading from ${String(progress.peerCount)} peers`,
+  });
+}
+
 export async function downloadTorrentSource(
   job: SessionJob,
   settings: DownloadSettings,
@@ -53,33 +91,6 @@ export async function downloadTorrentSource(
   const source = job.url.startsWith("magnet:")
     ? job.url
     : await fetchTorrentMetadata(job.url, signal);
-  const onMetadata = (metadata: TorrentMetadata) => {
-    if (metadata.length > CONFIRM_SIZE_BYTES && !input.confirmOversize) {
-      throw confirmationError();
-    }
-    deps.emitJob(job, {
-      phase: "downloading",
-      reportedSize: metadata.length,
-      message: `Downloading ${metadata.name}`,
-    });
-  };
-  const onProgress = (progress: TorrentProgress) =>
-    deps.emitJob(job, {
-      downloadedBytes: progress.downloadedBytes,
-      verifiedBytes: progress.downloadedBytes,
-      reportedSize: Math.max(job.reportedSize, progress.downloadedBytes),
-      percent: Math.min(100, progress.progress * 100),
-      peerCount: progress.peerCount,
-      downloadSpeedBytesPerSec: progress.downloadSpeedBytesPerSec,
-      uploadedBytes: progress.uploadedBytes,
-      uploadSpeedBytesPerSec: progress.uploadSpeedBytesPerSec,
-      isStalled: progress.peerCount === 0,
-      message:
-        progress.peerCount === 0
-          ? "Torrent stalled: waiting for peers."
-          : `Downloading from ${String(progress.peerCount)} peers`,
-    });
-
   for (
     let attempt = 0;
     settings.maxRetries === -1 || attempt <= settings.maxRetries;
@@ -92,8 +103,9 @@ export async function downloadTorrentSource(
         downloadDir: input.downloadDir,
         signal,
         retainStoreOnAbort: () => job.pauseRequested,
-        onMetadata,
-        onProgress,
+        onMetadata: (metadata) =>
+          handleMetadata(job, input.confirmOversize, deps.emitJob, metadata),
+        onProgress: (progress) => emitProgress(job, deps.emitJob, progress),
         onNoPeers: () =>
           deps.emitJob(job, {
             isStalled: true,

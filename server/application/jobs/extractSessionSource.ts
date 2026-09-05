@@ -61,7 +61,7 @@ async function extractZip(
         relativePath,
         type: "directory",
         size: 0,
-        modifiedAt: entry.lastModifiedDateTime?.getTime() ?? 0,
+        modifiedAt: entry.lastModifiedDateTime.getTime(),
       });
     } else {
       await mkdir(path.dirname(destination), { recursive: true });
@@ -70,7 +70,7 @@ async function extractZip(
         relativePath,
         type: "file",
         size: entry.uncompressedSize,
-        modifiedAt: entry.lastModifiedDateTime?.getTime() ?? 0,
+        modifiedAt: entry.lastModifiedDateTime.getTime(),
       });
     }
     progress();

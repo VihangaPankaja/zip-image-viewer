@@ -1,8 +1,8 @@
 import {
   useCallback,
   type Dispatch,
-  type FormEvent,
   type SetStateAction,
+  type SubmitEvent,
 } from "react";
 import {
   jobPayloadSchema,
@@ -65,7 +65,7 @@ async function loadSessionRequest(
 }
 
 async function submitSession(
-  event: FormEvent,
+  event: SubmitEvent<HTMLFormElement>,
   zipUrl: string,
   setError: Dispatch<SetStateAction<string>>,
   loadSession: (url: string, confirmOversize?: boolean) => Promise<void>,
@@ -89,7 +89,7 @@ export function useSessionRequest(
     [context],
   );
   const handleSubmit = useCallback(
-    (event: FormEvent) =>
+    (event: SubmitEvent<HTMLFormElement>) =>
       submitSession(event, zipUrl, context.setError, loadSession),
     [context.setError, loadSession, zipUrl],
   );

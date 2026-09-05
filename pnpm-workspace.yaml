@@ -1,5 +1,7 @@
 packages:
   - tooling/*
+# Keep the project lockfile readable by GitHub's dependency graph until it supports pnpm 12 environment documents.
+pmOnFail: ignore
 resolvePeersFromWorkspaceRoot: false
 onlyBuiltDependencies:
   - esbuild

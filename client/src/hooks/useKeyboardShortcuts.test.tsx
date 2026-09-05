@@ -88,4 +88,12 @@ describe("useKeyboardShortcuts", () => {
       value: null,
     });
   });
+
+  it("ignores the fullscreen shortcut when the API is unavailable", () => {
+    renderShortcuts();
+
+    expect(() =>
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "f" })),
+    ).not.toThrow();
+  });
 });

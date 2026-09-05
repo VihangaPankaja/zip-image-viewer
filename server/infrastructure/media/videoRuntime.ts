@@ -25,9 +25,9 @@ type LogEvent = (
 function durationFromOutput(output: string): number {
   const match = output.match(/Duration:\s*(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)/);
   if (!match) return 0;
-  const hours = Number.parseInt(match[1] ?? "0", 10);
-  const minutes = Number.parseInt(match[2] ?? "0", 10);
-  const seconds = Number.parseFloat(match[3] ?? "0");
+  const hours = Number.parseInt(match[1], 10);
+  const minutes = Number.parseInt(match[2], 10);
+  const seconds = Number.parseFloat(match[3]);
   return hours * 3600 + minutes * 60 + seconds;
 }
 

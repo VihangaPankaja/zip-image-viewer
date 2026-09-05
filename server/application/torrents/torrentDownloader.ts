@@ -52,7 +52,7 @@ export async function fetchTorrentMetadata(
   if (!reader) throw new Error("Torrent metadata response has no body.");
   const chunks: Uint8Array[] = [];
   let length = 0;
-  while (true) {
+  for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     length += value.length;
@@ -135,7 +135,7 @@ export function createWebTorrentAdapter(): TorrentAdapter {
         torrent.on("noPeers", input.onNoPeers);
         torrent.once("done", () => finish());
         torrent.once("error", (error) =>
-          finish(error instanceof Error ? error : new Error(String(error))),
+          finish(error instanceof Error ? error : new Error(error)),
         );
         input.signal.addEventListener("abort", abort, { once: true });
         if (input.signal.aborted) abort();

@@ -19,13 +19,13 @@ contents, and previewing files while work continues in the background.
 ## Requirements
 
 - Node.js 26.7.0
-- pnpm 11.22.0
+- pnpm 12.1.0
 - FFmpeg and 7-Zip are supplied by project dependencies for supported platforms.
 
 ```bash
 nvm install
 nvm use
-npm install --global pnpm@11.22.0
+npm install --global pnpm@12.1.0
 pnpm install --frozen-lockfile
 pnpm run dev
 ```

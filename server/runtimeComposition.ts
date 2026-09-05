@@ -2,10 +2,8 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { createServer, type Server } from "node:http";
 import { attachJobWebSocketServer } from "./realtime/jobSocketServer.js";
-import { downloadWithSegmentedManager } from "./services/segmentedDownloader.js";
 import {
   CLEANUP_INTERVAL_MS,
-  CONFIRM_SIZE_BYTES,
   PORT,
   SESSION_TTL_MS,
 } from "./config/runtimeConstants.js";
@@ -21,7 +19,7 @@ import {
 import { createServerContainer } from "./bootstrap/container.js";
 import { createRuntimeApp } from "./bootstrap/createRuntimeApp.js";
 import { registerRuntimeLifecycle } from "./bootstrap/runtimeLifecycle.js";
-import type { Session, SessionJob } from "./domain/models.js";
+import type { SessionJob } from "./domain/models.js";
 import { registerBaseRoutes } from "./bootstrap/registerRoutes.js";
 import { registerSessionRoutes } from "./handlers/sessions.js";
 import { registerVideoRoutes } from "./handlers/videoRoutes.js";
@@ -31,7 +29,6 @@ import { createWebTorrentAdapter } from "./application/torrents/torrentDownloade
 import { createProcessSessionJob } from "./application/jobs/processSessionJob.js";
 import { createJobManager } from "./application/jobs/jobManager.js";
 import { createSessionManager } from "./application/sessions/sessionManager.js";
-import type { DownloadSettings } from "./application/downloads/downloadOptions.js";
 import {
   getLogEntries,
   isTerminalJobStatus,
@@ -49,18 +46,16 @@ import {
   parseSeekSeconds,
   shouldPreserveOriginalPreview,
 } from "./infrastructure/runtime/mediaClassification.js";
-import type { RemoteMetadata } from "./infrastructure/downloads/remoteMetadata.js";
-import {
-  ensureImagePreview as generateImagePreview,
-  ensureThumbnail as generateThumbnail,
-  readPreviewChunk,
-} from "./infrastructure/media/imagePreviews.js";
-import {
-  detectArchiveEncryption as inspectArchiveEncryption,
-  extractWith7zip as extractArchiveWith7zip,
-} from "./infrastructure/process/commandRunner.js";
+import { readPreviewChunk } from "./infrastructure/media/imagePreviews.js";
 import { createVideoRuntime } from "./infrastructure/media/videoRuntime.js";
 import { listExtractedEntries } from "./infrastructure/archive/listExtractedEntries.js";
+import {
+  detectRuntimeArchiveEncryption,
+  downloadRuntimeSource,
+  ensureRuntimeImagePreview,
+  ensureRuntimeThumbnail,
+  extractRuntimeArchive,
+} from "./runtimeAdapters.js";
 
 const require = createRequire(import.meta.url);
 const sevenZipModule: unknown = require("7zip-bin");
@@ -79,12 +74,6 @@ const container = createServerContainer();
 let server: Server | undefined;
 const DEFAULT_VIDEO_SEGMENT_SECONDS = 4;
 const MAX_ACTIVE_SESSION_JOBS = 2;
-
-type DownloadState = {
-  downloadedBytes: number;
-  reportedSize: number;
-  statusText: string;
-};
 
 const videoRuntime = createVideoRuntime({
   ffmpegPath,
@@ -113,9 +102,11 @@ const processSessionJob = createProcessSessionJob({
   sessionStore,
   emitJob,
   closeJob,
-  download: downloadWithAria2,
-  detectEncryption: detectArchiveEncryption,
-  extractWith7zip,
+  download: downloadRuntimeSource,
+  detectEncryption: (archivePath) =>
+    detectRuntimeArchiveEncryption(path7za, archivePath),
+  extractWith7zip: (archivePath, extractDir) =>
+    extractRuntimeArchive(path7za, archivePath, extractDir),
   listExtractedEntries,
   logEvent,
   torrentAdapter,
@@ -193,7 +184,8 @@ app.use((req, res, next) => {
   const isTrackedRequest =
     req.path === "/health" || req.path.startsWith("/api");
   if (!isTrackedRequest) {
-    return next();
+    next();
+    return;
   }
 
   const startedAt = Date.now();
@@ -258,74 +250,6 @@ const dashboard = shouldUseTerminalDashboard({
       interrupt: () => process.kill(process.pid, "SIGINT"),
     })
   : undefined;
-async function ensureThumbnail(
-  session: Session,
-  normalizedPath: string,
-  targetPath: string,
-  size: unknown,
-): Promise<string> {
-  return generateThumbnail(session, normalizedPath, targetPath, size, logEvent);
-}
-
-async function ensureImagePreview(
-  session: Session,
-  normalizedPath: string,
-  targetPath: string,
-  profileName: string,
-): Promise<string> {
-  return generateImagePreview(
-    session,
-    normalizedPath,
-    targetPath,
-    profileName,
-    logEvent,
-  );
-}
-
-async function extractWith7zip(
-  archivePath: string,
-  extractDir: string,
-): Promise<void> {
-  await extractArchiveWith7zip(path7za, archivePath, extractDir);
-}
-
-async function detectArchiveEncryption(archivePath: string): Promise<boolean> {
-  return inspectArchiveEncryption(path7za, archivePath);
-}
-
-async function downloadWithAria2({
-  url,
-  targetPath,
-  signal,
-  settings,
-  state,
-  metadata,
-  confirmOversize,
-}: {
-  url: string;
-  targetPath: string;
-  signal: AbortSignal;
-  settings: DownloadSettings;
-  state: DownloadState;
-  metadata: RemoteMetadata;
-  confirmOversize: boolean;
-}): Promise<void> {
-  await downloadWithSegmentedManager({
-    url,
-    targetPath,
-    signal,
-    settings,
-    state,
-    metadata,
-  });
-
-  if (!confirmOversize && state.downloadedBytes > CONFIRM_SIZE_BYTES) {
-    throw Object.assign(new Error("Archive exceeds 1 GB."), {
-      code: "OVERSIZE_CONFIRM",
-    });
-  }
-}
-
 registerRuntimeLifecycle({
   sessions: sessionStore,
   jobs: jobStore,
@@ -396,9 +320,9 @@ registerFileRoutes(app, {
   formatBytes: container.runtime.formatBytes,
   readPreviewChunk,
   classifyMimeType,
-  ensureThumbnail,
+  ensureThumbnail: ensureRuntimeThumbnail,
   shouldPreserveOriginalPreview,
-  ensureImagePreview,
+  ensureImagePreview: ensureRuntimeImagePreview,
   parseRangeHeader: container.runtime.parseRangeHeader,
 });
 
