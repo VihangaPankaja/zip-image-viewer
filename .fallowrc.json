@@ -154,6 +154,7 @@
       "allowUnmatched": [
         "**/*.test.*",
         "client/src/test/**",
+        "docs/**",
         "tests/**",
         "tooling/**",
         "*.config.*"

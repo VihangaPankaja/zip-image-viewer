@@ -88,6 +88,42 @@ test("mobile uses a full-screen add sheet and tree-to-preview navigation", async
   });
 });
 
+test("blocks duplicate downloads until every URL is unique", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Add downloads" }).click();
+  await page
+    .getByRole("textbox", { name: "Paste download URLs" })
+    .fill("https://example.com/a.zip\nhttps://example.com/a.zip");
+  await page.getByRole("button", { name: "Review links" }).click();
+
+  await expect(page.getByText(/2 duplicates/)).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Add 2 downloads" }),
+  ).toBeDisabled();
+
+  await page
+    .getByLabel("Download URL", { exact: true })
+    .nth(1)
+    .fill("https://example.com/b.zip");
+  await expect(page.getByText(/duplicates/)).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Add 2 downloads" }),
+  ).toBeEnabled();
+});
+
+test("persists settings across a page reload", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByLabel("Seek jump seconds").fill("9");
+  await page.getByRole("button", { name: "Close" }).click();
+
+  await page.reload();
+  await page.getByRole("button", { name: "Settings" }).click();
+  await expect(page.getByLabel("Seek jump seconds")).toHaveValue("9");
+});
+
 test("both workspaces have no automatically detectable accessibility violations", async ({
   page,
 }) => {

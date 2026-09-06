@@ -1,0 +1,1980 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Media workspace · Product roadmap</title>
+    <style>
+      :root {
+        --paper: #f5f3ed;
+        --ink: #222b29;
+        --muted: #596660;
+        --line: #cdd3ca;
+        --green: #245b44;
+        --accent: #e4ef86;
+        --white: #fffef9;
+        --soft: #e9eee7;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+        scroll-padding-top: 24px;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font:
+          16px/1.6 "Segoe UI",
+          sans-serif;
+      }
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+      a {
+        color: var(--green);
+        text-underline-offset: 4px;
+      }
+      button,
+      a,
+      input,
+      select,
+      summary,
+      textarea {
+        outline-offset: 4px;
+      }
+      button {
+        cursor: pointer;
+      }
+      button,
+      select,
+      input,
+      textarea {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--white);
+        color: var(--ink);
+      }
+      button {
+        padding: 9px 16px;
+      }
+      button:hover {
+        background: var(--soft);
+      }
+      :focus-visible {
+        outline: 3px solid var(--green);
+      }
+      .shell {
+        max-width: 1500px;
+        margin: auto;
+        display: grid;
+        grid-template-columns: 250px minmax(0, 1fr);
+      }
+      aside {
+        border-right: 1px solid var(--line);
+        padding: 36px 25px;
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        overflow: auto;
+      }
+      .brand {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      .mark {
+        display: inline-grid;
+        place-items: center;
+        background: var(--green);
+        color: var(--accent);
+        width: 32px;
+        height: 32px;
+        margin-right: 8px;
+        font-size: 20px;
+      }
+      .edition {
+        color: var(--muted);
+        font-size: 12px;
+        margin: 12px 0 42px;
+      }
+      nav a {
+        display: block;
+        text-decoration: none;
+        color: var(--ink);
+        padding: 10px 0;
+        border-bottom: 1px solid var(--line);
+        font-size: 14px;
+      }
+      nav a span {
+        color: var(--muted);
+        font-size: 12px;
+        margin-right: 15px;
+      }
+      .aside-note {
+        font-size: 13px;
+        color: var(--muted);
+        margin-top: 32px;
+      }
+      .aside-progress {
+        margin-top: 35px;
+      }
+      .aside-progress strong {
+        font:
+          36px Georgia,
+          serif;
+      }
+      progress {
+        width: 100%;
+        height: 7px;
+        accent-color: var(--green);
+      }
+      main {
+        padding: 42px 54px 70px;
+        min-width: 0;
+      }
+      .eyebrow {
+        font:
+          700 11px/1.4 "Segoe UI",
+          sans-serif;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--green);
+      }
+      .hero {
+        padding: 0 0 35px;
+        border-bottom: 1px solid var(--ink);
+      }
+      .hero-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        align-items: center;
+      }
+      .date {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      h1 {
+        font:
+          clamp(42px, 5.5vw, 76px)/1.04 Georgia,
+          serif;
+        letter-spacing: -0.04em;
+        max-width: 750px;
+        margin: 30px 0 22px;
+      }
+      h1 em {
+        color: var(--green);
+        font-weight: 400;
+      }
+      .lede {
+        max-width: 690px;
+        font-size: 18px;
+        color: var(--muted);
+      }
+      .hero-tags {
+        display: flex;
+        gap: 9px;
+        flex-wrap: wrap;
+        margin-top: 26px;
+      }
+      .hero-tags span {
+        font-size: 12px;
+        border: 1px solid var(--line);
+        padding: 5px 10px;
+        border-radius: 30px;
+      }
+      .callout {
+        background: var(--green);
+        color: #fffef9;
+        padding: 28px 30px;
+        margin: 28px 0;
+        display: grid;
+        grid-template-columns: 170px 1fr;
+        gap: 20px;
+      }
+      .callout .eyebrow {
+        color: var(--accent);
+      }
+      .callout p {
+        margin: 0;
+      }
+      .callout strong {
+        font-size: 19px;
+        font-weight: 500;
+      }
+      .section {
+        margin: 44px 0;
+      }
+      .section-heading {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 20px;
+        margin-bottom: 18px;
+      }
+      h2 {
+        font:
+          32px/1.15 Georgia,
+          serif;
+        letter-spacing: -0.02em;
+        margin: 0;
+      }
+      h3 {
+        font-size: 19px;
+        line-height: 1.35;
+        margin: 9px 0 12px;
+      }
+      p {
+        margin: 10px 0;
+      }
+      .small {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .baseline {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0 24px;
+      }
+      .baseline article {
+        border-top: 1px solid var(--line);
+        padding: 15px 0;
+      }
+      .baseline h3 {
+        font-size: 15px;
+        margin: 0 0 5px;
+      }
+      .baseline p {
+        font-size: 14px;
+        margin: 0;
+        color: var(--muted);
+      }
+      .baseline code {
+        font-size: 11px;
+        overflow-wrap: anywhere;
+      }
+      .priority-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+      }
+      .priority {
+        background: var(--white);
+        border: 1px solid var(--line);
+        padding: 22px;
+      }
+      .priority .number {
+        font:
+          35px Georgia,
+          serif;
+        color: var(--green);
+      }
+      .priority p {
+        font-size: 14px;
+      }
+      .priority a {
+        font-size: 13px;
+      }
+      .track-intro {
+        max-width: 740px;
+      }
+      .controls {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin: 22px 0 16px;
+        padding: 18px;
+        background: var(--soft);
+      }
+      .controls label {
+        font-size: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        flex: 1;
+        min-width: 145px;
+      }
+      .controls label:first-child {
+        flex: 2;
+      }
+      .controls input,
+      .controls select {
+        padding: 9px;
+        width: 100%;
+      }
+      .toolbar {
+        display: flex;
+        gap: 9px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .toolbar button {
+        font-size: 13px;
+      }
+      .result {
+        margin-left: auto;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      #notice {
+        font-size: 13px;
+        color: var(--green);
+        min-height: 22px;
+        margin: 10px 0;
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 17px;
+      }
+      .card {
+        background: var(--white);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 23px;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        border-top: 3px solid var(--line);
+      }
+      .card[data-status="Done"] {
+        border-top-color: var(--green);
+      }
+      .card[data-status="In progress"] {
+        border-top-color: #a65b1c;
+      }
+      .card[data-status="Planned"] {
+        border-top-color: #719077;
+      }
+      .card-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        font-size: 11px;
+      }
+      .card-id {
+        font-family: monospace;
+        color: var(--muted);
+      }
+      .badge {
+        background: var(--soft);
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-weight: 600;
+      }
+      .card .summary {
+        font-size: 15px;
+        margin: 0 0 16px;
+      }
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        font-size: 11px;
+        color: var(--muted);
+        margin-bottom: 16px;
+      }
+      .meta span {
+        padding: 3px 6px;
+        border: 1px solid var(--line);
+        border-radius: 3px;
+      }
+      .card details {
+        border-top: 1px solid var(--line);
+        font-size: 14px;
+        padding-top: 10px;
+      }
+      .card summary {
+        cursor: pointer;
+        color: var(--green);
+        font-weight: 600;
+      }
+      .detail-label {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-weight: 700;
+        margin-top: 18px;
+      }
+      .evidence {
+        font:
+          11px/1.6 Consolas,
+          monospace;
+        overflow-wrap: anywhere;
+        color: var(--muted);
+      }
+      .card-foot {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: auto;
+        padding-top: 18px;
+      }
+      .card-foot label {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .card-foot select {
+        padding: 7px;
+        min-width: 0;
+        flex: 1;
+      }
+      .notes-label {
+        display: block;
+        font-size: 12px;
+        margin-top: 16px;
+      }
+      .card textarea {
+        padding: 9px;
+        resize: vertical;
+        width: 100%;
+        min-height: 70px;
+        font-size: 13px;
+      }
+      .no-results {
+        padding: 35px;
+        border: 1px dashed var(--line);
+        text-align: center;
+      }
+      .sequence {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        border: 1px solid var(--line);
+      }
+      .sequence article {
+        padding: 20px;
+        border-right: 1px solid var(--line);
+      }
+      .sequence article:last-child {
+        border: 0;
+      }
+      .sequence p {
+        font-size: 13px;
+      }
+      .sequence h3 {
+        font-size: 16px;
+      }
+      .table-wrap {
+        overflow: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+      th,
+      td {
+        text-align: left;
+        border-bottom: 1px solid var(--line);
+        padding: 14px 12px;
+        vertical-align: top;
+      }
+      th {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+      }
+      td:first-child {
+        font-weight: 600;
+        min-width: 130px;
+      }
+      .deep {
+        border-top: 1px solid var(--line);
+        padding-top: 24px;
+        margin-top: 25px;
+      }
+      .deep p,
+      .deep li {
+        font-size: 15px;
+      }
+      .deep li {
+        padding-bottom: 9px;
+      }
+      .flow {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 20px 0;
+      }
+      .flow span {
+        background: var(--soft);
+        padding: 9px 12px;
+        font-size: 12px;
+        border-radius: 4px;
+      }
+      .flow b {
+        align-self: center;
+        color: var(--green);
+      }
+      .sources {
+        padding: 24px;
+        background: var(--soft);
+        font-size: 13px;
+      }
+      .sources li {
+        padding-bottom: 8px;
+      }
+      footer {
+        border-top: 1px solid var(--ink);
+        padding-top: 20px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .skip {
+        position: absolute;
+        left: -10000px;
+      }
+      .skip:focus {
+        left: 15px;
+        top: 15px;
+        background: white;
+        padding: 12px;
+        z-index: 10;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      @media (max-width: 1100px) {
+        main {
+          padding: 32px;
+        }
+        .shell {
+          grid-template-columns: 205px minmax(0, 1fr);
+        }
+        aside {
+          padding: 28px 18px;
+        }
+        .priority-grid {
+          grid-template-columns: 1fr;
+        }
+        .priority {
+          display: block;
+        }
+        .priority h3 {
+          margin-top: 0;
+        }
+        .sequence {
+          grid-template-columns: 1fr 1fr;
+        }
+        .sequence article {
+          border-bottom: 1px solid var(--line);
+        }
+      }
+      @media (max-width: 760px) {
+        .shell {
+          display: block;
+        }
+        aside {
+          position: static;
+          height: auto;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+          padding: 18px 22px;
+        }
+        .edition,
+        .aside-note,
+        .aside-progress {
+          display: none;
+        }
+        nav {
+          display: flex;
+          gap: 18px;
+          overflow: auto;
+          margin-top: 12px;
+        }
+        nav a {
+          white-space: nowrap;
+          border: 0;
+          padding: 4px 0;
+          font-size: 12px;
+        }
+        nav a span {
+          display: none;
+        }
+        main {
+          padding: 28px 20px;
+        }
+        .cards,
+        .baseline {
+          grid-template-columns: 1fr;
+        }
+        .callout {
+          grid-template-columns: 1fr;
+        }
+        .hero-top {
+          align-items: flex-start;
+        }
+        .date {
+          text-align: right;
+        }
+        .section-heading {
+          display: block;
+        }
+        .result {
+          margin-left: 0;
+          width: 100%;
+        }
+        h1 {
+          font-size: 48px;
+        }
+        .sequence {
+          grid-template-columns: 1fr;
+        }
+        .sequence article {
+          border-right: 0;
+        }
+        .card {
+          padding: 20px;
+        }
+        .toolbar {
+          gap: 7px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+      }
+      @media print {
+        aside,
+        .controls,
+        .toolbar,
+        #notice,
+        .card-foot {
+          display: none;
+        }
+        .shell {
+          display: block;
+        }
+        main {
+          padding: 0;
+        }
+        .hero {
+          padding-bottom: 15px;
+        }
+        .section {
+          margin: 22px 0;
+        }
+        .card {
+          break-inside: avoid;
+        }
+        .cards {
+          display: block;
+        }
+        .card {
+          margin: 12px 0;
+        }
+        .card details {
+          display: block;
+        }
+        .callout {
+          background: #eee;
+          color: #111;
+        }
+        .callout .eyebrow {
+          color: #111;
+        }
+        body {
+          background: white;
+          font-size: 12px;
+        }
+        h1 {
+          font-size: 42px;
+        }
+        .sources a {
+          color: #111;
+        }
+        .print-status {
+          display: block !important;
+          font-weight: bold;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to roadmap</a>
+    <div class="shell">
+      <aside>
+        <div class="brand">
+          <span class="mark" aria-hidden="true">↗</span>Media workspace
+        </div>
+        <p class="edition">Product notes / September 2026</p>
+        <nav aria-label="Page sections">
+          <a href="#overview"><span>01</span>The recommendation</a>
+          <a href="#baseline"><span>02</span>What exists today</a>
+          <a href="#roadmap"><span>03</span>Track the work</a>
+          <a href="#video"><span>04</span>Video, in detail</a>
+          <a href="#delivery"><span>05</span>Build order & stack</a>
+          <a href="#references"><span>06</span>Sources & scope</a>
+        </nav>
+        <div class="aside-progress">
+          <p class="eyebrow">Your roadmap progress</p>
+          <strong id="percent">0%</strong
+          ><progress
+            id="progress"
+            value="0"
+            max="100"
+            aria-label="Roadmap completion"
+          ></progress>
+          <p class="small" id="totals"></p>
+        </div>
+        <p class="aside-note">
+          Change a status as work moves forward. Notes and progress save in this
+          browser. Export a backup before moving the file.
+        </p>
+      </aside>
+      <main id="main">
+        <header class="hero" id="overview">
+          <div class="hero-top">
+            <span class="eyebrow">zip-image-viewer / Improvement roadmap</span
+            ><span class="date"
+              >06 September 2026<br />Code reviewed at v3.3.2</span
+            >
+          </div>
+          <h1>Less waiting.<br /><em>More control.</em></h1>
+          <p class="lede">
+            Make video seeking feel immediate. Keep streams playing when
+            bandwidth changes. Download the torrent files you want, then come
+            back for the rest.
+          </p>
+          <div class="hero-tags">
+            <span>Repository-informed</span><span>Editable progress</span
+            ><span>Works offline</span><span>No new dependencies</span>
+          </div>
+        </header>
+        <div class="callout">
+          <div class="eyebrow">My recommendation</div>
+          <p>
+            <strong>Keep the stack. Fix the media pipeline first.</strong
+            ><br />React, Express, FFmpeg, hls.js and WebTorrent already cover
+            the core job. Spend the next releases on seek latency, rendition
+            readiness and file-level torrent state. A framework migration would
+            delay those improvements.
+          </p>
+        </div>
+        <section class="section" aria-labelledby="first-title">
+          <div class="section-heading">
+            <h2 id="first-title">Start with these</h2>
+            <span class="small">The changes you asked for, first.</span>
+          </div>
+          <div class="priority-grid">
+            <article class="priority">
+              <span class="number">01</span>
+              <h3>Seek without waiting for the whole encode</h3>
+              <p>
+                Serve prepared segments immediately. For an uncached jump,
+                prepare the requested time window before continuing background
+                work.
+              </p>
+              <a href="#video">Read the seek plan →</a>
+            </article>
+            <article class="priority">
+              <span class="number">02</span>
+              <h3>Make Auto quality dependable</h3>
+              <p>
+                Let hls.js adapt to bandwidth and buffer health. Give it
+                accurate bitrate metadata and renditions that can serve the
+                current playback position.
+              </p>
+              <a href="#abr-plan">Read the streaming plan →</a>
+            </article>
+            <article class="priority">
+              <span class="number">03</span>
+              <h3>Choose torrent files now or later</h3>
+              <p>
+                Resolve metadata, tick files, show selected size, and start.
+                Keep skipped files visible so they can be added later without
+                restarting the whole torrent.
+              </p>
+              <a href="#torrent-plan">Read the torrent plan →</a>
+            </article>
+          </div>
+        </section>
+        <section class="section" id="baseline">
+          <div class="section-heading">
+            <h2>What exists today</h2>
+            <span class="small"
+              >Code presence, not a production certification.</span
+            >
+          </div>
+          <div class="baseline">
+            <article>
+              <h3>HLS and automatic quality selection</h3>
+              <p>
+                fMP4 segments, a master playlist, an ABR-enabled hls.js
+                configuration and manual quality selection exist. The work below
+                improves their behavior.
+              </p>
+              <code>server/media/* · client/src/features/player/*</code>
+            </article>
+            <article>
+              <h3>Original playback and thumbnail endpoint</h3>
+              <p>
+                Original video supports byte ranges. FFmpeg can generate a frame
+                at a requested timestamp. The player currently uses native video
+                controls.
+              </p>
+              <code>server/handlers/video/* · VideoPreviewContent.tsx</code>
+            </article>
+            <article>
+              <h3>Torrent transfers and a download queue</h3>
+              <p>
+                Magnet links, torrent metadata URLs, peer counts, retry handling
+                and pause/resume paths exist. The adapter currently downloads
+                all files.
+              </p>
+              <code>server/application/torrents/* · DownloadDialog.tsx</code>
+            </article>
+            <article>
+              <h3>A modern client and server</h3>
+              <p>
+                React 19, Vite 8, Express 5, strict TypeScript, Zod, oRPC and
+                TanStack Query are installed. No replacement is needed for this
+                roadmap.
+              </p>
+              <code>package.json · tsconfig.json</code>
+            </article>
+            <article>
+              <h3>Tests and quality gates</h3>
+              <p>
+                Vitest, Playwright, axe, Fallow, Lefthook, linting and build
+                checks are already present. Extend them around the media and
+                torrent flows.
+              </p>
+              <code>package.json · .github/workflows/quality.yml</code>
+            </article>
+            <article>
+              <h3>Temporary sessions</h3>
+              <p>
+                Session and job stores are in memory. The shutdown path removes
+                sessions. Retaining downloads requires an explicit lifecycle
+                change.
+              </p>
+              <code
+                >server/repositories/memoryStores.ts ·
+                server/bootstrap/runtimeLifecycle.ts</code
+              >
+            </article>
+          </div>
+        </section>
+        <section class="section" id="roadmap">
+          <div class="section-heading">
+            <h2>Track the work</h2>
+            <span class="small" id="count-label"></span>
+          </div>
+          <p class="track-intro">
+            Suggested priorities, not commitments. All improvements start as
+            <b>Proposed</b>. Existing capabilities are listed above, so nothing
+            is marked done just because part of it exists. Open an item for its
+            implementation direction, evidence and completion check.
+          </p>
+          <p class="small">
+            P0 = user-requested core work · P1 = next release · P2 = later.
+            Effort is relative: S is localized, M crosses a few flows, L changes
+            the media or storage lifecycle. Dependencies use item IDs.
+          </p>
+          <div class="controls">
+            <label
+              >Search ideas<input
+                id="search"
+                type="search"
+                placeholder="Try scrubbing, subtitles, SQLite…"
+            /></label>
+            <label
+              >Area<select id="area">
+                <option value="">All areas</option>
+              </select></label
+            >
+            <label
+              >Status<select id="status">
+                <option value="">All statuses</option>
+              </select></label
+            >
+            <label
+              >Priority<select id="priority">
+                <option value="">All priorities</option>
+                <option>P0</option>
+                <option>P1</option>
+                <option>P2</option>
+              </select></label
+            >
+          </div>
+          <div class="toolbar">
+            <button id="export" type="button">Export progress</button
+            ><button id="import" type="button">Import progress</button
+            ><input
+              id="import-file"
+              type="file"
+              accept="application/json,.json"
+              hidden
+            /><button id="print" type="button">Print / save PDF</button
+            ><button id="clear" type="button">Clear filters</button
+            ><span class="result" id="result" role="status"></span>
+          </div>
+          <p id="notice" role="status">
+            Saved locally in this browser. Export/import moves your progress
+            between browsers or devices.
+          </p>
+          <noscript
+            ><p>
+              This tracker needs JavaScript. The recommendations, current-state
+              review and delivery plan below remain readable.
+            </p></noscript
+          >
+          <div class="cards" id="cards"></div>
+          <p class="no-results" id="empty" hidden>
+            No matching ideas. Clear the filters or try another search.
+          </p>
+        </section>
+        <section class="section" id="video">
+          <div class="section-heading">
+            <h2>What fast video actually needs</h2>
+            <span class="small"
+              >Preparation, delivery, then player behavior.</span
+            >
+          </div>
+          <article class="deep">
+            <h3>Scrubbing has two separate jobs</h3>
+            <p>
+              A thumbnail should respond as the pointer moves. Playback should
+              resume quickly when the user releases it. Avoid starting an
+              encoder for every pointer movement.
+            </p>
+            <p>
+              The current encoder runs from the beginning with four-second
+              segments. <code>startPrioritySegmentWindow</code> delegates to the
+              same full transcode; it does not prioritize a seek target. The
+              EVENT playlist lists only generated segments, and the route waits
+              up to 14 seconds for a missing file. These are code-based
+              explanations to test, not measured root causes of every slow seek.
+            </p>
+            <div class="flow" aria-label="Proposed seek flow">
+              <span>Preview cached thumbnail</span><b aria-hidden="true">→</b
+              ><span>Release at target time</span><b aria-hidden="true">→</b
+              ><span>Serve cached segment or prioritize window</span
+              ><b aria-hidden="true">→</b><span>Resume and fill ahead</span>
+            </div>
+            <p>
+              Start with reliable segment publication and one complete
+              low-resolution rendition for retained videos. That gives
+              predictable random access once preparation finishes. Then add
+              demand-driven windows for cold jumps on long videos. Each window
+              needs compatible initialization data, timestamps, keyframes, audio
+              boundaries and segment numbering. A new FFmpeg process with
+              <code>-ss</code> alone is not enough.
+            </p>
+            <p>
+              Use the real emitted playlist and committed segment durations. Do
+              not infer availability by counting files, especially once windows
+              create gaps. Benchmark two- and four-second segments on
+              representative hardware before choosing a default. Shorter
+              segments trade request overhead and compression efficiency for
+              finer seek and switch points.
+              <a href="https://ffmpeg.org/ffmpeg-formats.html#hls-2"
+                >FFmpeg HLS options</a
+              >.
+            </p>
+          </article>
+          <article class="deep" id="abr-plan">
+            <h3>Adaptive bitrate, like the behavior you expect from YouTube</h3>
+            <p>
+              Keep hls.js in Auto mode and let its existing bandwidth and buffer
+              logic choose the rendition. Auto already exists. The server must
+              make the choices honest: the master route estimates bandwidth as
+              height × 4,000, while the encoder uses a different ladder. The
+              manifest also uses one hard-coded codec string. Those values
+              should describe the actual outputs.
+            </p>
+            <p>
+              Start with an example ladder of 360p at 0.8 Mbps, 480p at 1.4,
+              720p at 2.8 and 1080p at 5.0 for video, plus audio and container
+              overhead. These are current encoder settings to benchmark, not
+              universal recommendations. Avoid upscaling. Tune for frame rate
+              and difficult content. Keep 1440p and 2160p optional until CPU,
+              storage and viewer demand justify them.
+            </p>
+            <p>
+              Warm a low rendition around the playhead and prepare higher ones
+              within the worker budget. An advertised level that starts encoding
+              from zero when selected can stall a viewer already halfway
+              through. Preserve the player instance when switching Auto and
+              manual levels. Show the actual active resolution and retain native
+              Safari HLS support.
+              <a href="https://hlsjs.video-dev.org/api-docs/hls.js.hls"
+                >hls.js level and automatic selection API</a
+              >.
+            </p>
+          </article>
+          <article class="deep" id="torrent-plan">
+            <h3>Select now, fetch the rest later</h3>
+            <p>
+              Use a metadata review step before payload downloading. The picker
+              needs a folder tree, file sizes, selection totals, Select all,
+              Select none and a clear Start selected action. On the server, use
+              WebTorrent's initial deselection option and file selection API.
+              Validate file IDs against the resolved torrent.
+            </p>
+            <p>
+              Persist the info hash, metadata, selected file IDs and storage
+              location. Reopen retained storage and verify pieces on restart.
+              Track selected-file completion, not only the whole torrent's done
+              event. Keep skipped files visible with a Download action. Adjacent
+              files can share a piece, so some extra bytes are unavoidable.
+              Availability still depends on peers.
+              <a href="https://webtorrent.io/docs"
+                >WebTorrent selection and storage API</a
+              >.
+            </p>
+            <p>
+              Retained torrents must survive session expiry and shutdown.
+              Separate closing peer connections from deleting data. Give users
+              distinct actions for Remove from list and Delete downloaded files.
+              An archive inside a torrent still needs its own download and
+              extraction path; selecting torrent files does not selectively
+              fetch members inside a compressed archive.
+            </p>
+          </article>
+          <article class="deep">
+            <h3>Proposed performance checks</h3>
+            <p class="small">
+              Targets to validate, not measured results or guarantees. Record
+              device, CPU/GPU, codec, resolution, source readiness, network
+              throughput and cache state. Use at least 30 jumps across each
+              representative clip and report p50 and p95.
+            </p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Scenario</th>
+                    <th>Initial target</th>
+                    <th>How to test</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Cached thumbnail</td>
+                    <td>p95 under 100 ms</td>
+                    <td>
+                      Pointer movement to updated preview after storyboard load.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Prepared video seek</td>
+                    <td>
+                      p95 under 500 ms on LAN; under 1.5 s on a controlled 10
+                      Mbps link
+                    </td>
+                    <td>
+                      Seek release to first displayed frame at the target. Seek
+                      outside the browser buffer into ready server segments.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Cold transcode seek</td>
+                    <td>
+                      First useful frame under 3 s on the benchmark machine
+                    </td>
+                    <td>
+                      Jump to 80% before that window exists. Report misses and
+                      encoder queue time. Revise the target if the hardware
+                      cannot keep up.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>ABR under a bandwidth drop</td>
+                    <td>
+                      Downshift within two segment loads; under 1% rebuffer time
+                      over a 10-minute controlled run
+                    </td>
+                    <td>
+                      Drop 10 → 2 → 0.8 Mbps, recover, and log actual levels,
+                      buffer, stalls and dropped frames.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Deferred torrent file</td>
+                    <td>Previously verified pieces are reused</td>
+                    <td>
+                      Download A, skip B, restart, select B. Check hashes,
+                      payload byte counts and file states.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+        <section class="section" id="delivery">
+          <div class="section-heading">
+            <h2>A sensible build order</h2>
+            <span class="small">Ship and measure each phase.</span>
+          </div>
+          <div class="sequence">
+            <article>
+              <span class="eyebrow">Phase 1</span>
+              <h3>Make playback trustworthy</h3>
+              <p>
+                V01, V02, V04, V07, Q01. Measure seeks, publish complete
+                segments, align manifests and stop unnecessary player reloads.
+              </p>
+            </article>
+            <article>
+              <span class="eyebrow">Phase 2</span>
+              <h3>Make seeking fast</h3>
+              <p>
+                V03, V05, V06, S02. Prepare a low rendition, add safe seek
+                windows and cached thumbnail previews. Bound disk and CPU use.
+              </p>
+            </article>
+            <article>
+              <span class="eyebrow">Phase 3</span>
+              <h3>Let users choose files</h3>
+              <p>
+                T01, T02, T03, S01, Q02. Deliver selection with retained
+                metadata, restart recovery and a working Download later action.
+              </p>
+            </article>
+            <article>
+              <span class="eyebrow">Phase 4</span>
+              <h3>Polish daily use</h3>
+              <p>
+                U01–U05, V08–V09, T04–T05, Q03. Add clearer status, mobile
+                controls, resume, subtitles and queue controls as demand
+                warrants.
+              </p>
+            </article>
+          </div>
+          <div class="deep">
+            <h3>Stack decisions</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Keep / change</th>
+                    <th>Recommendation</th>
+                    <th>When to revisit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Keep React + Vite + Express</td>
+                    <td>
+                      The app needs better media scheduling, not server
+                      rendering. Keep current feature boundaries.
+                    </td>
+                    <td>
+                      Consider a larger framework only for a concrete routing or
+                      server-rendering need.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Keep hls.js + FFmpeg</td>
+                    <td>
+                      Use existing ABR. Fix packaging, caching and rendition
+                      readiness before changing players.
+                    </td>
+                    <td>
+                      Add DASH only for a tested device or distribution
+                      requirement. Low-latency live HLS is not the first answer
+                      to VOD scrubbing.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Keep WebTorrent</td>
+                    <td>
+                      Extend the current adapter with metadata review and
+                      file-level selection.
+                    </td>
+                    <td>
+                      Evaluate a separate torrent daemon only if long-running
+                      seeding or operating limits outgrow this process.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Add SQLite for retained state</td>
+                    <td>
+                      Persist jobs, torrent metadata and file choices in
+                      transactions. Keep media files on disk. Evaluate the
+                      deployed Node runtime's SQLite API before choosing a
+                      driver.
+                    </td>
+                    <td>
+                      Postgres becomes useful for multiple app instances or
+                      shared multi-user state, not this first persistence pass.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Keep the quality toolchain</td>
+                    <td>
+                      Add real media, restart and selective-download regressions
+                      to existing Vitest and Playwright coverage.
+                    </td>
+                    <td>
+                      Use a dedicated benchmark worker only when stable timings
+                      cannot be collected locally.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Defer distributed infrastructure</td>
+                    <td>
+                      Start with bounded local encoder jobs, durable state and a
+                      measured cache budget.
+                    </td>
+                    <td>
+                      Add a worker service, object storage or CDN when
+                      concurrent use and egress measurements justify them.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+        <section class="section sources" id="references">
+          <h2>Sources & scope</h2>
+          <p>
+            Prepared from the local v3.3.2 checkout on 6 September 2026. This is
+            a code review and product proposal. The app's production playback
+            speed, current CI results and rendered app UI were not audited. UI
+            suggestions are based on component code and the requested workflows.
+            A missing feature means it was not found in the reviewed path.
+          </p>
+          <ul>
+            <li>
+              <a href="https://ffmpeg.org/ffmpeg-formats.html#hls-2"
+                >FFmpeg HLS muxer documentation</a
+              >
+              for segmentation and playlist controls.
+            </li>
+            <li>
+              <a href="https://hlsjs.video-dev.org/api-docs/hls.js.hls"
+                >hls.js API</a
+              >
+              for level selection and playback control.
+            </li>
+            <li>
+              <a href="https://webtorrent.io/docs">WebTorrent API</a> for
+              initial deselection, file selection and retained storage.
+            </li>
+            <li>
+              <a
+                href="https://developer.apple.com/documentation/http-live-streaming/hls-authoring-specification-for-apple-devices"
+                >Apple HLS authoring specification</a
+              >
+              as a compatibility checklist for implementation.
+            </li>
+          </ul>
+          <p>
+            Code pointers on each idea are relative to the repository root.
+            Tracker statuses are your planning data and do not inspect Git or
+            CI. Storage belongs to this browser and location; moving the HTML
+            file may create a separate storage area. Export JSON for a portable
+            backup.
+          </p>
+        </section>
+        <footer>
+          Media workspace / Working roadmap · Open any idea, choose its status,
+          and add a note. The HTML is standalone; progress backups are separate
+          JSON files.
+        </footer>
+      </main>
+    </div>
+    <script>
+      const ideas = [
+        {
+          id: "V01",
+          area: "Video",
+          priority: "P0",
+          effort: "S",
+          status: "Done",
+          title: "Measure startup and seek latency",
+          summary:
+            "Find out whether time is spent encoding, waiting for a worker, transferring bytes or decoding frames.",
+          now: "There are media tests, but this review did not find an end-to-end seek latency budget.",
+          plan: "Record seek release, first displayed frame, buffer length, rendition, cache hit and encoder queue time. Keep a repeatable benchmark with warm and cold clips.",
+          done: "Report p50 and p95 for original, prepared HLS and cold HLS on the same machine and network profile.",
+          depends: "None",
+          note: "Baseline report: docs/video-latency-baseline.md. Re-run with pnpm benchmark:video.",
+          evidence:
+            "docs/video-latency-baseline.md; tests/benchmarks/videoLatency.ts; server/infrastructure/media/videoRuntime.ts",
+        },
+        {
+          id: "V02",
+          area: "Video",
+          priority: "P0",
+          effort: "M",
+          title: "Publish only complete, accurate HLS segments",
+          summary:
+            "A segment file appearing on disk must not mean it is ready to play.",
+          now: "Availability counts matching filenames. Playlist durations are synthesized from a fixed interval, and routes check file existence.",
+          plan: "Use atomic segment publication and parse committed FFmpeg playlist entries. Preserve actual durations and gaps. Serve completed output with stable cache validators; keep mutable playlists fresh.",
+          done: "Requests made during encoding never receive partial media. Variable-frame-rate and final short segments play without timeline drift.",
+          depends: "V01",
+          evidence:
+            "server/infrastructure/media/videoRuntime.ts; server/media/hlsManifest.ts; server/handlers/videoHlsRoutes.ts",
+        },
+        {
+          id: "V03",
+          area: "Video",
+          priority: "P0",
+          effort: "L",
+          title: "Prioritize the time the user seeks to",
+          summary:
+            "A jump near the end should not wait for all earlier minutes to encode.",
+          now: "startPrioritySegmentWindow calls the full sequential encoder. Generated-only EVENT playlists limit what the player can seek through.",
+          plan: "First prepare a low rendition for retained videos. Then implement bounded target-window jobs and a full-duration seek model. Reuse compatible init data and align timestamps across windows; cancel obsolete demand without disturbing other viewers.",
+          done: "Jump to 80% of a cold 60-minute clip and decode valid audio/video near the target. Repeated seeks preserve time and prepared seeks meet the V01 budget.",
+          depends: "V01, V02, S02",
+          evidence:
+            "server/infrastructure/media/videoRuntime.ts; server/media/ffmpegHls.ts; server/media/hlsManifest.ts",
+        },
+        {
+          id: "V04",
+          area: "Video",
+          priority: "P0",
+          effort: "M",
+          title: "Make the bitrate ladder and manifest agree",
+          summary:
+            "Give Auto quality real choices with honest bandwidth and codec metadata.",
+          now: "The route estimates bandwidth independently of bitrateForHeight. CODECS is fixed, and the source HLS entry is also transcoded.",
+          plan: "Use one rendition definition for encoding and manifest generation. Include audio and overhead in bandwidth values and derive codec metadata from outputs. Align segment boundaries and avoid upscaling. Keep Original distinct from transcoded Auto.",
+          done: "Inspect encoded files and manifests for every level. Verify resolution, codec, peak bandwidth and switching alignment, including silent and high-frame-rate clips.",
+          depends: "V02",
+          evidence:
+            "server/media/ffmpegHls.ts; server/media/hlsManifest.ts; server/handlers/videoHlsRoutes.ts",
+        },
+        {
+          id: "V05",
+          area: "Video",
+          priority: "P0",
+          effort: "L",
+          title: "Have the next quality ready at the playhead",
+          summary:
+            "A bandwidth drop should switch to a usable lower rendition, not launch an encode from zero.",
+          now: "Variant requests start whole-file rendition jobs. The shared encoder limiter allows two jobs at a time.",
+          plan: "Prepare the low rendition first and warm candidate levels near playback. Coordinate advertised levels and scheduling so switching never depends on unrelated earlier work. Let hls.js retain its ABR logic.",
+          done: "Throttle bandwidth mid-video and confirm a downshift without a cold-level stall. Run two viewers at different times and check worker fairness.",
+          depends: "V03, V04, V07",
+          evidence:
+            "server/handlers/videoHlsRoutes.ts; server/infrastructure/media/videoRuntime.ts; client/src/features/player/adaptiveQuality.ts",
+        },
+        {
+          id: "V06",
+          area: "Video",
+          priority: "P1",
+          effort: "M",
+          title: "Add cached thumbnail scrubbing",
+          summary: "Show where a seek will land before the user commits it.",
+          now: "A timestamp thumbnail route exists, but native video controls do not connect it to a preview timeline.",
+          plan: "Generate small storyboard sheets and a timestamp index once per video. Reuse the endpoint for misses, cache results and limit concurrent work. Add an accessible timeline that requests playback only on committed seeks.",
+          done: "Pointer previews meet the warm-cache budget. Keyboard and touch can seek. Dragging for ten seconds does not spawn one FFmpeg process per event.",
+          depends: "V01, S02",
+          evidence:
+            "server/handlers/video/thumbnailRoute.ts; client/src/components/Preview/VideoPreviewContent.tsx",
+        },
+        {
+          id: "V07",
+          area: "Video",
+          priority: "P0",
+          effort: "M",
+          title: "Switch quality without recreating the player",
+          summary:
+            "Preserve position, paused state and buffer when changing Auto or a manual resolution.",
+          now: "selectedQuality is a dependency of the source effect, which destroys and recreates hls.js.",
+          plan: "Separate source attachment from level selection. Change the active instance level for HLS choices. Treat Original as a separate source transition and show Auto with the actual playing resolution.",
+          done: "Auto → 720p → Auto preserves playback state. Switching files starts at the correct position; Safari fallback and fatal errors remain usable.",
+          depends: "V04",
+          evidence:
+            "client/src/features/player/useVideoSource.ts; client/src/features/player/adaptiveQuality.ts; client/src/components/Preview/VideoPreviewContent.tsx",
+        },
+        {
+          id: "V08",
+          area: "Video",
+          priority: "P1",
+          effort: "S",
+          title: "Remember where playback stopped",
+          summary: "Offer Continue from 12:34 when reopening a video.",
+          now: "Volume and rate preferences exist. The reviewed player hooks do not provide a per-file resume library.",
+          plan: "Store a throttled playback position under a stable file identity. Offer Start over, clear near-end positions and save on pause or page hide.",
+          done: "Reload and resume the same file correctly. A different file with the same display name does not inherit its position.",
+          depends: "Stable file identity; S01 for cross-session retention",
+          evidence:
+            "client/src/features/player/useVideoPreferences.ts; client/src/features/player/useVideoEventSync.ts",
+        },
+        {
+          id: "V09",
+          area: "Video",
+          priority: "P1",
+          effort: "M",
+          title: "Add subtitle and audio-track choices",
+          summary:
+            "Let viewers select a language and load an external subtitle file.",
+          now: "The HLS encoder maps the first video and optional first audio stream. The reviewed player has no subtitle picker.",
+          plan: "Start with WebVTT and safely converted SRT via native text tracks. Probe embedded languages; add alternate audio HLS groups only when needed. Include subtitle size and timing offset controls.",
+          done: "A multilingual fixture switches audio in sync and displays captions on desktop and mobile. Malformed captions show a recoverable error.",
+          depends: "V02, V04",
+          evidence:
+            "server/media/ffmpegHls.ts; client/src/components/Preview/VideoPreviewContent.tsx",
+        },
+        {
+          id: "V10",
+          area: "Video",
+          priority: "P2",
+          effort: "M",
+          title: "Choose direct play or remux before encoding",
+          summary: "Save CPU when the browser can already decode the source.",
+          now: "Original playback and transcoded HLS are separate choices. Metadata extraction focuses on dimensions and duration.",
+          plan: "Probe codecs and container support. Prefer byte-range original playback when compatible; offer a remux when only the container is unsuitable. Preserve an explicit transcode fallback and explain the chosen mode.",
+          done: "Compatible MP4 plays with no encoder job. A supported codec in an unsuitable container remuxes correctly. Unsupported input falls back cleanly.",
+          depends: "V01, V04",
+          evidence:
+            "server/handlers/video/playbackRoutes.ts; server/infrastructure/media/videoRuntime.ts; client/src/features/player/useVideoSource.ts",
+        },
+        {
+          id: "T01",
+          area: "Torrents",
+          priority: "P0",
+          effort: "L",
+          title: "Choose files before a torrent starts",
+          summary:
+            "Review folders and sizes, then download only the selected files.",
+          now: "The adapter calls client.add with a storage path and no initial deselection. Metadata exposes file paths without per-file sizes.",
+          plan: "Create a metadata-only review state using initial deselection. Return stable file IDs, paths and sizes. Add folder checkboxes, all/none, search, selected byte totals and validated selection submission.",
+          done: "Select one file from a three-file fixture. It completes while skipped files remain unselected, allowing shared-piece overhead. Empty or unknown selections are rejected.",
+          depends: "T02",
+          evidence:
+            "server/application/torrents/torrentDownloader.ts; server/application/torrents/downloadTorrentSource.ts; client/src/features/workspace/components/DownloadDialog.tsx",
+        },
+        {
+          id: "T02",
+          area: "Torrents",
+          priority: "P0",
+          effort: "M",
+          title: "Track progress and completion per selected file",
+          summary:
+            "Show 2 of 2 selected files complete even when the torrent contains 20 files.",
+          now: "Progress uses torrent-wide counters and completion waits for the torrent done event.",
+          plan: "Model skipped, queued, downloading, verified and failed file states. Compute selected-set progress from verified data. Index only usable files and keep metadata rows for skipped files.",
+          done: "Selected completion ends the job without waiting for skipped files. Shared pieces do not inflate selected progress or mark incomplete files playable.",
+          depends: "None",
+          evidence:
+            "server/application/torrents/torrentDownloader.ts; server/application/torrents/downloadTorrentSource.ts; server/domain/models.ts",
+        },
+        {
+          id: "T03",
+          area: "Torrents",
+          priority: "P0",
+          effort: "L",
+          title: "Download skipped files later",
+          summary:
+            "Keep the full torrent file list with a Download action beside skipped entries.",
+          now: "The adapter removes the torrent when the operation settles. Session state is temporary and shutdown removes workspaces.",
+          plan: "Persist torrent metadata, selection and retained storage. Re-add retained torrents and verify existing pieces. Allow selection updates by file ID without duplicating the torrent or deleting completed files.",
+          done: "Download A, skip B, restart the server, request B and finish it. A is unchanged, verified pieces are reused and both files remain visible.",
+          depends: "T01, T02, S01",
+          evidence:
+            "server/application/torrents/torrentDownloader.ts; server/bootstrap/runtimeLifecycle.ts; server/repositories/memoryStores.ts",
+        },
+        {
+          id: "T04",
+          area: "Torrents",
+          priority: "P1",
+          effort: "M",
+          title: "Set file priority and transfer limits",
+          summary:
+            "Move the next episode ahead of the rest and leave bandwidth for playback.",
+          now: "There is a queue and torrent peer/speed reporting. The download UI exposes HTTP thread and retry options.",
+          plan: "Add file priority and global upload/download limits with a quiet-hours schedule only if requested. Use torrent-specific controls and explain stalled peer availability.",
+          done: "Prioritizing a file changes scheduling; limits apply across active torrents. HTTP thread settings are not presented as torrent parallelism controls.",
+          depends: "T01, T02",
+          evidence:
+            "client/src/features/workspace/components/DownloadDialog.tsx; server/application/torrents/torrentDownloader.ts",
+        },
+        {
+          id: "T05",
+          area: "Torrents",
+          priority: "P2",
+          effort: "L",
+          title: "Play a torrent video before it finishes",
+          summary:
+            "Begin with supported video formats and prioritize pieces around playback.",
+          now: "The torrent job indexes files after completion; playback resolves local files.",
+          plan: "After selective downloads are reliable, prioritize metadata and playhead pieces. Gate reads on verified availability and support pending range requests. Offer Download first for containers that need unavailable indexes.",
+          done: "A controlled peer fixture starts playback before completion, seeks into missing pieces and recovers from peer loss without serving corrupt bytes.",
+          depends: "T03, V03",
+          evidence:
+            "server/application/torrents/downloadTorrentSource.ts; server/handlers/video/playbackRoutes.ts",
+        },
+        {
+          id: "U01",
+          area: "UI / UX",
+          priority: "P1",
+          effort: "S",
+          title: "Explain what the player is waiting for",
+          summary:
+            "Distinguish downloading, preparing video and buffering instead of showing a generic wait.",
+          now: "Playback status is a short adaptive-stream label plus an optional error. Backend media work is separate from the active download job.",
+          plan: "Expose real player and encoder states. Offer a useful recovery action such as lower quality or retry. Show active resolution in Auto and identify Original playback correctly.",
+          done: "No-peers, queued encoder, missing segment and unsupported codec states have distinct messages with working actions.",
+          depends: "V01, V07",
+          evidence:
+            "client/src/components/Preview/VideoPreviewContent.tsx; server/handlers/videoHlsRoutes.ts",
+        },
+        {
+          id: "U02",
+          area: "UI / UX",
+          priority: "P1",
+          effort: "M",
+          title: "Make the file browser useful for large torrents",
+          summary:
+            "Keep skipped files visible, filter by media type and select multiple files at once.",
+          now: "The explorer renders file rows and provides sorting. Selective torrent metadata is not part of that flow.",
+          plan: "Add available/downloading/skipped filters, folder selection and clear selected totals. Preserve existing sorting. Profile a 10,000-file fixture before adding row virtualization.",
+          done: "Find and select an episode set without losing folder context. Keyboard navigation remains usable on a large fixture.",
+          depends: "T02",
+          evidence:
+            "client/src/components/ExplorerTablePanel.tsx; client/src/components/TreeExplorer.tsx",
+        },
+        {
+          id: "U03",
+          area: "UI / UX",
+          priority: "P1",
+          effort: "M",
+          title: "Give mobile playback a focused layout",
+          summary:
+            "Let the player use the screen while downloads remain one tap away.",
+          now: "Workspace layout, resizable panels and native video controls exist; this review has not visually audited breakpoints.",
+          plan: "Review narrow screens with real long filenames and active downloads. Collapse the session rail, use a preview-first view and keep actions touch-sized. Respect safe areas and orientation changes.",
+          done: "At 360 px width there is no page overflow; the picker, player and queue work with touch and keyboard.",
+          depends: "T01 for picker checks",
+          evidence:
+            "client/src/features/workspace/components/WorkspaceLayout.tsx; client/src/styles/workspace.css; client/src/styles/player.css",
+        },
+        {
+          id: "U04",
+          area: "UI / UX",
+          priority: "P1",
+          effort: "S",
+          title: "Keep keyboard and screen-reader flows intact",
+          summary:
+            "New player and torrent controls should work without a mouse.",
+          now: "Keyboard shortcuts, component tests and axe tooling already exist.",
+          plan: "Extend focus handling for the file picker, announce selected totals and transfer state, label seek controls and preserve visible focus. Keep essential controls visible on touch.",
+          done: "Add a torrent, select files, start, seek and close overlays using only the keyboard. Run axe and manually verify announcements.",
+          depends: "T01, V06",
+          evidence:
+            "client/src/hooks/useKeyboardShortcuts.ts; tests/e2e/smoke.spec.ts; package.json",
+        },
+        {
+          id: "U05",
+          area: "UI / UX",
+          priority: "P1",
+          effort: "M",
+          title: "Show storage use and make deletion explicit",
+          summary:
+            "Separate removing an item from deleting its downloaded files.",
+          now: "Sessions expire and removeSession deletes the workspace directory.",
+          plan: "Show original files, previews and transcodes separately. Add keep/pin controls, cache-only cleanup and clear deletion scope. Warn before removing files used by retained torrents.",
+          done: "Clear transcode cache without losing originals. Retained downloads survive expiry; explicit delete removes the intended files and updates the UI.",
+          depends: "S01, S02",
+          evidence:
+            "server/application/sessions/sessionManager.ts; server/bootstrap/runtimeLifecycle.ts",
+        },
+        {
+          id: "S01",
+          area: "Stack / operations",
+          priority: "P0",
+          effort: "L",
+          title: "Persist downloads beyond temporary sessions",
+          summary: "Make server restarts safe for the Download later workflow.",
+          now: "Jobs, sessions and transcodes use Maps. Shutdown removes sessions and cleans jobs.",
+          plan: "Add transactional SQLite state for retained jobs, torrent metadata, file selections and storage ownership. Reconcile disk state on startup. Close workers on shutdown without deleting retained data; keep temporary-session expiry explicit.",
+          done: "Graceful shutdown and forced termination recover retained state. Missing or changed disk files are detected and reverified rather than assumed complete.",
+          depends: "None",
+          evidence:
+            "server/repositories/memoryStores.ts; server/bootstrap/runtimeLifecycle.ts; server/application/sessions/sessionManager.ts",
+        },
+        {
+          id: "S02",
+          area: "Stack / operations",
+          priority: "P0",
+          effort: "M",
+          title: "Bound encoder work and cache growth",
+          summary:
+            "Repeated seeks should not exhaust CPU or leave abandoned encoders writing into deleted sessions.",
+          now: "HLS has a two-process limiter; thumbnail jobs use a separate command path. Session cleanup expects rendition process handles.",
+          plan: "Apply a shared media-work budget with deduplication and cancellation. Track running handles, wait for exit before cleanup and reserve capacity for interactive work. Add a disk budget and evict unused derived files.",
+          done: "Rapid seeking and session deletion leave no orphan process. Disk use stays within budget while active segments and originals remain available.",
+          depends: "V02",
+          evidence:
+            "server/media/processLimiter.ts; server/infrastructure/media/videoRuntime.ts; server/handlers/video/thumbnailRoute.ts; server/application/sessions/sessionManager.ts",
+        },
+        {
+          id: "S03",
+          area: "Stack / operations",
+          priority: "P2",
+          effort: "M",
+          title: "Offer hardware encoding when it helps",
+          summary:
+            "Use available acceleration after correctness and queueing are measured.",
+          now: "The HLS command uses libx264 and veryfast.",
+          plan: "Detect encoders in the deployed FFmpeg binary and verify device access. Add an opt-in hardware preset with a CPU fallback. Compare speed, image quality and output size using the same fixtures.",
+          done: "Unsupported machines fall back clearly. A real Docker run on supported hardware shows a measured gain and valid seekable output.",
+          depends: "V01, V04, S02",
+          evidence: "server/media/ffmpegHls.ts; Dockerfile",
+        },
+        {
+          id: "S04",
+          area: "Stack / operations",
+          priority: "P1",
+          effort: "S",
+          title: "Finish typed API coverage as features change",
+          summary:
+            "Use the existing oRPC and Zod contracts for new torrent and playback state.",
+          now: "oRPC, Zod and TanStack Query are installed, while video quality loading still uses a fetch helper and local payload shape.",
+          plan: "Add file-selection and media-state schemas to existing contracts. Migrate adjacent ad hoc fetches when touching them. Keep binary media delivery as HTTP.",
+          done: "Invalid file IDs and state transitions fail at the boundary. Contract changes are caught by typecheck and focused integration tests.",
+          depends: "T02",
+          evidence:
+            "client/src/features/player/useVideoQualities.ts; client/src/services/orpcClient.ts; server/rpc/serverRouter.ts",
+        },
+        {
+          id: "Q01",
+          area: "Tooling / quality",
+          priority: "P0",
+          effort: "M",
+          title: "Test real playback through the shipped container",
+          summary:
+            "Catch packaging and decoding failures that mocked player tests miss.",
+          now: "FFmpeg fixture, Dockerfile and browser tests exist. CI runs Chromium on PRs and more browsers on other configured events.",
+          plan: "Extend fixtures with long GOPs, variable frame rate, no audio and an unsupported codec. Run the built container and decode HLS in a browser. Add controlled network changes and random seeks.",
+          done: "The container passes a real media smoke test. Missing init files, truncated segments, codec mismatches and broken seeks produce failures.",
+          depends: "V02, V04",
+          evidence:
+            "tests/integration/ffmpegHlsFixture.test.ts; tests/integration/dockerfile.test.ts; .github/workflows/quality.yml",
+        },
+        {
+          id: "Q02",
+          area: "Tooling / quality",
+          priority: "P0",
+          effort: "M",
+          title: "Use deterministic selective-torrent tests",
+          summary:
+            "Test file choices and recovery without relying on a public swarm.",
+          now: "Torrent source and adapter tests exist. Selective completion and deferred selection are new flows.",
+          plan: "Run a local seed with multiple files and shared boundary pieces. Exercise initial selection, later selection, pause, restart, missing storage and peer loss.",
+          done: "CI proves skipped payload is limited to shared-piece needs, hashes match and completed data is reused after restart.",
+          depends: "T03",
+          evidence:
+            "server/application/torrents/downloadTorrentSource.test.ts; server/application/torrents/torrentSource.test.ts",
+        },
+        {
+          id: "Q03",
+          area: "Tooling / quality",
+          priority: "P1",
+          effort: "S",
+          title: "Add a small playback diagnostics view",
+          summary: "Make a slow-video report come with evidence.",
+          now: "The project has a server dashboard and logging, but the reviewed player only exposes an error string.",
+          plan: "Show mode, active level, estimated bandwidth, buffer, dropped frames and encoder wait time. Add a copyable sanitized report without source URLs or local paths.",
+          done: "A reproduced stall yields enough data to separate peer starvation, encoding delay and network buffering.",
+          depends: "V01, U01",
+          evidence:
+            "server/tui/dashboard.ts; client/src/components/Preview/VideoPreviewContent.tsx",
+        },
+        {
+          id: "Q04",
+          area: "Tooling / quality",
+          priority: "P1",
+          effort: "M",
+          title: "Review resource limits around new download flows",
+          summary:
+            "Keep metadata review and deferred downloads within the app's existing trust boundaries.",
+          now: "Torrent metadata size checks and file path validation exist. New selection endpoints and retained storage expand the lifecycle.",
+          plan: "Carry path and URL validation through redirects, metadata, selection updates and extraction. Enforce disk, file-count and media-job limits on the server. Scope retained files to their owning session or account.",
+          done: "Fixtures reject path escapes, unknown file IDs, oversized metadata and exhausted storage without affecting other retained downloads.",
+          depends: "T01, S01",
+          evidence:
+            "server/application/torrents/torrentSource.ts; server/application/torrents/torrentDownloader.ts; server/handlers/video/routeContext.ts",
+        },
+      ];
+      const statuses = [
+        "Proposed",
+        "Planned",
+        "In progress",
+        "Done",
+        "Deferred",
+      ];
+      const storageKey = "zip-image-viewer-roadmap-v1";
+      const byId = new Map(ideas.map((item) => [item.id, item]));
+      let state = {};
+      const $ = (id) => document.getElementById(id);
+      function message(text) {
+        $("notice").textContent = text;
+      }
+      function validate(payload) {
+        if (
+          !payload ||
+          payload.version !== 1 ||
+          !payload.items ||
+          typeof payload.items !== "object" ||
+          Array.isArray(payload.items)
+        )
+          throw new Error("This is not a version 1 roadmap backup.");
+        const clean = {};
+        for (const [id, value] of Object.entries(payload.items)) {
+          if (!byId.has(id)) continue;
+          if (
+            !value ||
+            !statuses.includes(value.status) ||
+            typeof value.note !== "string" ||
+            value.note.length > 10000
+          )
+            throw new Error("A saved item has an invalid status or note.");
+          clean[id] = { status: value.status, note: value.note };
+        }
+        return clean;
+      }
+      function saved(id) {
+        const item = byId.get(id);
+        return (
+          state[id] || {
+            status: item.status || "Proposed",
+            note: item.note || "",
+          }
+        );
+      }
+      function backup() {
+        return {
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          items: state,
+        };
+      }
+      function persist() {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(backup()));
+          message(
+            "Progress saved in this browser. Export a backup to keep a portable copy.",
+          );
+        } catch {
+          message(
+            "Browser storage is unavailable or full. Changes remain here for now; export them before closing.",
+          );
+        }
+      }
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (raw) state = validate(JSON.parse(raw));
+      } catch {
+        message(
+          "Saved progress could not be loaded. Import a backup or keep editing and export before closing.",
+        );
+      }
+      function element(tag, text, className) {
+        const node = document.createElement(tag);
+        if (text !== undefined) node.textContent = text;
+        if (className) node.className = className;
+        return node;
+      }
+      for (const area of [...new Set(ideas.map((item) => item.area))])
+        $("area").add(new Option(area, area));
+      for (const status of statuses)
+        $("status").add(new Option(status, status));
+      function render() {
+        $("cards").replaceChildren();
+        for (const item of ideas) {
+          const card = element("article", undefined, "card");
+          card.id = item.id;
+          card.dataset.status = saved(item.id).status;
+          const top = element("div", undefined, "card-top");
+          top.append(
+            element("span", item.id + " / " + item.area, "card-id"),
+            element("span", item.priority, "badge"),
+          );
+          card.append(
+            top,
+            element("h3", item.title),
+            element("p", item.summary, "summary"),
+          );
+          const meta = element("div", undefined, "meta");
+          meta.append(
+            element("span", "Effort " + item.effort),
+            element("span", "Depends on " + item.depends),
+          );
+          card.append(meta);
+          const detail = element("details");
+          detail.append(element("summary", "Plan & completion check"));
+          for (const [label, value] of [
+            ["Current code", item.now],
+            ["Proposed change", item.plan],
+            ["Done when", item.done],
+            ["Code pointers", item.evidence],
+          ]) {
+            detail.append(
+              element("div", label, "detail-label"),
+              element("p", value, label === "Code pointers" ? "evidence" : ""),
+            );
+          }
+          const noteLabel = element(
+            "label",
+            "Notes / owner / PR link",
+            "notes-label",
+          );
+          noteLabel.htmlFor = "note-" + item.id;
+          const note = element("textarea");
+          note.id = noteLabel.htmlFor;
+          note.value = saved(item.id).note;
+          note.maxLength = 10000;
+          note.placeholder = "Add your next step or completion evidence…";
+          note.addEventListener("input", () => {
+            state[item.id] = { ...saved(item.id), note: note.value };
+            persist();
+          });
+          detail.append(noteLabel, note);
+          card.append(detail);
+          const printStatus = element(
+            "p",
+            "Status: " + saved(item.id).status,
+            "print-status",
+          );
+          printStatus.hidden = true;
+          card.append(printStatus);
+          const foot = element("div", undefined, "card-foot");
+          const label = element("label", "Status");
+          label.htmlFor = "state-" + item.id;
+          const select = element("select");
+          select.id = label.htmlFor;
+          select.setAttribute("aria-label", item.id + " status");
+          for (const status of statuses) select.add(new Option(status, status));
+          select.value = saved(item.id).status;
+          select.addEventListener("change", () => {
+            state[item.id] = { ...saved(item.id), status: select.value };
+            card.dataset.status = select.value;
+            printStatus.textContent = "Status: " + select.value;
+            persist();
+            filter();
+          });
+          foot.append(label, select);
+          card.append(foot);
+          $("cards").append(card);
+        }
+        filter();
+      }
+      function filter() {
+        const term = $("search").value.trim().toLowerCase();
+        let visible = 0;
+        for (const item of ideas) {
+          const matches =
+            (!$("area").value || item.area === $("area").value) &&
+            (!$("status").value ||
+              saved(item.id).status === $("status").value) &&
+            (!$("priority").value || item.priority === $("priority").value) &&
+            (!term ||
+              (Object.values(item).join(" ") + " " + saved(item.id).note)
+                .toLowerCase()
+                .includes(term));
+          $(item.id).hidden = !matches;
+          if (matches) visible++;
+        }
+        const done = ideas.filter(
+          (item) => saved(item.id).status === "Done",
+        ).length;
+        const active = ideas.filter(
+          (item) => saved(item.id).status === "In progress",
+        ).length;
+        $("result").textContent =
+          visible + " of " + ideas.length + " ideas shown";
+        $("empty").hidden = visible !== 0;
+        $("percent").textContent =
+          Math.round((done / ideas.length) * 100) + "%";
+        $("progress").value = (done / ideas.length) * 100;
+        $("totals").textContent =
+          done +
+          " done · " +
+          active +
+          " in progress · " +
+          ideas.length +
+          " total";
+        $("count-label").textContent = ideas.length + " improvements";
+      }
+      for (const id of ["search", "area", "status", "priority"])
+        $(id).addEventListener("input", filter);
+      $("clear").addEventListener("click", () => {
+        for (const id of ["search", "area", "status", "priority"])
+          $(id).value = "";
+        filter();
+      });
+      $("export").addEventListener("click", () => {
+        const url = URL.createObjectURL(
+          new Blob([JSON.stringify(backup(), null, 2)], {
+            type: "application/json",
+          }),
+        );
+        const link = element("a");
+        link.href = url;
+        link.download = "media-roadmap-progress.json";
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        message("Progress exported. Keep the JSON file with this HTML.");
+      });
+      $("import").addEventListener("click", () => $("import-file").click());
+      $("import-file").addEventListener("change", async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        try {
+          if (file.size > 1000000)
+            throw new Error("Backup is too large. Maximum size is 1 MB.");
+          const imported = validate(JSON.parse(await file.text()));
+          if (!Object.keys(imported).length)
+            throw new Error("The backup contains no recognized saved items.");
+          if (
+            !confirm(
+              "Import replaces statuses and notes for matching items. Continue?",
+            )
+          )
+            return;
+          state = { ...state, ...imported };
+          persist();
+          render();
+        } catch (error) {
+          message(
+            "Import failed. " +
+              (error instanceof Error ? error.message : "Invalid backup."),
+          );
+        } finally {
+          event.target.value = "";
+        }
+      });
+      let printDetails = [];
+      let printCards = [];
+      addEventListener("beforeprint", () => {
+        printDetails = [...document.querySelectorAll(".card details")].map(
+          (node) => [node, node.open],
+        );
+        printCards = [...document.querySelectorAll(".card")].map((node) => [
+          node,
+          node.hidden,
+        ]);
+        for (const [node] of printDetails) node.open = true;
+        for (const [node] of printCards) node.hidden = false;
+      });
+      addEventListener("afterprint", () => {
+        for (const [node, open] of printDetails) node.open = open;
+        for (const [node, hidden] of printCards) node.hidden = hidden;
+      });
+      $("print").addEventListener("click", () => window.print());
+      render();
+    </script>
+  </body>
+</html>
