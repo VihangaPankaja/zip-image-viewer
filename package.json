@@ -1,6 +1,6 @@
 {
   "name": "zip-image-viewer",
-  "version": "3.3.1",
+  "version": "3.3.2",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@12.1.0",
@@ -30,6 +30,8 @@
     "test:coverage": "node --no-experimental-webstorage ./node_modules/vitest/vitest.mjs run --configLoader runner --coverage",
     "test:related": "node --no-experimental-webstorage ./node_modules/vitest/vitest.mjs related --configLoader runner --run",
     "test:e2e": "playwright test",
+    "check:roadmap": "node docs/app-roadmap.check.mjs",
+    "benchmark:video": "tsx tests/benchmarks/videoLatency.ts",
     "start": "node build/server/index.js",
     "fallow:health": "fallow health --coverage coverage/coverage-final.json --min-score 80 --score",
     "fallow:audit": "fallow audit --base origin/master --gate new-only --brief",
