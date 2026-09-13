@@ -121,11 +121,11 @@ test("blocks duplicate downloads until every URL is unique", async ({
   await page
     .getByRole("textbox", { name: "Paste download URLs" })
     .fill("https://example.com/a.zip\nhttps://example.com/a.zip");
-  await page.getByRole("button", { name: "Review links" }).click();
+  await page.getByRole("heading", { name: "Add downloads" }).click();
 
   await expect(page.getByText(/2 duplicates/)).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Add 2 downloads" }),
+    page.getByRole("button", { name: "Add to queue" }),
   ).toBeDisabled();
 
   await page
@@ -134,7 +134,7 @@ test("blocks duplicate downloads until every URL is unique", async ({
     .fill("https://example.com/b.zip");
   await expect(page.getByText(/duplicates/)).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: "Add 2 downloads" }),
+    page.getByRole("button", { name: "Add to queue" }),
   ).toBeEnabled();
 });
 
