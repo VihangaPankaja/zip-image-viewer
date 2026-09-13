@@ -298,6 +298,7 @@
 
 .download-list {
   display: grid;
+  min-width: 0;
   gap: 1px;
   margin: 0;
   padding: 0;
@@ -307,7 +308,9 @@
 
 .download-row {
   display: grid;
-  grid-template-columns: 62px minmax(0, 1fr) auto;
+  grid-template-columns: 100px minmax(0, 1fr) minmax(0, max-content);
+  min-width: 0;
+  max-width: 100%;
   gap: var(--space-4);
   padding: var(--space-4);
   background: var(--bg-panel);
@@ -324,11 +327,13 @@
 }
 
 .download-priority {
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, 44px);
   align-content: start;
 }
 
 .download-priority > span {
+  grid-column: 1 / -1;
   width: 100%;
   color: var(--text-dim);
   font-family: ui-monospace, monospace;
@@ -338,7 +343,9 @@
 
 .download-priority button,
 .download-row-actions button {
-  min-height: 32px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg-inset);
@@ -346,9 +353,21 @@
 }
 
 .download-row-actions {
+  min-width: 0;
+  max-width: 220px;
   align-items: start;
   flex-wrap: wrap;
   justify-content: end;
+}
+
+.download-confirm-error {
+  flex: 1 1 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--accent-danger);
+  font-size: 0.75rem;
 }
 
 .download-row-main {
@@ -359,20 +378,27 @@
 
 .download-row-title,
 .download-progress-line {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
 }
 
 .download-row-title strong,
 .download-row-main code {
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.download-row-title strong {
+  flex: 1 1 auto;
+}
+
 .download-row-title > span {
+  flex: 0 0 auto;
   color: var(--accent-strong);
   font-size: 0.7rem;
   font-weight: 800;
@@ -382,18 +408,20 @@
 
 .download-progress-line progress {
   width: 100%;
+  min-width: 0;
   height: 7px;
   accent-color: var(--accent);
 }
 
 .download-progress-line b {
+  flex: 0 0 auto;
   min-width: 3.5ch;
   font-size: 0.78rem;
 }
 
 .download-telemetry {
   display: grid;
-  grid-template-columns: repeat(5, minmax(90px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(96px, 100%), 1fr));
   gap: 8px;
   margin: 0;
 }
@@ -418,8 +446,16 @@
 }
 
 .download-row-main code {
+  display: block;
   color: var(--text-dim);
   font-size: 0.7rem;
+}
+
+.download-status-message {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+  font-size: 0.78rem;
 }
 
 .download-empty {
@@ -440,7 +476,7 @@
   border-radius: 18px;
   background: var(--bg-panel-strong);
   color: var(--text);
-  box-shadow: var(--shadow-strong);
+  box-shadow: var(--shadow);
 }
 
 .download-dialog::backdrop {
@@ -450,7 +486,7 @@
 
 .download-dialog-sheet {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   max-height: calc(100dvh - 34px);
 }
 
@@ -463,6 +499,7 @@
 
 .download-dialog-sheet > header,
 .download-dialog-sheet > footer {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -481,7 +518,7 @@
 
 .download-compose {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: end;
   gap: 10px;
 }
@@ -497,6 +534,13 @@
 }
 
 .download-compose textarea {
+  min-width: 0;
+  min-height: 108px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  color: var(--text);
   resize: vertical;
 }
 
@@ -508,10 +552,61 @@
 
 .download-draft {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) minmax(160px, auto) auto;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
   align-items: start;
   gap: 10px;
   border-block-end: 1px solid var(--border);
+}
+
+.download-draft > label {
+  min-width: 0;
+}
+
+.download-draft > label input,
+.draft-settings input,
+.draft-settings select {
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  color: var(--text);
+}
+
+.download-draft > details {
+  grid-column: 2;
+}
+
+.download-draft > details summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--text-muted);
+}
+
+.download-draft > .ghost-button {
+  grid-column: 3;
+  grid-row: 1;
+  min-height: 44px;
+}
+
+.draft-error,
+.download-submit-error {
+  color: var(--accent-danger);
+  font-size: 0.75rem;
+}
+
+.download-submit-error {
+  margin: 0;
+  padding: 10px var(--space-4);
+  border-block-start: 1px solid var(--border);
+  background: color-mix(in srgb, var(--accent-danger) 10%, transparent);
+}
+
+.download-dialog .primary-button,
+.download-dialog .ghost-button {
+  min-height: 44px;
 }
 
 .download-draft.invalid {
@@ -526,7 +621,7 @@
 
 .draft-settings {
   display: grid;
-  grid-template-columns: repeat(2, 74px);
+  grid-template-columns: repeat(3, minmax(88px, 1fr));
   gap: 8px;
   padding-block-start: 8px;
 }
@@ -812,13 +907,18 @@
   }
 
   .download-row {
-    grid-template-columns: 46px minmax(0, 1fr);
+    grid-template-columns: 52px minmax(0, 1fr);
     gap: 10px;
   }
 
   .download-row-actions {
     grid-column: 2;
+    max-width: 100%;
     justify-content: start;
+  }
+
+  .download-priority {
+    grid-template-columns: 44px;
   }
 
   .download-telemetry {
@@ -847,6 +947,29 @@
   .download-compose,
   .download-draft {
     grid-template-columns: 1fr;
+  }
+
+  .download-draft > label,
+  .download-draft > details,
+  .download-draft > .ghost-button {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .download-draft > .ghost-button {
+    width: 100%;
+  }
+
+  .draft-settings {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  }
+
+  .download-dialog-sheet > footer {
+    align-items: stretch;
+  }
+
+  .download-dialog-sheet > footer .primary-button {
+    width: 100%;
   }
 
   .draft-index {

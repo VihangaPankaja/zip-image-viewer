@@ -35,6 +35,7 @@ export function WorkspacePageView({ controller }: ViewProps) {
       jobs={queue.jobs}
       maxConcurrent={queue.maxConcurrent}
       onCancel={(id) => void queue.cancel(id)}
+      onConfirm={(id) => queue.confirm(id).then(() => undefined)}
       onOpenSession={(jobId) => {
         const sessionId = queue.jobs.find(({ id }) => id === jobId)?.sessionId;
         if (sessionId) void controller.actions.openSession(sessionId);
@@ -72,10 +73,9 @@ export function WorkspacePageView({ controller }: ViewProps) {
         defaultOptions={settings.downloadOptions}
         open={state.downloadDialogOpen}
         onClose={() => state.setDownloadDialogOpen(false)}
-        onSubmit={(items) => {
-          void queue
-            .enqueue(items)
-            .then(() => state.setDownloadDialogOpen(false));
+        onSubmit={async (items) => {
+          await queue.enqueue(items);
+          state.setDownloadDialogOpen(false);
         }}
       />
       {state.activeView === "explore" ? (

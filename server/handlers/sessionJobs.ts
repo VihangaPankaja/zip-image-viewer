@@ -10,7 +10,7 @@ type RangeValue = { start: number; end: number };
 export type SessionJobRouteDependencies = {
   getJob: (_jobId: string) => SessionJob | undefined;
   sanitizeJob: (_job: SessionJob) => unknown;
-  enqueueSessionJob: (_job: SessionJob, _confirmOversize: boolean) => void;
+  confirmSessionJob: (_jobId: string) => SessionJob;
   parseRangeHeader: (
     _rangeHeader: string | undefined,
     _fileSize: number,
@@ -64,10 +64,7 @@ function registerStateRoutes(
         .status(400)
         .json({ error: "This job does not need confirmation." });
     }
-    job.requiresConfirmation = false;
-    job.cleanupAt = 0;
-    deps.enqueueSessionJob(job, true);
-    return res.json(deps.sanitizeJob(job));
+    return res.json(deps.sanitizeJob(deps.confirmSessionJob(job.id)));
   });
 }
 

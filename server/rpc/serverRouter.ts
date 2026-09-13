@@ -15,6 +15,7 @@ export type ServerRpcDependencies = {
   enqueueJobs: (_input: EnqueueSessionsInput) => Job[] | Promise<Job[]>;
   getSession: (_id: string) => SessionSummary | undefined;
   cancelJob: (_id: string) => Job | Promise<Job>;
+  confirmJob: (_id: string) => Job | Promise<Job>;
   retryJob: (_id: string) => Job | Promise<Job>;
   pauseJob: (_id: string) => Job | Promise<Job>;
   resumeJob: (_id: string) => Job | Promise<Job>;
@@ -53,6 +54,9 @@ export function createServerRpcRouter(deps: ServerRpcDependencies) {
       })),
       cancel: contract.jobs.cancel.handler(({ input }) =>
         deps.cancelJob(input.id),
+      ),
+      confirm: contract.jobs.confirm.handler(({ input }) =>
+        deps.confirmJob(input.id),
       ),
       retry: contract.jobs.retry.handler(({ input }) =>
         deps.retryJob(input.id),

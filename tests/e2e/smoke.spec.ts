@@ -25,8 +25,11 @@ test("manages downloads and opens the Explore workspace", async ({
   await page
     .getByRole("textbox", { name: "Paste download URLs" })
     .fill("https://example.com/a.zip\nhttps://example.com/b.zip");
-  await page.getByRole("button", { name: "Review links" }).click();
+  await page.getByRole("heading", { name: "Add downloads" }).click();
   await expect(page.getByLabel("Download URL", { exact: true })).toHaveCount(2);
+  await expect(page.getByRole("button", { name: "Review links" })).toHaveCount(
+    0,
+  );
   await page.getByRole("button", { name: "Close" }).click();
 
   await page.getByRole("tab", { name: "Explore" }).click();
@@ -69,6 +72,28 @@ test("mobile uses a full-screen add sheet and tree-to-preview navigation", async
   }));
   expect(dialogBounds?.width ?? 0).toBeGreaterThanOrEqual(viewport.width - 1);
   expect(dialogBounds?.height ?? 0).toBeGreaterThanOrEqual(viewport.height - 1);
+  await page
+    .getByRole("textbox", { name: "Paste download URLs" })
+    .fill(`https://example.com/${"long-title-".repeat(35)}archive.zip`);
+  await page.getByRole("heading", { name: "Add downloads" }).click();
+  await expect(page.getByLabel("Download URL", { exact: true })).toHaveCount(1);
+  const addButton = page.getByRole("button", { name: "Add to queue" });
+  const [dialogBoundsAfterInput, addButtonBounds] = await Promise.all([
+    page.getByRole("dialog").boundingBox(),
+    addButton.boundingBox(),
+  ]);
+  expect(dialogBoundsAfterInput).not.toBeNull();
+  expect(addButtonBounds).not.toBeNull();
+  expect(
+    (addButtonBounds?.x ?? 0) + (addButtonBounds?.width ?? Infinity),
+  ).toBeLessThanOrEqual(
+    (dialogBoundsAfterInput?.x ?? 0) + (dialogBoundsAfterInput?.width ?? 0) + 1,
+  );
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+    ),
+  ).toBe(true);
   await page.getByRole("button", { name: "Close" }).click();
 
   await page.getByRole("tab", { name: "Explore" }).click();
@@ -96,11 +121,11 @@ test("blocks duplicate downloads until every URL is unique", async ({
   await page
     .getByRole("textbox", { name: "Paste download URLs" })
     .fill("https://example.com/a.zip\nhttps://example.com/a.zip");
-  await page.getByRole("button", { name: "Review links" }).click();
+  await page.getByRole("heading", { name: "Add downloads" }).click();
 
   await expect(page.getByText(/2 duplicates/)).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Add 2 downloads" }),
+    page.getByRole("button", { name: "Add to queue" }),
   ).toBeDisabled();
 
   await page
@@ -109,7 +134,7 @@ test("blocks duplicate downloads until every URL is unique", async ({
     .fill("https://example.com/b.zip");
   await expect(page.getByText(/duplicates/)).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: "Add 2 downloads" }),
+    page.getByRole("button", { name: "Add to queue" }),
   ).toBeEnabled();
 });
 

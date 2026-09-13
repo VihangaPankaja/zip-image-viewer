@@ -70,6 +70,35 @@ describe("createProcessSessionJob", () => {
     await expect(stat(workspace)).resolves.toMatchObject({});
   });
 
+  it("treats a requested cancellation as a normal terminal state", async () => {
+    const logEvent = vi.fn();
+    const manager = createJobManager(new Map(), vi.fn());
+    const job = manager.createJob("https://example.com/archive.zip");
+    mocks.downloadSessionSource.mockRejectedValue(
+      Object.assign(new Error("Cancelled"), { name: "AbortError" }),
+    );
+    const processJob = createProcessSessionJob({
+      sessionStore: new Map(),
+      torrentAdapter: { download: vi.fn(), close: vi.fn() },
+      emitJob: manager.emitJob,
+      closeJob: manager.closeJob,
+      download: vi.fn(),
+      detectEncryption: vi.fn(),
+      extractWith7zip: vi.fn(),
+      listExtractedEntries: vi.fn(),
+      logEvent,
+    });
+
+    await processJob(job);
+
+    expect(job.status).toBe("cancelled");
+    expect(logEvent).not.toHaveBeenCalledWith(
+      "error",
+      "session.create.failed",
+      expect.anything(),
+    );
+  });
+
   it("builds a completed session directly from deterministic torrent files", async () => {
     const workspace = await mkdtemp(path.join(os.tmpdir(), "torrent-job-"));
     workspaces.push(workspace);

@@ -16,6 +16,7 @@ type Dependencies = {
     _sourcePreference?: "auto" | "http" | "torrent",
   ) => SessionJob;
   enqueueJob: (_job: SessionJob, _confirmOversize: boolean) => void;
+  confirmJob: (_id: string) => SessionJob;
   listOrderedJobs: () => readonly SessionJob[];
   pauseJob: (_id: string) => Promise<SessionJob>;
   resumeJob: (_id: string) => SessionJob;
@@ -81,6 +82,7 @@ export function createRuntimeApp(deps: Dependencies) {
         }
         return deps.sanitizeJob(deps.cancelJob(job));
       },
+      confirmJob: (id) => deps.sanitizeJob(deps.confirmJob(id)),
       retryJob: (id) => {
         const previous = deps.jobs.get(id);
         if (!previous)

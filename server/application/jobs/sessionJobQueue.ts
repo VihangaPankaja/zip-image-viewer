@@ -1,4 +1,4 @@
-import type { SessionJob } from "../../domain/models.js";
+import { ApplicationError, type SessionJob } from "../../domain/models.js";
 
 type QueueItem = { job: SessionJob; confirmOversize: boolean };
 
@@ -26,7 +26,7 @@ type QueueState = SessionJobQueueDeps & {
   jobs: Map<string, QueueItem>;
   jobOrder: string[];
   pausing: Set<string>;
-  requeueAfterPause: Set<string>;
+  requeueAfterActive: Set<string>;
 };
 
 function validateConcurrency(value: number): void {
@@ -75,7 +75,7 @@ function scheduleSessionJobs(state: QueueState): void {
         state.activeItems.delete(next.job.id);
         state.pausing.delete(next.job.id);
         state.decrementActiveSessionJobCount();
-        if (state.requeueAfterPause.delete(next.job.id)) {
+        if (state.requeueAfterActive.delete(next.job.id)) {
           state.pendingSessionJobs.push(next);
           sortPending(state);
         }
@@ -142,11 +142,11 @@ function reorderSessionJobs(
     .at(0);
   if (!candidate) return;
   state.pausing.add(candidate.job.id);
-  state.requeueAfterPause.add(candidate.job.id);
+  state.requeueAfterActive.add(candidate.job.id);
   candidate.job.pauseRequested = true;
   void pauseJob(candidate.job).catch((error: unknown) => {
     state.pausing.delete(candidate.job.id);
-    state.requeueAfterPause.delete(candidate.job.id);
+    state.requeueAfterActive.delete(candidate.job.id);
     state.logEvent("error", "job.pause.failed", {
       jobId: candidate.job.id,
       error: error instanceof Error ? error.message : "Unknown",
@@ -186,6 +186,37 @@ function resumeSessionJob(state: QueueState, jobId: string): SessionJob {
   return item.job;
 }
 
+function confirmSessionJob(state: QueueState, jobId: string): SessionJob {
+  const item = state.jobs.get(jobId);
+  if (!item) throw new ApplicationError("NOT_FOUND", "Job not found.", 404);
+  if (
+    item.job.status !== "awaiting_confirmation" ||
+    !item.job.requiresConfirmation
+  ) {
+    throw new ApplicationError(
+      "CONFLICT",
+      "Job is not awaiting confirmation.",
+      409,
+    );
+  }
+  Object.assign(item.job, {
+    status: "queued",
+    phase: "queued",
+    requiresConfirmation: false,
+    cleanupAt: 0,
+    message: "Confirmation accepted. Waiting to start.",
+  });
+  item.confirmOversize = true;
+  if (state.activeItems.has(jobId)) {
+    state.requeueAfterActive.add(jobId);
+  } else {
+    state.pendingSessionJobs.push(item);
+    sortPending(state);
+    scheduleSessionJobs(state);
+  }
+  return item.job;
+}
+
 function cancelSessionJob(state: QueueState, jobId: string): SessionJob {
   const item = state.jobs.get(jobId);
   if (!item) throw new Error("Job not found.");
@@ -193,6 +224,7 @@ function cancelSessionJob(state: QueueState, jobId: string): SessionJob {
     ({ job }) => job.id === jobId,
   );
   if (pendingIndex >= 0) state.pendingSessionJobs.splice(pendingIndex, 1);
+  state.requeueAfterActive.delete(jobId);
   item.job.pauseRequested = false;
   item.job.abortController?.abort();
   Object.assign(item.job, {
@@ -229,10 +261,11 @@ export function createSessionJobQueue(deps: SessionJobQueueDeps) {
     jobs: new Map(),
     jobOrder: [],
     pausing: new Set(),
-    requeueAfterPause: new Set(),
+    requeueAfterActive: new Set(),
   };
   return {
     cancelSessionJob: (jobId: string) => cancelSessionJob(state, jobId),
+    confirmSessionJob: (jobId: string) => confirmSessionJob(state, jobId),
     enqueueSessionJob: (job: SessionJob, confirmOversize: boolean) =>
       enqueueSessionJob(state, job, confirmOversize),
     getSchedulerState: () => ({
