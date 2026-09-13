@@ -127,6 +127,64 @@ describe("createSessionJobQueue", () => {
     expect(peak).toBe(2);
   });
 
+  it("requeues one confirmed run after the awaiting worker releases its slot", async () => {
+    let active = 0;
+    let peak = 0;
+    let releaseAwaiting: (() => void) | undefined;
+    const job = createJob("oversized");
+    const dependencies = {
+      pendingSessionJobs: [] as Array<{
+        job: SessionJob;
+        confirmOversize: boolean;
+      }>,
+      getActiveSessionJobCount: () => active,
+      incrementActiveSessionJobCount: () => {
+        active += 1;
+        peak = Math.max(peak, active);
+      },
+      decrementActiveSessionJobCount: () => {
+        active -= 1;
+      },
+      maxActiveSessionJobs: 2,
+      processSessionJob: vi.fn(
+        (activeJob: SessionJob, confirmOversize: boolean) => {
+          if (confirmOversize) return Promise.resolve();
+          Object.assign(activeJob, {
+            status: "awaiting_confirmation",
+            phase: "confirm",
+            requiresConfirmation: true,
+          });
+          return new Promise<void>((resolve) => (releaseAwaiting = resolve));
+        },
+      ),
+      logEvent: vi.fn(),
+    };
+    const queue = createSessionJobQueue(dependencies);
+    queue.enqueueSessionJob(job, false);
+
+    expect(queue.confirmSessionJob(job.id)).toMatchObject({
+      status: "queued",
+      phase: "queued",
+      requiresConfirmation: false,
+      cleanupAt: 0,
+      message: "Confirmation accepted. Waiting to start.",
+    });
+    expect(dependencies.processSessionJob).toHaveBeenCalledTimes(1);
+    expect(active).toBe(1);
+    expect(() => queue.confirmSessionJob(job.id)).toThrow(
+      "Job is not awaiting confirmation.",
+    );
+    expect(() => queue.confirmSessionJob("missing")).toThrow("Job not found.");
+
+    releaseAwaiting?.();
+    await vi.waitFor(() =>
+      expect(dependencies.processSessionJob).toHaveBeenCalledTimes(2),
+    );
+    expect(dependencies.processSessionJob).toHaveBeenLastCalledWith(job, true);
+    await vi.waitFor(() => expect(active).toBe(0));
+    expect(peak).toBe(1);
+  });
+
   it("starts waiting work when concurrency increases", async () => {
     let active = 0;
     const releases: Array<() => void> = [];

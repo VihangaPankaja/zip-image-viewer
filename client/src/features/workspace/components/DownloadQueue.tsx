@@ -10,6 +10,7 @@ type DownloadManagerProps = {
   jobs: readonly Job[];
   maxConcurrent: number;
   onCancel: (id: string) => void;
+  onConfirm: (id: string) => Promise<void>;
   onOpenSession: (id: string) => void;
   onPause: (id: string) => void;
   onRemove: (id: string) => void;
@@ -27,16 +28,60 @@ function moveJob(ids: string[], from: number, to: number): string[] {
   return next;
 }
 
+function downloadTitle(job: Job): string {
+  const url = new URL(job.url);
+  return job.url.startsWith("magnet:")
+    ? url.searchParams.get("dn") || "Magnet download"
+    : url.pathname.split("/").at(-1) || job.url;
+}
+
 function JobActions({
   job,
   ...actions
 }: { job: Job } & Pick<
   DownloadManagerProps,
-  "onCancel" | "onOpenSession" | "onPause" | "onRemove" | "onResume" | "onRetry"
+  | "onCancel"
+  | "onConfirm"
+  | "onOpenSession"
+  | "onPause"
+  | "onRemove"
+  | "onResume"
+  | "onRetry"
 >) {
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState("");
+  const confirm = async () => {
+    setIsConfirming(true);
+    setConfirmError("");
+    try {
+      await actions.onConfirm(job.id);
+    } catch (error) {
+      setConfirmError(
+        error instanceof Error
+          ? error.message
+          : "Could not confirm this download.",
+      );
+    } finally {
+      setIsConfirming(false);
+    }
+  };
   const terminal = ["ready", "cancelled", "error"].includes(job.status);
   return (
     <div className="download-row-actions">
+      {job.status === "awaiting_confirmation" ? (
+        <button
+          type="button"
+          disabled={isConfirming}
+          onClick={() => void confirm()}
+        >
+          {isConfirming ? "Confirming…" : "Confirm & download"}
+        </button>
+      ) : null}
+      {confirmError ? (
+        <p className="download-confirm-error" role="alert">
+          {confirmError}
+        </p>
+      ) : null}
       {job.status === "paused" ? (
         <button type="button" onClick={() => actions.onResume(job.id)}>
           Resume
@@ -167,9 +212,7 @@ function DownloadRow({
       </div>
       <div className="download-row-main">
         <div className="download-row-title">
-          <strong title={job.url}>
-            {new URL(job.url).pathname.split("/").at(-1) || job.url}
-          </strong>
+          <strong title={job.url}>{downloadTitle(job)}</strong>
           <span>{job.status.replaceAll("_", " ")}</span>
         </div>
         <div className="download-progress-line">
@@ -177,6 +220,9 @@ function DownloadRow({
           <b>{job.percent == null ? "—" : `${Math.floor(job.percent)}%`}</b>
         </div>
         <DownloadTelemetry job={job} />
+        {job.message ? (
+          <p className="download-status-message">{job.message}</p>
+        ) : null}
         <code>{job.url}</code>
       </div>
       <JobActions job={job} {...actions} />
@@ -225,10 +271,7 @@ export function DownloadManager(props: DownloadManagerProps) {
       {jobs.length === 0 ? (
         <div className="download-empty">
           <strong>No transfers yet</strong>
-          <p>
-            Add direct links now. Torrent sources become available in the next
-            stack layer.
-          </p>
+          <p>Add direct download links or magnet URLs to start a transfer.</p>
         </div>
       ) : (
         <ol className="download-list">

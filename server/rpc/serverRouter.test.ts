@@ -34,6 +34,12 @@ function dependencies(): ServerRpcDependencies {
       status: "cancelled",
       phase: "cancelled",
     })),
+    confirmJob: vi.fn((): Job => ({
+      ...job(),
+      status: "queued",
+      phase: "queued",
+      requiresConfirmation: false,
+    })),
     retryJob: vi.fn(() => job("f86946a1-bcf7-4137-87c6-51502024367a")),
     pauseJob: vi.fn((): Job => ({
       ...job(),
@@ -87,6 +93,18 @@ describe("createServerRpcRouter", () => {
     await expect(call(router.jobs.retry, { id })).resolves.toMatchObject({
       status: "queued",
     });
+  });
+
+  it("confirms an oversized job through the typed control plane", async () => {
+    const deps = dependencies();
+    const router = createServerRpcRouter(deps);
+    const id = job().id;
+
+    await expect(call(router.jobs.confirm, { id })).resolves.toMatchObject({
+      status: "queued",
+      requiresConfirmation: false,
+    });
+    expect(deps.confirmJob).toHaveBeenCalledWith(id);
   });
 
   it("exposes pause, resume, remove, reorder, and scheduler controls", async () => {

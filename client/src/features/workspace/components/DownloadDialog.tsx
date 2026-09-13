@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { DownloadOptions } from "../../../types/download";
 
@@ -11,7 +12,7 @@ type DownloadDialogProps = {
   defaultOptions: DownloadOptions;
   open: boolean;
   onClose: () => void;
-  onSubmit: (items: DownloadItem[]) => void;
+  onSubmit: (items: DownloadItem[]) => Promise<void>;
 };
 
 function parseDrafts(value: string, options: DownloadOptions, startId: number) {
@@ -137,18 +138,28 @@ function DownloadDraftRow({
   onRemove: () => void;
 }) {
   const valid = validDraft(draft) && !duplicate;
+  const errorId = `${draft.id}-error`;
   return (
     <article className={valid ? "download-draft" : "download-draft invalid"}>
       <span className="draft-index">{String(index + 1).padStart(2, "0")}</span>
       <label>
         <span>Download URL</span>
         <input
+          aria-label="Download URL"
           value={draft.url}
           aria-invalid={!valid}
+          aria-describedby={valid ? undefined : errorId}
           onChange={(event) =>
             onChange({ ...draft, url: event.currentTarget.value })
           }
         />
+        {!valid ? (
+          <span id={errorId} className="draft-error">
+            {duplicate
+              ? "This URL is already in the batch."
+              : "Enter a valid download or magnet URL."}
+          </span>
+        ) : null}
       </label>
       <DraftSettings draft={draft} onChange={onChange} />
       <button
@@ -181,11 +192,9 @@ function DownloadCompose({
           rows={6}
           placeholder="One public URL per line"
           onChange={(event) => setSource(event.currentTarget.value)}
+          onBlur={addDrafts}
         />
       </label>
-      <button className="ghost-button" type="button" onClick={addDrafts}>
-        Review links
-      </button>
     </div>
   );
 }
@@ -222,32 +231,38 @@ function DraftList({
 }
 
 function DialogFooter({
-  drafts,
+  readyCount,
   invalidCount,
   duplicateCount,
+  isSubmitting,
 }: {
-  drafts: DownloadDraft[];
+  readyCount: number;
   invalidCount: number;
   duplicateCount: number;
+  isSubmitting: boolean;
 }) {
   return (
     <footer>
       <span>
-        {drafts.length} of 50 ready
+        {readyCount} of 50 ready
         {invalidCount ? ` · ${invalidCount} invalid` : ""}
         {duplicateCount ? ` · ${duplicateCount} duplicates` : ""}
       </span>
       <button
         className="primary-button"
         type="submit"
-        disabled={!drafts.length || invalidCount > 0 || duplicateCount > 0}
+        disabled={
+          isSubmitting || !readyCount || invalidCount > 0 || duplicateCount > 0
+        }
       >
-        Add {drafts.length} downloads
+        {isSubmitting ? "Adding to queue…" : "Add to queue"}
       </button>
     </footer>
   );
 }
 
+// The state and native dialog lifecycle stay together so submit failures preserve drafts.
+// eslint-disable-next-line max-lines-per-function
 export function DownloadDialog({
   defaultOptions,
   open,
@@ -256,27 +271,64 @@ export function DownloadDialog({
 }: DownloadDialogProps) {
   const [source, setSource] = useState("");
   const [drafts, setDrafts] = useState<DownloadDraft[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const nextDraftId = useRef(0);
   if (!open) return null;
+  const pendingDrafts = parseDrafts(source, defaultOptions, 0).slice(
+    0,
+    Math.max(0, 50 - drafts.length),
+  );
+  const submissionDrafts = [...drafts, ...pendingDrafts];
   const urlCounts = new Map<string, number>();
-  drafts.forEach(({ url }) =>
+  submissionDrafts.forEach(({ url }) =>
     urlCounts.set(url, (urlCounts.get(url) ?? 0) + 1),
   );
-  const invalidCount = drafts.filter((draft) => !validDraft(draft)).length;
-  const duplicateCount = drafts.filter(
+  const invalidCount = submissionDrafts.filter(
+    (draft) => !validDraft(draft),
+  ).length;
+  const duplicateCount = submissionDrafts.filter(
     ({ url }) => (urlCounts.get(url) ?? 0) > 1,
   ).length;
   const addDrafts = () => {
-    const added = parseDrafts(
-      source,
-      defaultOptions,
-      nextDraftId.current,
-    ).slice(0, Math.max(0, 50 - drafts.length));
+    const startId = nextDraftId.current;
+    const added = pendingDrafts.map((draft, index) => ({
+      ...draft,
+      id: `download-${String(startId + index)}`,
+    }));
     nextDraftId.current += added.length;
     setDrafts((current) => [...current, ...added]);
     setSource("");
   };
-  const submit = () => onSubmit(drafts.map(({ id: _, ...item }) => item));
+  const submit = async () => {
+    let submittedDrafts = submissionDrafts;
+    if (pendingDrafts.length) {
+      const startId = nextDraftId.current;
+      const added = pendingDrafts.map((draft, index) => ({
+        ...draft,
+        id: `download-${String(startId + index)}`,
+      }));
+      nextDraftId.current += added.length;
+      submittedDrafts = [...drafts, ...added];
+      setDrafts(submittedDrafts);
+      setSource("");
+    }
+    setIsSubmitting(true);
+    setSubmitError("");
+    try {
+      await onSubmit(submittedDrafts.map(({ id: _, ...item }) => item));
+      setSource("");
+      setDrafts([]);
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : "Could not add downloads to the queue.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
   return (
     <dialog
       ref={(dialog) => {
@@ -290,7 +342,9 @@ export function DownloadDialog({
         className="download-dialog-sheet"
         onSubmit={(event) => {
           event.preventDefault();
-          if (!invalidCount && !duplicateCount && drafts.length) submit();
+          if (!invalidCount && !duplicateCount && submissionDrafts.length) {
+            void submit();
+          }
         }}
       >
         <header>
@@ -312,10 +366,16 @@ export function DownloadDialog({
           urlCounts={urlCounts}
           setDrafts={setDrafts}
         />
+        {submitError ? (
+          <p className="download-submit-error" role="alert">
+            {submitError}
+          </p>
+        ) : null}
         <DialogFooter
-          drafts={drafts}
+          readyCount={submissionDrafts.length}
           invalidCount={invalidCount}
           duplicateCount={duplicateCount}
+          isSubmitting={isSubmitting}
         />
       </form>
     </dialog>

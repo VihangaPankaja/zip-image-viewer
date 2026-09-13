@@ -192,6 +192,10 @@ const cancelJobContract = oc
   .route({ method: "POST", path: "/session-jobs/{id}/cancel" })
   .input(jobControlInputSchema)
   .output(jobSchema);
+const confirmJobContract = oc
+  .route({ method: "POST", path: "/session-jobs/{id}/confirm" })
+  .input(jobControlInputSchema)
+  .output(jobSchema);
 const retryJobContract = oc
   .route({ method: "POST", path: "/session-jobs/{id}/retry" })
   .input(jobControlInputSchema)
@@ -239,6 +243,7 @@ export const serverContract = {
     list: listJobsContract,
     enqueue: enqueueSessionsContract,
     cancel: cancelJobContract,
+    confirm: confirmJobContract,
     retry: retryJobContract,
     pause: pauseJobContract,
     resume: resumeJobContract,

@@ -316,10 +316,12 @@ async function processSessionJob(
       return;
     }
     await rm(workspaceDir, { recursive: true, force: true });
-    deps.logEvent("error", "session.create.failed", {
-      jobId: job.id,
-      error: jobError.message,
-    });
+    if (jobError.name !== "AbortError") {
+      deps.logEvent("error", "session.create.failed", {
+        jobId: job.id,
+        error: jobError.message,
+      });
+    }
     emitFailure(job, jobError, deps);
   }
 }

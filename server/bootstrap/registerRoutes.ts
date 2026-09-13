@@ -12,7 +12,7 @@ export function registerBaseRoutes(app: Express, deps: RouteDependencies) {
   registerSessionJobRoutes(app, {
     getJob: deps.getJob,
     sanitizeJob: deps.sanitizeJob,
-    enqueueSessionJob: deps.enqueueSessionJob,
+    confirmSessionJob: deps.confirmSessionJob,
     parseRangeHeader: deps.parseRangeHeader,
     emitJob: deps.emitJob,
     closeJob: deps.closeJob,

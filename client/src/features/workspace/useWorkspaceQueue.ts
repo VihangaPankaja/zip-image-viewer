@@ -27,6 +27,9 @@ export function useWorkspaceQueue() {
   const cancelMutation = useMutation(
     workspaceRpc.jobs.cancel.mutationOptions(),
   );
+  const confirmMutation = useMutation(
+    workspaceRpc.jobs.confirm.mutationOptions(),
+  );
   const retryMutation = useMutation(workspaceRpc.jobs.retry.mutationOptions());
   const removeMutation = useMutation(
     workspaceRpc.jobs.remove.mutationOptions(),
@@ -51,6 +54,7 @@ export function useWorkspaceQueue() {
 
   return {
     cancel: (id: string) => control(cancelMutation.mutateAsync({ id })),
+    confirm: (id: string) => control(confirmMutation.mutateAsync({ id })),
     enqueue: (
       items: readonly {
         url: string;
