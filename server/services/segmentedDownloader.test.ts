@@ -1,13 +1,32 @@
 import { createServer } from "node:http";
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { path7za } from "7zip-bin";
+import unzipper from "unzipper";
 import { describe, expect, it } from "vitest";
+import { runCommand } from "../infrastructure/process/commandRunner.js";
 import { downloadWithSegmentedManager } from "./segmentedDownloader.js";
 
 describe("downloadWithSegmentedManager", () => {
-  it("merges HTTP ranges and removes segment files", async () => {
-    const payload = Buffer.from("0123456789abcdef".repeat(64));
+  it("downloads a real ZIP over HTTP, opens it, and removes segment files", async () => {
+    const workspace = await mkdtemp(join(tmpdir(), "segmented-download-"));
+    const sourceDirectory = join(workspace, "source");
+    const servedArchive = join(workspace, "served.zip");
+    const targetPath = join(workspace, "download.zip");
+    await mkdir(sourceDirectory);
+    await writeFile(join(sourceDirectory, "caption.txt"), "hello download");
+    await runCommand(path7za, ["a", "-tzip", servedArchive, "."], {
+      cwd: sourceDirectory,
+    });
+    const payload = await readFile(servedArchive);
     const server = createServer((request, response) => {
       const match = /^bytes=(\d+)-(\d+)$/.exec(request.headers.range ?? "");
       if (!match) {
@@ -25,7 +44,6 @@ describe("downloadWithSegmentedManager", () => {
       });
       response.end(body);
     });
-    const workspace = await mkdtemp(join(tmpdir(), "segmented-download-"));
 
     try {
       await new Promise<void>((resolve, reject) => {
@@ -37,7 +55,6 @@ describe("downloadWithSegmentedManager", () => {
         throw new Error("HTTP test server did not bind to a TCP port.");
       }
 
-      const targetPath = join(workspace, "download.bin");
       const state = { downloadedBytes: 0 };
       await downloadWithSegmentedManager({
         url: `http://127.0.0.1:${String(address.port)}/archive.bin`,
@@ -54,8 +71,17 @@ describe("downloadWithSegmentedManager", () => {
       });
 
       expect(await readFile(targetPath)).toEqual(payload);
+      const archive = await unzipper.Open.file(targetPath);
+      const caption = archive.files.find(
+        (entry) => entry.path.replace(/\\/g, "/") === "caption.txt",
+      );
+      expect(await caption?.buffer()).toEqual(Buffer.from("hello download"));
       expect(state.downloadedBytes).toBe(payload.length);
-      expect(await readdir(workspace)).toEqual(["download.bin"]);
+      expect((await readdir(workspace)).sort()).toEqual([
+        "download.zip",
+        "served.zip",
+        "source",
+      ]);
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
       await rm(workspace, { recursive: true, force: true });

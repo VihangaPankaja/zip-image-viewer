@@ -166,9 +166,25 @@ class VideoRuntime {
     if (!executable || rendition.status !== "idle") return;
     await mkdir(rendition.dir, { recursive: true });
     rendition.status = "running";
+    const queuedAt = Date.now();
+    let startedAt = queuedAt;
+    this.logEvent("info", "video.transcode.queued", {
+      sessionId: session.id,
+      path: entry.path,
+      quality: rendition.qualityId,
+      cache: "miss",
+    });
     void processLimiter
-      .run(() =>
-        runCommand(
+      .run(async () => {
+        startedAt = Date.now();
+        this.logEvent("info", "video.transcode.started", {
+          sessionId: session.id,
+          path: entry.path,
+          quality: rendition.qualityId,
+          cache: "miss",
+          queueMs: startedAt - queuedAt,
+        });
+        await runCommand(
           executable,
           buildFmp4HlsArgs({
             inputPath: entry.targetPath,
@@ -176,11 +192,19 @@ class VideoRuntime {
             height: rendition.selectedHeight,
             segmentDurationSeconds: SEGMENT_SECONDS,
           }),
-        ),
-      )
+        );
+      })
       .then(async () => {
         await this.refreshRenditionAvailability(rendition);
         rendition.status = "done";
+        this.logEvent("info", "video.transcode.completed", {
+          sessionId: session.id,
+          path: entry.path,
+          quality: rendition.qualityId,
+          cache: "miss",
+          queueMs: startedAt - queuedAt,
+          encodeMs: Date.now() - startedAt,
+        });
       })
       .catch((error: unknown) => {
         rendition.status = "error";
