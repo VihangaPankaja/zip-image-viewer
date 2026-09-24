@@ -33,12 +33,18 @@ function VideoPreviewToolbar(props: VideoPreviewDetailsProps) {
 
 function PlaybackStatus(props: VideoPreviewDetailsProps) {
   const activeTranscode = props.activeJob?.phase === "transcoding";
+  const quality =
+    props.selectedVideoQuality === "source"
+      ? "Original"
+      : props.selectedVideoQuality === "auto"
+        ? `Auto${props.videoHeight ? ` · ${props.videoHeight}p` : ""}`
+        : props.selectedVideoQuality;
   return (
     <div className="progress-meta-row">
       <span>
         {activeTranscode
           ? `Transcoding ${props.activeJob?.videoQuality || props.selectedVideoQuality}: ${props.activeJob?.transcodedEntries || 0}/${props.activeJob?.totalTranscodeEntries || 0}`
-          : `Adaptive stream · ${props.selectedVideoQuality} quality`}
+          : `${quality} playback`}
       </span>
       <span>
         Keyboard: ±{props.keyboardSettings.jumpSeconds}s · speed step{" "}

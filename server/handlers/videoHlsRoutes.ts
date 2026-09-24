@@ -1,7 +1,6 @@
-import { createReadStream } from "node:fs";
-import { access, stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
-import type { Express, Request } from "express";
+import type { Express, Request, Response } from "express";
 import {
   ApplicationError,
   type Session,
@@ -12,6 +11,7 @@ import { queryText } from "./httpUtils.js";
 import {
   buildMasterPlaylist,
   buildVariantPlaylist,
+  publishedSegments,
 } from "../media/hlsManifest.js";
 import type { VideoRouteDependencies } from "./videoRoutes.js";
 
@@ -107,6 +107,39 @@ async function startRendition(
   return rendition;
 }
 
+async function readRenditionPlaylist(
+  rendition: VideoRendition,
+): Promise<string> {
+  return readFile(rendition.playlistPath, "utf8").catch(() => "");
+}
+
+async function waitForPublishedSegment(
+  rendition: VideoRendition,
+  index: number,
+): Promise<boolean> {
+  const deadline = Date.now() + 14_000;
+  do {
+    if (
+      publishedSegments(await readRenditionPlaylist(rendition)).includes(index)
+    )
+      return true;
+    if (rendition.status === "error" || rendition.status === "done")
+      return false;
+    await new Promise<void>((resolve) => setTimeout(resolve, 160));
+  } while (Date.now() < deadline);
+  return false;
+}
+
+function sendCompletedFile(
+  response: Response,
+  filePath: string,
+  contentType: string,
+) {
+  response.set("Cache-Control", "private, max-age=3600, immutable");
+  response.type(contentType);
+  response.sendFile(filePath, { cacheControl: false });
+}
+
 function registerMasterRoute(app: Express, deps: VideoRouteDependencies): void {
   app.get("/api/sessions/:id/video/hls/master", async (request, response) => {
     const { context, entry } = await resolveHlsEntry(request, deps);
@@ -129,6 +162,7 @@ function registerMasterRoute(app: Express, deps: VideoRouteDependencies): void {
     const playlist = buildMasterPlaylist(renditions, ({ id }) =>
       renditionUri(request, context, id, "playlist"),
     );
+    response.set("Cache-Control", "private, no-store");
     response.type("application/vnd.apple.mpegurl").send(playlist);
   });
 }
@@ -147,23 +181,15 @@ function registerVariantRoute(
       ? requested
       : entry.defaultQuality;
     const rendition = await startRendition(deps, context, entry, quality);
-    await deps.refreshRenditionAvailability(rendition);
-    const playlist = buildVariantPlaylist({
-      availableSegments: rendition.availableSegments,
-      complete: rendition.status === "done",
-      durationSeconds: entry.durationSeconds,
-      segmentDurationSeconds: deps.DEFAULT_VIDEO_SEGMENT_SECONDS,
-    })
-      .replace("init.mp4", renditionUri(request, context, quality, "init"))
-      .replace(/segment_(\d+)\.m4s/g, (_match, digits: string) =>
-        renditionUri(
-          request,
-          context,
-          quality,
-          "segment",
-          Number.parseInt(digits, 10),
-        ),
-      );
+    const source = await readRenditionPlaylist(rendition);
+    const playlist = source
+      ? buildVariantPlaylist(
+          source,
+          renditionUri(request, context, quality, "init"),
+          (index) => renditionUri(request, context, quality, "segment", index),
+        )
+      : "#EXTM3U\n#EXT-X-VERSION:7\n#EXT-X-TARGETDURATION:4\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:EVENT\n";
+    response.set("Cache-Control", "private, no-store");
     response.type("application/vnd.apple.mpegurl").send(playlist);
   });
 }
@@ -177,13 +203,12 @@ function registerInitRoute(app: Express, deps: VideoRouteDependencies): void {
     ).toLowerCase();
     const rendition = await startRendition(deps, context, entry, quality);
     const initPath = path.join(rendition.dir, "init.mp4");
-    if (!(await deps.waitForFile(initPath, 14_000))) {
+    if (!(await waitForPublishedSegment(rendition, 0))) {
       return response
         .status(425)
         .json({ error: "Rendition is being prepared." });
     }
-    response.type("video/mp4");
-    return createReadStream(initPath).pipe(response);
+    sendCompletedFile(response, initPath, "video/mp4");
   });
 }
 
@@ -206,14 +231,10 @@ function registerSegmentRoute(
       rendition.dir,
       `segment_${String(index).padStart(6, "0")}.m4s`,
     );
-    const exists = await access(segmentPath)
-      .then(() => true)
-      .catch(() => false);
-    if (!exists && !(await deps.waitForFile(segmentPath, 14_000))) {
+    if (!(await waitForPublishedSegment(rendition, index))) {
       return response.status(425).json({ error: "Segment is being prepared." });
     }
-    response.type("video/iso.segment");
-    return createReadStream(segmentPath).pipe(response);
+    sendCompletedFile(response, segmentPath, "video/iso.segment");
   });
 }
 

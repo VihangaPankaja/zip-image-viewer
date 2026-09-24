@@ -12,11 +12,10 @@ describe("video playback model", () => {
         sessionId: "session-1",
         selectedKind: "video",
         selectedNode: { type: "file", path: "folder/a&b.mp4" },
-        quality: "720p",
       }),
     ).toEqual({
       hlsUrl:
-        "/api/sessions/session-1/video/hls/playlist?path=folder%2Fa%26b.mp4&quality=720p",
+        "/api/sessions/session-1/video/hls/master?path=folder%2Fa%26b.mp4",
       originalUrl:
         "/api/sessions/session-1/video/play?path=folder%2Fa%26b.mp4&quality=source",
     });
@@ -28,7 +27,6 @@ describe("video playback model", () => {
         sessionId: "session-1",
         selectedKind: "image",
         selectedNode: { type: "file", path: "cover.jpg" },
-        quality: "source",
       }),
     ).toEqual({ hlsUrl: "", originalUrl: "" });
   });

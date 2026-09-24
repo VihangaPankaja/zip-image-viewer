@@ -1,13 +1,13 @@
 import type Hls from "hls.js";
 import {
   useEffect,
+  useRef,
   type Dispatch,
   type RefObject,
   type SetStateAction,
 } from "react";
 import { getVideoMimeType } from "../../lib/mimeTypeSystem";
 import {
-  AUTO_QUALITY,
   createAdaptiveHlsConfig,
   loadHlsModule,
   resolveManualLevel,
@@ -19,11 +19,21 @@ type VideoSourceParams = {
   hlsUrl: string;
   originalUrl: string;
   selectedKind: string;
-  selectedNode: object | null;
   selectedQuality: string;
   setPlaybackError: Dispatch<SetStateAction<string>>;
+  setVideoHeight: Dispatch<SetStateAction<number | null>>;
   videoRef: RefObject<HTMLVideoElement | null>;
 };
+
+type AdaptiveSourceParams = Pick<
+  VideoSourceParams,
+  | "extension"
+  | "hlsRef"
+  | "hlsUrl"
+  | "originalUrl"
+  | "setPlaybackError"
+  | "setVideoHeight"
+>;
 
 function destroyHls(hlsRef: RefObject<Hls | null>) {
   hlsRef.current?.destroy();
@@ -43,10 +53,21 @@ function attachOriginalSource(
   player.load();
 }
 
-async function attachAdaptiveSource(
-  params: VideoSourceParams,
+function restorePlayback(
   player: HTMLVideoElement,
   resumeTime: number,
+  wasPlaying: boolean,
+) {
+  if (resumeTime > 0) player.currentTime = resumeTime;
+  if (wasPlaying) void player.play().catch(() => {});
+}
+
+async function attachAdaptiveSource(
+  params: AdaptiveSourceParams,
+  player: HTMLVideoElement,
+  resumeTime: number,
+  wasPlaying: boolean,
+  quality: () => string,
   isCancelled: () => boolean,
 ) {
   const hlsModule = await loadHlsModule();
@@ -61,6 +82,8 @@ async function attachAdaptiveSource(
     }
     return;
   }
+  player.removeAttribute("src");
+  player.replaceChildren();
   const hls = new HlsConstructor(createAdaptiveHlsConfig());
   params.hlsRef.current = hls;
   hls.on(HlsConstructor.Events.ERROR, (_event, data) => {
@@ -69,41 +92,55 @@ async function attachAdaptiveSource(
     }
   });
   hls.on(HlsConstructor.Events.MANIFEST_PARSED, () => {
-    hls.currentLevel = resolveManualLevel(
-      params.selectedQuality === "source"
-        ? AUTO_QUALITY
-        : params.selectedQuality,
+    hls.loadLevel = resolveManualLevel(
+      quality(),
       hls.levels.map((level) => level.height),
     );
-    if (resumeTime > 0) player.currentTime = resumeTime;
+    restorePlayback(player, resumeTime, wasPlaying);
+  });
+  hls.on(HlsConstructor.Events.LEVEL_SWITCHED, (_event, data) => {
+    params.setVideoHeight(hls.levels[data.level]?.height ?? null);
   });
   hls.loadSource(params.hlsUrl);
   hls.attachMedia(player);
 }
 
-export function useVideoSource(params: VideoSourceParams) {
+function useAttachedVideoSource(
+  params: VideoSourceParams,
+  qualityRef: RefObject<string>,
+) {
   const {
     extension,
     hlsRef,
     hlsUrl,
     originalUrl,
     selectedKind,
-    selectedNode,
-    selectedQuality,
     setPlaybackError,
+    setVideoHeight,
     videoRef,
   } = params;
+  const sourceRef = useRef("");
+  const isOriginal = params.selectedQuality === "source";
   useEffect(() => {
     const player = videoRef.current;
-    if (!player || selectedKind !== "video" || !selectedNode) {
+    if (!player || selectedKind !== "video" || !originalUrl) {
       destroyHls(hlsRef);
       return;
     }
-    const resumeTime = player.currentTime;
+    const sameFile = sourceRef.current === originalUrl;
+    const resumeTime = sameFile ? player.currentTime : 0;
+    const wasPlaying = sameFile && !player.paused;
+    sourceRef.current = originalUrl;
     setPlaybackError("");
+    setVideoHeight(null);
     destroyHls(hlsRef);
+    const onResize = () => setVideoHeight(player.videoHeight || null);
+    const onLoadedMetadata = () =>
+      restorePlayback(player, resumeTime, wasPlaying);
+    player.addEventListener("resize", onResize);
+    player.addEventListener("loadedmetadata", onLoadedMetadata, { once: true });
     let cancelled = false;
-    if (selectedQuality === "source") {
+    if (isOriginal) {
       attachOriginalSource(player, originalUrl, extension);
     } else {
       void attachAdaptiveSource(
@@ -112,14 +149,13 @@ export function useVideoSource(params: VideoSourceParams) {
           hlsRef,
           hlsUrl,
           originalUrl,
-          selectedKind,
-          selectedNode,
-          selectedQuality,
           setPlaybackError,
-          videoRef,
+          setVideoHeight,
         },
         player,
         resumeTime,
+        wasPlaying,
+        () => qualityRef.current,
         () => cancelled,
       ).catch((error: unknown) => {
         if (!cancelled) {
@@ -131,6 +167,8 @@ export function useVideoSource(params: VideoSourceParams) {
     }
     return () => {
       cancelled = true;
+      player.removeEventListener("resize", onResize);
+      player.removeEventListener("loadedmetadata", onLoadedMetadata);
       destroyHls(hlsRef);
     };
   }, [
@@ -139,9 +177,26 @@ export function useVideoSource(params: VideoSourceParams) {
     hlsUrl,
     originalUrl,
     selectedKind,
-    selectedNode,
-    selectedQuality,
+    isOriginal,
     setPlaybackError,
+    setVideoHeight,
     videoRef,
+    qualityRef,
   ]);
+}
+
+export function useVideoSource(params: VideoSourceParams) {
+  const qualityRef = useRef(params.selectedQuality);
+  const { hlsRef, selectedQuality } = params;
+  useEffect(() => {
+    qualityRef.current = selectedQuality;
+    const hls = hlsRef.current;
+    if (hls && selectedQuality !== "source" && hls.levels.length) {
+      hls.loadLevel = resolveManualLevel(
+        selectedQuality,
+        hls.levels.map((level) => level.height),
+      );
+    }
+  }, [hlsRef, selectedQuality]);
+  useAttachedVideoSource(params, qualityRef);
 }

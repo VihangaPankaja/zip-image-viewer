@@ -1313,6 +1313,7 @@
           area: "Video",
           priority: "P0",
           effort: "M",
+          status: "Done",
           title: "Publish only complete, accurate HLS segments",
           summary:
             "A segment file appearing on disk must not mean it is ready to play.",
@@ -1320,6 +1321,7 @@
           plan: "Use atomic segment publication and parse committed FFmpeg playlist entries. Preserve actual durations and gaps. Serve completed output with stable cache validators; keep mutable playlists fresh.",
           done: "Requests made during encoding never receive partial media. Variable-frame-rate and final short segments play without timeline drift.",
           depends: "V01",
+          note: "Implemented in v3.3.4: atomic FFmpeg output, playlist-derived timing and segment publication, and cache validators. Verified with route, FFmpeg and Chromium playback checks.",
           evidence:
             "server/infrastructure/media/videoRuntime.ts; server/media/hlsManifest.ts; server/handlers/videoHlsRoutes.ts",
         },
@@ -1387,6 +1389,7 @@
           area: "Video",
           priority: "P0",
           effort: "M",
+          status: "Done",
           title: "Switch quality without recreating the player",
           summary:
             "Preserve position, paused state and buffer when changing Auto or a manual resolution.",
@@ -1394,6 +1397,7 @@
           plan: "Separate source attachment from level selection. Change the active instance level for HLS choices. Treat Original as a separate source transition and show Auto with the actual playing resolution.",
           done: "Auto → 720p → Auto preserves playback state. Switching files starts at the correct position; Safari fallback and fatal errors remain usable.",
           depends: "V04",
+          note: "Implemented in v3.3.4: HLS level changes keep the player and buffer; Auto shows the active resolution. Verified in the React player with a two-rendition Chromium fixture.",
           evidence:
             "client/src/features/player/useVideoSource.ts; client/src/features/player/adaptiveQuality.ts; client/src/components/Preview/VideoPreviewContent.tsx",
         },

@@ -67,6 +67,8 @@ export function buildFmp4HlsArgs(input: Fmp4HlsInput): string[] {
     String(duration),
     "-hls_playlist_type",
     "event",
+    "-hls_flags",
+    "temp_file",
     "-hls_segment_type",
     "fmp4",
     "-hls_fmp4_init_filename",

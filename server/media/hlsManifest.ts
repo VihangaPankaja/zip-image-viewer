@@ -61,37 +61,40 @@ export function buildMasterPlaylist(
   return `${lines.join("\n")}\n`;
 }
 
-export type VariantPlaylistInput = {
-  availableSegments: number;
-  complete: boolean;
-  durationSeconds: number;
-  segmentDurationSeconds: number;
-};
-
-export function buildVariantPlaylist(input: VariantPlaylistInput): string {
-  const segmentDuration = Math.max(1, input.segmentDurationSeconds);
-  const count = Math.max(0, Math.floor(input.availableSegments));
-  const lines = [
-    "#EXTM3U",
-    "#EXT-X-VERSION:7",
-    `#EXT-X-TARGETDURATION:${String(Math.ceil(segmentDuration))}`,
-    "#EXT-X-MEDIA-SEQUENCE:0",
-    "#EXT-X-PLAYLIST-TYPE:EVENT",
-    '#EXT-X-MAP:URI="init.mp4"',
-  ];
-
-  for (let index = 0; index < count; index += 1) {
-    const remaining = input.durationSeconds - index * segmentDuration;
-    const duration =
-      input.durationSeconds > 0
-        ? Math.max(0.001, Math.min(segmentDuration, remaining))
-        : segmentDuration;
-    lines.push(
-      `#EXTINF:${duration.toFixed(3)},`,
-      `segment_${String(index).padStart(6, "0")}.m4s`,
-    );
+export function publishedSegments(playlist: string): number[] {
+  const lines = playlist
+    .slice(0, playlist.lastIndexOf("\n") + 1)
+    .split(/\r?\n/);
+  const segments: number[] = [];
+  for (let i = 0; i < lines.length - 1; i += 1) {
+    if (!/^#EXTINF:\d+(?:\.\d+)?,/.test(lines[i])) continue;
+    const match = /^segment_(\d+)\.m4s$/.exec(lines[i + 1]);
+    if (match) segments.push(Number(match[1]));
   }
+  return segments;
+}
 
-  if (input.complete) lines.push("#EXT-X-ENDLIST");
-  return `${lines.join("\n")}\n`;
+export function buildVariantPlaylist(
+  source: string,
+  initUri: string,
+  segmentUri: (_index: number) => string,
+): string {
+  const completeLines = source.slice(0, source.lastIndexOf("\n") + 1);
+  const lines = completeLines.split(/\r?\n/);
+  const output: string[] = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (/^#EXTINF:/.test(line)) {
+      const match = /^segment_(\d+)\.m4s$/.exec(lines[i + 1]);
+      if (match && /^#EXTINF:\d+(?:\.\d+)?,/.test(line)) {
+        output.push(line, segmentUri(Number(match[1])));
+        i += 1;
+      }
+    } else if (line === '#EXT-X-MAP:URI="init.mp4"') {
+      output.push(`#EXT-X-MAP:URI="${initUri}"`);
+    } else if (line && !/^segment_\d+\.m4s$/.test(line)) {
+      output.push(line);
+    }
+  }
+  return `${output.join("\n")}\n`;
 }
