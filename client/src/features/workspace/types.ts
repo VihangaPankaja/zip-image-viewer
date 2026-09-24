@@ -51,6 +51,7 @@ export type VideoPreviewProps = {
   selectedVideoQuality: string;
   setSelectedVideoQuality: (value: string) => void;
   videoPlaybackError: string;
+  videoHeight: number | null;
   videoQualityOptions: PreviewOption[];
   videoRef: RefObject<HTMLVideoElement | null>;
   videoShellRef: RefObject<HTMLDivElement | null>;

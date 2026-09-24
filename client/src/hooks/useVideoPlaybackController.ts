@@ -26,7 +26,6 @@ export function useVideoPlaybackController({
   const state = useVideoPlaybackState();
   const playback = state.publicState;
   const urls = buildVideoPlaybackUrls({
-    quality: playback.selectedVideoQuality,
     selectedKind,
     selectedNode,
     sessionId: session?.id,
@@ -42,8 +41,8 @@ export function useVideoPlaybackController({
     hlsUrl: urls.hlsUrl,
     originalUrl: urls.originalUrl,
     selectedKind,
-    selectedNode,
     selectedQuality: playback.selectedVideoQuality,
+    setVideoHeight: state.setters.setVideoHeight,
     setPlaybackError: state.setters.setVideoPlaybackError,
     videoRef: playback.videoRef,
   });

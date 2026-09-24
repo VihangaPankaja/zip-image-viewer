@@ -21,6 +21,7 @@ describe("VideoPreviewContent", () => {
         selectedVideoQuality="auto"
         setSelectedVideoQuality={vi.fn()}
         videoPlaybackError=""
+        videoHeight={720}
         videoQualityOptions={[]}
         videoRef={createRef<HTMLVideoElement>()}
         videoShellRef={createRef<HTMLDivElement>()}
@@ -30,6 +31,7 @@ describe("VideoPreviewContent", () => {
     const video = screen.getByLabelText("Video preview");
     expect(video).toHaveAttribute("controls");
     expect(video).toHaveAttribute("playsinline");
+    expect(screen.getByText("Auto · 720p playback")).toBeInTheDocument();
     expect(
       screen.queryByRole("slider", { name: "Seek video" }),
     ).not.toBeInTheDocument();

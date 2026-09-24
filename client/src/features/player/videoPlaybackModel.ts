@@ -6,14 +6,12 @@ type VideoPlaybackNode = {
 };
 
 type BuildVideoPlaybackUrlsParams = {
-  quality: string;
   selectedKind: string;
   selectedNode: VideoPlaybackNode | null;
   sessionId?: string;
 };
 
 export function buildVideoPlaybackUrls({
-  quality,
   selectedKind,
   selectedNode,
   sessionId,
@@ -23,10 +21,10 @@ export function buildVideoPlaybackUrls({
   }
   const path = selectedNode.path ?? "";
   const originalQuery = new URLSearchParams({ path, quality: "source" });
-  const hlsQuery = new URLSearchParams({ path, quality });
+  const hlsQuery = new URLSearchParams({ path });
   const encodedSessionId = String(sessionId);
   return {
-    hlsUrl: `/api/sessions/${encodedSessionId}/video/hls/playlist?${hlsQuery.toString()}`,
+    hlsUrl: `/api/sessions/${encodedSessionId}/video/hls/master?${hlsQuery.toString()}`,
     originalUrl: `/api/sessions/${encodedSessionId}/video/play?${originalQuery.toString()}`,
   };
 }
