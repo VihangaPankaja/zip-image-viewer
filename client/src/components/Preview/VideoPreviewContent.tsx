@@ -1,4 +1,5 @@
 import { CustomDropdown } from "../Common/CustomDropdown";
+import { PlaybackDiagnostics } from "./PlaybackDiagnostics";
 import type { VideoPreviewProps } from "../../features/workspace/types";
 
 type VideoPreviewDetailsProps = Omit<
@@ -32,20 +33,63 @@ function VideoPreviewToolbar(props: VideoPreviewDetailsProps) {
 }
 
 function PlaybackStatus(props: VideoPreviewDetailsProps) {
-  const activeTranscode = props.activeJob?.phase === "transcoding";
+  const noPeers =
+    props.activeJob?.sessionId === props.sessionId &&
+    props.activeJob.sourceKind === "torrent" &&
+    props.activeJob.status === "downloading" &&
+    props.activeJob.peerCount === 0;
+  const rendition =
+    props.videoHlsStatus?.renditions.find(
+      ({ quality }) =>
+        quality === props.selectedVideoQuality ||
+        (props.selectedVideoQuality === "auto" &&
+          quality === `${props.videoHeight}p`),
+    ) ??
+    (props.selectedVideoQuality === "auto"
+      ? props.videoHlsStatus?.renditions[0]
+      : undefined);
   const quality =
     props.selectedVideoQuality === "source"
       ? "Original"
       : props.selectedVideoQuality === "auto"
         ? `Auto${props.videoHeight ? ` · ${props.videoHeight}p` : ""}`
         : props.selectedVideoQuality;
+  let status = `${quality} playback`;
+  if (props.activeJob?.phase === "transcoding")
+    status = `Transcoding ${props.activeJob.videoQuality || props.selectedVideoQuality}: ${props.activeJob.transcodedEntries || 0}/${props.activeJob.totalTranscodeEntries || 0}`;
+  if (props.videoPlaybackStatus === "loading") status = "Loading video";
+  if (props.videoPlaybackStatus === "buffering") status = "Buffering video";
+  if (
+    props.selectedVideoQuality !== "source" &&
+    props.videoPlaybackStatus !== "ready" &&
+    rendition?.status === "running" &&
+    !rendition.availableSegments
+  )
+    status = "Preparing video";
+  if (
+    props.selectedVideoQuality !== "source" &&
+    props.videoPlaybackStatus !== "ready" &&
+    rendition?.status === "queued"
+  )
+    status = "Waiting for video encoder";
+  if (props.videoPlaybackError) status = "Playback needs attention";
+  if (noPeers) status = "Waiting for peers";
   return (
     <div className="progress-meta-row">
-      <span>
-        {activeTranscode
-          ? `Transcoding ${props.activeJob?.videoQuality || props.selectedVideoQuality}: ${props.activeJob?.transcodedEntries || 0}/${props.activeJob?.totalTranscodeEntries || 0}`
-          : `${quality} playback`}
-      </span>
+      <span aria-live="polite">{status}</span>
+      {noPeers ? (
+        <button type="button" onClick={props.onOpenDownloads}>
+          Open downloads
+        </button>
+      ) : rendition?.status === "queued" &&
+        props.videoPlaybackStatus !== "ready" ? (
+        <button
+          type="button"
+          onClick={() => props.setSelectedVideoQuality("source")}
+        >
+          Try Original
+        </button>
+      ) : null}
       <span>
         Keyboard: ±{props.keyboardSettings.jumpSeconds}s · speed step{" "}
         {props.keyboardSettings.rateStep}x
@@ -75,9 +119,39 @@ export function VideoPreviewContent({
         </video>
       </div>
       <PlaybackStatus {...props} />
+      <PlaybackDiagnostics
+        hlsRef={props.hlsRef}
+        videoRef={videoRef}
+        selectedVideoQuality={props.selectedVideoQuality}
+        videoHeight={props.videoHeight}
+        videoPlaybackError={props.videoPlaybackError}
+        videoHlsStatus={props.videoHlsStatus}
+      />
       {props.videoPlaybackError ? (
         <div className="navigation-hint" role="alert">
-          Video error: {props.videoPlaybackError}
+          <span>{props.videoPlaybackError}</span>{" "}
+          {props.videoPlaybackError === "This browser cannot play Original." &&
+          props.videoQualityOptions.some(({ id }) => id === "auto") ? (
+            <button
+              type="button"
+              onClick={() => props.setSelectedVideoQuality("auto")}
+            >
+              Try adaptive playback
+            </button>
+          ) : props.videoPlaybackError ===
+              "This browser cannot decode this stream." &&
+            props.selectedVideoQuality !== "source" ? (
+            <button
+              type="button"
+              onClick={() => props.setSelectedVideoQuality("source")}
+            >
+              Try Original
+            </button>
+          ) : (
+            <button type="button" onClick={props.retryVideoPlayback}>
+              Retry playback
+            </button>
+          )}
         </div>
       ) : null}
     </div>

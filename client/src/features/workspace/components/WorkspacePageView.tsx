@@ -161,6 +161,8 @@ function WorkspacePreview({ controller }: ViewProps) {
       {...image}
       {...video}
       activeJob={state.activeJob}
+      onOpenDownloads={() => state.setActiveView("downloads")}
+      sessionId={state.session?.id || ""}
       formatBytes={formatBytes}
       formatDate={formatDate}
       keyboardSettings={settings.keyboardSettings}

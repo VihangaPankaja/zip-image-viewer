@@ -40,6 +40,8 @@ export const jobPayloadSchema = z.looseObject({
   maxRetries: z.number().optional(),
   percent: z.number().nullable().optional(),
   phase: z.string().optional(),
+  peerCount: z.number().optional(),
+  sourceKind: z.string().optional(),
   retryCount: z.number().optional(),
   threadCount: z.number().optional(),
   threadMode: z.enum(["auto", "single", "segmented"]).optional(),

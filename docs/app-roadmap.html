@@ -1524,6 +1524,7 @@
           area: "UI / UX",
           priority: "P1",
           effort: "S",
+          status: "Done",
           title: "Explain what the player is waiting for",
           summary:
             "Distinguish downloading, preparing video and buffering instead of showing a generic wait.",
@@ -1531,6 +1532,7 @@
           plan: "Expose real player and encoder states. Offer a useful recovery action such as lower quality or retry. Show active resolution in Auto and identify Original playback correctly.",
           done: "No-peers, queued encoder, missing segment and unsupported codec states have distinct messages with working actions.",
           depends: "V01, V07",
+          note: "Implemented in v3.3.5: player loading, buffering, encoder and codec states with recovery actions. Peer waiting is wired to download telemetry; preview remains available after torrent completion until T05.",
           evidence:
             "client/src/components/Preview/VideoPreviewContent.tsx; server/handlers/videoHlsRoutes.ts",
         },
@@ -1687,12 +1689,14 @@
           area: "Tooling / quality",
           priority: "P1",
           effort: "S",
+          status: "Done",
           title: "Add a small playback diagnostics view",
           summary: "Make a slow-video report come with evidence.",
           now: "The project has a server dashboard and logging, but the reviewed player only exposes an error string.",
           plan: "Show mode, active level, estimated bandwidth, buffer, dropped frames and encoder wait time. Add a copyable sanitized report without source URLs or local paths.",
           done: "A reproduced stall yields enough data to separate peer starvation, encoding delay and network buffering.",
           depends: "V01, U01",
+          note: "Implemented in v3.3.5: live player and encoder measurements with a copyable report that excludes source URLs and local paths.",
           evidence:
             "server/tui/dashboard.ts; client/src/components/Preview/VideoPreviewContent.tsx",
         },

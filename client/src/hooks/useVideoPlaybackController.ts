@@ -1,9 +1,11 @@
+import { useEffect, useState } from "react";
 import { buildVideoPlaybackUrls } from "../features/player/videoPlaybackModel";
 import { useVideoEventSync } from "../features/player/useVideoEventSync";
 import { useVideoPlaybackState } from "../features/player/useVideoPlaybackState";
 import { useVideoPreferences } from "../features/player/useVideoPreferences";
 import { useVideoQualities } from "../features/player/useVideoQualities";
 import { useVideoSource } from "../features/player/useVideoSource";
+import { fetchJson } from "../services/apiClient";
 
 type VideoNode = {
   type?: string;
@@ -18,6 +20,56 @@ type UseVideoPlaybackControllerParams = {
   selectedKind: string;
 };
 
+type VideoHlsStatus = {
+  status: string;
+  renditions: {
+    quality: string;
+    status: string;
+    availableSegments?: number;
+    expectedSegments?: number;
+    encoderWaitMs?: number;
+  }[];
+};
+
+function useVideoHlsStatus(
+  selectedKind: string,
+  quality: string,
+  sessionId?: string,
+  path?: string,
+) {
+  const [status, setStatus] = useState<VideoHlsStatus | null>(null);
+  useEffect(() => {
+    if (
+      selectedKind !== "video" ||
+      quality === "source" ||
+      !sessionId ||
+      !path
+    ) {
+      setStatus(null);
+      return;
+    }
+    let cancelled = false;
+    const url = `/api/sessions/${sessionId}/video/hls/status?${new URLSearchParams({ path })}`;
+    const refresh = () => {
+      void fetchJson<VideoHlsStatus>(url).then(
+        (result) => {
+          if (!cancelled) setStatus(result);
+        },
+        () => {
+          if (!cancelled) setStatus(null);
+        },
+      );
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [selectedKind, quality, sessionId, path]);
+  return status;
+}
+
 export function useVideoPlaybackController({
   session,
   selectedNode,
@@ -25,6 +77,12 @@ export function useVideoPlaybackController({
 }: UseVideoPlaybackControllerParams) {
   const state = useVideoPlaybackState();
   const playback = state.publicState;
+  const videoHlsStatus = useVideoHlsStatus(
+    selectedKind,
+    playback.selectedVideoQuality,
+    session?.id,
+    selectedNode?.path,
+  );
   const urls = buildVideoPlaybackUrls({
     selectedKind,
     selectedNode,
@@ -34,6 +92,7 @@ export function useVideoPlaybackController({
     selectedKind,
     videoRef: playback.videoRef,
     setPlaybackError: state.setters.setVideoPlaybackError,
+    setPlaybackStatus: state.setters.setVideoPlaybackStatus,
   });
   useVideoSource({
     extension: selectedNode?.extension,
@@ -44,6 +103,7 @@ export function useVideoPlaybackController({
     selectedQuality: playback.selectedVideoQuality,
     setVideoHeight: state.setters.setVideoHeight,
     setPlaybackError: state.setters.setVideoPlaybackError,
+    setPlaybackStatus: state.setters.setVideoPlaybackStatus,
     videoRef: playback.videoRef,
   });
   useVideoPreferences({
@@ -60,5 +120,26 @@ export function useVideoPlaybackController({
     setOptions: state.setters.setVideoQualityOptions,
     setSelectedQuality: state.setters.setSelectedVideoQuality,
   });
-  return playback;
+  const retryVideoPlayback = () => {
+    state.setters.setVideoPlaybackError("");
+    state.setters.setVideoPlaybackStatus("loading");
+    if (state.hlsRef.current) {
+      if (
+        playback.videoPlaybackError ===
+        "This browser cannot decode this stream."
+      ) {
+        state.hlsRef.current.recoverMediaError();
+      } else {
+        state.hlsRef.current.startLoad(-1);
+      }
+    } else {
+      playback.videoRef.current?.load();
+    }
+  };
+  return {
+    ...playback,
+    hlsRef: state.hlsRef,
+    videoHlsStatus,
+    retryVideoPlayback,
+  };
 }

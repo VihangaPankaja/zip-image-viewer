@@ -21,6 +21,9 @@ type VideoSourceParams = {
   selectedKind: string;
   selectedQuality: string;
   setPlaybackError: Dispatch<SetStateAction<string>>;
+  setPlaybackStatus: Dispatch<
+    SetStateAction<"loading" | "buffering" | "ready">
+  >;
   setVideoHeight: Dispatch<SetStateAction<number | null>>;
   videoRef: RefObject<HTMLVideoElement | null>;
 };
@@ -62,6 +65,15 @@ function restorePlayback(
   if (wasPlaying) void player.play().catch(() => {});
 }
 
+function reportAttachmentError(
+  error: unknown,
+  setPlaybackError: VideoSourceParams["setPlaybackError"],
+) {
+  setPlaybackError(
+    error instanceof Error ? error.message : "HLS playback failed.",
+  );
+}
+
 async function attachAdaptiveSource(
   params: AdaptiveSourceParams,
   player: HTMLVideoElement,
@@ -88,7 +100,18 @@ async function attachAdaptiveSource(
   params.hlsRef.current = hls;
   hls.on(HlsConstructor.Events.ERROR, (_event, data) => {
     if (data.fatal) {
-      params.setPlaybackError(data.details);
+      const missingSegment =
+        data.response?.code === 404 &&
+        data.details.toLowerCase().includes("frag");
+      params.setPlaybackError(
+        missingSegment
+          ? "Video segment is missing."
+          : data.response?.code === 425
+            ? "Video segment is still being prepared."
+            : data.type === HlsConstructor.ErrorTypes.MEDIA_ERROR
+              ? "This browser cannot decode this stream."
+              : `${data.type}: ${data.details}`,
+      );
     }
   });
   hls.on(HlsConstructor.Events.MANIFEST_PARSED, () => {
@@ -116,6 +139,7 @@ function useAttachedVideoSource(
     originalUrl,
     selectedKind,
     setPlaybackError,
+    setPlaybackStatus,
     setVideoHeight,
     videoRef,
   } = params;
@@ -132,6 +156,7 @@ function useAttachedVideoSource(
     const wasPlaying = sameFile && !player.paused;
     sourceRef.current = originalUrl;
     setPlaybackError("");
+    setPlaybackStatus("loading");
     setVideoHeight(null);
     destroyHls(hlsRef);
     const onResize = () => setVideoHeight(player.videoHeight || null);
@@ -158,11 +183,7 @@ function useAttachedVideoSource(
         () => qualityRef.current,
         () => cancelled,
       ).catch((error: unknown) => {
-        if (!cancelled) {
-          setPlaybackError(
-            error instanceof Error ? error.message : "HLS playback failed.",
-          );
-        }
+        if (!cancelled) reportAttachmentError(error, setPlaybackError);
       });
     }
     return () => {
@@ -179,6 +200,7 @@ function useAttachedVideoSource(
     selectedKind,
     isOriginal,
     setPlaybackError,
+    setPlaybackStatus,
     setVideoHeight,
     videoRef,
     qualityRef,

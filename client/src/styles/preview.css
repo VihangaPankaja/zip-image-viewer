@@ -45,6 +45,26 @@
   margin-inline-start: auto;
 }
 
+.playback-diagnostics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--space-2);
+}
+
+.playback-diagnostics div {
+  min-width: 0;
+}
+
+.playback-diagnostics dt {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.playback-diagnostics dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .image-frame {
   display: grid;
   min-height: clamp(300px, 58vh, 760px);
