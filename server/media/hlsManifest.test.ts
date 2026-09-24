@@ -3,6 +3,7 @@ import {
   buildMasterPlaylist,
   buildVariantPlaylist,
   calculateRenditions,
+  publishedSegments,
 } from "./hlsManifest.js";
 
 describe("adaptive HLS manifests", () => {
@@ -46,30 +47,35 @@ describe("adaptive HLS manifests", () => {
     expect(playlist).toContain("variants/720p/index.m3u8");
   });
 
-  it("uses aligned four-second fMP4 segments and closes completed media", () => {
-    const playlist = buildVariantPlaylist({
-      availableSegments: 3,
-      complete: true,
-      durationSeconds: 10,
-      segmentDurationSeconds: 4,
-    });
+  it("uses FFmpeg's real durations and segment numbers, including gaps", () => {
+    const source =
+      '#EXTM3U\n#EXT-X-TARGETDURATION:5\n#EXT-X-MAP:URI="init.mp4"\n#EXTINF:4.125,\nsegment_000000.m4s\n#EXTINF:2.375,\nsegment_000002.m4s\n#EXT-X-ENDLIST\n';
+    const playlist = buildVariantPlaylist(
+      source,
+      "/init",
+      (index) => `/segment?index=${String(index)}`,
+    );
 
-    expect(playlist).toContain('#EXT-X-MAP:URI="init.mp4"');
-    expect(playlist).toContain("#EXTINF:4.000,");
-    expect(playlist).toContain("#EXTINF:2.000,");
-    expect(playlist).toContain("segment_000002.m4s");
+    expect(publishedSegments(source)).toEqual([0, 2]);
+    expect(playlist).toContain('#EXT-X-MAP:URI="/init"');
+    expect(playlist).toContain("#EXT-X-TARGETDURATION:5");
+    expect(playlist).toContain("#EXTINF:4.125,\n/segment?index=0");
+    expect(playlist).toContain("#EXTINF:2.375,\n/segment?index=2");
+    expect(playlist).not.toContain("index=1");
     expect(playlist).toContain("#EXT-X-ENDLIST");
   });
 
-  it("keeps an in-progress unknown-duration playlist open", () => {
-    const playlist = buildVariantPlaylist({
-      availableSegments: 1.9,
-      complete: false,
-      durationSeconds: 0,
-      segmentDurationSeconds: 0,
-    });
-    expect(playlist).toContain("#EXT-X-TARGETDURATION:1");
-    expect(playlist).toContain("#EXTINF:1.000,");
+  it("does not publish a segment before its playlist entry is complete", () => {
+    const source =
+      "#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXTINF:4.000,\nsegment_000000.m4s\n#EXTINF:1.000,\nsegment_000001.m4s";
+    const playlist = buildVariantPlaylist(
+      source,
+      "/init",
+      (index) => `/segment?index=${String(index)}`,
+    );
+    expect(publishedSegments(source)).toEqual([0]);
+    expect(playlist).toContain("/segment?index=0");
+    expect(playlist).not.toContain("index=1");
     expect(playlist).not.toContain("#EXT-X-ENDLIST");
   });
 });

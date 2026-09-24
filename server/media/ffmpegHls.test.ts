@@ -13,6 +13,7 @@ describe("FFmpeg adaptive HLS arguments", () => {
     expect(args).toContain("expr:gte(t,n_forced*4)");
     expect(args).toContain("-hls_segment_type");
     expect(args).toContain("fmp4");
+    expect(args[args.indexOf("-hls_flags") + 1]).toBe("temp_file");
     expect(args).toContain("rendition/segment_%06d.m4s");
     expect(args.at(-1)).toBe("rendition/index.m3u8");
   });

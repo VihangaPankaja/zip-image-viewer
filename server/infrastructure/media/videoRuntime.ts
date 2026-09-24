@@ -1,4 +1,4 @@
-import { access, mkdir, readdir } from "node:fs/promises";
+import { access, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import type {
@@ -8,7 +8,10 @@ import type {
   VideoTranscodeEntry,
 } from "../../domain/models.js";
 import { buildFmp4HlsArgs } from "../../media/ffmpegHls.js";
-import { calculateRenditions } from "../../media/hlsManifest.js";
+import {
+  calculateRenditions,
+  publishedSegments,
+} from "../../media/hlsManifest.js";
 import { ProcessLimiter } from "../../media/processLimiter.js";
 import { errorFromUnknown } from "../runtime/mediaClassification.js";
 import { runCommand, runCommandCapture } from "../process/commandRunner.js";
@@ -135,7 +138,12 @@ class VideoRuntime {
       qualityId,
       selectedHeight: height,
       dir: path.join(session.workspaceDir, "video-transcodes", hash),
-      playlistPath: "",
+      playlistPath: path.join(
+        session.workspaceDir,
+        "video-transcodes",
+        hash,
+        "index.m3u8",
+      ),
       status: "idle",
       process: null,
       priorityJobs: new Map(),
@@ -150,10 +158,10 @@ class VideoRuntime {
   refreshRenditionAvailability = async (
     rendition: VideoRendition,
   ): Promise<number> => {
-    const entries = await readdir(rendition.dir).catch(() => []);
-    rendition.availableSegments = entries.filter((entry) =>
-      /^segment_\d+\.m4s$/i.test(entry),
-    ).length;
+    const playlist = await readFile(rendition.playlistPath, "utf8").catch(
+      () => "",
+    );
+    rendition.availableSegments = publishedSegments(playlist).length;
     return rendition.availableSegments;
   };
 

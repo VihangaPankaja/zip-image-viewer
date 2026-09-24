@@ -1,10 +1,11 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, mkdir, readdir, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import ffmpegPath from "ffmpeg-static";
 import { describe, expect, it } from "vitest";
 import { buildFmp4HlsArgs } from "../../server/media/ffmpegHls.js";
+import { publishedSegments } from "../../server/media/hlsManifest.js";
 
 function runFfmpeg(args: string[]): Promise<void> {
   const executable = ffmpegPath;
@@ -61,6 +62,13 @@ describe("real FFmpeg HLS fixture", () => {
       expect(outputs).toContain("init.mp4");
       expect(outputs).toContain("index.m3u8");
       expect(outputs.some((file) => file.endsWith(".m4s"))).toBe(true);
+      expect(outputs.some((file) => file.endsWith(".tmp"))).toBe(false);
+      const playlist = await readFile(
+        path.join(renditionDirectory, "index.m3u8"),
+        "utf8",
+      );
+      expect(publishedSegments(playlist)).toEqual([0]);
+      expect(playlist).toContain("#EXT-X-ENDLIST");
     } finally {
       await rm(workspace, { recursive: true, force: true });
     }
