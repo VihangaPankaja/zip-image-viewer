@@ -76,15 +76,20 @@ function createHlsStatusHandler(deps: VideoRouteDependencies): RequestHandler {
         status: rendition.status,
         availableSegments: await deps.refreshRenditionAvailability(rendition),
         expectedSegments: rendition.expectedSegments,
+        encoderWaitMs:
+          rendition.encoderWaitMs ??
+          (rendition.queuedAt ? Date.now() - rendition.queuedAt : null),
       });
     }
     res.json({
       path: normalizedPath,
       status: renditions.some(({ status }) => status === "running")
         ? "running"
-        : renditions.some(({ status }) => status === "done")
-          ? "ready"
-          : "idle",
+        : renditions.some(({ status }) => status === "queued")
+          ? "queued"
+          : renditions.some(({ status }) => status === "done")
+            ? "ready"
+            : "idle",
       durationSeconds: entry.durationSeconds,
       renditions,
     });

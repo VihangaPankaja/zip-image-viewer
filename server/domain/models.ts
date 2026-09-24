@@ -127,12 +127,14 @@ export type VideoRendition = {
   selectedHeight: number;
   dir: string;
   playlistPath: string;
-  status: "idle" | "running" | "done" | "error";
+  status: "idle" | "queued" | "running" | "done" | "error";
   process: ChildProcess | null;
   availableSegments: number;
   expectedSegments: number;
   durationSeconds: number;
   priorityJobs: Map<number, Promise<void>>;
+  queuedAt?: number;
+  encoderWaitMs?: number;
 };
 
 export type VideoTranscodeEntry = {

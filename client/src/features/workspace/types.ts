@@ -1,4 +1,5 @@
 import type { RefObject } from "react";
+import type Hls from "hls.js";
 
 export type PreviewNode = {
   extension?: string;
@@ -21,9 +22,23 @@ export type ThumbnailItem = {
 export type KeyboardSettings = { jumpSeconds: number; rateStep: number };
 export type VideoJob = {
   phase?: string;
+  peerCount?: number;
+  sourceKind?: string;
+  status?: string;
+  sessionId?: string;
   totalTranscodeEntries?: number;
   transcodedEntries?: number;
   videoQuality?: string;
+};
+export type VideoHlsStatus = {
+  status: string;
+  renditions: {
+    quality: string;
+    status: string;
+    availableSegments?: number;
+    expectedSegments?: number;
+    encoderWaitMs?: number;
+  }[];
 };
 
 export type ImagePreviewProps = {
@@ -44,6 +59,7 @@ export type ImagePreviewProps = {
 
 export type VideoPreviewProps = {
   activeJob: VideoJob | null;
+  onOpenDownloads: () => void;
   formatBytes: (value: number) => string;
   formatDate: (value: number) => string;
   keyboardSettings: KeyboardSettings;
@@ -51,6 +67,11 @@ export type VideoPreviewProps = {
   selectedVideoQuality: string;
   setSelectedVideoQuality: (value: string) => void;
   videoPlaybackError: string;
+  videoPlaybackStatus: "loading" | "buffering" | "ready";
+  videoHlsStatus: VideoHlsStatus | null;
+  hlsRef: RefObject<Hls | null>;
+  retryVideoPlayback: () => void;
+  sessionId: string;
   videoHeight: number | null;
   videoQualityOptions: PreviewOption[];
   videoRef: RefObject<HTMLVideoElement | null>;

@@ -173,8 +173,9 @@ class VideoRuntime {
     const executable = this.ffmpegPath;
     if (!executable || rendition.status !== "idle") return;
     await mkdir(rendition.dir, { recursive: true });
-    rendition.status = "running";
+    rendition.status = "queued";
     const queuedAt = Date.now();
+    rendition.queuedAt = queuedAt;
     let startedAt = queuedAt;
     this.logEvent("info", "video.transcode.queued", {
       sessionId: session.id,
@@ -185,6 +186,8 @@ class VideoRuntime {
     void processLimiter
       .run(async () => {
         startedAt = Date.now();
+        rendition.status = "running";
+        rendition.encoderWaitMs = startedAt - queuedAt;
         this.logEvent("info", "video.transcode.started", {
           sessionId: session.id,
           path: entry.path,

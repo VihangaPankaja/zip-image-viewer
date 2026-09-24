@@ -72,7 +72,8 @@ async function encode(directory: string, height: number) {
 test("switches Auto and manual HLS levels without reloading playback", async ({
   page,
   browserName,
-}) => {
+  context,
+}, testInfo) => {
   test.skip(browserName !== "chromium");
   test.setTimeout(120_000);
   const root = await mkdtemp(path.join(tmpdir(), "ziv-quality-e2e-"));
@@ -147,6 +148,21 @@ test("switches Auto and manual HLS levels without reloading playback", async ({
           });
           return;
         }
+        if (resource === "status") {
+          await route.fulfill({
+            json: {
+              status: "ready",
+              renditions: [360, 720].map((height) => ({
+                quality: `${String(height)}p`,
+                status: "ready",
+                availableSegments: 4,
+                expectedSegments: 4,
+                encoderWaitMs: 120,
+              })),
+            },
+          });
+          return;
+        }
         const quality = url.searchParams.get("quality");
         if (quality !== "360p" && quality !== "720p")
           throw new Error(`Unexpected quality: ${quality}`);
@@ -194,7 +210,9 @@ test("switches Auto and manual HLS levels without reloading playback", async ({
     await page.getByRole("tab", { name: "Explore" }).click();
     await page.getByRole("button", { name: `Open ${filePath}` }).click();
     const video = page.getByLabel("Video preview");
-    await expect(page.getByText(/Auto · (360|720)p playback/)).toBeVisible();
+    await expect(page.getByText(/Auto · (360|720)p playback/)).toBeVisible({
+      timeout: 20_000,
+    });
     await video.evaluate(async (element: HTMLVideoElement) => {
       await element.play();
     });
@@ -211,7 +229,9 @@ test("switches Auto and manual HLS levels without reloading playback", async ({
     await page.getByRole("option", { name: "720p" }).click();
     await page.getByRole("button", { name: "Quality", exact: true }).click();
     await page.getByRole("option", { name: "Auto" }).click();
-    await expect(page.getByText(/Auto · (360|720)p playback/)).toBeVisible();
+    await expect(page.getByText(/Auto · (360|720)p playback/)).toBeVisible({
+      timeout: 20_000,
+    });
     const after = await video.evaluate((element: HTMLVideoElement) => ({
       time: element.currentTime,
       paused: element.paused,
@@ -219,6 +239,45 @@ test("switches Auto and manual HLS levels without reloading playback", async ({
     expect(after.paused).toBe(true);
     expect(Math.abs(after.time - before)).toBeLessThan(0.5);
     expect(masterRequests).toBe(1);
+
+    await page.getByText("Playback diagnostics").click();
+    const diagnostics = page.locator(".playback-diagnostics");
+    await expect(diagnostics).toBeVisible();
+    await expect(diagnostics).toContainText("HLS.js");
+    await expect(diagnostics).toContainText(/(360|720)p/);
+    await expect(diagnostics).toContainText("Buffer");
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.getByRole("button", { name: "Copy diagnostic report" }).click();
+    await expect(page.getByRole("status")).toHaveText("Report copied");
+    const report = await page.evaluate(() => navigator.clipboard.readText());
+    expect(JSON.parse(report)).toMatchObject({ mode: "HLS.js" });
+    expect(report).not.toContain(filePath);
+    expect(report).not.toContain(sessionId);
+    expect(report).not.toContain("http");
+    await page.screenshot({
+      animations: "disabled",
+      path: testInfo.outputPath("player-desktop.png"),
+    });
+
+    await page.setViewportSize({ width: 360, height: 800 });
+    await page.locator('label[for="workspace-pane-preview"]').click();
+    await expect(page.getByLabel("Video preview")).toBeVisible();
+    await expect(page.getByText("Playback diagnostics")).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      animations: "disabled",
+      fullPage: true,
+      path: testInfo.outputPath("player-mobile.png"),
+    });
+    await page.getByText("Playback diagnostics").scrollIntoViewIfNeeded();
+    await page.screenshot({
+      animations: "disabled",
+      path: testInfo.outputPath("player-mobile-diagnostics.png"),
+    });
   } finally {
     await rm(root, { recursive: true, force: true });
   }

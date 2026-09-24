@@ -10,20 +10,18 @@ class FakeHls {
     MANIFEST_PARSED: "manifestParsed",
     LEVEL_SWITCHED: "levelSwitched",
   };
+  static ErrorTypes = { MEDIA_ERROR: "mediaError" };
   static isSupported() {
     return true;
   }
   levels = [{ height: 360 }, { height: 720 }];
   loadLevel = -1;
   destroyed = false;
-  handlers = new Map<
-    string,
-    (event: string, data: { level: number }) => void
-  >();
+  handlers = new Map<string, (event: string, data: unknown) => void>();
   constructor() {
     instances.push(this);
   }
-  on(event: string, handler: (event: string, data: { level: number }) => void) {
+  on(event: string, handler: (event: string, data: unknown) => void) {
     this.handlers.set(event, handler);
   }
   loadSource(_url: string) {}
@@ -31,7 +29,7 @@ class FakeHls {
   destroy() {
     this.destroyed = true;
   }
-  emit(event: string, data = { level: 0 }) {
+  emit(event: string, data: unknown = { level: 0 }) {
     this.handlers.get(event)?.(event, data);
   }
 }
@@ -46,7 +44,8 @@ function Harness({ quality, file }: { quality: string; file: string }) {
     null,
   );
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [, setError] = useState("");
+  const [error, setError] = useState("");
+  const [, setStatus] = useState<"loading" | "buffering" | "ready">("loading");
   const [, setHeight] = useState<number | null>(null);
   useVideoSource({
     extension: "mp4",
@@ -56,10 +55,16 @@ function Harness({ quality, file }: { quality: string; file: string }) {
     selectedKind: "video",
     selectedQuality: quality,
     setPlaybackError: setError,
+    setPlaybackStatus: setStatus,
     setVideoHeight: setHeight,
     videoRef,
   });
-  return <video ref={videoRef} />;
+  return (
+    <>
+      <video ref={videoRef} />
+      <output>{error}</output>
+    </>
+  );
 }
 
 describe("video quality switching", () => {
@@ -98,5 +103,22 @@ describe("video quality switching", () => {
     await waitFor(() => expect(instances).toHaveLength(2));
     act(() => instances[1].emit(FakeHls.Events.MANIFEST_PARSED));
     expect(player.currentTime).toBe(0);
+  });
+
+  it("identifies a missing HLS segment from a fragment 404", async () => {
+    instances.length = 0;
+    const { container } = render(<Harness quality="auto" file="one.mp4" />);
+    await waitFor(() => expect(instances).toHaveLength(1));
+    act(() =>
+      instances[0].emit(FakeHls.Events.ERROR, {
+        fatal: true,
+        type: "networkError",
+        details: "fragLoadError",
+        response: { code: 404 },
+      }),
+    );
+    expect(container.querySelector("output")?.textContent).toBe(
+      "Video segment is missing.",
+    );
   });
 });

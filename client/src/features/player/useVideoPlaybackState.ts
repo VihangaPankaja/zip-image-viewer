@@ -6,6 +6,9 @@ export function useVideoPlaybackState() {
   const [videoPlaybackRate, setVideoPlaybackRate] = useState(1);
   const [videoVolume, setVideoVolume] = useState(0.9);
   const [videoPlaybackError, setVideoPlaybackError] = useState("");
+  const [videoPlaybackStatus, setVideoPlaybackStatus] = useState<
+    "loading" | "buffering" | "ready"
+  >("loading");
   const [videoHeight, setVideoHeight] = useState<number | null>(null);
   const [videoQualityOptions, setVideoQualityOptions] = useState<
     VideoQualityOption[]
@@ -25,6 +28,7 @@ export function useVideoPlaybackState() {
       videoVolume,
       setVideoVolume,
       videoPlaybackError,
+      videoPlaybackStatus,
       videoHeight,
       videoQualityOptions,
       selectedVideoQuality,
@@ -32,6 +36,7 @@ export function useVideoPlaybackState() {
     },
     setters: {
       setVideoPlaybackError,
+      setVideoPlaybackStatus,
       setVideoHeight,
       setVideoQualityOptions,
       setSelectedVideoQuality,
