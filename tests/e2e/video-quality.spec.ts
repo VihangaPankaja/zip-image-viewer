@@ -48,13 +48,14 @@ async function encode(directory: string, height: number) {
     "-hls_segment_type",
     "fmp4",
     "-hls_fmp4_init_filename",
-    path.join(directory, "init.mp4"),
+    "init.mp4",
     "-hls_segment_filename",
     path.join(directory, "segment_%06d.m4s"),
     path.join(directory, "index.m3u8"),
   ];
   await new Promise<void>((resolve, reject) => {
     const child = spawn(executable, args, {
+      cwd: directory,
       stdio: ["ignore", "ignore", "pipe"],
     });
     let stderr = "";
