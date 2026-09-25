@@ -1345,6 +1345,7 @@
           area: "Video",
           priority: "P0",
           effort: "M",
+          status: "Done",
           title: "Make the bitrate ladder and manifest agree",
           summary:
             "Give Auto quality real choices with honest bandwidth and codec metadata.",
@@ -1352,6 +1353,7 @@
           plan: "Use one rendition definition for encoding and manifest generation. Include audio and overhead in bandwidth values and derive codec metadata from outputs. Align segment boundaries and avoid upscaling. Keep Original distinct from transcoded Auto.",
           done: "Inspect encoded files and manifests for every level. Verify resolution, codec, peak bandwidth and switching alignment, including silent and high-frame-rate clips.",
           depends: "V02",
+          note: "Implemented in v3.3.6: shared encoder/manifest ladder, audio-aware bandwidth, and output-derived codecs after init publication. Verified with real FFmpeg fixtures and Chrome playback.",
           evidence:
             "server/media/ffmpegHls.ts; server/media/hlsManifest.ts; server/handlers/videoHlsRoutes.ts",
         },
@@ -1659,6 +1661,7 @@
           area: "Tooling / quality",
           priority: "P0",
           effort: "M",
+          status: "In progress",
           title: "Test real playback through the shipped container",
           summary:
             "Catch packaging and decoding failures that mocked player tests miss.",
@@ -1666,6 +1669,7 @@
           plan: "Extend fixtures with long GOPs, variable frame rate, no audio and an unsupported codec. Run the built container and decode HLS in a browser. Add controlled network changes and random seeks.",
           done: "The container passes a real media smoke test. Missing init files, truncated segments, codec mismatches and broken seeks produce failures.",
           depends: "V02, V04",
+          note: "v3.3.6 adds long-GOP, variable-frame-rate, silent and codec-conversion fixtures plus a production-image FFmpeg smoke. Browser playback through the container and controlled network checks remain.",
           evidence:
             "tests/integration/ffmpegHlsFixture.test.ts; tests/integration/dockerfile.test.ts; .github/workflows/quality.yml",
         },

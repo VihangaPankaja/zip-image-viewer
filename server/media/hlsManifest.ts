@@ -6,16 +6,37 @@ export type VideoDimensions = {
 export type HlsRendition = VideoDimensions & {
   id: string;
   bandwidth: number;
+  codecs?: string;
 };
 
 const LADDER = [
-  { height: 360, bandwidth: 800_000 },
-  { height: 480, bandwidth: 1_400_000 },
-  { height: 720, bandwidth: 2_800_000 },
-  { height: 1080, bandwidth: 5_000_000 },
-  { height: 1440, bandwidth: 8_000_000 },
-  { height: 2160, bandwidth: 14_000_000 },
+  { height: 360, videoBitrate: 800_000 },
+  { height: 480, videoBitrate: 1_400_000 },
+  { height: 720, videoBitrate: 2_800_000 },
+  { height: 1080, videoBitrate: 5_000_000 },
+  { height: 1440, videoBitrate: 8_000_000 },
+  { height: 2160, videoBitrate: 14_000_000 },
 ] as const;
+
+export const AUDIO_BITRATE = 128_000;
+
+export function videoBitrateForHeight(height: number): number {
+  return (
+    [...LADDER].reverse().find((level) => height >= level.height)
+      ?.videoBitrate ?? 800_000
+  );
+}
+
+function advertisedBandwidth(height: number): number {
+  return ((videoBitrateForHeight(height) + AUDIO_BITRATE) * 11) / 10;
+}
+
+export function codecsFromInit(init: Buffer): string | undefined {
+  const box = init.indexOf("avcC");
+  if (box < 0 || box + 8 > init.length) return undefined;
+  const avc = `avc1.${init.subarray(box + 5, box + 8).toString("hex")}`;
+  return init.includes("mp4a") ? `${avc},mp4a.40.2` : avc;
+}
 
 function evenWidth(dimensions: VideoDimensions, targetHeight: number): number {
   const ratio = dimensions.width / dimensions.height;
@@ -29,11 +50,11 @@ export function calculateRenditions(
 
   const renditions = LADDER.filter(
     ({ height }) => height <= dimensions.height,
-  ).map(({ height, bandwidth }) => ({
+  ).map(({ height }) => ({
     id: `${String(height)}p`,
     width: evenWidth(dimensions, height),
     height,
-    bandwidth,
+    bandwidth: advertisedBandwidth(height),
   }));
 
   if (renditions.length > 0) return renditions;
@@ -42,7 +63,7 @@ export function calculateRenditions(
       id: "source",
       width: dimensions.width,
       height: dimensions.height,
-      bandwidth: 600_000,
+      bandwidth: advertisedBandwidth(dimensions.height),
     },
   ];
 }
@@ -54,7 +75,7 @@ export function buildMasterPlaylist(
   const lines = ["#EXTM3U", "#EXT-X-VERSION:7"];
   for (const rendition of renditions) {
     lines.push(
-      `#EXT-X-STREAM-INF:BANDWIDTH=${String(rendition.bandwidth)},RESOLUTION=${String(rendition.width)}x${String(rendition.height)},CODECS="avc1.4d401f,mp4a.40.2"`,
+      `#EXT-X-STREAM-INF:BANDWIDTH=${String(rendition.bandwidth)},RESOLUTION=${String(rendition.width)}x${String(rendition.height)}${rendition.codecs ? `,CODECS="${rendition.codecs}"` : ""}`,
       getUri(rendition),
     );
   }

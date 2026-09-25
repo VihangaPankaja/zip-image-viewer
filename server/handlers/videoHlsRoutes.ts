@@ -11,6 +11,8 @@ import { queryText } from "./httpUtils.js";
 import {
   buildMasterPlaylist,
   buildVariantPlaylist,
+  calculateRenditions,
+  codecsFromInit,
   publishedSegments,
 } from "../media/hlsManifest.js";
 import type { VideoRouteDependencies } from "./videoRoutes.js";
@@ -143,22 +145,22 @@ function sendCompletedFile(
 function registerMasterRoute(app: Express, deps: VideoRouteDependencies): void {
   app.get("/api/sessions/:id/video/hls/master", async (request, response) => {
     const { context, entry } = await resolveHlsEntry(request, deps);
-    const renditions = entry.qualities.map((quality) => ({
-      id: quality.id,
-      height: quality.height ?? entry.height,
-      width: Math.max(
-        2,
-        Math.round(
-          (entry.width * (quality.height ?? entry.height)) /
-            Math.max(1, entry.height) /
-            2,
-        ) * 2,
-      ),
-      bandwidth:
-        quality.id === "source"
-          ? 14_000_000
-          : Math.max(600_000, (quality.height ?? 360) * 4_000),
-    }));
+    const renditions = await Promise.all(
+      calculateRenditions(entry).map(async (rendition) => {
+        const state = deps.getRenditionState(
+          entry,
+          context.session,
+          rendition.id,
+        );
+        const init = await readFile(path.join(state.dir, "init.mp4")).catch(
+          () => null,
+        );
+        return {
+          ...rendition,
+          codecs: init ? codecsFromInit(init) : undefined,
+        };
+      }),
+    );
     const playlist = buildMasterPlaylist(renditions, ({ id }) =>
       renditionUri(request, context, id, "playlist"),
     );

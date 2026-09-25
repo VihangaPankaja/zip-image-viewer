@@ -3,22 +3,23 @@ import {
   buildMasterPlaylist,
   buildVariantPlaylist,
   calculateRenditions,
+  codecsFromInit,
   publishedSegments,
 } from "./hlsManifest.js";
 
 describe("adaptive HLS manifests", () => {
   it("builds a source-bounded ladder ordered by bandwidth", () => {
     expect(calculateRenditions({ width: 1920, height: 1080 })).toEqual([
-      { id: "360p", width: 640, height: 360, bandwidth: 800_000 },
-      { id: "480p", width: 854, height: 480, bandwidth: 1_400_000 },
-      { id: "720p", width: 1280, height: 720, bandwidth: 2_800_000 },
-      { id: "1080p", width: 1920, height: 1080, bandwidth: 5_000_000 },
+      { id: "360p", width: 640, height: 360, bandwidth: 1_020_800 },
+      { id: "480p", width: 854, height: 480, bandwidth: 1_680_800 },
+      { id: "720p", width: 1280, height: 720, bandwidth: 3_220_800 },
+      { id: "1080p", width: 1920, height: 1080, bandwidth: 5_640_800 },
     ]);
   });
 
   it("never upscales a small source", () => {
     expect(calculateRenditions({ width: 640, height: 360 })).toEqual([
-      { id: "360p", width: 640, height: 360, bandwidth: 800_000 },
+      { id: "360p", width: 640, height: 360, bandwidth: 1_020_800 },
     ]);
   });
 
@@ -28,7 +29,7 @@ describe("adaptive HLS manifests", () => {
         id: "source",
         width: 320,
         height: 180,
-        bandwidth: 600_000,
+        bandwidth: 1_020_800,
       },
     ]);
     expect(calculateRenditions({ width: 0, height: 180 })).toEqual([]);
@@ -42,9 +43,19 @@ describe("adaptive HLS manifests", () => {
     );
 
     expect(playlist).toContain(
-      "#EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=640x360",
+      "#EXT-X-STREAM-INF:BANDWIDTH=1020800,RESOLUTION=640x360",
     );
     expect(playlist).toContain("variants/720p/index.m3u8");
+    expect(playlist).not.toContain("CODECS=");
+  });
+
+  it("reads video level and optional audio from encoded init data", () => {
+    const video = Buffer.from("avcC\x01\x4d\x40\x1f", "latin1");
+    expect(codecsFromInit(video)).toBe("avc1.4d401f");
+    expect(codecsFromInit(Buffer.concat([video, Buffer.from("mp4a")]))).toBe(
+      "avc1.4d401f,mp4a.40.2",
+    );
+    expect(codecsFromInit(Buffer.from("empty"))).toBeUndefined();
   });
 
   it("uses FFmpeg's real durations and segment numbers, including gaps", () => {

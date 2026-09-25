@@ -20,7 +20,6 @@ describe("HLS routes", () => {
     const playlistPath = path.join(dir, "index.m3u8");
     await mkdir(dir);
     await writeFile(source, "source");
-    await writeFile(path.join(dir, "init.mp4"), "init");
     await writeFile(path.join(dir, "segment_000000.m4s"), "complete segment");
     const session = { id: "session", extractDir: workspace } as Session;
     const rendition = {
@@ -29,6 +28,8 @@ describe("HLS routes", () => {
       status: "done",
     } as VideoRendition;
     const entry = {
+      width: 640,
+      height: 360,
       qualities: [{ id: "360p", label: "360p", height: 360 }],
       defaultQuality: "360p",
     } as VideoTranscodeEntry;
@@ -46,6 +47,27 @@ describe("HLS routes", () => {
     const query = "?path=source.mp4&quality=360p";
 
     try {
+      const cold = await request(app)
+        .get(`${resource}/master?path=source.mp4`)
+        .expect(200);
+      expect(cold.text).toContain(
+        "#EXT-X-STREAM-INF:BANDWIDTH=1020800,RESOLUTION=640x360",
+      );
+      expect(cold.text).toContain(
+        "/api/sessions/session/video/hls/playlist?path=source.mp4&quality=360p",
+      );
+      expect(cold.text).not.toContain("CODECS=");
+
+      await writeFile(
+        path.join(dir, "init.mp4"),
+        Buffer.from("avcC\x01\x4d\x40\x1fmp4a", "latin1"),
+      );
+      const warm = await request(app)
+        .get(`${resource}/master?path=source.mp4`)
+        .expect(200);
+      expect(warm.text).toContain('CODECS="avc1.4d401f,mp4a.40.2"');
+      expect(warm.text).toContain("quality=360p");
+
       await request(app).get(`${resource}/segment${query}&index=0`).expect(425);
       await writeFile(
         playlistPath,

@@ -4,7 +4,8 @@
   "entry": [
     "server/index.ts",
     "server/runtimeComposition.ts",
-    "client/src/main.tsx"
+    "client/src/main.tsx",
+    "tests/integration/containerHlsSmoke.mjs"
   ],
   "ignorePatterns": ["build/**", "dist/**", "coverage/**", "node_modules/**"],
   "ignoreDependencies": ["7zip-bin", "ffmpeg-static"],
