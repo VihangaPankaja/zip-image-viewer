@@ -3,10 +3,14 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import process from "node:process";
 import ffmpegPath from "ffmpeg-static";
-import { buildFmp4HlsArgs } from "../../build/server/media/ffmpegHls.js";
-import { publishedSegments } from "../../build/server/media/hlsManifest.js";
+// The production build exists only after the CI dead-code check.
+const mediaModule = (name) =>
+  pathToFileURL(path.join(process.cwd(), "build/server/media", name)).href;
+const { buildFmp4HlsArgs } = await import(mediaModule("ffmpegHls.js"));
+const { publishedSegments } = await import(mediaModule("hlsManifest.js"));
 
 assert.ok(ffmpegPath, "Production FFmpeg binary is missing");
 const workspace = mkdtempSync(path.join(tmpdir(), "ziv-container-hls-"));
