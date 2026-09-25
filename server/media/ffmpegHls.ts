@@ -1,3 +1,5 @@
+import { AUDIO_BITRATE, videoBitrateForHeight } from "./hlsManifest.js";
+
 export type Fmp4HlsInput = {
   inputPath: string;
   outputDirectory: string;
@@ -5,22 +7,13 @@ export type Fmp4HlsInput = {
   segmentDurationSeconds?: number;
 };
 
-function bitrateForHeight(height: number): string {
-  if (height >= 2160) return "14000k";
-  if (height >= 1440) return "8000k";
-  if (height >= 1080) return "5000k";
-  if (height >= 720) return "2800k";
-  if (height >= 480) return "1400k";
-  return "800k";
-}
-
 function mediaPath(directory: string, filename: string): string {
   return `${directory.replace(/\\/g, "/").replace(/\/$/, "")}/${filename}`;
 }
 
 export function buildFmp4HlsArgs(input: Fmp4HlsInput): string[] {
   const duration = Math.max(1, input.segmentDurationSeconds ?? 4);
-  const bitrate = bitrateForHeight(input.height);
+  const bitrate = `${String(videoBitrateForHeight(input.height) / 1000)}k`;
   const args = [
     "-hide_banner",
     "-loglevel",
@@ -56,7 +49,7 @@ export function buildFmp4HlsArgs(input: Fmp4HlsInput): string[] {
     "-c:a",
     "aac",
     "-b:a",
-    "128k",
+    `${String(AUDIO_BITRATE / 1000)}k`,
     "-ac",
     "2",
     "-ar",

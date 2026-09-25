@@ -72,3 +72,10 @@ jobs:
             sleep 1
           done
           exit 1
+
+      - name: Decode HLS in production image
+        if: github.event_name == 'pull_request'
+        run: |
+          docker run --rm --entrypoint node \
+            --mount type=bind,source="$PWD/tests/integration/containerHlsSmoke.mjs",target=/app/tests/integration/containerHlsSmoke.mjs,readonly \
+            ${{ env.IMAGE_NAME }}:latest /app/tests/integration/containerHlsSmoke.mjs
