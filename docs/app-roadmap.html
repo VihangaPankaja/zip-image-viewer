@@ -1377,14 +1377,16 @@
           area: "Video",
           priority: "P1",
           effort: "M",
+          status: "In progress",
           title: "Add cached thumbnail scrubbing",
           summary: "Show where a seek will land before the user commits it.",
           now: "A timestamp thumbnail route exists, but native video controls do not connect it to a preview timeline.",
           plan: "Generate small storyboard sheets and a timestamp index once per video. Reuse the endpoint for misses, cache results and limit concurrent work. Add an accessible timeline that requests playback only on committed seeks.",
           done: "Pointer previews meet the warm-cache budget. Keyboard and touch can seek. Dragging for ten seconds does not spawn one FFmpeg process per event.",
           depends: "V01, S02",
+          note: "v3.4.1 adds an accessible pointer, touch and keyboard seek timeline with quantized cached thumbnails and coalesced thumbnail generation. Storyboard sheets and shared media-worker budgeting remain.",
           evidence:
-            "server/handlers/video/thumbnailRoute.ts; client/src/components/Preview/VideoPreviewContent.tsx",
+            "server/handlers/video/thumbnailRoute.ts; client/src/components/Preview/VideoScrubber.tsx; client/src/components/Preview/VideoPreviewContent.tsx",
         },
         {
           id: "V07",
@@ -1577,6 +1579,7 @@
           area: "UI / UX",
           priority: "P1",
           effort: "S",
+          status: "In progress",
           title: "Keep keyboard and screen-reader flows intact",
           summary:
             "New player and torrent controls should work without a mouse.",
@@ -1584,8 +1587,9 @@
           plan: "Extend focus handling for the file picker, announce selected totals and transfer state, label seek controls and preserve visible focus. Keep essential controls visible on touch.",
           done: "Add a torrent, select files, start, seek and close overlays using only the keyboard. Run axe and manually verify announcements.",
           depends: "T01, V06",
+          note: "v3.4.1 labels the seek timeline, exposes its time value, preserves visible focus and uses commit-only pointer and keyboard seeking. Torrent picker coverage remains dependent on T01.",
           evidence:
-            "client/src/hooks/useKeyboardShortcuts.ts; tests/e2e/smoke.spec.ts; package.json",
+            "client/src/components/Preview/VideoScrubber.tsx; client/src/hooks/useKeyboardShortcuts.ts; tests/e2e/smoke.spec.ts; package.json",
         },
         {
           id: "U05",

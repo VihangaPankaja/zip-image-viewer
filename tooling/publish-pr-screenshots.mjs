@@ -25,13 +25,45 @@ if (run("git", ["status", "--porcelain", "--untracked-files=normal"]))
   throw new Error(
     "Commit implementation changes before publishing screenshots.",
   );
+const requiredScreens = [
+  "downloads-empty",
+  "http-and-torrent-downloads",
+  "settings",
+  "settings-more",
+  "add-downloads",
+  "explorer",
+  "preview-png",
+  "preview-txt",
+  "preview-mp4",
+  "preview-wav",
+  "preview-zip",
+  "slideshow",
+  "explorer-dialog",
+  "video-seek-preview",
+  "video-seek-committed",
+];
+for (const device of ["Mobile", "Tablet", "Desktop", "Ultrawide"]) {
+  for (const theme of ["light", "dark"]) {
+    for (const screen of requiredScreens) {
+      if (
+        manifest.captures.filter(
+          (capture) =>
+            capture.device === device &&
+            capture.theme === theme &&
+            capture.screen === screen,
+        ).length !== 1
+      )
+        throw new Error(
+          `Missing or duplicate ${device} ${theme} ${screen}. Run screenshots:pr again.`,
+        );
+    }
+  }
+}
 if (
-  manifest.captures.length !== 104 ||
-  new Set(manifest.captures.map((capture) => capture.file)).size !== 104
+  new Set(manifest.captures.map((capture) => capture.file)).size !==
+  manifest.captures.length
 )
-  throw new Error(
-    "Expected all 13 screens in both themes on four devices. Run screenshots:pr again.",
-  );
+  throw new Error("Screenshot filenames must be unique.");
 const repository = run("gh", [
   "repo",
   "view",

@@ -38,9 +38,29 @@ export async function prepareMedia() {
         "-i",
         source,
         "-t",
-        "3",
+        "8",
         ...options,
         path.join(mediaDirectory, name),
+      ],
+      { timeout: 30_000 },
+    );
+  }
+  for (const time of [0, 5]) {
+    execFileSync(
+      ffmpeg,
+      [
+        "-y",
+        "-loglevel",
+        "error",
+        "-ss",
+        String(time),
+        "-i",
+        path.join(mediaDirectory, "sample.mp4"),
+        "-frames:v",
+        "1",
+        "-vf",
+        "scale=320:-1",
+        path.join(mediaDirectory, `thumbnail-${time}.jpg`),
       ],
       { timeout: 30_000 },
     );
@@ -159,6 +179,7 @@ export async function installReviewFixtures(page: Page) {
             children: filenames.map((name) => ({
               name,
               path: name,
+              parentPath: ".",
               type: "file",
               extension: name.split(".").at(-1),
               size: 2400000,
@@ -174,6 +195,20 @@ export async function installReviewFixtures(page: Page) {
           defaultQuality: "source",
         },
       });
+    if (url.pathname.endsWith("/video/thumbnail")) {
+      const time = Number(url.searchParams.get("time"));
+      if (time !== 0 && time !== 5)
+        return route.fulfill({
+          status: 416,
+          body: "Thumbnail outside fixture duration",
+        });
+      return route.fulfill({
+        body: await readFile(
+          path.join(mediaDirectory, `thumbnail-${time}.jpg`),
+        ),
+        contentType: "image/jpeg",
+      });
+    }
     if (
       url.pathname.endsWith("/file") ||
       url.pathname.endsWith("/video/play")
@@ -189,10 +224,26 @@ export async function installReviewFixtures(page: Page) {
         : name.endsWith(".wav")
           ? ["sample.wav", "audio/wav"]
           : ["sample.mp4", "video/mp4"];
-      return route.fulfill({
-        body: await readFile(path.join(mediaDirectory, file)),
-        contentType,
-      });
+      const body = await readFile(path.join(mediaDirectory, file));
+      const range = (await route.request().headerValue("range"))?.match(
+        /^bytes=(\d+)-(\d*)$/,
+      );
+      if (range) {
+        const start = Number(range[1]);
+        const end = range[2]
+          ? Math.min(Number(range[2]), body.length - 1)
+          : body.length - 1;
+        return route.fulfill({
+          status: 206,
+          headers: {
+            "accept-ranges": "bytes",
+            "content-range": `bytes ${start}-${end}/${body.length}`,
+          },
+          body: body.subarray(start, end + 1),
+          contentType,
+        });
+      }
+      return route.fulfill({ body, contentType });
     }
     return route.fulfill({ json: { renditions: [] } });
   });
