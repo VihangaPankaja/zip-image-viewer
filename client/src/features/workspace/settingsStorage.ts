@@ -20,6 +20,22 @@ const defaultColumns: ExplorerColumns = {
   path: true,
 };
 
+export function readStoredSetting(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+export function writeStoredSetting(key: string, value: string): void {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Keep settings usable for this tab when browser storage is unavailable.
+  }
+}
+
 function parseStoredValue(raw: string | null): Record<string, unknown> | null {
   if (!raw) return null;
   try {
@@ -33,9 +49,7 @@ function parseStoredValue(raw: string | null): Record<string, unknown> | null {
 }
 export function readKeyboardSettings(): KeyboardSettings {
   if (typeof window === "undefined") return defaultKeyboard;
-  const value = parseStoredValue(
-    window.localStorage.getItem("zip-shortcut-settings"),
-  );
+  const value = parseStoredValue(readStoredSetting("zip-shortcut-settings"));
   const jump = value?.jumpSeconds;
   const rate = value?.rateStep;
   return {
@@ -50,9 +64,7 @@ export function readKeyboardSettings(): KeyboardSettings {
 }
 export function readExplorerColumns(): ExplorerColumns {
   if (typeof window === "undefined") return defaultColumns;
-  const value = parseStoredValue(
-    window.localStorage.getItem("zip-explorer-columns"),
-  );
+  const value = parseStoredValue(readStoredSetting("zip-explorer-columns"));
   return {
     type: value?.type !== false,
     size: value?.size !== false,
@@ -62,12 +74,8 @@ export function readExplorerColumns(): ExplorerColumns {
 }
 export function readDownloadOptions(): DownloadOptions {
   if (typeof window === "undefined") return DEFAULT_DOWNLOAD_OPTIONS;
-  const current = parseStoredValue(
-    window.localStorage.getItem("zip-download-options"),
-  );
-  const legacy = parseStoredValue(
-    window.localStorage.getItem("zip-download-settings"),
-  );
+  const current = parseStoredValue(readStoredSetting("zip-download-options"));
+  const legacy = parseStoredValue(readStoredSetting("zip-download-settings"));
   return normalizeDownloadOptions(
     current ?? legacy ?? DEFAULT_DOWNLOAD_OPTIONS,
   );

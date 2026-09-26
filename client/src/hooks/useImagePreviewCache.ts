@@ -9,7 +9,6 @@ type ImagePreviewNode = {
 type ImagePreviewCacheEntry = {
   objectUrl?: string;
   promise?: Promise<string>;
-  touchedAt: number;
 };
 
 type UseImagePreviewCacheParams = {
@@ -33,44 +32,29 @@ async function requestImagePreview(
   cache: Map<string, ImagePreviewCacheEntry>,
   cacheKey: string,
   requestUrl: string,
+  entry: ImagePreviewCacheEntry,
 ): Promise<string> {
   try {
     const response = await fetch(requestUrl);
     if (!response.ok) {
       throw new Error("Could not load image preview.");
     }
-    const objectUrl = URL.createObjectURL(await response.blob());
-    cache.set(cacheKey, { objectUrl, touchedAt: Date.now() });
+    const blob = await response.blob();
+    // A cleared session must not be repopulated by an older in-flight request.
+    if (cache.get(cacheKey) !== entry) return "";
+    const objectUrl = URL.createObjectURL(blob);
+    entry.objectUrl = objectUrl;
     return objectUrl;
   } catch (error) {
-    cache.delete(cacheKey);
+    if (cache.get(cacheKey) === entry) cache.delete(cacheKey);
     throw error;
   }
 }
 
-function getCachedPreview(
-  cache: Map<string, ImagePreviewCacheEntry>,
-  cacheKey: string,
-): string | Promise<string> | null {
-  const existing = cache.get(cacheKey);
-  return existing?.objectUrl ?? existing?.promise ?? null;
-}
-
-export function useImagePreviewCache({
-  sessionId,
-  selectedNode,
-  selectedKind,
-  previewQuality,
-  selectedImagePreviewUrl,
-}: UseImagePreviewCacheParams) {
-  const [selectedImageSrc, setSelectedImageSrc] = useState("");
+function useImageCache(sessionId: string) {
   const imagePreviewCacheRef = useRef<Map<string, ImagePreviewCacheEntry>>(
     new Map(),
   );
-
-  const resetSelectedImageSrc = useCallback(() => {
-    setSelectedImageSrc("");
-  }, []);
 
   const clearImagePreviewCache = useCallback(() => {
     clearPreviewCache(imagePreviewCacheRef.current);
@@ -83,25 +67,39 @@ export function useImagePreviewCache({
       }
 
       const cacheKey = getImageCacheKey(sessionId, imagePath, quality);
-      const cached = getCachedPreview(imagePreviewCacheRef.current, cacheKey);
+      const cache = imagePreviewCacheRef.current;
+      const existing = cache.get(cacheKey);
+      const cached = existing?.objectUrl ?? existing?.promise;
       if (cached) {
         return cached;
       }
-      const request = requestImagePreview(
-        imagePreviewCacheRef.current,
+      const entry: ImagePreviewCacheEntry = {};
+      cache.set(cacheKey, entry);
+      entry.promise = requestImagePreview(
+        cache,
         cacheKey,
         buildFileUrl(sessionId, imagePath, { imagePreview: true, quality }),
+        entry,
       );
-
-      imagePreviewCacheRef.current.set(cacheKey, {
-        promise: request,
-        touchedAt: Date.now(),
-      });
-
-      return request;
+      return entry.promise;
     },
     [sessionId],
   );
+
+  useEffect(() => clearImagePreviewCache, [clearImagePreviewCache, sessionId]);
+  return { clearImagePreviewCache, loadImagePreview };
+}
+
+export function useImagePreviewCache({
+  sessionId,
+  selectedNode,
+  selectedKind,
+  previewQuality,
+  selectedImagePreviewUrl,
+}: UseImagePreviewCacheParams) {
+  const [selectedImageSrc, setSelectedImageSrc] = useState("");
+  const { clearImagePreviewCache, loadImagePreview } = useImageCache(sessionId);
+  const resetSelectedImageSrc = useCallback(() => setSelectedImageSrc(""), []);
 
   useEffect(() => {
     if (!selectedNode || !sessionId || selectedKind !== "image") {

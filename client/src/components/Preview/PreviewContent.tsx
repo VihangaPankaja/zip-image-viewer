@@ -1,4 +1,5 @@
 import React from "react";
+import { FileImage } from "lucide-react";
 import { ImagePreviewContent } from "./ImagePreviewContent";
 import { TextPreviewContent } from "./TextPreviewContent";
 import { VideoPreviewContent } from "./VideoPreviewContent";
@@ -52,48 +53,70 @@ function PreviewHeader({
         </h2>
       </div>
       {selectedFile ? (
-        <div className="panel-actions">
-          <button
-            className="ghost-button"
-            type="button"
-            onClick={() => setExplorerModalOpen(true)}
-          >
-            Open explorer
-          </button>
-          {selectedKind !== "binary" && selectedKind !== "directory" ? (
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={(event) =>
-                void (
-                  event.currentTarget.closest<HTMLElement>(
-                    ".preview-panel",
-                  ) as { requestFullscreen?: () => Promise<void> } | null
-                )?.requestFullscreen?.()
-              }
-            >
-              Maximize preview
-            </button>
-          ) : null}
-          {selectedKind === "image" ? (
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={() => setSlideshowOpen(true)}
-            >
-              Slideshow
-            </button>
-          ) : null}
-          <a
-            className="ghost-button inline-link"
-            href={selectedFileUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Open raw
-          </a>
-        </div>
+        <PreviewActions
+          selectedKind={selectedKind}
+          selectedFileUrl={selectedFileUrl}
+          setExplorerModalOpen={setExplorerModalOpen}
+          setSlideshowOpen={setSlideshowOpen}
+        />
       ) : null}
+    </div>
+  );
+}
+
+function PreviewActions({
+  selectedKind,
+  selectedFileUrl,
+  setExplorerModalOpen,
+  setSlideshowOpen,
+}: Pick<
+  PreviewContentProps,
+  | "selectedKind"
+  | "selectedFileUrl"
+  | "setExplorerModalOpen"
+  | "setSlideshowOpen"
+>) {
+  return (
+    <div className="panel-actions">
+      <button
+        className="ghost-button"
+        type="button"
+        onClick={() => setExplorerModalOpen(true)}
+      >
+        Open explorer
+      </button>
+      {selectedKind !== "binary" && selectedKind !== "directory" ? (
+        <button
+          className="ghost-button"
+          type="button"
+          onClick={(event) =>
+            void (
+              event.currentTarget.closest<HTMLElement>(".preview-panel") as {
+                requestFullscreen?: () => Promise<void>;
+              } | null
+            )?.requestFullscreen?.()
+          }
+        >
+          Maximize preview
+        </button>
+      ) : null}
+      {selectedKind === "image" ? (
+        <button
+          className="ghost-button"
+          type="button"
+          onClick={() => setSlideshowOpen(true)}
+        >
+          Slideshow
+        </button>
+      ) : null}
+      <a
+        className="ghost-button inline-link"
+        href={selectedFileUrl}
+        target="_blank"
+        rel="noreferrer"
+      >
+        Open raw
+      </a>
     </div>
   );
 }
@@ -152,6 +175,9 @@ export function PreviewContent(props: PreviewContentProps) {
 
       {!selectedFile ? (
         <div className="empty-card preview-empty">
+          <span className="empty-state-icon" aria-hidden="true">
+            <FileImage size={28} strokeWidth={1.5} />
+          </span>
           <strong>Nothing selected</strong>
           <p>
             Choose a file from the sidebar to start previewing its contents.

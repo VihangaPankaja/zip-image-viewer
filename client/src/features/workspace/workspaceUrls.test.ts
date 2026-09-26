@@ -24,5 +24,6 @@ describe("workspace URL batches", () => {
         ),
       ),
     ).toMatch(/up to 50/i);
+    expect(getBatchValidationMessage(["https://example.com/a.zip"])).toBe("");
   });
 });

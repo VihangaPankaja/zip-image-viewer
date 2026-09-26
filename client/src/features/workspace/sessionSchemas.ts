@@ -4,6 +4,7 @@ import { z } from "zod";
 export type SessionTree = {
   children?: SessionTree[];
   extension?: string;
+  modifiedAt?: number;
   name: string;
   parentPath?: string;
   path: string;
@@ -14,6 +15,7 @@ export type SessionTree = {
 const sessionTreeSchema: z.ZodType<SessionTree> = z.object({
   children: z.lazy(() => z.array(sessionTreeSchema)).optional(),
   extension: z.string().optional(),
+  modifiedAt: z.number().optional(),
   name: z.string(),
   parentPath: z.string().optional(),
   path: z.string(),

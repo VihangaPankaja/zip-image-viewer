@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   checks:
     runs-on: ubuntu-latest
@@ -50,6 +54,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: quality-reports
+          retention-days: 14
           path: |
             coverage/
             fallow.sarif
@@ -59,6 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
+      fail-fast: false
       matrix:
         suite: [unit, component, integration, ui]
     steps:
@@ -88,6 +94,16 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm run check:roadmap
+      - name: Capture device and theme review gallery
+        run: pnpm run screenshots:pr
+      - name: Publish review gallery
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pr-screenshots
+          path: test-results/pr-screenshots/
+          retention-days: 14
+          if-no-files-found: error
       - name: Run real video benchmark smoke test
         run: pnpm run benchmark:video -- --samples 1 --duration 8 --output "$RUNNER_TEMP/video-latency.md"
       - name: Remove benchmark output
@@ -99,6 +115,7 @@ jobs:
     timeout-minutes: 15
     needs: checks
     strategy:
+      fail-fast: false
       matrix:
         browser: [chromium, firefox, webkit]
     steps:
@@ -113,3 +130,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
       - run: pnpm exec playwright test --project=${{ matrix.browser }}
+
+      - name: Publish browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-${{ matrix.browser }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+          if-no-files-found: ignore

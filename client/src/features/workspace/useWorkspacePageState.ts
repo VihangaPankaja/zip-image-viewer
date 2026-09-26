@@ -1,10 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { readStoredSetting, writeStoredSetting } from "./settingsStorage";
+import { SORT_OPTIONS, PREVIEW_QUALITY_OPTIONS } from "../../lib/appConstants";
 import type { WorkspaceView } from "./components/WorkspaceAppBar";
 import type {
   JobPayload,
   OversizePrompt,
   SessionPayload,
 } from "./sessionSchemas";
+
+function readSortMode() {
+  const stored = readStoredSetting("zip-explorer-sort");
+  return (
+    SORT_OPTIONS.find(({ value }) => value === stored)?.value ?? "natural-tail"
+  );
+}
+
+function readPreviewQuality() {
+  const stored = readStoredSetting("zip-preview-quality");
+  return (
+    PREVIEW_QUALITY_OPTIONS.find(({ value }) => value === stored)?.value ??
+    "balanced"
+  );
+}
 
 export function useWorkspacePageState() {
   const [zipUrl, setZipUrl] = useState("");
@@ -14,8 +31,8 @@ export function useWorkspacePageState() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [session, setSession] = useState<SessionPayload | null>(null);
   const [selectedPath, setSelectedPath] = useState("");
-  const [sortMode, setSortMode] = useState("natural-tail");
-  const [previewQuality, setPreviewQuality] = useState("balanced");
+  const [sortMode, setSortMode] = useState(readSortMode);
+  const [previewQuality, setPreviewQuality] = useState(readPreviewQuality);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [, setOversizePrompt] = useState<OversizePrompt | null>(null);
@@ -24,6 +41,13 @@ export function useWorkspacePageState() {
   const [slideshowFitMode, setSlideshowFitMode] = useState("best-fit");
   const [slideshowChromeHidden, setSlideshowChromeHidden] = useState(false);
   const [activeJob, setActiveJob] = useState<JobPayload | null>(null);
+
+  useEffect(() => {
+    writeStoredSetting("zip-explorer-sort", sortMode);
+  }, [sortMode]);
+  useEffect(() => {
+    writeStoredSetting("zip-preview-quality", previewQuality);
+  }, [previewQuality]);
 
   return {
     activeJob,

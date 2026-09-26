@@ -187,13 +187,11 @@ function emitFailure(
 
 async function processTorrentJob(
   job: SessionJob,
-  workspaceDir: string,
-  extractDir: string,
-  torrentDir: string,
   confirmOversize: boolean,
   settings: ReturnType<typeof normalizeDownloadSettings>,
   deps: ProcessorDependencies,
 ): Promise<void> {
+  const torrentDir = path.join(job.workspaceDir, "torrent");
   await mkdir(torrentDir, { recursive: true });
   const result = await downloadTorrentSource(
     job,
@@ -208,11 +206,11 @@ async function processTorrentJob(
   const prepared = await prepareTorrentEntries(
     job,
     torrentDir,
-    extractDir,
+    job.extractDir,
     deps,
   );
   const session = createSession(
-    workspaceDir,
+    job.workspaceDir,
     prepared.sessionDir,
     torrentDisplayName(job.url),
     prepared.entries,
@@ -222,14 +220,11 @@ async function processTorrentJob(
 
 async function processHttpJob(
   job: SessionJob,
-  sourceUrl: URL,
-  workspaceDir: string,
-  extractDir: string,
-  zipPath: string,
   confirmOversize: boolean,
   settings: ReturnType<typeof normalizeDownloadSettings>,
   deps: ProcessorDependencies,
 ): Promise<void> {
+  const { workspaceDir, extractDir, zipPath } = job;
   const result = await downloadSessionSource(
     job,
     settings,
@@ -241,7 +236,7 @@ async function processHttpJob(
   const session = createSession(
     workspaceDir,
     extractDir,
-    sourceUrl.pathname || "download",
+    new URL(job.url).pathname || "download",
     entries,
   );
   completeSession(job, session, "Archive is ready to browse.", deps);
@@ -252,10 +247,10 @@ async function processSessionJob(
   job: SessionJob,
   confirmOversize: boolean,
 ): Promise<void> {
+  const sourceUrl = job.sourceKind === "http" ? parseSourceUrl(job.url) : null;
   const workspaceDir =
     job.workspaceDir ||
     (await mkdtemp(path.join(os.tmpdir(), "zip-image-viewer-")));
-  const sourceUrl = job.sourceKind === "http" ? parseSourceUrl(job.url) : null;
   const zipPath =
     job.zipPath ||
     (sourceUrl
@@ -265,7 +260,6 @@ async function processSessionJob(
         )
       : "");
   const extractDir = job.extractDir || path.join(workspaceDir, "extracted");
-  const torrentDir = path.join(workspaceDir, "torrent");
   await mkdir(extractDir, { recursive: true });
   Object.assign(job, {
     workspaceDir,
@@ -277,26 +271,9 @@ async function processSessionJob(
   const settings = configureJob(job);
   try {
     if (sourceUrl) {
-      await processHttpJob(
-        job,
-        sourceUrl,
-        workspaceDir,
-        extractDir,
-        zipPath,
-        confirmOversize,
-        settings,
-        deps,
-      );
+      await processHttpJob(job, confirmOversize, settings, deps);
     } else {
-      await processTorrentJob(
-        job,
-        workspaceDir,
-        extractDir,
-        torrentDir,
-        confirmOversize,
-        settings,
-        deps,
-      );
+      await processTorrentJob(job, confirmOversize, settings, deps);
     }
   } catch (error) {
     const jobError = errorFromUnknown(error);

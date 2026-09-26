@@ -118,6 +118,8 @@ function handleHierarchyKey(
     event.preventDefault();
     if (current.hasChildren && !navigation.expanded.has(current.id)) {
       navigation.toggleExpanded(current.id);
+    } else if (current.hasChildren) {
+      focusRow(navigation, navigation.activeIndex + 1);
     }
     return true;
   }
@@ -230,6 +232,7 @@ function TreeItem({
       }}
       type="button"
       role="treeitem"
+      aria-label={row.node.name}
       aria-level={row.depth + 1}
       aria-expanded={row.hasChildren ? isExpanded : undefined}
       aria-selected={isSelected}

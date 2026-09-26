@@ -1,3 +1,4 @@
+import { Download } from "lucide-react";
 import { useMemo, useState, type DragEvent } from "react";
 import type { Job } from "../../../../../shared/contracts";
 import {
@@ -8,7 +9,6 @@ import {
 
 type DownloadManagerProps = {
   jobs: readonly Job[];
-  maxConcurrent: number;
   onCancel: (id: string) => void;
   onConfirm: (id: string) => Promise<void>;
   onOpenSession: (id: string) => void;
@@ -17,7 +17,6 @@ type DownloadManagerProps = {
   onReorder: (ids: string[]) => void;
   onResume: (id: string) => void;
   onRetry: (id: string) => void;
-  onSetConcurrency: (value: number) => void;
 };
 
 function moveJob(ids: string[], from: number, to: number): string[] {
@@ -251,25 +250,17 @@ export function DownloadManager(props: DownloadManagerProps) {
           <p className="panel-label">Queue control</p>
           <h2 id="downloads-title">Downloads</h2>
           <p>
-            Priority is read top to bottom. Active resumable work yields when
-            promoted work needs a slot.
+            {jobs.length
+              ? "Drag downloads or use the arrows to change their priority."
+              : "Add links, track progress, and explore your files."}
           </p>
         </div>
-        <label className="concurrency-control">
-          <span>Concurrent</span>
-          <input
-            type="number"
-            min="1"
-            max="8"
-            value={props.maxConcurrent}
-            onChange={(event) =>
-              props.onSetConcurrency(Number(event.currentTarget.value))
-            }
-          />
-        </label>
       </header>
       {jobs.length === 0 ? (
         <div className="download-empty">
+          <span className="empty-state-icon">
+            <Download size={28} aria-hidden="true" />
+          </span>
           <strong>No transfers yet</strong>
           <p>Add direct download links or magnet URLs to start a transfer.</p>
         </div>

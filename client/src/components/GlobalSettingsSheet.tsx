@@ -1,26 +1,12 @@
-import type { Dispatch, SetStateAction } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
+import { AppearanceConfiguration } from "./AppearanceConfiguration";
+import type { ThemePreference } from "../hooks/useLocalStorageSettings";
+import type { DownloadSettings } from "../lib/appConstants";
+import type {
+  KeyboardSettings,
+  ExplorerColumns,
+} from "../features/workspace/settingsStorage";
 import { CustomDropdown } from "./Common/CustomDropdown";
-
-type DownloadSettings = {
-  enableMultithread: boolean;
-  enableResume: boolean;
-  maxRetries: number;
-  threadCount: number;
-  threadMode: string;
-  videoQuality: string;
-};
-
-type KeyboardSettings = {
-  jumpSeconds: number;
-  rateStep: number;
-};
-
-type ExplorerColumns = {
-  date: boolean;
-  path: boolean;
-  size: boolean;
-  type: boolean;
-};
 
 type DropdownOption = {
   label: string;
@@ -28,6 +14,10 @@ type DropdownOption = {
 };
 
 type GlobalSettingsSheetProps = {
+  theme: ThemePreference;
+  setTheme: (value: ThemePreference) => void;
+  maxConcurrent: number;
+  onSetConcurrency: (value: number) => Promise<void>;
   settingsOpen: boolean;
   setSettingsOpen: (value: boolean) => void;
   downloadSettings: DownloadSettings;
@@ -63,7 +53,11 @@ type DownloadUpdateProps = Pick<
 type DownloadConfigurationProps = DownloadUpdateProps &
   Pick<
     GlobalSettingsSheetProps,
-    "downloadRetryOptions" | "downloadSettings" | "downloadThreadModeOptions"
+    | "downloadRetryOptions"
+    | "downloadSettings"
+    | "downloadThreadModeOptions"
+    | "maxConcurrent"
+    | "onSetConcurrency"
   >;
 type PreviewConfigurationProps = Pick<
   GlobalSettingsSheetProps,
@@ -81,11 +75,10 @@ type KeyboardConfigurationProps = Pick<
   GlobalSettingsSheetProps,
   "clampNumber" | "keyboardSettings" | "setKeyboardSettings"
 >;
-type ToggleConfigurationProps = DownloadUpdateProps &
-  Pick<
-    GlobalSettingsSheetProps,
-    "downloadSettings" | "explorerColumns" | "setExplorerColumns"
-  >;
+type ToggleConfigurationProps = Pick<
+  GlobalSettingsSheetProps,
+  "explorerColumns" | "setExplorerColumns"
+>;
 
 function updateDownloadSettings(
   props: DownloadUpdateProps,
@@ -102,8 +95,9 @@ function SettingsHeader({
   return (
     <div className="panel-header">
       <div className="panel-title-group">
-        <p className="panel-label">Global settings</p>
-        <h2 id="global-settings-title">Download, explorer, and shortcuts</h2>
+        <p className="panel-label">Your workspace</p>
+        <h2 id="global-settings-title">Settings</h2>
+        <p className="settings-description">Changes save automatically.</p>
       </div>
       <button
         className="ghost-button compact-button"
@@ -116,11 +110,52 @@ function SettingsHeader({
   );
 }
 
+function ConcurrencyConfiguration(
+  props: Pick<GlobalSettingsSheetProps, "maxConcurrent" | "onSetConcurrency">,
+) {
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  async function setConcurrency(value: number) {
+    setIsSaving(true);
+    setSaveError("");
+    try {
+      await props.onSetConcurrency(value);
+    } catch {
+      setSaveError("Could not update concurrent downloads. Try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+  return (
+    <>
+      <label className="input-shell">
+        <span className="input-label">Concurrent downloads</span>
+        <select
+          value={props.maxConcurrent}
+          disabled={isSaving}
+          onChange={(event) => void setConcurrency(Number(event.target.value))}
+        >
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((value) => (
+            <option key={value} value={value}>
+              {value}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="settings-hint">
+        Maximum active transfers across this server.
+      </p>
+      {saveError ? <p role="alert">{saveError}</p> : null}
+    </>
+  );
+}
+
 function DownloadConfiguration(props: DownloadConfigurationProps) {
   const { downloadSettings } = props;
   return (
     <fieldset className="settings-group">
       <legend>Downloads</legend>
+      <ConcurrencyConfiguration {...props} />
       <CustomDropdown
         id="settings-download-thread-mode"
         label="Thread mode"
@@ -157,6 +192,30 @@ function DownloadConfiguration(props: DownloadConfigurationProps) {
           updateDownloadSettings(props, { maxRetries: value })
         }
       />
+      <label className="toggle-row">
+        <input
+          type="checkbox"
+          checked={props.downloadSettings.enableMultithread}
+          onChange={(event) =>
+            updateDownloadSettings(props, {
+              enableMultithread: event.target.checked,
+            })
+          }
+        />
+        <span>Enable multithread</span>
+      </label>
+      <label className="toggle-row">
+        <input
+          type="checkbox"
+          checked={props.downloadSettings.enableResume}
+          onChange={(event) =>
+            updateDownloadSettings(props, {
+              enableResume: event.target.checked,
+            })
+          }
+        />
+        <span>Enable resume</span>
+      </label>
     </fieldset>
   );
 }
@@ -194,7 +253,7 @@ function KeyboardConfiguration(props: KeyboardConfigurationProps) {
   const { keyboardSettings, setKeyboardSettings } = props;
   return (
     <fieldset className="settings-group">
-      <legend>Keyboard</legend>
+      <legend>Keyboard shortcuts</legend>
       <label className="input-shell">
         <span className="input-label">Seek jump seconds</span>
         <input
@@ -221,7 +280,7 @@ function KeyboardConfiguration(props: KeyboardConfigurationProps) {
           onChange={(event) =>
             setKeyboardSettings((current) => ({
               ...current,
-              rateStep: Math.max(0.05, Number(event.target.value) || 0.25),
+              rateStep: props.clampNumber(event.target.value, 0.05, 1, 0.25),
             }))
           }
         />
@@ -243,31 +302,7 @@ const EXPLORER_COLUMN_OPTIONS: Array<{
 function ToggleConfiguration(props: ToggleConfigurationProps) {
   return (
     <fieldset className="settings-group">
-      <legend>Behavior and columns</legend>
-      <label className="toggle-row">
-        <input
-          type="checkbox"
-          checked={props.downloadSettings.enableMultithread}
-          onChange={(event) =>
-            updateDownloadSettings(props, {
-              enableMultithread: event.target.checked,
-            })
-          }
-        />
-        <span>Enable multithread</span>
-      </label>
-      <label className="toggle-row">
-        <input
-          type="checkbox"
-          checked={props.downloadSettings.enableResume}
-          onChange={(event) =>
-            updateDownloadSettings(props, {
-              enableResume: event.target.checked,
-            })
-          }
-        />
-        <span>Enable resume</span>
-      </label>
+      <legend>Visible columns</legend>
       {EXPLORER_COLUMN_OPTIONS.map(({ key, label }) => (
         <label className="toggle-row" key={key}>
           <input
@@ -306,6 +341,7 @@ export function GlobalSettingsSheet(props: GlobalSettingsSheetProps) {
       <div className="settings-sheet">
         <SettingsHeader setSettingsOpen={props.setSettingsOpen} />
         <div className="download-settings-grid">
+          <AppearanceConfiguration {...props} />
           <DownloadConfiguration {...props} />
           <PreviewConfiguration {...props} />
           <KeyboardConfiguration {...props} />

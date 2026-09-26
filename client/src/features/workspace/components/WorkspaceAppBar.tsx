@@ -51,7 +51,11 @@ export function WorkspaceAppBar({
         <button
           className="primary-button compact-button"
           type="button"
-          onClick={onAddDownloads}
+          onClick={(event) => {
+            // WebKit pointer clicks need explicit focus for native dialog return.
+            event.currentTarget.focus();
+            onAddDownloads();
+          }}
         >
           <Plus size={18} aria-hidden="true" />
           Add downloads
@@ -60,7 +64,10 @@ export function WorkspaceAppBar({
           className="icon-button"
           type="button"
           aria-label="Settings"
-          onClick={onOpenSettings}
+          onClick={(event) => {
+            event.currentTarget.focus();
+            onOpenSettings();
+          }}
         >
           <Settings size={18} aria-hidden="true" />
         </button>

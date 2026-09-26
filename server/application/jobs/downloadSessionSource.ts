@@ -125,14 +125,6 @@ async function retryDownload(
     attempt += 1
   ) {
     job.retryCount = attempt;
-    const retries =
-      settings.maxRetries === UNLIMITED_RETRIES
-        ? "∞"
-        : String(settings.maxRetries);
-    state.statusText =
-      attempt === 0
-        ? "Starting archive download"
-        : `Retrying download (attempt ${String(attempt)}/${retries})`;
     try {
       state.statusText = "";
       await deps.download({

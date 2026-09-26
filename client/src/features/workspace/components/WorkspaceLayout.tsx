@@ -5,7 +5,6 @@ type WorkspaceLayoutProps = {
   mobilePane: "files" | "preview";
   onMobilePaneChange: (pane: "files" | "preview") => void;
   files: ReactNode;
-  header: ReactNode;
   metadata: ReactNode;
   preview: ReactNode;
   sessions: ReactNode;
@@ -23,15 +22,13 @@ export function WorkspaceLayout({
   mobilePane,
   onMobilePaneChange,
   files,
-  header,
   metadata,
   preview,
   sessions,
 }: WorkspaceLayoutProps) {
   const [sessionsExpanded, setSessionsExpanded] = useState(false);
   return (
-    <section className="unified-workspace" data-testid="workspace-layout">
-      <header className="unified-workspace-header">{header}</header>
+    <>
       <Group className="workspace-panel-group" orientation="horizontal">
         <Panel defaultSize="30" minSize="20">
           <section
@@ -95,6 +92,6 @@ export function WorkspaceLayout({
           </div>
         ))}
       </nav>
-    </section>
+    </>
   );
 }

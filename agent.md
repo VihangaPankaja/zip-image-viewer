@@ -34,6 +34,7 @@ pnpm start
 - Keep changes focused and preserve existing app structure
 - Follow the current plain, minimal style unless asked for a redesign
 - Bump the app version in `package.json` before opening a PR to `master`
+- For every PR, run the [PR screenshots skill](.agents/skills/pr-screenshots/SKILL.md). Include screenshots in the PR description under Mobile, Tablet, Desktop, and Ultrawide sections, with both themes and populated file/download/torrent examples. Regenerate after UI changes.
 - For multi-step feature work, create a commit after each major implementation step
 - Before each major commit, run `pnpm run format`, `pnpm run lint`, `pnpm run typecheck`, and `pnpm run build`
 - Keep formatter, lint, and typecheck configurations current with repo scripts
