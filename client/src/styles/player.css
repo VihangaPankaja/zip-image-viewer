@@ -39,7 +39,8 @@ audio.video-player {
 
 @media (max-width: 760px) {
   .media-frame {
-    min-height: 46vh;
+    min-height: 0;
+    aspect-ratio: 16 / 9;
   }
 
   .progress-meta-row {

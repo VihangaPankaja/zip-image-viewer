@@ -352,7 +352,8 @@
   }
 
   .image-frame {
-    min-height: 48vh;
+    min-height: 0;
+    aspect-ratio: 3 / 2;
   }
 
   .slideshow-floating-top {

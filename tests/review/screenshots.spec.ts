@@ -92,10 +92,10 @@ async function selectFile(page: Page, name: string, mobile: boolean) {
           .locator("video")
           .evaluate((video: HTMLVideoElement) => video.readyState),
       )
-      .toBeGreaterThanOrEqual(2);
+      .toBe(4);
     await page.locator("video").evaluate((video: HTMLVideoElement) => {
       video.pause();
-      video.currentTime = 1;
+      video.currentTime = 0;
     });
     await expect
       .poll(() =>
@@ -104,6 +104,22 @@ async function selectFile(page: Page, name: string, mobile: boolean) {
           .evaluate((video: HTMLVideoElement) => video.seeking),
       )
       .toBe(false);
+    await expect
+      .poll(() =>
+        page
+          .locator("video")
+          .evaluate((video: HTMLVideoElement) => video.readyState),
+      )
+      .toBe(4);
+    if (mobile) {
+      const video = await page.locator("video").boundingBox();
+      const navigation = await page
+        .locator(".workspace-mobile-nav")
+        .boundingBox();
+      if (!video || !navigation)
+        throw new Error("Mobile player or navigation is missing.");
+      expect(video.y + video.height).toBeLessThanOrEqual(navigation.y);
+    }
   }
 }
 
