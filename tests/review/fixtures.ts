@@ -179,6 +179,7 @@ export async function installReviewFixtures(page: Page) {
             children: filenames.map((name) => ({
               name,
               path: name,
+              parentPath: ".",
               type: "file",
               extension: name.split(".").at(-1),
               size: 2400000,

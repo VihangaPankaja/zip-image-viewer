@@ -78,11 +78,23 @@ async function selectFile(page: Page, name: string, mobile: boolean) {
       .check({ force: true });
   await page.getByRole("treeitem", { name, exact: true }).click();
   await expect(page.locator(".preview-panel h2")).toHaveText(name);
-  if (name.endsWith(".png"))
-    await expect(page.locator(".image-frame > img")).toHaveJSProperty(
-      "complete",
-      true,
-    );
+  if (name.endsWith(".png")) {
+    const image = page.locator(".image-frame > img");
+    await expect(image).toHaveJSProperty("naturalWidth", 1200);
+    if (mobile) {
+      await image.evaluate((element) =>
+        element.scrollIntoView({ block: "center" }),
+      );
+      const bounds = await image.boundingBox();
+      const navigation = await page
+        .locator(".workspace-mobile-nav")
+        .boundingBox();
+      if (!bounds || !navigation)
+        throw new Error("Mobile image preview is missing.");
+      expect(bounds.y).toBeGreaterThanOrEqual(0);
+      expect(bounds.y + bounds.height).toBeLessThanOrEqual(navigation.y);
+    }
+  }
   if (name.endsWith(".txt"))
     await expect(page.locator("pre")).toContainText("COASTAL COLLECTION");
   if (name.endsWith(".mp4")) {
@@ -246,6 +258,11 @@ for (const device of devices) {
       await page
         .getByRole("button", { name: "Slideshow", exact: true })
         .click();
+      await expect(page.locator(".slideshow-meta")).toContainText("1 / 1");
+      await expect(page.locator(".slideshow-stage img")).toHaveJSProperty(
+        "naturalWidth",
+        1200,
+      );
       await save(page, device, theme, "slideshow");
       await page.keyboard.press("Escape");
       await page
