@@ -10,6 +10,8 @@ import {
 } from "./routeContext.js";
 import type { VideoRouteDependencies } from "./types.js";
 
+const pendingThumbnails = new Map<string, Promise<void>>();
+
 function buildThumbnailArgs(
   targetPath: string,
   outputPath: string,
@@ -65,18 +67,25 @@ export function registerVideoThumbnailRoute(
       .digest("hex");
     const thumbPath = path.join(thumbDir, `${hash}.jpg`);
     if (!(await stat(thumbPath).catch(() => null))) {
-      await deps.runCommand(
-        ffmpegPath,
-        buildThumbnailArgs(
-          context.targetPath,
-          thumbPath,
-          roundedSeek,
-          width,
-          selected.height,
-        ),
-      );
+      let generation = pendingThumbnails.get(thumbPath);
+      if (!generation) {
+        generation = deps
+          .runCommand(
+            ffmpegPath,
+            buildThumbnailArgs(
+              context.targetPath,
+              thumbPath,
+              roundedSeek,
+              width,
+              selected.height,
+            ),
+          )
+          .finally(() => pendingThumbnails.delete(thumbPath));
+        pendingThumbnails.set(thumbPath, generation);
+      }
+      await generation;
     }
-    res.setHeader("cache-control", "no-store");
+    res.setHeader("cache-control", "private, max-age=31536000, immutable");
     res.type("image/jpeg");
     res.sendFile(thumbPath);
   });

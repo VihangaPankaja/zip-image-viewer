@@ -44,6 +44,64 @@ describe("VideoPreviewContent", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("previews a thumbnail without seeking until the value is committed", () => {
+    const videoRef = createRef<HTMLVideoElement>();
+    render(
+      <VideoPreviewContent
+        activeJob={null}
+        onOpenDownloads={vi.fn()}
+        hlsRef={createRef()}
+        sessionId="session/one"
+        videoHlsStatus={null}
+        videoPlaybackStatus="ready"
+        retryVideoPlayback={vi.fn()}
+        formatBytes={String}
+        formatDate={String}
+        keyboardSettings={{ jumpSeconds: 5, rateStep: 0.25 }}
+        selectedNode={{
+          extension: "mp4",
+          name: "sample.mp4",
+          path: "folder/sample clip.mp4",
+          type: "file",
+        }}
+        selectedVideoQuality="720p"
+        setSelectedVideoQuality={vi.fn()}
+        videoPlaybackError=""
+        videoHeight={720}
+        videoQualityOptions={[]}
+        videoRef={videoRef}
+        videoShellRef={createRef<HTMLDivElement>()}
+      />,
+    );
+
+    const video = screen.getByLabelText<HTMLVideoElement>("Video preview");
+    Object.defineProperty(video, "duration", {
+      configurable: true,
+      value: 120,
+    });
+    video.currentTime = 12;
+    fireEvent.loadedMetadata(video);
+
+    const timeline = screen.getByRole("slider", { name: "Seek video" });
+    expect(timeline).toHaveAttribute("max", "120");
+    fireEvent.input(timeline, { target: { value: "60" } });
+
+    expect(video.currentTime).toBe(12);
+    expect(screen.getByRole("img", { name: "Preview at 1:00" })).toHaveAttribute(
+      "src",
+      "/api/sessions/session%2Fone/video/thumbnail?path=folder%2Fsample+clip.mp4&time=60&quality=720p&width=320",
+    );
+    expect(timeline).toHaveAttribute("aria-valuetext", "1:00 of 2:00");
+
+    fireEvent.pointerUp(timeline);
+    expect(video.currentTime).toBe(60);
+
+    fireEvent.input(timeline, { target: { value: "60.25" } });
+    expect(video.currentTime).toBe(60);
+    fireEvent.keyUp(timeline, { key: "ArrowRight" });
+    expect(video.currentTime).toBe(60.25);
+  });
+
   it("shows distinct waiting states with recovery actions", () => {
     const setQuality = vi.fn();
     const openDownloads = vi.fn();
