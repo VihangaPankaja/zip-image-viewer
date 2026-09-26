@@ -1,6 +1,7 @@
 import { CustomDropdown } from "../Common/CustomDropdown";
 import { PlaybackDiagnostics } from "./PlaybackDiagnostics";
 import type { VideoPreviewProps } from "../../features/workspace/types";
+import { useVideoResume } from "../../features/player/useVideoResume";
 
 type VideoPreviewDetailsProps = Omit<
   VideoPreviewProps,
@@ -78,12 +79,17 @@ function PlaybackStatus(props: VideoPreviewDetailsProps) {
     <div className="progress-meta-row">
       <span aria-live="polite">{status}</span>
       {noPeers ? (
-        <button type="button" onClick={props.onOpenDownloads}>
+        <button
+          className="ghost-button"
+          type="button"
+          onClick={props.onOpenDownloads}
+        >
           Open downloads
         </button>
       ) : rendition?.status === "queued" &&
         props.videoPlaybackStatus !== "ready" ? (
         <button
+          className="ghost-button"
           type="button"
           onClick={() => props.setSelectedVideoQuality("source")}
         >
@@ -98,11 +104,34 @@ function PlaybackStatus(props: VideoPreviewDetailsProps) {
   );
 }
 
+function PlaybackResume(resume: ReturnType<typeof useVideoResume>) {
+  if (resume.position === null) return null;
+  return (
+    <div className="progress-meta-row" aria-label="Resume playback">
+      <button
+        className="ghost-button"
+        type="button"
+        onClick={resume.continuePlayback}
+      >
+        Continue from {Math.floor(resume.position / 60)}:
+        {String(Math.floor(resume.position % 60)).padStart(2, "0")}
+      </button>
+      <button className="ghost-button" type="button" onClick={resume.startOver}>
+        Start over
+      </button>
+    </div>
+  );
+}
 export function VideoPreviewContent({
   videoRef,
   videoShellRef,
   ...props
 }: VideoPreviewProps) {
+  const resume = useVideoResume(
+    videoRef,
+    props.sessionId,
+    props.selectedNode.path,
+  );
   return (
     <div className="preview-stage">
       <VideoPreviewToolbar {...props} />
@@ -118,6 +147,7 @@ export function VideoPreviewContent({
           Your browser cannot play this video inline.
         </video>
       </div>
+      <PlaybackResume {...resume} />
       <PlaybackStatus {...props} />
       <PlaybackDiagnostics
         hlsRef={props.hlsRef}
@@ -133,6 +163,7 @@ export function VideoPreviewContent({
           {props.videoPlaybackError === "This browser cannot play Original." &&
           props.videoQualityOptions.some(({ id }) => id === "auto") ? (
             <button
+              className="ghost-button"
               type="button"
               onClick={() => props.setSelectedVideoQuality("auto")}
             >
@@ -142,13 +173,18 @@ export function VideoPreviewContent({
               "This browser cannot decode this stream." &&
             props.selectedVideoQuality !== "source" ? (
             <button
+              className="ghost-button"
               type="button"
               onClick={() => props.setSelectedVideoQuality("source")}
             >
               Try Original
             </button>
           ) : (
-            <button type="button" onClick={props.retryVideoPlayback}>
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={props.retryVideoPlayback}
+            >
               Retry playback
             </button>
           )}

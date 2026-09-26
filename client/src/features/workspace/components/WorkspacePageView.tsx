@@ -60,6 +60,8 @@ export function WorkspacePageView({ controller }: ViewProps) {
           </section>
         ) : (
           <WorkspaceLayout
+            mobilePane={state.mobilePane}
+            onMobilePaneChange={state.setMobilePane}
             header={<WorkspaceHeader controller={controller} />}
             sessions={<WorkspaceSessions controller={controller} />}
             files={<WorkspaceFiles controller={controller} />}
@@ -139,7 +141,10 @@ function WorkspaceFiles({ controller }: ViewProps) {
           rootNode={selection.sortedTree}
           selectedPath={selectedPath}
           onSelect={(node) => {
-            if (node.type === "file") setSelectedPath(node.path);
+            if (node.type === "file") {
+              setSelectedPath(node.path);
+              controller.state.setMobilePane("preview");
+            }
           }}
         />
       ) : (

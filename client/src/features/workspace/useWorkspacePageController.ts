@@ -38,7 +38,7 @@ function useWorkspaceMedia(state: WorkspacePageState) {
     sessionId: state.session?.id || "",
   });
   const video = useVideoPlaybackController({
-    selectedKind: selection.selectedKind,
+    selectedKind: state.activeView === "explore" ? selection.selectedKind : "",
     selectedNode: selection.selectedNode,
     session: state.session,
   });

@@ -1,6 +1,6 @@
 {
   "name": "zip-image-viewer",
-  "version": "3.3.6",
+  "version": "3.3.7",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@12.1.0",
