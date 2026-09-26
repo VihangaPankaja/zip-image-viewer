@@ -39,7 +39,15 @@ vi.mock("./adaptiveQuality", async (importOriginal) => ({
   loadHlsModule: () => Promise.resolve({ default: FakeHls }),
 }));
 
-function Harness({ quality, file }: { quality: string; file: string }) {
+function Harness({
+  quality,
+  file,
+  active = true,
+}: {
+  quality: string;
+  file: string;
+  active?: boolean;
+}) {
   const hlsRef = useRef<InstanceType<typeof import("hls.js").default> | null>(
     null,
   );
@@ -52,7 +60,7 @@ function Harness({ quality, file }: { quality: string; file: string }) {
     hlsRef,
     hlsUrl: `/hls/master?path=${file}`,
     originalUrl: `/play?path=${file}`,
-    selectedKind: "video",
+    selectedKind: active ? "video" : "",
     selectedQuality: quality,
     setPlaybackError: setError,
     setPlaybackStatus: setStatus,
@@ -61,13 +69,29 @@ function Harness({ quality, file }: { quality: string; file: string }) {
   });
   return (
     <>
-      <video ref={videoRef} />
+      {active && <video ref={videoRef} />}
       <output>{error}</output>
     </>
   );
 }
 
 describe("video quality switching", () => {
+  it("reattaches the source after leaving and reopening the player view", async () => {
+    instances.length = 0;
+    const { rerender, container } = render(
+      <Harness quality="auto" file="one.mp4" />,
+    );
+    await waitFor(() => expect(instances).toHaveLength(1));
+    const originalPlayer = container.querySelector("video");
+    rerender(<Harness quality="auto" file="one.mp4" active={false} />);
+    expect(instances[0].destroyed).toBe(true);
+    expect(container.querySelector("video")).toBeNull();
+    rerender(<Harness quality="auto" file="one.mp4" />);
+    await waitFor(() => expect(instances).toHaveLength(2));
+    expect(container.querySelector("video")).not.toBe(originalPlayer);
+    expect(instances[1].destroyed).toBe(false);
+  });
+
   it("changes HLS level without replacing the player or resetting position", async () => {
     instances.length = 0;
     const { rerender, container } = render(

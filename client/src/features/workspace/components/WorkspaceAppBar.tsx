@@ -53,7 +53,7 @@ export function WorkspaceAppBar({
           type="button"
           onClick={onAddDownloads}
         >
-          <Plus size={16} aria-hidden="true" />
+          <Plus size={18} aria-hidden="true" />
           Add downloads
         </button>
         <button
@@ -62,7 +62,7 @@ export function WorkspaceAppBar({
           aria-label="Settings"
           onClick={onOpenSettings}
         >
-          <Settings size={17} aria-hidden="true" />
+          <Settings size={18} aria-hidden="true" />
         </button>
       </div>
     </div>

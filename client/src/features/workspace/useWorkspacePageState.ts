@@ -9,6 +9,7 @@ import type {
 export function useWorkspacePageState() {
   const [zipUrl, setZipUrl] = useState("");
   const [activeView, setActiveView] = useState<WorkspaceView>("downloads");
+  const [mobilePane, setMobilePane] = useState<"files" | "preview">("files");
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [session, setSession] = useState<SessionPayload | null>(null);
@@ -27,6 +28,8 @@ export function useWorkspacePageState() {
   return {
     activeJob,
     activeView,
+    mobilePane,
+    setMobilePane,
     downloadDialogOpen,
     error,
     explorerModalOpen,

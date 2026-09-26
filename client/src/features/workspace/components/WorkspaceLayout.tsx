@@ -1,7 +1,9 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 
 type WorkspaceLayoutProps = {
+  mobilePane: "files" | "preview";
+  onMobilePaneChange: (pane: "files" | "preview") => void;
   files: ReactNode;
   header: ReactNode;
   metadata: ReactNode;
@@ -18,19 +20,36 @@ const mobileViews: ReadonlyArray<{
 ];
 
 export function WorkspaceLayout({
+  mobilePane,
+  onMobilePaneChange,
   files,
   header,
   metadata,
   preview,
   sessions,
 }: WorkspaceLayoutProps) {
+  const [sessionsExpanded, setSessionsExpanded] = useState(false);
   return (
     <section className="unified-workspace" data-testid="workspace-layout">
       <header className="unified-workspace-header">{header}</header>
       <Group className="workspace-panel-group" orientation="horizontal">
         <Panel defaultSize="30" minSize="20">
-          <section className="explore-sidebar" aria-label="Explorer sidebar">
-            <div className="unified-workspace-sessions">{sessions}</div>
+          <section
+            className={`explore-sidebar ${sessionsExpanded ? "sessions-expanded" : "sessions-collapsed"}`}
+            aria-label="Explorer sidebar"
+          >
+            <button
+              className="mobile-sessions-toggle"
+              type="button"
+              aria-expanded={sessionsExpanded}
+              aria-controls="workspace-sessions"
+              onClick={() => setSessionsExpanded(!sessionsExpanded)}
+            >
+              {sessionsExpanded ? "Hide sessions" : "Show sessions"}
+            </button>
+            <div id="workspace-sessions" className="unified-workspace-sessions">
+              {sessions}
+            </div>
             <div className="unified-workspace-files">{files}</div>
           </section>
         </Panel>
@@ -41,12 +60,13 @@ export function WorkspaceLayout({
             aria-label="Preview panel"
             tabIndex={0}
           >
-            <label
+            <button
               className="mobile-back-action"
-              htmlFor="workspace-pane-files"
+              type="button"
+              onClick={() => onMobilePaneChange("files")}
             >
               Back to files
-            </label>
+            </button>
             {preview}
             <aside
               className="unified-workspace-metadata"
@@ -66,7 +86,8 @@ export function WorkspaceLayout({
               name="workspace-pane"
               id={`workspace-pane-${view.id}`}
               aria-label={view.label}
-              defaultChecked={view.id === "files"}
+              checked={mobilePane === view.id}
+              onChange={() => onMobilePaneChange(view.id)}
             />
             <label htmlFor={`workspace-pane-${view.id}`} data-pane={view.id}>
               {view.label}

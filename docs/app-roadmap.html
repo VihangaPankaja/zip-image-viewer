@@ -1408,12 +1408,14 @@
           area: "Video",
           priority: "P1",
           effort: "S",
+          status: "Done",
           title: "Remember where playback stopped",
           summary: "Offer Continue from 12:34 when reopening a video.",
           now: "Volume and rate preferences exist. The reviewed player hooks do not provide a per-file resume library.",
           plan: "Store a throttled playback position under a stable file identity. Offer Start over, clear near-end positions and save on pause or page hide.",
           done: "Reload and resume the same file correctly. A different file with the same display name does not inherit its position.",
           depends: "Stable file identity; S01 for cross-session retention",
+          note: "Implemented in v3.3.7: browser-local resume keyed by session and full file path, Continue and Start over, throttled saves and completed-position cleanup. Verified with a real HLS reload/resume test. Cross-session retention remains part of S01.",
           evidence:
             "client/src/features/player/useVideoPreferences.ts; client/src/features/player/useVideoEventSync.ts",
         },
@@ -1558,6 +1560,7 @@
           area: "UI / UX",
           priority: "P1",
           effort: "M",
+          status: "In progress",
           title: "Give mobile playback a focused layout",
           summary:
             "Let the player use the screen while downloads remain one tap away.",
@@ -1565,6 +1568,7 @@
           plan: "Review narrow screens with real long filenames and active downloads. Collapse the session rail, use a preview-first view and keep actions touch-sized. Respect safe areas and orientation changes.",
           done: "At 360 px width there is no page overflow; the picker, player and queue work with touch and keyboard.",
           depends: "T01 for picker checks",
+          note: "Delivered in v3.3.7: selecting a file opens Preview, returning from Downloads preserves the pane, mobile sessions collapse, keyboard Back works, and controls respect touch sizing and safe areas. Portrait and landscape checks cover long filenames. Selective-torrent picker verification awaits T01.",
           evidence:
             "client/src/features/workspace/components/WorkspaceLayout.tsx; client/src/styles/workspace.css; client/src/styles/player.css",
         },

@@ -5,9 +5,12 @@ import { WorkspaceLayout } from "./WorkspaceLayout";
 describe("WorkspaceLayout", () => {
   it("keeps sessions and the file tree together beside preview", async () => {
     const user = userEvent.setup();
+    const onMobilePaneChange = vi.fn();
 
     render(
       <WorkspaceLayout
+        mobilePane="files"
+        onMobilePaneChange={onMobilePaneChange}
         files={<p>Files pane</p>}
         header={<h1>Media workspace</h1>}
         metadata={<p>Metadata pane</p>}
@@ -31,9 +34,11 @@ describe("WorkspaceLayout", () => {
     expect(
       screen.queryByRole("radio", { name: "Sessions" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("Back to files")).toHaveAttribute(
-      "for",
-      "workspace-pane-files",
-    );
+    await user.click(screen.getByRole("button", { name: "Back to files" }));
+    expect(onMobilePaneChange).toHaveBeenCalledWith("files");
+    await user.click(screen.getByRole("button", { name: "Show sessions" }));
+    expect(
+      screen.getByRole("button", { name: "Hide sessions" }),
+    ).toHaveAttribute("aria-expanded", "true");
   });
 });

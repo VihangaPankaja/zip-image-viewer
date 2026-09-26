@@ -19,11 +19,11 @@ async function encode(directory: string, height: number) {
     "-f",
     "lavfi",
     "-i",
-    "testsrc2=size=1280x720:rate=24:duration=8",
+    "testsrc2=size=1280x720:rate=24:duration=30",
     "-f",
     "lavfi",
     "-i",
-    "sine=frequency=440:sample_rate=48000:duration=8",
+    "sine=frequency=440:sample_rate=48000:duration=30",
     "-vf",
     `scale=-2:${String(height)}`,
     "-c:v",
@@ -69,7 +69,7 @@ async function encode(directory: string, height: number) {
   });
 }
 
-test("switches Auto and manual HLS levels without reloading playback", async ({
+test("switches HLS quality and resumes real playback after reopening", async ({
   page,
   browserName,
   context,
@@ -155,8 +155,8 @@ test("switches Auto and manual HLS levels without reloading playback", async ({
               renditions: [360, 720].map((height) => ({
                 quality: `${String(height)}p`,
                 status: "ready",
-                availableSegments: 4,
-                expectedSegments: 4,
+                availableSegments: 15,
+                expectedSegments: 15,
                 encoderWaitMs: 120,
               })),
             },
@@ -259,6 +259,71 @@ test("switches Auto and manual HLS levels without reloading playback", async ({
       path: testInfo.outputPath("player-desktop.png"),
     });
 
+    const resumeKey = `video-resume:${JSON.stringify([sessionId, filePath])}`;
+    await video.evaluate(async (element: HTMLVideoElement) => {
+      element.currentTime = 12;
+      await element.play();
+    });
+    await expect
+      .poll(() =>
+        video.evaluate((element: HTMLVideoElement) => element.currentTime),
+      )
+      .toBeGreaterThan(12.1);
+    await video.evaluate((element: HTMLVideoElement) => element.pause());
+    let savedTime = await video.evaluate(
+      (element: HTMLVideoElement) => element.currentTime,
+    );
+    await expect
+      .poll(() =>
+        page.evaluate((key) => Number(localStorage.getItem(key)), resumeKey),
+      )
+      .toBeCloseTo(savedTime, 1);
+
+    const continuePlayback = async () => {
+      await page.getByRole("button", { name: /^Continue from / }).click();
+      await expect
+        .poll(() =>
+          video.evaluate(
+            (element: HTMLVideoElement, position) =>
+              !element.paused &&
+              element.readyState >= 2 &&
+              Math.abs(element.currentTime - position) < 1,
+            savedTime,
+          ),
+        )
+        .toBe(true);
+      await video.evaluate((element: HTMLVideoElement) => element.pause());
+      savedTime = await video.evaluate(
+        (element: HTMLVideoElement) => element.currentTime,
+      );
+    };
+    await page.getByRole("tab", { name: "Downloads" }).click();
+    await expect(video).toHaveCount(0);
+    await page.getByRole("tab", { name: "Explore" }).click();
+    await continuePlayback();
+
+    const reopen = async () => {
+      await page.reload();
+      await page.getByRole("tab", { name: "Explore" }).click();
+      await page.getByRole("button", { name: `Open ${filePath}` }).click();
+    };
+    await reopen();
+    await continuePlayback();
+    await reopen();
+    await page.getByRole("button", { name: "Start over", exact: true }).click();
+    await expect
+      .poll(() => page.evaluate((key) => localStorage.getItem(key), resumeKey))
+      .toBeNull();
+    await expect
+      .poll(() =>
+        video.evaluate((element: HTMLVideoElement) => element.currentTime),
+      )
+      .toBeLessThan(1);
+    await reopen();
+    await expect(
+      page.getByRole("button", { name: /^Continue from / }),
+    ).toHaveCount(0);
+
     await page.setViewportSize({ width: 360, height: 800 });
     await page.locator('label[for="workspace-pane-preview"]').click();
     await expect(page.getByLabel("Video preview")).toBeVisible();
@@ -279,6 +344,7 @@ test("switches Auto and manual HLS levels without reloading playback", async ({
       path: testInfo.outputPath("player-mobile-diagnostics.png"),
     });
   } finally {
+    await page.unrouteAll({ behavior: "wait" });
     await rm(root, { recursive: true, force: true });
   }
 });
