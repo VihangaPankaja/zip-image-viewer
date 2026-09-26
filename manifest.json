@@ -1,0 +1,1086 @@
+{
+  "sourceCommit": "cb77ea23099c2d58dfb12e2a2967f074a3a188a0",
+  "fixtures": "Deterministic local media and simulated HTTP/torrent progress; not a live network benchmark.",
+  "captures": [
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "downloads-empty",
+      "file": "mobile-light-downloads-empty.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "http-and-torrent-downloads",
+      "file": "mobile-light-http-and-torrent-downloads.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "settings",
+      "file": "mobile-light-settings.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "settings-more",
+      "file": "mobile-light-settings-more.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "add-downloads",
+      "file": "mobile-light-add-downloads.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "explorer",
+      "file": "mobile-light-explorer.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "preview-png",
+      "file": "mobile-light-preview-png.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "preview-txt",
+      "file": "mobile-light-preview-txt.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "preview-mp4",
+      "file": "mobile-light-preview-mp4.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "video-seek-preview",
+      "file": "mobile-light-video-seek-preview.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "video-seek-committed",
+      "file": "mobile-light-video-seek-committed.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "preview-wav",
+      "file": "mobile-light-preview-wav.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "preview-zip",
+      "file": "mobile-light-preview-zip.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "slideshow",
+      "file": "mobile-light-slideshow.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "explorer-dialog",
+      "file": "mobile-light-explorer-dialog.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "downloads-empty",
+      "file": "mobile-dark-downloads-empty.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "http-and-torrent-downloads",
+      "file": "mobile-dark-http-and-torrent-downloads.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "settings",
+      "file": "mobile-dark-settings.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "settings-more",
+      "file": "mobile-dark-settings-more.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "add-downloads",
+      "file": "mobile-dark-add-downloads.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "explorer",
+      "file": "mobile-dark-explorer.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "preview-png",
+      "file": "mobile-dark-preview-png.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "preview-txt",
+      "file": "mobile-dark-preview-txt.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "preview-mp4",
+      "file": "mobile-dark-preview-mp4.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "video-seek-preview",
+      "file": "mobile-dark-video-seek-preview.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "video-seek-committed",
+      "file": "mobile-dark-video-seek-committed.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "preview-wav",
+      "file": "mobile-dark-preview-wav.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "preview-zip",
+      "file": "mobile-dark-preview-zip.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "slideshow",
+      "file": "mobile-dark-slideshow.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "explorer-dialog",
+      "file": "mobile-dark-explorer-dialog.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "downloads-empty",
+      "file": "tablet-light-downloads-empty.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "http-and-torrent-downloads",
+      "file": "tablet-light-http-and-torrent-downloads.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "settings",
+      "file": "tablet-light-settings.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "settings-more",
+      "file": "tablet-light-settings-more.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "add-downloads",
+      "file": "tablet-light-add-downloads.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "explorer",
+      "file": "tablet-light-explorer.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "preview-png",
+      "file": "tablet-light-preview-png.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "preview-txt",
+      "file": "tablet-light-preview-txt.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "preview-mp4",
+      "file": "tablet-light-preview-mp4.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "video-seek-preview",
+      "file": "tablet-light-video-seek-preview.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "video-seek-committed",
+      "file": "tablet-light-video-seek-committed.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "preview-wav",
+      "file": "tablet-light-preview-wav.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "preview-zip",
+      "file": "tablet-light-preview-zip.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "slideshow",
+      "file": "tablet-light-slideshow.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "explorer-dialog",
+      "file": "tablet-light-explorer-dialog.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "downloads-empty",
+      "file": "tablet-dark-downloads-empty.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "http-and-torrent-downloads",
+      "file": "tablet-dark-http-and-torrent-downloads.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "settings",
+      "file": "tablet-dark-settings.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "settings-more",
+      "file": "tablet-dark-settings-more.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "add-downloads",
+      "file": "tablet-dark-add-downloads.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "explorer",
+      "file": "tablet-dark-explorer.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "preview-png",
+      "file": "tablet-dark-preview-png.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "preview-txt",
+      "file": "tablet-dark-preview-txt.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "preview-mp4",
+      "file": "tablet-dark-preview-mp4.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "video-seek-preview",
+      "file": "tablet-dark-video-seek-preview.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "video-seek-committed",
+      "file": "tablet-dark-video-seek-committed.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "preview-wav",
+      "file": "tablet-dark-preview-wav.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "preview-zip",
+      "file": "tablet-dark-preview-zip.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "slideshow",
+      "file": "tablet-dark-slideshow.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "explorer-dialog",
+      "file": "tablet-dark-explorer-dialog.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "downloads-empty",
+      "file": "desktop-light-downloads-empty.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "http-and-torrent-downloads",
+      "file": "desktop-light-http-and-torrent-downloads.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "settings",
+      "file": "desktop-light-settings.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "settings-more",
+      "file": "desktop-light-settings-more.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "add-downloads",
+      "file": "desktop-light-add-downloads.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "explorer",
+      "file": "desktop-light-explorer.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "preview-png",
+      "file": "desktop-light-preview-png.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "preview-txt",
+      "file": "desktop-light-preview-txt.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "preview-mp4",
+      "file": "desktop-light-preview-mp4.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "video-seek-preview",
+      "file": "desktop-light-video-seek-preview.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "video-seek-committed",
+      "file": "desktop-light-video-seek-committed.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "preview-wav",
+      "file": "desktop-light-preview-wav.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "preview-zip",
+      "file": "desktop-light-preview-zip.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "slideshow",
+      "file": "desktop-light-slideshow.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "explorer-dialog",
+      "file": "desktop-light-explorer-dialog.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "downloads-empty",
+      "file": "desktop-dark-downloads-empty.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "http-and-torrent-downloads",
+      "file": "desktop-dark-http-and-torrent-downloads.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "settings",
+      "file": "desktop-dark-settings.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "settings-more",
+      "file": "desktop-dark-settings-more.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "add-downloads",
+      "file": "desktop-dark-add-downloads.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "explorer",
+      "file": "desktop-dark-explorer.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "preview-png",
+      "file": "desktop-dark-preview-png.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "preview-txt",
+      "file": "desktop-dark-preview-txt.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "preview-mp4",
+      "file": "desktop-dark-preview-mp4.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "video-seek-preview",
+      "file": "desktop-dark-video-seek-preview.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "video-seek-committed",
+      "file": "desktop-dark-video-seek-committed.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "preview-wav",
+      "file": "desktop-dark-preview-wav.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "preview-zip",
+      "file": "desktop-dark-preview-zip.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "slideshow",
+      "file": "desktop-dark-slideshow.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "explorer-dialog",
+      "file": "desktop-dark-explorer-dialog.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "downloads-empty",
+      "file": "ultrawide-light-downloads-empty.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "http-and-torrent-downloads",
+      "file": "ultrawide-light-http-and-torrent-downloads.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "settings",
+      "file": "ultrawide-light-settings.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "settings-more",
+      "file": "ultrawide-light-settings-more.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "add-downloads",
+      "file": "ultrawide-light-add-downloads.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "explorer",
+      "file": "ultrawide-light-explorer.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "preview-png",
+      "file": "ultrawide-light-preview-png.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "preview-txt",
+      "file": "ultrawide-light-preview-txt.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "preview-mp4",
+      "file": "ultrawide-light-preview-mp4.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "video-seek-preview",
+      "file": "ultrawide-light-video-seek-preview.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "video-seek-committed",
+      "file": "ultrawide-light-video-seek-committed.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "preview-wav",
+      "file": "ultrawide-light-preview-wav.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "preview-zip",
+      "file": "ultrawide-light-preview-zip.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "slideshow",
+      "file": "ultrawide-light-slideshow.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "explorer-dialog",
+      "file": "ultrawide-light-explorer-dialog.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "downloads-empty",
+      "file": "ultrawide-dark-downloads-empty.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "http-and-torrent-downloads",
+      "file": "ultrawide-dark-http-and-torrent-downloads.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "settings",
+      "file": "ultrawide-dark-settings.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "settings-more",
+      "file": "ultrawide-dark-settings-more.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "add-downloads",
+      "file": "ultrawide-dark-add-downloads.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "explorer",
+      "file": "ultrawide-dark-explorer.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "preview-png",
+      "file": "ultrawide-dark-preview-png.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "preview-txt",
+      "file": "ultrawide-dark-preview-txt.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "preview-mp4",
+      "file": "ultrawide-dark-preview-mp4.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "video-seek-preview",
+      "file": "ultrawide-dark-video-seek-preview.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "video-seek-committed",
+      "file": "ultrawide-dark-video-seek-committed.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "preview-wav",
+      "file": "ultrawide-dark-preview-wav.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "preview-zip",
+      "file": "ultrawide-dark-preview-zip.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "slideshow",
+      "file": "ultrawide-dark-slideshow.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "explorer-dialog",
+      "file": "ultrawide-dark-explorer-dialog.png"
+    }
+  ]
+}
