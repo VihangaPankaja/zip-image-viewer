@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { mkdir, stat } from "node:fs/promises";
+import { mkdir, rename, stat } from "node:fs/promises";
 import path from "node:path";
 import type { Express } from "express";
 import {
@@ -58,7 +58,14 @@ export function registerVideoThumbnailRoute(
       "video-thumbnails",
     );
     await mkdir(thumbDir, { recursive: true });
-    const roundedSeek = Math.max(0, Math.round(seekSeconds * 4) / 4);
+    const lastSeek =
+      source.durationSeconds > 0
+        ? Math.max(0, Math.ceil(source.durationSeconds * 4) - 1) / 4
+        : Infinity;
+    const roundedSeek = Math.min(
+      lastSeek,
+      Math.max(0, Math.round(seekSeconds * 4) / 4),
+    );
     const hash = crypto
       .createHash("sha1")
       .update(
@@ -74,12 +81,13 @@ export function registerVideoThumbnailRoute(
             ffmpegPath,
             buildThumbnailArgs(
               context.targetPath,
-              thumbPath,
+              `${thumbPath}.pending.jpg`,
               roundedSeek,
               width,
               selected.height,
             ),
           )
+          .then(() => rename(`${thumbPath}.pending.jpg`, thumbPath))
           .finally(() => pendingThumbnails.delete(thumbPath));
         pendingThumbnails.set(thumbPath, generation);
       }

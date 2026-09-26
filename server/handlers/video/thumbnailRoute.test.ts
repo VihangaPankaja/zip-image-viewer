@@ -13,14 +13,15 @@ const workspaces: string[] = [];
 afterEach(async () => {
   vi.restoreAllMocks();
   await Promise.all(
-    workspaces.splice(0).map((workspace) =>
-      rm(workspace, { recursive: true, force: true }),
-    ),
+    workspaces
+      .splice(0)
+      .map((workspace) => rm(workspace, { recursive: true, force: true })),
   );
 });
 
 async function createThumbnailApp(
   runCommand: VideoRouteDependencies["runCommand"],
+  durationSeconds = 60,
 ) {
   const workspace = await mkdtemp(path.join(tmpdir(), "ziv-thumbnail-route-"));
   workspaces.push(workspace);
@@ -37,7 +38,7 @@ async function createThumbnailApp(
     sanitizeEntryPath: (value: string) => value,
     parseSeekSeconds: (value: unknown) => Number(value),
     getVideoMetadata: () =>
-      Promise.resolve({ width: 1920, height: 1080, durationSeconds: 60 }),
+      Promise.resolve({ width: 1920, height: 1080, durationSeconds }),
     buildVideoQualityOptions: () => ({
       options: [{ id: "360p", label: "360p", height: 360 }],
       defaultQuality: "360p",
@@ -50,7 +51,7 @@ async function createThumbnailApp(
 describe("video thumbnail route", () => {
   it("reuses a generated thumbnail with stable cache validators", async () => {
     const runCommand = vi.fn(async (_command: string, args: string[]) => {
-      await writeFile(args.at(-1)!, "thumbnail");
+      await writeFile(String(args.at(-1)), "thumbnail");
     });
     const app = await createThumbnailApp(runCommand);
     const resource =
@@ -68,6 +69,60 @@ describe("video thumbnail route", () => {
     expect(runCommand).toHaveBeenCalledTimes(1);
   });
 
+  it("waits for an in-progress thumbnail even after the output file appears", async () => {
+    let finishGeneration!: () => void;
+    const finishing = new Promise<void>((resolve) => {
+      finishGeneration = resolve;
+    });
+    const runCommand = vi.fn(async (_command: string, args: string[]) => {
+      await writeFile(String(args.at(-1)), "partial");
+      await finishing;
+      await writeFile(String(args.at(-1)), "complete");
+    });
+    const app = await createThumbnailApp(runCommand);
+    const resource =
+      "/api/sessions/session/video/thumbnail?path=source.mp4&time=5";
+    const first = request(app)
+      .get(resource)
+      .then((response) => response);
+    await vi.waitFor(() => expect(runCommand).toHaveBeenCalled());
+    let secondFinished = false;
+    const second = request(app)
+      .get(resource)
+      .then((response) => {
+        secondFinished = true;
+        return response;
+      });
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(secondFinished).toBe(false);
+    } finally {
+      finishGeneration();
+      const responses = await Promise.all([first, second]);
+      for (const response of responses)
+        expect(
+          Buffer.isBuffer(response.body) ? response.body.toString() : null,
+        ).toBe("complete");
+    }
+  });
+
+  it.each([7.99, 8, 10])(
+    "keeps a thumbnail request at %s inside the video duration",
+    async (time) => {
+      const runCommand = vi.fn(async (_command: string, args: string[]) => {
+        const seek = Number(args[args.indexOf("-ss") + 1]);
+        if (seek >= 8) throw new Error("No frame exists at or beyond EOF");
+        await writeFile(String(args.at(-1)), "thumbnail");
+      });
+      const app = await createThumbnailApp(runCommand, 8);
+      await request(app)
+        .get(
+          `/api/sessions/session/video/thumbnail?path=source.mp4&time=${time}`,
+        )
+        .expect(200);
+    },
+  );
+
   it("coalesces concurrent requests for the same cold thumbnail", async () => {
     let releaseGeneration!: () => void;
     const generationStarted = new Promise<void>((resolve) => {
@@ -75,7 +130,7 @@ describe("video thumbnail route", () => {
     });
     const runCommand = vi.fn(async (_command: string, args: string[]) => {
       await generationStarted;
-      await writeFile(args.at(-1)!, "thumbnail");
+      await writeFile(String(args.at(-1)), "thumbnail");
     });
     const app = await createThumbnailApp(runCommand);
     const resource =

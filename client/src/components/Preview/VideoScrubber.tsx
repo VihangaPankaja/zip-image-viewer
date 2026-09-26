@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
 type VideoScrubberProps = {
   path: string;
@@ -30,9 +30,13 @@ function thumbnailUrl(
   path: string,
   quality: string,
   time: number,
+  duration: number,
 ) {
   const quantized =
-    Math.round(time / THUMBNAIL_INTERVAL_SECONDS) * THUMBNAIL_INTERVAL_SECONDS;
+    Math.min(
+      Math.round(time / THUMBNAIL_INTERVAL_SECONDS),
+      Math.max(0, Math.ceil(duration / THUMBNAIL_INTERVAL_SECONDS) - 1),
+    ) * THUMBNAIL_INTERVAL_SECONDS;
   const query = new URLSearchParams({
     path,
     time: String(quantized),
@@ -42,33 +46,26 @@ function thumbnailUrl(
   return `/api/sessions/${encodeURIComponent(sessionId)}/video/thumbnail?${query.toString()}`;
 }
 
-export function VideoScrubber({
+function useVideoScrubPosition({
   path,
-  quality,
   sessionId,
   videoRef,
 }: VideoScrubberProps) {
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(0);
-  const [previewPosition, setPreviewPosition] = useState(0);
-  const [isPreviewing, setIsPreviewing] = useState(false);
-  const isPreviewingRef = useRef(false);
+  const [previewPosition, setPreviewPosition] = useState<number | null>(null);
+  const previewRef = useRef<number | null>(null);
 
   useEffect(() => {
     const video = videoRef.current;
     setDuration(0);
     setPosition(0);
-    setPreviewPosition(0);
-    setIsPreviewing(false);
-    isPreviewingRef.current = false;
+    setPreviewPosition(null);
+    previewRef.current = null;
     if (!video) return;
-
     const syncDuration = () => setDuration(finiteDuration(video));
     const syncPosition = () => {
-      if (!isPreviewingRef.current && Number.isFinite(video.currentTime)) {
-        setPosition(video.currentTime);
-        setPreviewPosition(video.currentTime);
-      }
+      if (Number.isFinite(video.currentTime)) setPosition(video.currentTime);
     };
     syncDuration();
     syncPosition();
@@ -82,43 +79,60 @@ export function VideoScrubber({
     };
   }, [path, sessionId, videoRef]);
 
-  const previewUrl = useMemo(
-    () => thumbnailUrl(sessionId, path, quality, previewPosition),
-    [path, previewPosition, quality, sessionId],
-  );
-
-  if (!duration) return null;
-
-  const commit = () => {
-    const video = videoRef.current;
-    if (video) video.currentTime = previewPosition;
-    setPosition(previewPosition);
-    setIsPreviewing(false);
-    isPreviewingRef.current = false;
+  const preview = (time: number | null) => {
+    previewRef.current = time;
+    setPreviewPosition(time);
   };
+  const commit = () => {
+    if (previewRef.current === null) return;
+    const video = videoRef.current;
+    if (video) video.currentTime = previewRef.current;
+    setPosition(previewRef.current);
+    preview(null);
+  };
+  const cancel = () => {
+    setPosition(videoRef.current?.currentTime ?? position);
+    preview(null);
+  };
+  return { duration, position, previewPosition, preview, commit, cancel };
+}
 
+export function VideoScrubber(props: VideoScrubberProps) {
+  const { duration, position, previewPosition, preview, commit, cancel } =
+    useVideoScrubPosition(props);
+  if (!duration) return null;
+  const displayedPosition = previewPosition ?? position;
   return (
     <div className="video-scrubber">
-      <div className="video-scrubber-preview">
-        <img src={previewUrl} alt={`Preview at ${formatTime(previewPosition)}`} />
-        <span>{formatTime(previewPosition)}</span>
-      </div>
+      {previewPosition !== null && (
+        <div className="video-scrubber-preview">
+          <img
+            src={thumbnailUrl(
+              props.sessionId,
+              props.path,
+              props.quality,
+              previewPosition,
+              duration,
+            )}
+            alt={`Preview at ${formatTime(previewPosition)}`}
+          />
+          <span>{formatTime(previewPosition)}</span>
+        </div>
+      )}
       <div className="video-scrubber-control">
-        <span>{formatTime(isPreviewing ? previewPosition : position)}</span>
+        <span>{formatTime(displayedPosition)}</span>
         <input
           type="range"
           aria-label="Seek video"
-          aria-valuetext={`${formatTime(previewPosition)} of ${formatTime(duration)}`}
+          aria-valuetext={`${formatTime(displayedPosition)} of ${formatTime(duration)}`}
           min="0"
           max={duration}
           step="0.25"
-          value={isPreviewing ? previewPosition : position}
-          onInput={(event) => {
-            setIsPreviewing(true);
-            isPreviewingRef.current = true;
-            setPreviewPosition(Number(event.currentTarget.value));
-          }}
+          value={displayedPosition}
+          onInput={(event) => preview(Number(event.currentTarget.value))}
           onPointerUp={commit}
+          onPointerCancel={cancel}
+          onBlur={cancel}
           onKeyUp={(event) => {
             if (
               event.key.startsWith("Arrow") ||
@@ -132,9 +146,6 @@ export function VideoScrubber({
         />
         <span>{formatTime(duration)}</span>
       </div>
-      <span className="sr-only" aria-live="polite">
-        {isPreviewing ? "" : `Video position ${formatTime(position)}`}
-      </span>
     </div>
   );
 }
