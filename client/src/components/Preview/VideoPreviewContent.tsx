@@ -2,6 +2,7 @@ import { CustomDropdown } from "../Common/CustomDropdown";
 import { PlaybackDiagnostics } from "./PlaybackDiagnostics";
 import type { VideoPreviewProps } from "../../features/workspace/types";
 import { useVideoResume } from "../../features/player/useVideoResume";
+import { VideoScrubber } from "./VideoScrubber";
 
 type VideoPreviewDetailsProps = Omit<
   VideoPreviewProps,
@@ -204,6 +205,12 @@ export function VideoPreviewContent({
           Your browser cannot play this video inline.
         </video>
       </div>
+      <VideoScrubber
+        path={props.selectedNode.path}
+        quality={props.selectedVideoQuality}
+        sessionId={props.sessionId}
+        videoRef={videoRef}
+      />
       <PlaybackResume {...resume} />
       <PlaybackStatus {...props} />
       <PlaybackDiagnostics

@@ -78,11 +78,23 @@ async function selectFile(page: Page, name: string, mobile: boolean) {
       .check({ force: true });
   await page.getByRole("treeitem", { name, exact: true }).click();
   await expect(page.locator(".preview-panel h2")).toHaveText(name);
-  if (name.endsWith(".png"))
-    await expect(page.locator(".image-frame > img")).toHaveJSProperty(
-      "complete",
-      true,
-    );
+  if (name.endsWith(".png")) {
+    const image = page.locator(".image-frame > img");
+    await expect(image).toHaveJSProperty("naturalWidth", 1200);
+    if (mobile) {
+      await image.evaluate((element) =>
+        element.scrollIntoView({ block: "center" }),
+      );
+      const bounds = await image.boundingBox();
+      const navigation = await page
+        .locator(".workspace-mobile-nav")
+        .boundingBox();
+      if (!bounds || !navigation)
+        throw new Error("Mobile image preview is missing.");
+      expect(bounds.y).toBeGreaterThanOrEqual(0);
+      expect(bounds.y + bounds.height).toBeLessThanOrEqual(navigation.y);
+    }
+  }
   if (name.endsWith(".txt"))
     await expect(page.locator("pre")).toContainText("COASTAL COLLECTION");
   if (name.endsWith(".mp4")) {
@@ -93,6 +105,17 @@ async function selectFile(page: Page, name: string, mobile: boolean) {
           .evaluate((video: HTMLVideoElement) => video.readyState),
       )
       .toBe(4);
+    await page.locator("video").evaluate(async (video: HTMLVideoElement) => {
+      video.muted = true;
+      await video.play();
+    });
+    await expect
+      .poll(() =>
+        page
+          .locator("video")
+          .evaluate((video: HTMLVideoElement) => video.currentTime),
+      )
+      .toBeGreaterThan(0.1);
     await page.locator("video").evaluate((video: HTMLVideoElement) => {
       video.pause();
       video.currentTime = 0;
@@ -112,6 +135,9 @@ async function selectFile(page: Page, name: string, mobile: boolean) {
       )
       .toBe(4);
     if (mobile) {
+      await page
+        .getByRole("slider", { name: "Seek video" })
+        .evaluate((control) => control.scrollIntoView({ block: "center" }));
       const video = await page.locator("video").boundingBox();
       const navigation = await page
         .locator(".workspace-mobile-nav")
@@ -178,11 +204,65 @@ for (const device of devices) {
       for (const name of filenames) {
         await selectFile(page, name, mobile);
         await save(page, device, theme, `preview-${name.split(".").at(-1)}`);
+        if (name.endsWith(".mp4")) {
+          const seek = page.getByRole("slider", { name: "Seek video" });
+          await seek.focus();
+          await page.keyboard.down("End");
+          await page.keyboard.down("ArrowLeft");
+          const thumbnail = page.locator(".video-scrubber-preview img");
+          await expect(thumbnail).toBeVisible();
+          await expect(thumbnail).toHaveJSProperty("naturalWidth", 320);
+          await expect(seek).toHaveValue("7.75");
+          if (mobile) {
+            const navigation = await page
+              .locator(".workspace-mobile-nav")
+              .boundingBox();
+            if (!navigation) throw new Error("Mobile navigation is missing.");
+            for (const control of [seek, thumbnail]) {
+              const bounds = await control.boundingBox();
+              if (!bounds) throw new Error("Video seek evidence is missing.");
+              expect(bounds.x).toBeGreaterThanOrEqual(0);
+              expect(bounds.y).toBeGreaterThanOrEqual(0);
+              expect(bounds.x + bounds.width).toBeLessThanOrEqual(device.width);
+              expect(bounds.y + bounds.height).toBeLessThanOrEqual(
+                navigation.y,
+              );
+            }
+          }
+          await expect(page.locator("video")).toHaveJSProperty(
+            "currentTime",
+            0,
+          );
+          await save(page, device, theme, "video-seek-preview");
+          await page.keyboard.up("ArrowLeft");
+          await page.keyboard.up("End");
+          await expect(page.locator("video")).toHaveJSProperty(
+            "currentTime",
+            7.75,
+          );
+          await expect
+            .poll(() =>
+              page
+                .locator("video")
+                .evaluate(
+                  (video: HTMLVideoElement) =>
+                    !video.seeking && video.readyState >= 2,
+                ),
+            )
+            .toBe(true);
+          await expect(thumbnail).toHaveCount(0);
+          await save(page, device, theme, "video-seek-committed");
+        }
       }
       await selectFile(page, filenames[0], mobile);
       await page
         .getByRole("button", { name: "Slideshow", exact: true })
         .click();
+      await expect(page.locator(".slideshow-meta")).toContainText("1 / 1");
+      await expect(page.locator(".slideshow-stage img")).toHaveJSProperty(
+        "naturalWidth",
+        1200,
+      );
       await save(page, device, theme, "slideshow");
       await page.keyboard.press("Escape");
       await page
