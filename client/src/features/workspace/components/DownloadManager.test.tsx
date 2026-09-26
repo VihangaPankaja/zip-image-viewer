@@ -30,7 +30,6 @@ describe("DownloadManager", () => {
           job(),
           job({ id: "f86946a1-bcf7-4137-87c6-51502024367a", queuePosition: 1 }),
         ]}
-        maxConcurrent={2}
         onCancel={vi.fn()}
         onConfirm={vi.fn()}
         onOpenSession={vi.fn()}
@@ -39,7 +38,6 @@ describe("DownloadManager", () => {
         onReorder={onReorder}
         onResume={vi.fn()}
         onRetry={vi.fn()}
-        onSetConcurrency={vi.fn()}
       />,
     );
 
@@ -76,7 +74,6 @@ describe("DownloadManager", () => {
             requiresConfirmation: true,
           }),
         ]}
-        maxConcurrent={2}
         onCancel={vi.fn()}
         onConfirm={onConfirm}
         onOpenSession={vi.fn()}
@@ -85,7 +82,6 @@ describe("DownloadManager", () => {
         onReorder={vi.fn()}
         onResume={vi.fn()}
         onRetry={vi.fn()}
-        onSetConcurrency={vi.fn()}
       />,
     );
 
@@ -118,7 +114,6 @@ describe("DownloadManager", () => {
             requiresConfirmation: true,
           }),
         ]}
-        maxConcurrent={2}
         onCancel={vi.fn()}
         onConfirm={vi.fn().mockRejectedValue(new Error("Confirmation failed"))}
         onOpenSession={vi.fn()}
@@ -127,7 +122,6 @@ describe("DownloadManager", () => {
         onReorder={vi.fn()}
         onResume={vi.fn()}
         onRetry={vi.fn()}
-        onSetConcurrency={vi.fn()}
       />,
     );
 
@@ -152,7 +146,6 @@ describe("DownloadManager", () => {
             sourceKind: "torrent",
           }),
         ]}
-        maxConcurrent={2}
         onCancel={vi.fn()}
         onConfirm={vi.fn().mockResolvedValue(undefined)}
         onOpenSession={vi.fn()}
@@ -161,7 +154,6 @@ describe("DownloadManager", () => {
         onReorder={vi.fn()}
         onResume={vi.fn()}
         onRetry={vi.fn()}
-        onSetConcurrency={vi.fn()}
       />,
     );
 

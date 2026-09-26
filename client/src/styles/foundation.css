@@ -5,7 +5,7 @@
 }
 
 html {
-  min-width: 320px;
+  min-width: 0;
   min-height: 100%;
   background: var(--bg);
   scrollbar-color: var(--border-strong) var(--bg-inset);
@@ -23,7 +23,7 @@ body {
   color: var(--text);
   font-family: var(--font-body);
   font-size: 15px;
-  line-height: 1.45;
+  line-height: 1.5;
   text-rendering: optimizeLegibility;
 }
 
@@ -56,7 +56,7 @@ a {
 
 ::selection {
   background: var(--accent);
-  color: var(--bg-inset);
+  color: var(--accent-contrast);
 }
 
 h1,
@@ -72,8 +72,8 @@ h1,
 h2,
 h3 {
   font-family: var(--font-display);
-  font-stretch: condensed;
-  letter-spacing: 0.01em;
+  font-weight: 650;
+  letter-spacing: -0.025em;
 }
 
 .app-shell,
@@ -82,7 +82,9 @@ h3 {
 }
 
 .workspace {
-  padding-inline: clamp(10px, 1.5vw, 22px);
+  max-width: 1800px;
+  margin-inline: auto;
+  padding-inline: clamp(12px, 2vw, 32px);
 }
 
 .panel-label {
@@ -96,7 +98,7 @@ h3 {
 
 .panel-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
 }
@@ -117,6 +119,8 @@ h3 {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .empty-card {
@@ -126,6 +130,8 @@ h3 {
   padding: var(--space-6);
   color: var(--text-muted);
   text-align: center;
+  justify-items: center;
+  gap: var(--space-2);
 }
 
 .empty-card strong {
@@ -136,7 +142,20 @@ h3 {
 
 .empty-card p {
   max-width: 38ch;
-  margin: var(--space-2) auto 0;
+  margin: 0 auto;
+  font-size: 0.875rem;
+}
+
+.empty-state-icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin-block-end: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-inset);
+  color: var(--accent-strong);
 }
 
 @media (prefers-reduced-motion: reduce) {

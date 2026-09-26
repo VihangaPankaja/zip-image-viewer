@@ -13,6 +13,7 @@ describe("workspace session schemas", () => {
           children: [
             {
               extension: ".jpg",
+              modifiedAt: 1768478400000,
               name: "cover.jpg",
               path: "photos/cover.jpg",
               type: "file",
@@ -20,7 +21,10 @@ describe("workspace session schemas", () => {
           ],
         },
       }),
-    ).toMatchObject({ id: "session-1", tree: { name: "photos" } });
+    ).toMatchObject({
+      id: "session-1",
+      tree: { name: "photos", children: [{ modifiedAt: 1768478400000 }] },
+    });
     expect(
       jobPayloadSchema.parse({ id: "job-1", threadMode: "segmented" }),
     ).toMatchObject({ id: "job-1", threadMode: "segmented" });

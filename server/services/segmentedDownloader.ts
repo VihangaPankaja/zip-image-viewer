@@ -25,6 +25,7 @@ type RangeRequest = {
   state: DownloadState;
   signal: AbortSignal;
   strictRange: boolean;
+  append: boolean;
   responseHeader?: (_statusCode: number) => void;
 };
 
@@ -47,7 +48,7 @@ function buildSegments(totalSize: number, segmentCount: number): Segment[] {
     return [];
   }
 
-  const safeCount = Math.max(1, Math.floor(segmentCount));
+  const safeCount = Math.max(1, Math.min(totalSize, Math.floor(segmentCount)));
   const sizePerSegment = Math.floor(totalSize / safeCount);
   const segments: Segment[] = [];
 
@@ -70,6 +71,7 @@ async function streamSingleRange({
   state,
   signal,
   strictRange,
+  append,
   responseHeader,
 }: RangeRequest): Promise<void> {
   const headers: Record<string, string> = {};
@@ -118,7 +120,7 @@ async function streamSingleRange({
   await pipeline(
     request,
     createWriteStream(targetPath, {
-      flags: requestedStart > 0 ? "a" : "w",
+      flags: append ? "a" : "w",
     }),
   );
 
@@ -163,6 +165,7 @@ async function downloadSingleWithResume({
     state,
     signal,
     strictRange: shouldRangeResume,
+    append: shouldRangeResume,
     responseHeader: (statusCode) => {
       if (shouldRangeResume && statusCode !== 206) {
         void rm(targetPath, { force: true }).catch(() => undefined);
@@ -229,21 +232,16 @@ async function downloadSegmentWithRetry({
         state,
         signal,
         strictRange: true,
+        append: existingBytes > 0,
       });
 
       return partPath;
     } catch (error) {
-      if (getErrorProperty(error, "name") === "AbortError") {
-        throw error;
-      }
-
-      if (getErrorProperty(error, "code") === "RANGE_UNSUPPORTED") {
-        throw error;
-      }
-
       if (
-        settings.maxRetries !== UNLIMITED_RETRIES &&
-        attempt >= settings.maxRetries
+        getErrorProperty(error, "name") === "AbortError" ||
+        getErrorProperty(error, "code") === "RANGE_UNSUPPORTED" ||
+        (settings.maxRetries !== UNLIMITED_RETRIES &&
+          attempt >= settings.maxRetries)
       ) {
         throw error;
       }

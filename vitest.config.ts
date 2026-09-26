@@ -7,11 +7,7 @@ export default defineConfig({
         test: {
           name: "component",
           environment: "jsdom",
-          environmentOptions: {
-            jsdom: {
-              url: "http://localhost/",
-            },
-          },
+          environmentOptions: { jsdom: { url: "http://localhost/" } },
           globals: true,
           include: ["client/src/**/*.test.{ts,tsx}"],
           setupFiles: ["./client/src/test/setup.ts"],
@@ -28,37 +24,36 @@ export default defineConfig({
     ],
     coverage: {
       provider: "v8",
-      reporter: ["text", "json", "html", "lcov"],
+      reporter: ["text", "json", "json-summary", "html", "lcov"],
       reportOnFailure: true,
-      include: [
-        "shared/contracts.ts",
-        "server/application/downloads/downloadOptions.ts",
-        "server/application/jobs/sessionJobQueue.ts",
-        "server/domain/explorerTree.ts",
-        "server/infrastructure/runtime/mediaClassification.ts",
-        "server/infrastructure/runtime/runtimePrimitives.ts",
-        "server/media/*.ts",
-        "client/src/features/player/adaptiveQuality.ts",
-        "client/src/features/workspace/workspaceUrls.ts",
-      ],
+      include: ["shared/**/*.ts", "server/**/*.ts", "client/src/**/*.{ts,tsx}"],
+      exclude: ["**/*.test.{ts,tsx}", "**/*.d.ts", "client/src/test/**"],
       thresholds: {
         perFile: false,
-        statements: 85,
-        lines: 85,
-        functions: 85,
-        branches: 80,
+        statements: 68,
+        lines: 69,
+        functions: 66,
+        branches: 64,
+        "client/src/{features/player/adaptiveQuality,features/workspace/workspaceUrls}.ts":
+          {
+            statements: 85,
+            lines: 85,
+            functions: 85,
+            branches: 80,
+          },
         "shared/contracts.ts": {
           statements: 95,
           lines: 95,
           functions: 95,
           branches: 90,
         },
-        "server/{application,domain,infrastructure,media}/**/*.ts": {
-          statements: 95,
-          lines: 95,
-          functions: 95,
-          branches: 90,
-        },
+        "server/{application/downloads/downloadOptions,application/jobs/sessionJobQueue,domain/explorerTree,infrastructure/runtime/mediaClassification,infrastructure/runtime/runtimePrimitives,media/*}.ts":
+          {
+            statements: 95,
+            lines: 95,
+            functions: 95,
+            branches: 90,
+          },
       },
     },
   },

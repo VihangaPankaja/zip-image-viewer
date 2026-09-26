@@ -108,41 +108,7 @@ function SlideshowOverlay(props: SlideshowOverlayProps) {
           <img src={props.selectedImageUrl} alt={node.name} />
         </div>
         <SlideshowTools {...props} node={node} lastPath={lastPath} />
-        <div
-          className="slideshow-floating slideshow-floating-nav"
-          aria-hidden={props.slideshowChromeHidden}
-        >
-          <button
-            className="nav-button nav-button-left"
-            type="button"
-            aria-label="Previous image"
-            data-tooltip="Previous image"
-            onClick={() => props.onSelectPath(props.previousImagePath)}
-          >
-            {"<"}
-          </button>
-          <button
-            className="nav-button nav-button-right"
-            type="button"
-            aria-label="Next image"
-            data-tooltip="Next image"
-            onClick={() => props.onSelectPath(props.nextImagePath)}
-          >
-            {">"}
-          </button>
-        </div>
-        <div className="slideshow-floating slideshow-floating-bottom">
-          <div className="slideshow-neighbors-card">
-            <div className="slideshow-neighbors">
-              <span>Prev: {props.previousImageName || "None"}</span>
-              <span>Next: {props.nextImageName || "None"}</span>
-            </div>
-            <div className="navigation-hint">
-              Arrow keys move, Home/End jump, F opens slideshow, Escape closes
-              it.
-            </div>
-          </div>
-        </div>
+        <SlideshowNavigation {...props} />
         {props.slideshowChromeHidden ? (
           <button
             className="slideshow-reveal-button"
@@ -157,6 +123,79 @@ function SlideshowOverlay(props: SlideshowOverlayProps) {
   );
 }
 
+function SlideshowNavigation(
+  props: Pick<
+    SlideshowOverlayProps,
+    | "slideshowChromeHidden"
+    | "onSelectPath"
+    | "previousImagePath"
+    | "nextImagePath"
+    | "previousImageName"
+    | "nextImageName"
+  >,
+) {
+  return (
+    <>
+      <div
+        className="slideshow-floating slideshow-floating-nav"
+        aria-hidden={props.slideshowChromeHidden}
+      >
+        <button
+          className="nav-button nav-button-left"
+          type="button"
+          aria-label="Previous image"
+          data-tooltip="Previous image"
+          onClick={() => props.onSelectPath(props.previousImagePath)}
+        >
+          {"<"}
+        </button>
+        <button
+          className="nav-button nav-button-right"
+          type="button"
+          aria-label="Next image"
+          data-tooltip="Next image"
+          onClick={() => props.onSelectPath(props.nextImagePath)}
+        >
+          {">"}
+        </button>
+      </div>
+      <div className="slideshow-floating slideshow-floating-bottom">
+        <div className="slideshow-neighbors-card">
+          <div className="slideshow-neighbors">
+            <span>Prev: {props.previousImageName || "None"}</span>
+            <span>Next: {props.nextImageName || "None"}</span>
+          </div>
+          <div className="navigation-hint">
+            Arrow keys move, Home/End jump, F opens slideshow, Escape closes it.
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function SlideshowInfo({
+  node,
+  ...props
+}: Pick<
+  SlideshowToolsProps,
+  "currentFolderImages" | "currentImageIndex" | "formatBytes" | "formatDate"
+> & { node: ImageNode }) {
+  return (
+    <div className="slideshow-info-card">
+      <p className="panel-label">Folder slideshow</p>
+      <h2 title={node.name}>{node.name}</h2>
+      <div className="slideshow-meta">
+        <span>
+          {props.currentImageIndex + 1} / {props.currentFolderImages.length}
+        </span>
+        <span>{props.formatBytes(node.size ?? 0)}</span>
+        <span>{props.formatDate(node.modifiedAt ?? 0)}</span>
+      </div>
+    </div>
+  );
+}
+
 function SlideshowTools({
   node,
   lastPath,
@@ -164,17 +203,7 @@ function SlideshowTools({
 }: SlideshowToolsProps & { node: ImageNode; lastPath: string }) {
   return (
     <div className="slideshow-floating slideshow-floating-top">
-      <div className="slideshow-info-card">
-        <p className="panel-label">Folder slideshow</p>
-        <h2 title={node.name}>{node.name}</h2>
-        <div className="slideshow-meta">
-          <span>
-            {props.currentImageIndex + 1} / {props.currentFolderImages.length}
-          </span>
-          <span>{props.formatBytes(node.size ?? 0)}</span>
-          <span>{props.formatDate(node.modifiedAt ?? 0)}</span>
-        </div>
-      </div>
+      <SlideshowInfo {...props} node={node} />
       <div className="slideshow-controls-card">
         <CustomDropdown
           id="slideshow-fit-mode"

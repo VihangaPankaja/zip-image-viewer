@@ -33,13 +33,8 @@ function VideoPreviewToolbar(props: VideoPreviewDetailsProps) {
   );
 }
 
-function PlaybackStatus(props: VideoPreviewDetailsProps) {
-  const noPeers =
-    props.activeJob?.sessionId === props.sessionId &&
-    props.activeJob.sourceKind === "torrent" &&
-    props.activeJob.status === "downloading" &&
-    props.activeJob.peerCount === 0;
-  const rendition =
+function selectedRendition(props: VideoPreviewDetailsProps) {
+  return (
     props.videoHlsStatus?.renditions.find(
       ({ quality }) =>
         quality === props.selectedVideoQuality ||
@@ -48,33 +43,50 @@ function PlaybackStatus(props: VideoPreviewDetailsProps) {
     ) ??
     (props.selectedVideoQuality === "auto"
       ? props.videoHlsStatus?.renditions[0]
-      : undefined);
+      : undefined)
+  );
+}
+
+function playbackLabel(props: VideoPreviewDetailsProps) {
   const quality =
     props.selectedVideoQuality === "source"
       ? "Original"
       : props.selectedVideoQuality === "auto"
         ? `Auto${props.videoHeight ? ` · ${props.videoHeight}p` : ""}`
         : props.selectedVideoQuality;
-  let status = `${quality} playback`;
-  if (props.activeJob?.phase === "transcoding")
-    status = `Transcoding ${props.activeJob.videoQuality || props.selectedVideoQuality}: ${props.activeJob.transcodedEntries || 0}/${props.activeJob.totalTranscodeEntries || 0}`;
-  if (props.videoPlaybackStatus === "loading") status = "Loading video";
-  if (props.videoPlaybackStatus === "buffering") status = "Buffering video";
-  if (
+  if (props.videoPlaybackError) return "Playback needs attention";
+  const rendition = selectedRendition(props);
+  const preparing =
     props.selectedVideoQuality !== "source" &&
-    props.videoPlaybackStatus !== "ready" &&
+    props.videoPlaybackStatus !== "ready";
+  if (preparing && rendition?.status === "queued")
+    return "Waiting for video encoder";
+  if (
+    preparing &&
     rendition?.status === "running" &&
     !rendition.availableSegments
   )
-    status = "Preparing video";
-  if (
-    props.selectedVideoQuality !== "source" &&
-    props.videoPlaybackStatus !== "ready" &&
-    rendition?.status === "queued"
-  )
-    status = "Waiting for video encoder";
-  if (props.videoPlaybackError) status = "Playback needs attention";
-  if (noPeers) status = "Waiting for peers";
+    return "Preparing video";
+  if (props.videoPlaybackStatus === "buffering") return "Buffering video";
+  if (props.videoPlaybackStatus === "loading") return "Loading video";
+  if (props.activeJob?.phase === "transcoding")
+    return `Transcoding ${props.activeJob.videoQuality || props.selectedVideoQuality}: ${props.activeJob.transcodedEntries || 0}/${props.activeJob.totalTranscodeEntries || 0}`;
+  return `${quality} playback`;
+}
+
+function playbackState(props: VideoPreviewDetailsProps) {
+  const noPeers =
+    props.activeJob?.sessionId === props.sessionId &&
+    props.activeJob.sourceKind === "torrent" &&
+    props.activeJob.status === "downloading" &&
+    props.activeJob.peerCount === 0;
+  const rendition = selectedRendition(props);
+  const status = noPeers ? "Waiting for peers" : playbackLabel(props);
+  return { status, noPeers, rendition };
+}
+
+function PlaybackStatus(props: VideoPreviewDetailsProps) {
+  const { status, noPeers, rendition } = playbackState(props);
   return (
     <div className="progress-meta-row">
       <span aria-live="polite">{status}</span>
@@ -122,6 +134,51 @@ function PlaybackResume(resume: ReturnType<typeof useVideoResume>) {
     </div>
   );
 }
+function PlaybackRecovery(
+  props: Pick<
+    VideoPreviewDetailsProps,
+    | "videoPlaybackError"
+    | "videoQualityOptions"
+    | "selectedVideoQuality"
+    | "setSelectedVideoQuality"
+    | "retryVideoPlayback"
+  >,
+) {
+  return props.videoPlaybackError ? (
+    <div className="navigation-hint" role="alert">
+      <span>{props.videoPlaybackError}</span>{" "}
+      {props.videoPlaybackError === "This browser cannot play Original." &&
+      props.videoQualityOptions.some(({ id }) => id === "auto") ? (
+        <button
+          className="ghost-button"
+          type="button"
+          onClick={() => props.setSelectedVideoQuality("auto")}
+        >
+          Try adaptive playback
+        </button>
+      ) : props.videoPlaybackError ===
+          "This browser cannot decode this stream." &&
+        props.selectedVideoQuality !== "source" ? (
+        <button
+          className="ghost-button"
+          type="button"
+          onClick={() => props.setSelectedVideoQuality("source")}
+        >
+          Try Original
+        </button>
+      ) : (
+        <button
+          className="ghost-button"
+          type="button"
+          onClick={props.retryVideoPlayback}
+        >
+          Retry playback
+        </button>
+      )}
+    </div>
+  ) : null;
+}
+
 export function VideoPreviewContent({
   videoRef,
   videoShellRef,
@@ -157,39 +214,7 @@ export function VideoPreviewContent({
         videoPlaybackError={props.videoPlaybackError}
         videoHlsStatus={props.videoHlsStatus}
       />
-      {props.videoPlaybackError ? (
-        <div className="navigation-hint" role="alert">
-          <span>{props.videoPlaybackError}</span>{" "}
-          {props.videoPlaybackError === "This browser cannot play Original." &&
-          props.videoQualityOptions.some(({ id }) => id === "auto") ? (
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={() => props.setSelectedVideoQuality("auto")}
-            >
-              Try adaptive playback
-            </button>
-          ) : props.videoPlaybackError ===
-              "This browser cannot decode this stream." &&
-            props.selectedVideoQuality !== "source" ? (
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={() => props.setSelectedVideoQuality("source")}
-            >
-              Try Original
-            </button>
-          ) : (
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={props.retryVideoPlayback}
-            >
-              Retry playback
-            </button>
-          )}
-        </div>
-      ) : null}
+      <PlaybackRecovery {...props} />
     </div>
   );
 }

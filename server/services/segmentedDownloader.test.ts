@@ -88,3 +88,70 @@ describe("downloadWithSegmentedManager", () => {
     }
   });
 });
+
+it.each([
+  { payload: "abc", staleParts: false, threads: 8 },
+  { payload: "a fresh download", staleParts: true, threads: 3 },
+])(
+  "downloads small payloads and overwrites stale parts when resume is disabled (%j)",
+  async ({ payload, staleParts, threads }) => {
+    const workspace = await mkdtemp(join(tmpdir(), "segmented-restart-"));
+    const targetPath = join(workspace, "download.bin");
+    const body = Buffer.from(payload);
+    const ranges: string[] = [];
+    if (staleParts) {
+      await Promise.all(
+        Array.from({ length: threads }, (_, index) =>
+          writeFile(`${targetPath}.part.${String(index)}`, "stale bytes"),
+        ),
+      );
+    }
+    const server = createServer((request, response) => {
+      const range = request.headers.range ?? "";
+      ranges.push(range);
+      const match = /^bytes=(\d+)-(\d+)$/.exec(range);
+      if (!match) {
+        response.writeHead(416).end();
+        return;
+      }
+      const start = Number(match[1]);
+      const end = Number(match[2]);
+      const part = body.subarray(start, end + 1);
+      response
+        .writeHead(206, {
+          "content-length": part.length,
+          "content-range": `bytes ${String(start)}-${String(end)}/${String(body.length)}`,
+        })
+        .end(part);
+    });
+    try {
+      await new Promise<void>((resolve) =>
+        server.listen(0, "127.0.0.1", resolve),
+      );
+      const address = server.address();
+      if (!address || typeof address === "string")
+        throw new Error("Missing TCP address");
+      const state = { downloadedBytes: 0 };
+      await downloadWithSegmentedManager({
+        url: `http://127.0.0.1:${String(address.port)}/file`,
+        targetPath,
+        signal: new AbortController().signal,
+        state,
+        settings: {
+          enableResume: false,
+          enableMultithread: true,
+          threadCount: threads,
+          maxRetries: 0,
+        },
+        metadata: { acceptRanges: true, size: body.length },
+      });
+      expect(await readFile(targetPath)).toEqual(body);
+      expect(state.downloadedBytes).toBe(body.length);
+      expect(ranges).toHaveLength(Math.min(threads, body.length));
+      expect(await readdir(workspace)).toEqual(["download.bin"]);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(workspace, { recursive: true, force: true });
+    }
+  },
+);

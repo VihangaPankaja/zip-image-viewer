@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import {
   readDownloadOptions,
+  readStoredSetting,
+  writeStoredSetting,
   readExplorerColumns,
   readKeyboardSettings,
   type ExplorerColumns,
@@ -8,13 +10,12 @@ import {
 } from "../features/workspace/settingsStorage";
 import type { DownloadOptions } from "../types/download";
 
-export function useLocalStorageSettings() {
-  const [theme, setTheme] = useState(() => {
-    if (typeof window === "undefined") {
-      return "dark";
-    }
+export type ThemePreference = "system" | "light" | "dark";
 
-    return window.localStorage.getItem("zip-image-viewer-theme") || "dark";
+export function useLocalStorageSettings() {
+  const [theme, setTheme] = useState<ThemePreference>(() => {
+    const stored = readStoredSetting("zip-image-viewer-theme");
+    return stored === "light" || stored === "dark" ? stored : "system";
   });
 
   const [keyboardSettings, setKeyboardSettings] =
@@ -27,26 +28,27 @@ export function useLocalStorageSettings() {
     useState<DownloadOptions>(readDownloadOptions);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    window.localStorage.setItem("zip-image-viewer-theme", theme);
+    const preference = window.matchMedia("(prefers-color-scheme: dark)");
+    const applyTheme = () => {
+      document.documentElement.dataset.theme =
+        theme === "system" ? (preference.matches ? "dark" : "light") : theme;
+    };
+    applyTheme();
+    writeStoredSetting("zip-image-viewer-theme", theme);
+    preference.addEventListener("change", applyTheme);
+    return () => preference.removeEventListener("change", applyTheme);
   }, [theme]);
 
   useEffect(() => {
-    window.localStorage.setItem(
-      "zip-download-options",
-      JSON.stringify(downloadOptions),
-    );
+    writeStoredSetting("zip-download-options", JSON.stringify(downloadOptions));
   }, [downloadOptions]);
 
   useEffect(() => {
-    window.localStorage.setItem(
-      "zip-explorer-columns",
-      JSON.stringify(explorerColumns),
-    );
+    writeStoredSetting("zip-explorer-columns", JSON.stringify(explorerColumns));
   }, [explorerColumns]);
 
   useEffect(() => {
-    window.localStorage.setItem(
+    writeStoredSetting(
       "zip-shortcut-settings",
       JSON.stringify(keyboardSettings),
     );

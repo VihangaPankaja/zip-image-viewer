@@ -12,7 +12,6 @@ describe("WorkspaceLayout", () => {
         mobilePane="files"
         onMobilePaneChange={onMobilePaneChange}
         files={<p>Files pane</p>}
-        header={<h1>Media workspace</h1>}
         metadata={<p>Metadata pane</p>}
         preview={<p>Preview pane</p>}
         sessions={<p>Sessions pane</p>}
@@ -23,9 +22,6 @@ describe("WorkspaceLayout", () => {
 
     expect(
       screen.getByRole("navigation", { name: "Workspace views" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "Media workspace" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "Files" })).toBeChecked();
     expect(
