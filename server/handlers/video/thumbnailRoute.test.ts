@@ -1,12 +1,18 @@
 import express from "express";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createVideoRuntime } from "../../infrastructure/media/videoRuntime.js";
 import type { Session } from "../../domain/models.js";
 import { registerVideoThumbnailRoute } from "./thumbnailRoute.js";
 import type { VideoRouteDependencies } from "./types.js";
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...actual, mkdir: vi.fn(actual.mkdir) };
+});
 
 const workspaces: string[] = [];
 
@@ -22,6 +28,8 @@ afterEach(async () => {
 async function createThumbnailApp(
   runCommand: VideoRouteDependencies["runCommand"],
   durationSeconds = 60,
+  trackVideoTask: VideoRouteDependencies["trackVideoTask"] = (_session, task) =>
+    task,
 ) {
   const workspace = await mkdtemp(path.join(tmpdir(), "ziv-thumbnail-route-"));
   workspaces.push(workspace);
@@ -44,7 +52,7 @@ async function createThumbnailApp(
       defaultQuality: "360p",
     }),
     runCommand,
-    trackVideoTask: (_session: Session, task: Promise<void>) => task,
+    trackVideoTask,
   } as unknown as VideoRouteDependencies);
   return app;
 }
@@ -151,4 +159,59 @@ describe("video thumbnail route", () => {
     }
     expect(runCommand).toHaveBeenCalledTimes(1);
   });
+});
+
+it("drains a thumbnail mkdir and publication before removing the session workspace", async () => {
+  const runtime = createVideoRuntime({
+    ffmpegPath: null,
+    transcodes: new Map(),
+    logEvent: () => undefined,
+  });
+  let trackedSession: Session | undefined;
+  const app = await createThumbnailApp(
+    async (_command, args) => {
+      await writeFile(String(args.at(-1)), "thumbnail");
+    },
+    60,
+    (session, task) => {
+      trackedSession = session;
+      return runtime.trackVideoTask(session, task);
+    },
+  );
+  const workspace = workspaces.at(-1);
+  if (!workspace) throw new Error("Missing test workspace");
+  const native =
+    await vi.importActual<typeof import("node:fs/promises")>(
+      "node:fs/promises",
+    );
+  let release: (() => void) | undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const reached = vi.fn();
+  vi.mocked(mkdir).mockImplementationOnce(async () => {
+    reached();
+    await gate;
+    return native.mkdir(path.join(workspace, "video-thumbnails"), {
+      recursive: true,
+    });
+  });
+  const response = request(app)
+    .get("/api/sessions/session/video/thumbnail?path=source.mp4&time=5")
+    .then((value) => value);
+  await vi.waitFor(() => expect(reached).toHaveBeenCalled());
+  let removed = false;
+  const removal = (async () => {
+    if (trackedSession) await runtime.cleanupVideoSession(trackedSession);
+    await rm(workspace, { recursive: true, force: true });
+    removed = true;
+  })();
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(removed).toBe(false);
+  } finally {
+    release?.();
+    await Promise.all([response, removal]);
+  }
+  await expect(stat(workspace)).rejects.toMatchObject({ code: "ENOENT" });
 });

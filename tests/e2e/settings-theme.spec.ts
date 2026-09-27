@@ -201,6 +201,7 @@ test("long transfer names, statistics, and actions fit in both themes", async ({
     (status, index) => ({
       id: `00000000-0000-4000-8000-00000000000${String(index + 1)}`,
       url: `https://downloads.example.com/${"archive-with-a-long-name-".repeat(12)}${String(index)}.zip`,
+      torrentFiles: [],
       sourceKind: "http",
       sourcePreference: "auto",
       status,

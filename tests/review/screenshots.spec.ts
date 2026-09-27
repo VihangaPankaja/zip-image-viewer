@@ -7,6 +7,7 @@ import {
   installReviewFixtures,
   prepareMedia,
   reviewJobs,
+  reviewTorrentJob,
 } from "./fixtures";
 
 const output = path.resolve("test-results/pr-screenshots");
@@ -188,6 +189,25 @@ for (const device of devices) {
       await expect(page.locator(".download-row")).toHaveCount(4);
       await save(page, device, theme, "http-and-torrent-downloads");
       await captureDialogs(page, device, theme);
+      state.jobs = [reviewTorrentJob()];
+      await page
+        .getByRole("button", { name: "Review files", exact: true })
+        .click();
+      await page
+        .getByRole("checkbox", { name: "Extras", exact: true })
+        .uncheck();
+      await expect(page.getByRole("dialog").getByRole("status")).toContainText(
+        "3 of 4 files selected",
+      );
+      await save(page, device, theme, "torrent-file-selection");
+      await page
+        .getByRole("button", { name: "Start selected download" })
+        .click();
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await expect(page.locator(".download-status-message")).toContainText(
+        "Downloading selected files",
+      );
+      await save(page, device, theme, "torrent-selection-started");
       state.jobs = [];
       await expect(page.locator(".download-row")).toHaveCount(0);
       await page.getByRole("tab", { name: "Explore" }).click();
@@ -211,14 +231,17 @@ for (const device of devices) {
           await page.keyboard.down("ArrowLeft");
           const thumbnail = page.locator(".video-scrubber-preview img");
           await expect(thumbnail).toBeVisible();
-          await expect(thumbnail).toHaveJSProperty("naturalWidth", 320);
+          await expect(thumbnail).toHaveJSProperty("naturalWidth", 1600);
           await expect(seek).toHaveValue("7.75");
           if (mobile) {
             const navigation = await page
               .locator(".workspace-mobile-nav")
               .boundingBox();
             if (!navigation) throw new Error("Mobile navigation is missing.");
-            for (const control of [seek, thumbnail]) {
+            for (const control of [
+              seek,
+              page.locator(".video-scrubber-preview"),
+            ]) {
               const bounds = await control.boundingBox();
               if (!bounds) throw new Error("Video seek evidence is missing.");
               expect(bounds.x).toBeGreaterThanOrEqual(0);

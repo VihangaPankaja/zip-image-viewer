@@ -62,7 +62,6 @@ export function registerVideoThumbnailRoute(
       context.session.workspaceDir,
       "video-thumbnails",
     );
-    await mkdir(thumbDir, { recursive: true });
     const lastSeek =
       source.durationSeconds > 0
         ? Math.max(0, Math.ceil(source.durationSeconds * 4) - 1) / 4
@@ -79,13 +78,20 @@ export function registerVideoThumbnailRoute(
       .digest("hex");
     const thumbPath = path.join(thumbDir, `${hash}.jpg`);
     if (!(await stat(thumbPath).catch(() => null))) {
+      if (!deps.touchSession(context.session.id)) {
+        res
+          .status(404)
+          .json({ error: "Session not found or already cleaned up." });
+        return;
+      }
       let generation = pendingThumbnails.get(thumbPath);
       if (!generation) {
         generation = deps
           .trackVideoTask(
             context.session,
-            deps
-              .runCommand(
+            (async () => {
+              await mkdir(thumbDir, { recursive: true });
+              await deps.runCommand(
                 ffmpegPath,
                 buildThumbnailArgs(
                   context.targetPath,
@@ -95,8 +101,9 @@ export function registerVideoThumbnailRoute(
                   selected.height,
                 ),
                 context.session,
-              )
-              .then(() => rename(`${thumbPath}.pending.jpg`, thumbPath)),
+              );
+              await rename(`${thumbPath}.pending.jpg`, thumbPath);
+            })(),
           )
           .finally(() => pendingThumbnails.delete(thumbPath));
         pendingThumbnails.set(thumbPath, generation);
