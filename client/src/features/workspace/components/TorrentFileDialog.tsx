@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { Job } from "../../../../../shared/contracts";
 import { formatTransferBytes } from "../../../lib/formatterUtils";
 import { classifyExtension } from "../../../lib/mimeTypeSystem";
-import { MediaTypeFilter } from "../../../components/MediaTypeFilter";
+import { FileList, FileTools, fileState } from "./TorrentFileContents";
 
 type TorrentFile = Job["torrentFiles"][number];
 type Props = {
@@ -11,59 +11,8 @@ type Props = {
   onSubmit: (id: string, fileIds: string[]) => Promise<void>;
 };
 
-function FileGroup({
-  folder,
-  files,
-  selected,
-  onChange,
-}: {
-  folder: string;
-  files: TorrentFile[];
-  selected: Set<string>;
-  onChange: (files: TorrentFile[], checked: boolean) => void;
-}) {
-  const count = files.filter((file) => selected.has(file.id)).length;
-  return (
-    <fieldset className="torrent-file-group">
-      <legend>
-        <label className="torrent-file-choice torrent-folder-choice">
-          <input
-            type="checkbox"
-            checked={count === files.length}
-            ref={(input) => {
-              if (input)
-                input.indeterminate = count > 0 && count < files.length;
-            }}
-            onChange={(event) => onChange(files, event.currentTarget.checked)}
-          />
-          <span>{folder || "Top-level files"}</span>
-        </label>
-      </legend>
-      {files.map((file) => (
-        <label className="torrent-file-choice" key={file.id}>
-          <input
-            type="checkbox"
-            checked={selected.has(file.id)}
-            aria-label={file.path}
-            onChange={(event) => onChange([file], event.currentTarget.checked)}
-          />
-          <span>{file.path.slice(folder ? folder.length + 1 : 0)}</span>
-          <small>{formatTransferBytes(file.size)}</small>
-        </label>
-      ))}
-    </fieldset>
-  );
-}
-
-function useTorrentSelection({ job, onClose, onSubmit }: Props) {
+function useTorrentDialog() {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const [selected, setSelected] = useState(
-    () => new Set(job.torrentFiles.map(({ id }) => id)),
-  );
-  const [search, setSearch] = useState("");
-  const [mediaType, setMediaType] = useState("all");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
   useEffect(() => {
     const opener = document.activeElement;
     const dialog = dialogRef.current;
@@ -77,14 +26,32 @@ function useTorrentSelection({ job, onClose, onSubmit }: Props) {
       });
     };
   }, []);
-  const chosen = job.torrentFiles.filter(({ id }) => selected.has(id));
+  return dialogRef;
+}
+
+function useTorrentSelection({ job, onClose, onSubmit }: Props) {
+  const selecting = job.status === "awaiting_selection";
+  const dialogRef = useTorrentDialog();
+  const [selected, setSelected] = useState(
+    () => new Set(job.torrentFiles.map(({ id }) => id)),
+  );
+  const [search, setSearch] = useState("");
+  const [mediaType, setMediaType] = useState("all");
+  const [status, setStatus] = useState("all");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const chosen = job.torrentFiles.filter((file) =>
+    selecting ? selected.has(file.id) : file.selected,
+  );
   const total = chosen.reduce((sum, file) => sum + file.size, 0);
-  const visible = job.torrentFiles.filter(({ path }) => {
+  const visible = job.torrentFiles.filter((file) => {
+    const { path } = file;
     const filename = path.split("/").at(-1) ?? "";
     const dot = filename.lastIndexOf(".");
     const extension = dot > 0 ? filename.slice(dot + 1) : "";
     return (
       path.toLowerCase().includes(search.toLowerCase()) &&
+      (selecting || status === "all" || fileState(file, job) === status) &&
       (mediaType === "all" || classifyExtension(extension) === mediaType)
     );
   });
@@ -100,7 +67,7 @@ function useTorrentSelection({ job, onClose, onSubmit }: Props) {
     setError("");
   };
   const submit = async () => {
-    if (!chosen.length || submitting) return;
+    if (!selecting || !chosen.length || submitting) return;
     setSubmitting(true);
     setError("");
     try {
@@ -120,6 +87,9 @@ function useTorrentSelection({ job, onClose, onSubmit }: Props) {
   };
   return {
     dialogRef,
+    selecting,
+    status,
+    setStatus,
     selected,
     search,
     setSearch,
@@ -135,11 +105,12 @@ function useTorrentSelection({ job, onClose, onSubmit }: Props) {
   };
 }
 
-type Selection = ReturnType<typeof useTorrentSelection>;
+export type Selection = ReturnType<typeof useTorrentSelection>;
 
 export function TorrentFileDialog({ job, onClose, onSubmit }: Props) {
   const selection = useTorrentSelection({ job, onClose, onSubmit });
-  const { dialogRef, submitting, error, chosen, total, submit } = selection;
+  const { dialogRef, selecting, submitting, error, chosen, total, submit } =
+    selection;
   return (
     <dialog
       ref={dialogRef}
@@ -162,7 +133,9 @@ export function TorrentFileDialog({ job, onClose, onSubmit }: Props) {
         <header>
           <div>
             <p className="panel-label">Torrent contents</p>
-            <h2 id="torrent-file-title">Choose files</h2>
+            <h2 id="torrent-file-title">
+              {selecting ? "Choose files" : "Torrent files"}
+            </h2>
           </div>
           <button
             type="button"
@@ -174,29 +147,33 @@ export function TorrentFileDialog({ job, onClose, onSubmit }: Props) {
           </button>
         </header>
         <FileTools job={job} selection={selection} />
-        <FileList selection={selection} />
+        <FileList job={job} selection={selection} />
         <div className="torrent-file-feedback">
           <p role="status" aria-atomic="true">
             {submitting
               ? "Starting selected download…"
               : `${chosen.length} of ${job.torrentFiles.length} files selected · ${formatTransferBytes(total)}`}
           </p>
-          {!chosen.length ? <p>Select at least one file to start.</p> : null}
+          {selecting && !chosen.length ? (
+            <p>Select at least one file to start.</p>
+          ) : null}
           {error ? (
             <p role="alert" className="download-confirm-error">
               {error}
             </p>
           ) : null}
         </div>
-        <footer>
-          <button
-            type="submit"
-            className="primary-button"
-            disabled={!chosen.length || submitting}
-          >
-            {submitting ? "Starting…" : "Start selected download"}
-          </button>
-        </footer>
+        {selecting ? (
+          <footer>
+            <button
+              type="submit"
+              className="primary-button"
+              disabled={!chosen.length || submitting}
+            >
+              {submitting ? "Starting…" : "Start selected download"}
+            </button>
+          </footer>
+        ) : null}
       </form>
     </dialog>
   );
@@ -206,9 +183,9 @@ export function TorrentReviewAction({ job, onSubmit }: Omit<Props, "onClose">) {
   const [reviewing, setReviewing] = useState(false);
   return (
     <>
-      {job.status === "awaiting_selection" ? (
+      {job.torrentFiles.length ? (
         <button type="button" onClick={() => setReviewing(true)}>
-          Review files
+          {job.status === "awaiting_selection" ? "Review files" : "View files"}
         </button>
       ) : null}
       {reviewing ? (
@@ -222,104 +199,10 @@ export function TorrentReviewAction({ job, onSubmit }: Omit<Props, "onClose">) {
   );
 }
 
-function FileTools({ job, selection }: { job: Job; selection: Selection }) {
-  const {
-    search,
-    setSearch,
-    mediaType,
-    setMediaType,
-    submitting,
-    change,
-    visible,
-  } = selection;
-  return (
-    <div className="torrent-file-tools">
-      <p id="torrent-file-description">
-        Review the metadata and choose what to download. File contents have not
-        started downloading.
-      </p>
-      <label>
-        Search files
-        <input
-          type="search"
-          value={search}
-          onChange={(event) => setSearch(event.currentTarget.value)}
-        />
-      </label>
-      <MediaTypeFilter
-        value={mediaType}
-        onChange={setMediaType}
-        disabled={submitting}
-      />
-      <div className="torrent-file-bulk">
-        <button
-          type="button"
-          className="ghost-button"
-          disabled={submitting}
-          onClick={() => change(job.torrentFiles, true)}
-        >
-          Select all
-        </button>
-        <button
-          type="button"
-          className="ghost-button"
-          disabled={submitting}
-          onClick={() => change(job.torrentFiles, false)}
-        >
-          Select none
-        </button>
-        <span>
-          {visible.length} of {job.torrentFiles.length} files shown
-        </span>
-      </div>
-      {search || mediaType !== "all" ? (
-        <p>
-          Folder checkboxes affect matching files. Select all and Select none
-          affect every file.
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function FileList({ selection }: { selection: Selection }) {
-  const { submitting, selected, change, visible } = selection;
-  const groups = new Map<string, TorrentFile[]>();
-  for (const file of visible) {
-    const folder = file.path.includes("/")
-      ? file.path.slice(0, file.path.lastIndexOf("/"))
-      : "";
-    const group = groups.get(folder) ?? [];
-    group.push(file);
-    groups.set(folder, group);
-  }
-
-  return (
-    <div
-      className="torrent-file-list"
-      aria-label="Torrent files"
-      aria-busy={submitting}
-    >
-      <fieldset disabled={submitting} className="torrent-file-fields">
-        {[...groups].map(([folder, files]) => (
-          <FileGroup
-            key={folder}
-            folder={folder}
-            files={files}
-            selected={selected}
-            onChange={change}
-          />
-        ))}
-      </fieldset>
-      {!visible.length ? <p>No files match your filters.</p> : null}
-    </div>
-  );
-}
-
 function trapDialogTab(event: KeyboardEvent<HTMLDialogElement>) {
   if (event.key !== "Tab") return;
   const controls = event.currentTarget.querySelectorAll<HTMLElement>(
-    "button:not(:disabled), input:not(:disabled), select:not(:disabled)",
+    'button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]',
   );
   const first = controls[0];
   const last = controls[controls.length - 1];

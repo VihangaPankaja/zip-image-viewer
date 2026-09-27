@@ -48,7 +48,7 @@ function attachOriginalSource(
   originalUrl: string,
   extension?: string,
 ) {
-  player.innerHTML = "";
+  player.querySelectorAll("source").forEach((source) => source.remove());
   const source = document.createElement("source");
   source.src = originalUrl;
   source.type = getVideoMimeType(extension ?? "");
@@ -95,7 +95,7 @@ async function attachAdaptiveSource(
     return;
   }
   player.removeAttribute("src");
-  player.replaceChildren();
+  player.querySelectorAll("source").forEach((source) => source.remove());
   const hls = new HlsConstructor(createAdaptiveHlsConfig());
   params.hlsRef.current = hls;
   hls.on(HlsConstructor.Events.ERROR, (_event, data) => {

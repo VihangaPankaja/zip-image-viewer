@@ -1426,6 +1426,7 @@
           area: "Video",
           priority: "P1",
           effort: "M",
+          status: "In progress",
           title: "Add subtitle and audio-track choices",
           summary:
             "Let viewers select a language and load an external subtitle file.",
@@ -1433,6 +1434,7 @@
           plan: "Start with WebVTT and safely converted SRT via native text tracks. Probe embedded languages; add alternate audio HLS groups only when needed. Include subtitle size and timing offset controls.",
           done: "A multilingual fixture switches audio in sync and displays captions on desktop and mobile. Malformed captions show a recoverable error.",
           depends: "V02, V04",
+          note: "v3.7.0 adds browser-local WebVTT/SRT subtitles with native captions, off/on, size and timing offset controls, recoverable validation errors and per-video cleanup. Embedded language probing and alternate audio groups remain planned.",
           evidence:
             "server/media/ffmpegHls.ts; client/src/components/Preview/VideoPreviewContent.tsx",
         },
@@ -1561,7 +1563,7 @@
           depends: "T02",
           evidence:
             "client/src/components/TreeExplorer.tsx; client/src/features/workspace/components/TorrentFileDialog.tsx",
-          note: "v3.6.0 adds media-type filters to the explorer and torrent picker, preserving folder context, sorting, hidden selections and selected totals. Keyboard and responsive browser checks include a 10,000-file fixture. Available/downloading/skipped filters and retained skipped entries remain planned.",
+          note: "v3.6.0 adds media-type filters to the explorer and torrent picker, preserving folder context, sorting, hidden selections and selected totals. Keyboard and responsive browser checks include a 10,000-file fixture. v3.7.0 adds a read-only torrent file view after selection with available/downloading/skipped and lifecycle-state filters, search and media filters. Downloaded files are available only after indexing; failed or cancelled jobs do not claim availability. Skipped metadata remains visible while the job exists. Cross-restart retention and downloading skipped files later remain planned under S01/T03.",
         },
         {
           id: "U03",

@@ -3,6 +3,7 @@ import { PlaybackDiagnostics } from "./PlaybackDiagnostics";
 import type { VideoPreviewProps } from "../../features/workspace/types";
 import { useVideoResume } from "../../features/player/useVideoResume";
 import { VideoScrubber } from "./VideoScrubber";
+import { VideoSubtitles } from "./VideoSubtitles";
 
 type VideoPreviewDetailsProps = Omit<
   VideoPreviewProps,
@@ -209,6 +210,10 @@ export function VideoPreviewContent({
         path={props.selectedNode.path}
         quality={props.selectedVideoQuality}
         sessionId={props.sessionId}
+        videoRef={videoRef}
+      />
+      <VideoSubtitles
+        key={JSON.stringify([props.sessionId, props.selectedNode.path])}
         videoRef={videoRef}
       />
       <PlaybackResume {...resume} />

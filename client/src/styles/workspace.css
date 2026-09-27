@@ -1162,6 +1162,27 @@
   margin-left: auto;
   color: var(--text-muted);
 }
+.torrent-file-status-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.torrent-file-status-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  padding: 8px;
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+.torrent-file-status-row small,
+.torrent-file-state {
+  color: var(--text-muted);
+}
+.torrent-file-state {
+  grid-column: 1 / -1;
+  font-size: 0.75rem;
+}
 .torrent-folder-choice {
   font-weight: 650;
 }
