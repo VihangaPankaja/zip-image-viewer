@@ -7,6 +7,7 @@ function createJob(id: string): SessionJob {
     id,
     url: `https://example.com/${id}.zip`,
     sourceKind: "http",
+    torrentFiles: [],
     sourcePreference: "auto",
     status: "queued",
     phase: "queued",
@@ -183,6 +184,79 @@ describe("createSessionJobQueue", () => {
     expect(dependencies.processSessionJob).toHaveBeenLastCalledWith(job, true);
     await vi.waitFor(() => expect(active).toBe(0));
     expect(peak).toBe(1);
+  });
+
+  it("validates selected IDs and safely requeues a still-active metadata worker", async () => {
+    const deps = queueDependencies(1);
+    let release: (() => void) | undefined;
+    deps.processSessionJob.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
+    const queue = createSessionJobQueue(deps);
+    const job = createJob("torrent");
+    job.sourceKind = "torrent";
+    job.torrentFiles = ["0", "1", "2"].map((id) => ({
+      id,
+      path: `${id}.txt`,
+      size: 10,
+      selected: false,
+      complete: false,
+      downloadedBytes: 0,
+    }));
+    queue.enqueueSessionJob(job, false);
+    job.status = "awaiting_selection";
+    for (const ids of [[], ["bad"], ["1", "1"]]) {
+      expect(() => queue.selectTorrentFiles(job.id, ids)).toThrow(
+        "Choose one or more known",
+      );
+    }
+    expect(() => queue.selectTorrentFiles("missing", ["1"])).toThrow(
+      "Job not found.",
+    );
+    queue.selectTorrentFiles(job.id, ["1"]);
+    expect(job.torrentFiles.map((file) => file.selected)).toEqual([
+      false,
+      true,
+      false,
+    ]);
+    expect(job.reportedSize).toBe(10);
+    expect(deps.processSessionJob).toHaveBeenCalledTimes(1);
+    expect(() => queue.selectTorrentFiles(job.id, ["0"])).toThrow(
+      "not awaiting file selection",
+    );
+    release?.();
+    await vi.waitFor(() =>
+      expect(deps.processSessionJob).toHaveBeenCalledTimes(2),
+    );
+  });
+
+  it("starts a selection after metadata released its worker and emits the accepted state", async () => {
+    const emitJob = vi.fn();
+    const deps = { ...queueDependencies(1), emitJob };
+    const queue = createSessionJobQueue(deps);
+    const job = createJob("torrent");
+    job.sourceKind = "torrent";
+    job.torrentFiles = [
+      {
+        id: "0",
+        path: "zero.txt",
+        size: 0,
+        selected: false,
+        complete: false,
+        downloadedBytes: 0,
+      },
+    ];
+    queue.enqueueSessionJob(job, false);
+    await vi.waitFor(() =>
+      expect(queue.getSchedulerState().activeCount).toBe(0),
+    );
+    job.status = "awaiting_selection";
+    queue.selectTorrentFiles(job.id, ["0"]);
+    expect(emitJob).toHaveBeenCalledWith(job, {});
+    expect(deps.processSessionJob).toHaveBeenCalledTimes(2);
   });
 
   it("starts waiting work when concurrency increases", async () => {

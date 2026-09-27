@@ -79,7 +79,11 @@ describe("video runtime timing", () => {
         timeout: 30_000,
       });
 
-      expect(events.map(({ event }) => event)).toEqual([
+      expect(
+        events
+          .map(({ event }) => event)
+          .filter((event) => event.startsWith("video.transcode.")),
+      ).toEqual([
         "video.transcode.queued",
         "video.transcode.started",
         "video.transcode.completed",

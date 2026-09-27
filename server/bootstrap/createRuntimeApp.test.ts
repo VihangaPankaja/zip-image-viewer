@@ -40,6 +40,7 @@ describe("createRuntimeApp", () => {
       createJob: manager.createJob,
       enqueueJob: vi.fn(),
       confirmJob,
+      selectTorrentFiles: vi.fn(),
       listOrderedJobs: () => [job],
       pauseJob: vi.fn(),
       resumeJob: vi.fn(),

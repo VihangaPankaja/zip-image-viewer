@@ -1,3 +1,4 @@
+import { TorrentReviewAction } from "./TorrentFileDialog";
 import { Download } from "lucide-react";
 import { useMemo, useState, type DragEvent } from "react";
 import type { Job } from "../../../../../shared/contracts";
@@ -17,6 +18,7 @@ type DownloadManagerProps = {
   onReorder: (ids: string[]) => void;
   onResume: (id: string) => void;
   onRetry: (id: string) => void;
+  onSelectFiles: (id: string, fileIds: string[]) => Promise<void>;
 };
 
 function moveJob(ids: string[], from: number, to: number): string[] {
@@ -46,6 +48,7 @@ function JobActions({
   | "onRemove"
   | "onResume"
   | "onRetry"
+  | "onSelectFiles"
 >) {
   const [isConfirming, setIsConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState("");
@@ -67,6 +70,7 @@ function JobActions({
   const terminal = ["ready", "cancelled", "error"].includes(job.status);
   return (
     <div className="download-row-actions">
+      <TorrentReviewAction job={job} onSubmit={actions.onSelectFiles} />
       {job.status === "awaiting_confirmation" ? (
         <button
           type="button"
@@ -212,13 +216,24 @@ function DownloadRow({
       <div className="download-row-main">
         <div className="download-row-title">
           <strong title={job.url}>{downloadTitle(job)}</strong>
-          <span>{job.status.replaceAll("_", " ")}</span>
+          <span
+            role="status"
+            aria-label={downloadTitle(job)}
+            aria-atomic="true"
+          >
+            {job.status.replaceAll("_", " ")}
+          </span>
         </div>
         <div className="download-progress-line">
-          <progress value={job.percent ?? 0} max="100" />
+          <progress
+            aria-label={`${downloadTitle(job)} progress`}
+            value={job.percent ?? 0}
+            max="100"
+          />
           <b>{job.percent == null ? "—" : `${Math.floor(job.percent)}%`}</b>
         </div>
         <DownloadTelemetry job={job} />
+        <TorrentSelectionSummary job={job} />
         {job.message ? (
           <p className="download-status-message">{job.message}</p>
         ) : null}
@@ -248,7 +263,9 @@ export function DownloadManager(props: DownloadManagerProps) {
       <header className="download-manager-header">
         <div>
           <p className="panel-label">Queue control</p>
-          <h2 id="downloads-title">Downloads</h2>
+          <h2 id="downloads-title" tabIndex={-1}>
+            Downloads
+          </h2>
           <p>
             {jobs.length
               ? "Drag downloads or use the arrows to change their priority."
@@ -281,5 +298,17 @@ export function DownloadManager(props: DownloadManagerProps) {
         </ol>
       )}
     </section>
+  );
+}
+
+function TorrentSelectionSummary({ job }: { job: Job }) {
+  const selected = job.torrentFiles.filter((file) => file.selected);
+  if (!selected.length) return null;
+  const complete = selected.filter((file) => file.complete).length;
+  return (
+    <p className="torrent-selection-summary" role="status" aria-atomic="true">
+      {selected.length} of {job.torrentFiles.length} files selected · {complete}{" "}
+      complete
+    </p>
   );
 }

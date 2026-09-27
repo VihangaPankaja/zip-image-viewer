@@ -1377,16 +1377,16 @@
           area: "Video",
           priority: "P1",
           effort: "M",
-          status: "In progress",
+          status: "Done",
           title: "Add cached thumbnail scrubbing",
           summary: "Show where a seek will land before the user commits it.",
           now: "A timestamp thumbnail route exists, but native video controls do not connect it to a preview timeline.",
           plan: "Generate small storyboard sheets and a timestamp index once per video. Reuse the endpoint for misses, cache results and limit concurrent work. Add an accessible timeline that requests playback only on committed seeks.",
           done: "Pointer previews meet the warm-cache budget. Keyboard and touch can seek. Dragging for ten seconds does not spawn one FFmpeg process per event.",
           depends: "V01, S02",
-          note: "v3.4.1 adds an accessible pointer, touch and keyboard seek timeline with quantized cached thumbnails and coalesced thumbnail generation. Storyboard sheets and shared media-worker budgeting remain.",
+          note: "v3.5.0 adds cached storyboard sheets and a timestamp index with a shared two-process media budget. A real 10-second drag under two competing FFmpeg processes measured warm sheet p95 28.9 ms and rendered preview p95 20.4 ms, with zero seeks or new encoders during dragging. See docs/storyboard-verification.md for scope and reproduction. Pointer, touch and keyboard seeking commit on release.",
           evidence:
-            "server/handlers/video/thumbnailRoute.ts; client/src/components/Preview/VideoScrubber.tsx; client/src/components/Preview/VideoPreviewContent.tsx",
+            "server/media/videoStoryboard.ts; server/handlers/video/storyboardRoutes.ts; client/src/components/Preview/VideoScrubber.tsx; tests/benchmarks/videoStoryboard.ts",
         },
         {
           id: "V07",
@@ -1455,6 +1455,7 @@
           area: "Torrents",
           priority: "P0",
           effort: "L",
+          status: "Done",
           title: "Choose files before a torrent starts",
           summary:
             "Review folders and sizes, then download only the selected files.",
@@ -1462,14 +1463,16 @@
           plan: "Create a metadata-only review state using initial deselection. Return stable file IDs, paths and sizes. Add folder checkboxes, all/none, search, selected byte totals and validated selection submission.",
           done: "Select one file from a three-file fixture. It completes while skipped files remain unselected, allowing shared-piece overhead. Empty or unknown selections are rejected.",
           depends: "T02",
+          note: "v3.5.0 resolves metadata with files deselected, then offers folder/file checkboxes, search, all/none and selected totals. Selection is validated by stable file ID. A real local three-file torrent verifies zero payload before selection and selected-only completion with bounded shared-piece overhead.",
           evidence:
-            "server/application/torrents/torrentDownloader.ts; server/application/torrents/downloadTorrentSource.ts; client/src/features/workspace/components/DownloadDialog.tsx",
+            "server/application/torrents/torrentDownloader.ts; server/application/torrents/downloadTorrentSource.ts; client/src/features/workspace/components/TorrentFileDialog.tsx",
         },
         {
           id: "T02",
           area: "Torrents",
           priority: "P0",
           effort: "M",
+          status: "Done",
           title: "Track progress and completion per selected file",
           summary:
             "Show 2 of 2 selected files complete even when the torrent contains 20 files.",
@@ -1477,6 +1480,7 @@
           plan: "Model skipped, queued, downloading, verified and failed file states. Compute selected-set progress from verified data. Index only usable files and keep metadata rows for skipped files.",
           done: "Selected completion ends the job without waiting for skipped files. Shared pieces do not inflate selected progress or mark incomplete files playable.",
           depends: "None",
+          note: "v3.5.0 reports each file's selection, verified bytes and completion. Selected totals exclude shared-piece bytes outside selected files; completion waits only for selected files. Indexing excludes skipped partial files. The local peer integration test selects the middle of three files and verifies its exact bytes.",
           evidence:
             "server/application/torrents/torrentDownloader.ts; server/application/torrents/downloadTorrentSource.ts; server/domain/models.ts",
         },
@@ -1570,7 +1574,7 @@
           plan: "Review narrow screens with real long filenames and active downloads. Collapse the session rail, use a preview-first view and keep actions touch-sized. Respect safe areas and orientation changes.",
           done: "At 360 px width there is no page overflow; the picker, player and queue work with touch and keyboard.",
           depends: "T01 for picker checks",
-          note: "Delivered in v3.3.7: selecting a file opens Preview, returning from Downloads preserves the pane, mobile sessions collapse, keyboard Back works, and controls respect touch sizing and safe areas. Portrait and landscape checks cover long filenames. Selective-torrent picker verification awaits T01.",
+          note: "Delivered in v3.3.7: selecting a file opens Preview, returning from Downloads preserves the pane, mobile sessions collapse, keyboard Back works, and controls respect touch sizing and safe areas. Portrait and landscape checks cover long filenames. v3.5.0 extends the 360 px keyboard and overflow checks to the selective-torrent picker, with mobile interaction screenshots.",
           evidence:
             "client/src/features/workspace/components/WorkspaceLayout.tsx; client/src/styles/workspace.css; client/src/styles/player.css",
         },
@@ -1587,9 +1591,9 @@
           plan: "Extend focus handling for the file picker, announce selected totals and transfer state, label seek controls and preserve visible focus. Keep essential controls visible on touch.",
           done: "Add a torrent, select files, start, seek and close overlays using only the keyboard. Run axe and manually verify announcements.",
           depends: "T01, V06",
-          note: "v3.4.1 labels the seek timeline, exposes its time value, preserves visible focus and uses commit-only pointer and keyboard seeking. Torrent picker coverage remains dependent on T01.",
+          note: "v3.5.0 adds native dialog focus trapping/restoration, file selection totals and transfer-state live regions to the keyboard-accessible seek timeline. Browser keyboard and axe checks cover the picker. Manual spoken announcements remain unverified: the native automation kernel cannot launch because helper_unknown_error: setup refresh had errors. Keep this item In progress until an actual screen reader is checked.",
           evidence:
-            "client/src/components/Preview/VideoScrubber.tsx; client/src/hooks/useKeyboardShortcuts.ts; tests/e2e/smoke.spec.ts; package.json",
+            "client/src/components/Preview/VideoScrubber.tsx; client/src/features/workspace/components/TorrentFileDialog.tsx; client/src/hooks/useKeyboardShortcuts.ts; tests/e2e/torrent-selection.spec.ts",
         },
         {
           id: "U05",
@@ -1625,6 +1629,7 @@
           area: "Stack / operations",
           priority: "P0",
           effort: "M",
+          status: "In progress",
           title: "Bound encoder work and cache growth",
           summary:
             "Repeated seeks should not exhaust CPU or leave abandoned encoders writing into deleted sessions.",
@@ -1632,6 +1637,7 @@
           plan: "Apply a shared media-work budget with deduplication and cancellation. Track running handles, wait for exit before cleanup and reserve capacity for interactive work. Add a disk budget and evict unused derived files.",
           done: "Rapid seeking and session deletion leave no orphan process. Disk use stays within budget while active segments and originals remain available.",
           depends: "V02",
+          note: "v3.5.0 shares the existing two-process budget across metadata probes, thumbnails, storyboards, HLS and streaming, coalesces cached work, and aborts/drains session media work before deleting files. Interactive priority reservation and aggregate disk-budget eviction remain planned; the per-video storyboard frame cap is not a global disk budget.",
           evidence:
             "server/media/processLimiter.ts; server/infrastructure/media/videoRuntime.ts; server/handlers/video/thumbnailRoute.ts; server/application/sessions/sessionManager.ts",
         },

@@ -75,6 +75,9 @@ function WorkspaceDownloads({ controller }: ViewProps) {
     <DownloadManager
       jobs={queue.jobs}
       onCancel={(id) => void queue.cancel(id)}
+      onSelectFiles={(id, fileIds) =>
+        queue.selectFiles(id, fileIds).then(() => undefined)
+      }
       onConfirm={(id) => queue.confirm(id).then(() => undefined)}
       onOpenSession={(jobId) => {
         const sessionId = queue.jobs.find(({ id }) => id === jobId)?.sessionId;

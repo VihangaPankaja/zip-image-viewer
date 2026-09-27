@@ -99,6 +99,7 @@ test("confirms an oversized transfer through the browser control flow", async ({
   const job = {
     id: "00000000-0000-4000-8000-000000000001",
     url: "https://downloads.example.com/oversized-archive.zip",
+    torrentFiles: [],
     sourceKind: "http",
     sourcePreference: "auto",
     status: "awaiting_confirmation",

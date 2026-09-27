@@ -11,8 +11,11 @@ function chunkText(chunk: unknown): string {
 
 function waitForClose(child: ChildProcess): Promise<number | null> {
   return new Promise((resolve, reject) => {
-    child.once("error", reject);
-    child.once("close", resolve);
+    let failure: Error | undefined;
+    child.once("error", (error) => {
+      failure = error;
+    });
+    child.once("close", (code) => (failure ? reject(failure) : resolve(code)));
   });
 }
 
@@ -28,7 +31,7 @@ async function ensureExecutable(command: string): Promise<void> {
 export async function runCommand(
   command: string,
   args: string[],
-  options: { cwd?: string } = {},
+  options: { cwd?: string; signal?: AbortSignal } = {},
 ): Promise<void> {
   await ensureExecutable(command);
   const child = spawn(command, args, {
@@ -48,7 +51,11 @@ export async function runCommand(
 export async function runCommandCapture(
   command: string,
   args: string[],
-  options: { allowNonZeroExit?: boolean; cwd?: string } = {},
+  options: {
+    allowNonZeroExit?: boolean;
+    cwd?: string;
+    signal?: AbortSignal;
+  } = {},
 ): Promise<{ stdout: string; stderr: string }> {
   await ensureExecutable(command);
   const { allowNonZeroExit = false, ...spawnOptions } = options;

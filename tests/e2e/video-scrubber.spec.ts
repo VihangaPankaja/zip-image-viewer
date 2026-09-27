@@ -62,7 +62,7 @@ test("real video previews pointer, keyboard and touch seeks before committing", 
     steps: 8,
   });
   await expect(thumbnail).toBeVisible();
-  await expect(thumbnail).toHaveJSProperty("naturalWidth", 320);
+  await expect(thumbnail).toHaveJSProperty("naturalWidth", 1600);
   await expect(video).toHaveJSProperty("currentTime", before);
   const pointerTime = Number(await seek.inputValue());
   expect(pointerTime).toBeGreaterThan(7);
@@ -79,7 +79,7 @@ test("real video previews pointer, keyboard and touch seeks before committing", 
   await expect(video).toHaveJSProperty("currentTime", 0);
   await page.keyboard.down("End");
   await expect(seek).toHaveValue("8");
-  await expect(thumbnail).toHaveJSProperty("naturalWidth", 320);
+  await expect(thumbnail).toHaveJSProperty("naturalWidth", 1600);
   await expect(video).toHaveJSProperty("currentTime", 0);
   expect(thumbnailTimes.every((time) => time >= 0 && time < 8)).toBe(true);
   await page.keyboard.up("End");
@@ -106,7 +106,7 @@ test("real video previews pointer, keyboard and touch seeks before committing", 
     touchPoints: [{ x: touchBox.x + touchBox.width * 0.6, y }],
   });
   await expect(thumbnail).toBeVisible();
-  await expect(thumbnail).toHaveJSProperty("naturalWidth", 320);
+  await expect(thumbnail).toHaveJSProperty("naturalWidth", 1600);
   await expect(video).toHaveJSProperty("currentTime", 8);
   const touchTime = Number(await seek.inputValue());
   expect(touchTime).toBeGreaterThan(4);

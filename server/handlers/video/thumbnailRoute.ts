@@ -8,6 +8,7 @@ import {
   resolveVideoContext,
   selectVideoQuality,
 } from "./routeContext.js";
+import { registerVideoStoryboardRoutes } from "./storyboardRoutes.js";
 import type { VideoRouteDependencies } from "./types.js";
 
 const pendingThumbnails = new Map<string, Promise<void>>();
@@ -41,6 +42,7 @@ export function registerVideoThumbnailRoute(
   app: Express,
   deps: VideoRouteDependencies,
 ): void {
+  registerVideoStoryboardRoutes(app, deps);
   app.get("/api/sessions/:id/video/thumbnail", async (req, res) => {
     const context = await resolveVideoContext(req, res, deps);
     const ffmpegPath = context && requireTranscoder(res, deps);
@@ -50,14 +52,16 @@ export function registerVideoThumbnailRoute(
     const requestedWidth =
       Number.parseInt(queryText(req.query.width, "240"), 10) || 240;
     const width = Math.max(120, Math.min(640, requestedWidth));
-    const source = await deps.getVideoMetadata(context.targetPath);
+    const source = await deps.getVideoMetadata(
+      context.targetPath,
+      context.session,
+    );
     const { options } = deps.buildVideoQualityOptions(source.height);
     const selected = selectVideoQuality(options, quality);
     const thumbDir = path.join(
       context.session.workspaceDir,
       "video-thumbnails",
     );
-    await mkdir(thumbDir, { recursive: true });
     const lastSeek =
       source.durationSeconds > 0
         ? Math.max(0, Math.ceil(source.durationSeconds * 4) - 1) / 4
@@ -74,20 +78,33 @@ export function registerVideoThumbnailRoute(
       .digest("hex");
     const thumbPath = path.join(thumbDir, `${hash}.jpg`);
     if (!(await stat(thumbPath).catch(() => null))) {
+      if (!deps.touchSession(context.session.id)) {
+        res
+          .status(404)
+          .json({ error: "Session not found or already cleaned up." });
+        return;
+      }
       let generation = pendingThumbnails.get(thumbPath);
       if (!generation) {
         generation = deps
-          .runCommand(
-            ffmpegPath,
-            buildThumbnailArgs(
-              context.targetPath,
-              `${thumbPath}.pending.jpg`,
-              roundedSeek,
-              width,
-              selected.height,
-            ),
+          .trackVideoTask(
+            context.session,
+            (async () => {
+              await mkdir(thumbDir, { recursive: true });
+              await deps.runCommand(
+                ffmpegPath,
+                buildThumbnailArgs(
+                  context.targetPath,
+                  `${thumbPath}.pending.jpg`,
+                  roundedSeek,
+                  width,
+                  selected.height,
+                ),
+                context.session,
+              );
+              await rename(`${thumbPath}.pending.jpg`, thumbPath);
+            })(),
           )
-          .then(() => rename(`${thumbPath}.pending.jpg`, thumbPath))
           .finally(() => pendingThumbnails.delete(thumbPath));
         pendingThumbnails.set(thumbPath, generation);
       }

@@ -1,15 +1,18 @@
-import WebTorrent from "webtorrent";
+import WebTorrent, { type Torrent } from "webtorrent";
+import type { TorrentFile } from "../../../shared/contracts.js";
 import { validateTorrentFilePath } from "./torrentSource.js";
 
 export const MAX_TORRENT_METADATA_BYTES = 10 * 1024 * 1024;
 
 export type TorrentMetadata = {
-  files: string[];
+  files: TorrentFile[];
+  torrentFile?: Uint8Array;
   length: number;
   name: string;
 };
 
 export type TorrentProgress = {
+  files?: TorrentFile[];
   downloadedBytes: number;
   downloadSpeedBytesPerSec: number;
   peerCount: number;
@@ -23,7 +26,7 @@ export type TorrentDownloadInput = {
   downloadDir: string;
   signal: AbortSignal;
   retainStoreOnAbort: () => boolean;
-  onMetadata: (_metadata: TorrentMetadata) => void;
+  onMetadata: (_metadata: TorrentMetadata) => string[];
   onProgress: (_progress: TorrentProgress) => void;
   onNoPeers: () => void;
 };
@@ -71,26 +74,113 @@ export async function fetchTorrentMetadata(
   return result;
 }
 
+function describeTorrentFiles(
+  torrent: Torrent,
+  directory: string,
+): TorrentFile[] {
+  return torrent.files.map((file, index) => {
+    validateTorrentFilePath(directory, file.path);
+    return {
+      id: String(index),
+      path: file.path.replaceAll("\\", "/"),
+      size: file.length,
+      selected: false,
+      downloadedBytes: 0,
+      complete: false,
+    };
+  });
+}
+
+function selectedProgress(
+  torrent: Torrent,
+  selectedIds: Set<string>,
+): TorrentProgress {
+  const files = torrent.files.map((file, index) => {
+    let downloadedBytes = 0;
+    const end = file.offset + file.length;
+    for (
+      let piece = Math.floor(file.offset / torrent.pieceLength);
+      piece * torrent.pieceLength < end;
+      piece += 1
+    ) {
+      if (torrent.pieces[piece] === null) {
+        downloadedBytes +=
+          Math.min(end, (piece + 1) * torrent.pieceLength) -
+          Math.max(file.offset, piece * torrent.pieceLength);
+      }
+    }
+    return {
+      id: String(index),
+      path: file.path.replaceAll("\\", "/"),
+      size: file.length,
+      selected: selectedIds.has(String(index)),
+      downloadedBytes,
+      complete: file.done,
+    };
+  });
+  const selected = files.filter((file) => file.selected);
+  const total = selected.reduce((sum, file) => sum + file.size, 0);
+  const downloadedBytes = selected.reduce(
+    (sum, file) => sum + file.downloadedBytes,
+    0,
+  );
+  return {
+    files,
+    downloadedBytes,
+    downloadSpeedBytesPerSec: torrent.downloadSpeed,
+    peerCount: torrent.numPeers,
+    progress: total ? downloadedBytes / total : 1,
+    uploadedBytes: torrent.uploaded,
+    uploadSpeedBytesPerSec: torrent.uploadSpeed,
+  };
+}
+
+function selectFiles(
+  torrent: Torrent,
+  input: TorrentDownloadInput,
+): Set<string> {
+  const files = describeTorrentFiles(torrent, input.downloadDir);
+  const ids = new Set(
+    input.onMetadata({
+      files,
+      length: torrent.length,
+      name: torrent.name,
+      torrentFile: torrent.torrentFile,
+    }),
+  );
+  if (
+    !ids.size ||
+    [...ids].some((id) => !files.some((file) => file.id === id))
+  ) {
+    throw new Error("Choose one or more known torrent files.");
+  }
+  return ids;
+}
+
 export function createWebTorrentAdapter(): TorrentAdapter {
   const client = new WebTorrent({ utp: false });
   return {
     download: (input) =>
       new Promise((resolve, reject) => {
         let settled = false;
+        let selectedIds = new Set<string>();
+        let metadataReady = false;
+        let resultFiles: string[] = [];
         const torrent = client.add(
           input.source,
-          { path: input.downloadDir },
+          { path: input.downloadDir, deselect: true },
           (readyTorrent) => {
+            if (settled || readyTorrent !== torrent) return;
             try {
-              const files = readyTorrent.files.map(({ path }) => {
-                validateTorrentFilePath(input.downloadDir, path);
-                return path;
+              selectedIds = selectFiles(readyTorrent, input);
+              resultFiles = readyTorrent.files
+                .filter((_file, index) => selectedIds.has(String(index)))
+                .map((file) => file.path.replaceAll("\\", "/"));
+              metadataReady = true;
+              readyTorrent.files.forEach((file, index) => {
+                if (selectedIds.has(String(index))) file.select();
               });
-              input.onMetadata({
-                files,
-                length: readyTorrent.length,
-                name: readyTorrent.name,
-              });
+              emitProgress();
             } catch (error) {
               finish(
                 error instanceof Error
@@ -100,42 +190,43 @@ export function createWebTorrentAdapter(): TorrentAdapter {
             }
           },
         );
-        const remove = (destroyStore: boolean, callback: () => void) => {
-          void client.remove(
-            torrent.infoHash || input.source,
-            { destroyStore },
-            callback,
-          );
-        };
-        const finish = (error?: Error) => {
+        const finish = (error?: Error, destroy = true) => {
           if (settled) return;
           settled = true;
           input.signal.removeEventListener("abort", abort);
           clearInterval(progressTimer);
-          remove(Boolean(error) && !input.retainStoreOnAbort(), () => {
+          const complete = (cleanupError?: Error) => {
             if (error) reject(error);
-            else resolve({ files: torrent.files.map(({ path }) => path) });
-          });
+            else if (cleanupError) reject(cleanupError);
+            else resolve({ files: resultFiles });
+          };
+          if (!destroy) complete();
+          else
+            torrent.destroy(
+              { destroyStore: Boolean(error) && !input.retainStoreOnAbort() },
+              complete,
+            );
         };
         const abort = () =>
           finish(Object.assign(new Error("Aborted"), { name: "AbortError" }));
-        const emitProgress = () =>
-          input.onProgress({
-            downloadedBytes: torrent.downloaded,
-            downloadSpeedBytesPerSec: torrent.downloadSpeed,
-            peerCount: torrent.numPeers,
-            progress: torrent.progress,
-            uploadedBytes: torrent.uploaded,
-            uploadSpeedBytesPerSec: torrent.uploadSpeed,
-          });
+        const emitProgress = () => {
+          if (settled || !metadataReady) return;
+          const progress = selectedProgress(torrent, selectedIds);
+          input.onProgress(progress);
+          if (
+            progress.files
+              ?.filter((file) => file.selected)
+              .every((file) => file.complete)
+          )
+            finish();
+        };
         const progressTimer = setInterval(emitProgress, 250);
         progressTimer.unref();
         torrent.on("download", emitProgress);
         torrent.on("upload", emitProgress);
         torrent.on("noPeers", input.onNoPeers);
-        torrent.once("done", () => finish());
         torrent.once("error", (error) =>
-          finish(error instanceof Error ? error : new Error(error)),
+          finish(error instanceof Error ? error : new Error(error), false),
         );
         input.signal.addEventListener("abort", abort, { once: true });
         if (input.signal.aborted) abort();

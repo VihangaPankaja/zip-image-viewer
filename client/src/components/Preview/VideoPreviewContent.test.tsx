@@ -1,5 +1,5 @@
 import React, { createRef } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { vi } from "vitest";
 import type { VideoPreviewProps } from "../../features/workspace/types";
 import { VideoPreviewContent } from "./VideoPreviewContent";
@@ -262,4 +262,124 @@ describe("video scrub preview requests", () => {
       expect(video.currentTime).toBe(Number(position));
     },
   );
+});
+
+it("loads the storyboard only on interaction and changes crops without seeking or refetching", async () => {
+  const fetchIndex = vi.fn().mockResolvedValue({
+    ok: true,
+    json: () =>
+      Promise.resolve({
+        intervalSeconds: 5,
+        width: 320,
+        height: 180,
+        columns: 5,
+        rows: 5,
+        frames: [
+          { time: 0, sheet: 0, x: 0, y: 0 },
+          { time: 5, sheet: 0, x: 320, y: 0 },
+        ],
+      }),
+  });
+  vi.stubGlobal("fetch", fetchIndex);
+  try {
+    const video = document.createElement("video");
+    Object.defineProperty(video, "duration", { value: 8 });
+    render(
+      <VideoScrubber
+        path="clip.mp4"
+        quality="source"
+        sessionId="session"
+        videoRef={{ current: video }}
+      />,
+    );
+    expect(fetchIndex).not.toHaveBeenCalled();
+    const slider = screen.getByRole("slider", { name: "Seek video" });
+    fireEvent.input(slider, { target: { value: "1" } });
+    await waitFor(() =>
+      expect(screen.getByRole("img")).toHaveAttribute(
+        "src",
+        "/api/sessions/session/video/storyboard/sheet?path=clip.mp4&sheet=0",
+      ),
+    );
+    expect(screen.getByRole("img")).toHaveStyle({
+      transform: "translate(0%, 0%)",
+    });
+    fireEvent.input(slider, { target: { value: "7" } });
+    expect(screen.getByRole("img")).toHaveStyle({
+      transform: "translate(-20%, 0%)",
+    });
+    expect(fetchIndex).toHaveBeenCalledTimes(1);
+    expect(video.currentTime).toBe(0);
+    fireEvent.pointerUp(slider);
+    expect(video.currentTime).toBe(7);
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it("holds one fallback thumbnail while the cold storyboard is pending", () => {
+  const fetchIndex = vi.fn(() => new Promise<Response>(() => undefined));
+  vi.stubGlobal("fetch", fetchIndex);
+  try {
+    const video = document.createElement("video");
+    Object.defineProperty(video, "duration", { value: 120 });
+    render(
+      <VideoScrubber
+        path="clip.mp4"
+        quality="source"
+        sessionId="session"
+        videoRef={{ current: video }}
+      />,
+    );
+    const slider = screen.getByRole("slider", { name: "Seek video" });
+    fireEvent.input(slider, { target: { value: "5" } });
+    const first = screen.getByRole("img").getAttribute("src");
+    for (const value of [10, 30, 60, 90])
+      fireEvent.input(slider, { target: { value: String(value) } });
+    expect(
+      screen.getByRole("img", { name: "Preview at 1:30" }),
+    ).toHaveAttribute("src", first);
+    expect(video.currentTime).toBe(0);
+    expect(fetchIndex).toHaveBeenCalledTimes(1);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it("does not request a new source storyboard until that source is scrubbed", async () => {
+  const fetchIndex = vi.fn().mockResolvedValue({ ok: false });
+  vi.stubGlobal("fetch", fetchIndex);
+  try {
+    const video = document.createElement("video");
+    Object.defineProperty(video, "duration", { value: 120 });
+    const videoRef = { current: video };
+    const { rerender } = render(
+      <VideoScrubber
+        path="first.mp4"
+        quality="source"
+        sessionId="session"
+        videoRef={videoRef}
+      />,
+    );
+    const slider = screen.getByRole("slider", { name: "Seek video" });
+    fireEvent.input(slider, { target: { value: "5" } });
+    await waitFor(() => expect(fetchIndex).toHaveBeenCalledTimes(1));
+    fireEvent.pointerUp(slider);
+    rerender(
+      <VideoScrubber
+        path="second.mp4"
+        quality="source"
+        sessionId="session"
+        videoRef={videoRef}
+      />,
+    );
+    expect(fetchIndex).toHaveBeenCalledTimes(1);
+    fireEvent.input(screen.getByRole("slider", { name: "Seek video" }), {
+      target: { value: "10" },
+    });
+    await waitFor(() => expect(fetchIndex).toHaveBeenCalledTimes(2));
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

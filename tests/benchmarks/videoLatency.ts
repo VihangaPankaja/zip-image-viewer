@@ -241,6 +241,9 @@ async function main(): Promise<void> {
   const app: Express = express();
   app.get("/health", (_request, response) => response.json({ ok: true }));
   registerVideoRoutes(app, {
+    ensureVideoStoryboard: runtime.ensureVideoStoryboard,
+    runVideoTask: runtime.runVideoTask,
+    trackVideoTask: runtime.trackVideoTask,
     touchSession: (id) => sessions.get(id),
     sanitizeEntryPath,
     getSessionQualityOutputPath: runtime.getSessionQualityOutputPath,

@@ -34,15 +34,42 @@ function handleMetadata(
   confirmOversize: boolean,
   emitJob: EmitJob,
   metadata: TorrentMetadata,
-): void {
-  if (metadata.length > CONFIRM_SIZE_BYTES && !confirmOversize) {
-    throw confirmationError();
+): string[] {
+  const selected = job.torrentFiles.filter((file) => file.selected);
+  if (metadata.torrentFile) job.torrentMetadata = metadata.torrentFile;
+  if (!selected.length) {
+    emitJob(job, {
+      torrentFiles: metadata.files,
+      reportedSize: metadata.length,
+    });
+    throw Object.assign(new Error("Choose torrent files to download."), {
+      code: "FILE_SELECTION",
+    });
   }
+  if (
+    selected.some(
+      (file) =>
+        !metadata.files.some(
+          (resolved) =>
+            resolved.id === file.id &&
+            resolved.path === file.path &&
+            resolved.size === file.size,
+        ),
+    )
+  ) {
+    throw new Error(
+      "Torrent metadata changed. Add the torrent again to review its files.",
+    );
+  }
+  const size = selected.reduce((sum, file) => sum + file.size, 0);
+  if (size > CONFIRM_SIZE_BYTES && !confirmOversize) throw confirmationError();
   emitJob(job, {
     phase: "downloading",
-    reportedSize: metadata.length,
+    reportedSize: size,
+    requiresConfirmation: false,
     message: `Downloading ${metadata.name}`,
   });
+  return selected.map((file) => file.id);
 }
 
 function emitProgress(
@@ -51,6 +78,7 @@ function emitProgress(
   progress: TorrentProgress,
 ): void {
   emitJob(job, {
+    ...(progress.files ? { torrentFiles: progress.files } : {}),
     downloadedBytes: progress.downloadedBytes,
     verifiedBytes: progress.downloadedBytes,
     reportedSize: Math.max(job.reportedSize, progress.downloadedBytes),
@@ -65,6 +93,36 @@ function emitProgress(
         ? "Torrent stalled: waiting for peers."
         : `Downloading from ${String(progress.peerCount)} peers`,
   });
+}
+
+function waitForUser(
+  job: SessionJob,
+  error: unknown,
+  emitJob: EmitJob,
+): boolean {
+  if (errorCode(error) === "FILE_SELECTION") {
+    emitJob(job, {
+      status: "awaiting_selection",
+      phase: "selecting",
+      canPause: false,
+      canResume: false,
+      downloadSpeedBytesPerSec: 0,
+      percent: 0,
+      message: "Choose files to download.",
+    });
+    return true;
+  }
+  if (errorCode(error) === "OVERSIZE_CONFIRM") {
+    emitJob(job, {
+      status: "awaiting_confirmation",
+      phase: "confirm",
+      requiresConfirmation: true,
+      canPause: false,
+      message: "Torrent is larger than 1 GiB and needs confirmation.",
+    });
+    return true;
+  }
+  return false;
 }
 
 export async function downloadTorrentSource(
@@ -90,7 +148,7 @@ export async function downloadTorrentSource(
   });
   const source = job.url.startsWith("magnet:")
     ? job.url
-    : await fetchTorrentMetadata(job.url, signal);
+    : (job.torrentMetadata ?? (await fetchTorrentMetadata(job.url, signal)));
   for (
     let attempt = 0;
     settings.maxRetries === -1 || attempt <= settings.maxRetries;
@@ -121,16 +179,7 @@ export async function downloadTorrentSource(
       });
       return "complete";
     } catch (error) {
-      if (errorCode(error) === "OVERSIZE_CONFIRM") {
-        deps.emitJob(job, {
-          status: "awaiting_confirmation",
-          phase: "confirm",
-          requiresConfirmation: true,
-          canPause: false,
-          message: "Torrent is larger than 1 GiB and needs confirmation.",
-        });
-        return "paused";
-      }
+      if (waitForUser(job, error, deps.emitJob)) return "paused";
       if (
         error instanceof Error &&
         (error.name === "AbortError" ||

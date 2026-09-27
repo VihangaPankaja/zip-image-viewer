@@ -4,6 +4,7 @@ type QueueItem = { job: SessionJob; confirmOversize: boolean };
 
 type SessionJobQueueDeps = {
   pendingSessionJobs: QueueItem[];
+  emitJob?: (_job: SessionJob, _patch: Partial<SessionJob>) => void;
   getActiveSessionJobCount: () => number;
   incrementActiveSessionJobCount: () => void;
   decrementActiveSessionJobCount: () => void;
@@ -217,6 +218,59 @@ function confirmSessionJob(state: QueueState, jobId: string): SessionJob {
   return item.job;
 }
 
+function selectTorrentFiles(
+  state: QueueState,
+  jobId: string,
+  fileIds: string[],
+): SessionJob {
+  const item = state.jobs.get(jobId);
+  if (!item) throw new ApplicationError("NOT_FOUND", "Job not found.", 404);
+  if (
+    item.job.sourceKind !== "torrent" ||
+    item.job.status !== "awaiting_selection"
+  ) {
+    throw new ApplicationError(
+      "CONFLICT",
+      "Job is not awaiting file selection.",
+      409,
+    );
+  }
+  const ids = new Set(fileIds);
+  const known = new Set(item.job.torrentFiles.map((file) => file.id));
+  if (
+    !ids.size ||
+    ids.size !== fileIds.length ||
+    fileIds.some((id) => !known.has(id))
+  ) {
+    throw new ApplicationError(
+      "INVALID_INPUT",
+      "Choose one or more known torrent files.",
+      400,
+    );
+  }
+  item.job.torrentFiles = item.job.torrentFiles.map((file) => ({
+    ...file,
+    selected: ids.has(file.id),
+  }));
+  Object.assign(item.job, {
+    status: "queued",
+    phase: "queued",
+    cleanupAt: 0,
+    reportedSize: item.job.torrentFiles
+      .filter((file) => file.selected)
+      .reduce((total, file) => total + file.size, 0),
+    message: "File selection accepted. Waiting to start.",
+  });
+  state.emitJob?.(item.job, {});
+  if (state.activeItems.has(jobId)) state.requeueAfterActive.add(jobId);
+  else {
+    state.pendingSessionJobs.push(item);
+    sortPending(state);
+    scheduleSessionJobs(state);
+  }
+  return item.job;
+}
+
 function cancelSessionJob(state: QueueState, jobId: string): SessionJob {
   const item = state.jobs.get(jobId);
   if (!item) throw new Error("Job not found.");
@@ -266,6 +320,8 @@ export function createSessionJobQueue(deps: SessionJobQueueDeps) {
   return {
     cancelSessionJob: (jobId: string) => cancelSessionJob(state, jobId),
     confirmSessionJob: (jobId: string) => confirmSessionJob(state, jobId),
+    selectTorrentFiles: (jobId: string, fileIds: string[]) =>
+      selectTorrentFiles(state, jobId, fileIds),
     enqueueSessionJob: (job: SessionJob, confirmOversize: boolean) =>
       enqueueSessionJob(state, job, confirmOversize),
     getSchedulerState: () => ({

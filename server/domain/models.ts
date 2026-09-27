@@ -1,3 +1,4 @@
+import type { TorrentFile } from "../../shared/contracts.js";
 import type { Response } from "express";
 import type { WebSocket } from "ws";
 import type { ChildProcess } from "node:child_process";
@@ -7,6 +8,7 @@ export type JobStatus =
   | "downloading"
   | "extracting"
   | "awaiting_confirmation"
+  | "awaiting_selection"
   | "paused"
   | "ready"
   | "cancelled"
@@ -19,6 +21,7 @@ export type JobPhase =
   | "indexing"
   | "extracting"
   | "confirm"
+  | "selecting"
   | "paused"
   | "ready"
   | "cancelled"
@@ -72,6 +75,8 @@ export type SessionJob = {
   sourceKind: "http" | "torrent";
   sourcePreference: "auto" | "http" | "torrent";
   status: JobStatus;
+  torrentFiles: TorrentFile[];
+  torrentMetadata?: Uint8Array;
   phase: JobPhase;
   percent: number | null;
   downloadedBytes: number;

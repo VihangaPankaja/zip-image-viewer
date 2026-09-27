@@ -109,6 +109,8 @@ jobs:
       - name: Remove benchmark output
         if: always()
         run: rm -f "$RUNNER_TEMP/video-latency.md"
+      - name: Verify storyboard latency and sustained dragging under media load
+        run: pnpm run benchmark:storyboard -- --output "$RUNNER_TEMP/storyboard-performance.json"
 
   e2e:
     runs-on: ubuntu-latest

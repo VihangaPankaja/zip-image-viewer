@@ -29,6 +29,7 @@ export class ProcessLimiter {
   ): Promise<Result> {
     await this.#acquire(signal);
     try {
+      if (signal?.aborted) throw abortError();
       return await task();
     } finally {
       this.#release();

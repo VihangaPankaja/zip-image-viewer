@@ -108,10 +108,20 @@ describe("createProcessSessionJob", () => {
       "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=fixture",
     );
     job.workspaceDir = workspace;
+    const torrentFiles = [
+      {
+        id: "0",
+        path: "album/image.jpg",
+        size: 100,
+        selected: false,
+        downloadedBytes: 0,
+        complete: false,
+      },
+    ];
     const download = vi.fn<TorrentAdapter["download"]>(
       ({ onMetadata, onProgress }) => {
         onMetadata({
-          files: ["album/image.jpg"],
+          files: torrentFiles,
           length: 100,
           name: "fixture",
         });
@@ -141,6 +151,12 @@ describe("createProcessSessionJob", () => {
             size: 100,
             modifiedAt: 1,
           },
+          {
+            type: "file" as const,
+            relativePath: "album/unselected.txt",
+            size: 20,
+            modifiedAt: 1,
+          },
         ]),
       ),
       logEvent: vi.fn(),
@@ -149,8 +165,20 @@ describe("createProcessSessionJob", () => {
 
     await processJob(job);
 
-    expect(download).toHaveBeenCalledOnce();
+    expect(job.status).toBe("awaiting_selection");
+    expect(sessionStore.size).toBe(0);
+    job.torrentFiles = torrentFiles.map((file) => ({
+      ...file,
+      selected: true,
+    }));
+    await processJob(job);
+
+    expect(download).toHaveBeenCalledTimes(2);
     expect(job.status).toBe("ready");
     expect(sessionStore.size).toBe(1);
+    expect(sessionStore.get(job.sessionId)?.stats.fileCount).toBe(1);
+    expect(sessionStore.get(job.sessionId)?.firstFilePath).toBe(
+      "album/image.jpg",
+    );
   });
 });

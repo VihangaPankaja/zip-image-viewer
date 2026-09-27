@@ -83,6 +83,10 @@ const videoRuntime = createVideoRuntime({
 const {
   buildVideoQualityOptions,
   ensureVideoTranscodeEntry,
+  ensureVideoStoryboard,
+  cleanupVideoSession,
+  runVideoTask,
+  trackVideoTask,
   getRenditionState,
   getSessionQualityOutputPath,
   getVideoDimensions,
@@ -119,6 +123,7 @@ const sessionJobQueue = createSessionJobQueue({
   decrementActiveSessionJobCount,
   maxActiveSessionJobs: MAX_ACTIVE_SESSION_JOBS,
   processSessionJob,
+  emitJob,
   pauseJob: (job) => {
     job.pauseRequested = true;
     job.abortController?.abort();
@@ -151,6 +156,12 @@ function retrySessionJob(previous: SessionJob) {
     previous.downloadOptions,
     previous.sourcePreference,
   );
+  job.torrentFiles = previous.torrentFiles.map((file) => ({
+    ...file,
+    downloadedBytes: 0,
+    complete: false,
+  }));
+  job.torrentMetadata = previous.torrentMetadata;
   enqueueSessionJob(job, false);
   return job;
 }
@@ -169,6 +180,7 @@ const app = createRuntimeApp({
   createJob,
   enqueueJob: enqueueSessionJob,
   confirmJob: sessionJobQueue.confirmSessionJob,
+  selectTorrentFiles: sessionJobQueue.selectTorrentFiles,
   listOrderedJobs: sessionJobQueue.getOrderedJobs,
   pauseJob: sessionJobQueue.pauseSessionJob,
   resumeJob: sessionJobQueue.resumeSessionJob,
@@ -212,6 +224,7 @@ const { removeSession, touchSession } = createSessionManager(
   sessionStore,
   videoTranscodeStore,
   logEvent,
+  cleanupVideoSession,
 );
 const dashboard = shouldUseTerminalDashboard({
   inputTTY: process.stdin.isTTY,
@@ -307,6 +320,9 @@ registerVideoRoutes(app, {
   refreshRenditionAvailability,
   DEFAULT_VIDEO_SEGMENT_SECONDS,
   runCommand,
+  ensureVideoStoryboard,
+  runVideoTask,
+  trackVideoTask,
   getVideoTranscodeKey,
   videoTranscodeStore,
   waitForFile,

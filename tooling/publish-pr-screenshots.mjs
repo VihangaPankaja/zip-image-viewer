@@ -41,6 +41,8 @@ const requiredScreens = [
   "explorer-dialog",
   "video-seek-preview",
   "video-seek-committed",
+  "torrent-file-selection",
+  "torrent-selection-started",
 ];
 for (const device of ["Mobile", "Tablet", "Desktop", "Ultrawide"]) {
   for (const theme of ["light", "dark"]) {

@@ -16,6 +16,7 @@ export type ServerRpcDependencies = {
   getSession: (_id: string) => SessionSummary | undefined;
   cancelJob: (_id: string) => Job | Promise<Job>;
   confirmJob: (_id: string) => Job | Promise<Job>;
+  selectFiles: (_id: string, _fileIds: string[]) => Job | Promise<Job>;
   retryJob: (_id: string) => Job | Promise<Job>;
   pauseJob: (_id: string) => Job | Promise<Job>;
   resumeJob: (_id: string) => Job | Promise<Job>;
@@ -57,6 +58,9 @@ export function createServerRpcRouter(deps: ServerRpcDependencies) {
       ),
       confirm: contract.jobs.confirm.handler(({ input }) =>
         deps.confirmJob(input.id),
+      ),
+      selectFiles: contract.jobs.selectFiles.handler(({ input }) =>
+        deps.selectFiles(input.id, input.fileIds),
       ),
       retry: contract.jobs.retry.handler(({ input }) =>
         deps.retryJob(input.id),
