@@ -1,39 +1,73 @@
 import path from "node:path";
 import mime from "mime-types";
 import type { Express, RequestHandler } from "express";
-import { queryText, resolveVideoContext } from "./routeContext.js";
+import type {
+  VideoQualities,
+  VideoQualitiesInput,
+} from "../../../shared/contracts.js";
+import { ApplicationError } from "../../domain/models.js";
+import { queryText, resolveVideoFile } from "./routeContext.js";
 import type { VideoRouteDependencies } from "./types.js";
+
+export async function getVideoQualities(
+  input: VideoQualitiesInput,
+  deps: Pick<
+    VideoRouteDependencies,
+    | "touchSession"
+    | "sanitizeEntryPath"
+    | "VIDEO_EXTENSIONS"
+    | "getVideoMetadata"
+    | "buildVideoQualityOptions"
+  >,
+): Promise<VideoQualities> {
+  const context = await resolveVideoFile(input.sessionId, input.path, deps);
+  const contentType =
+    mime.lookup(context.targetPath) || "application/octet-stream";
+  const extension = path.extname(context.targetPath).slice(1).toLowerCase();
+  if (
+    !contentType.startsWith("video/") &&
+    !deps.VIDEO_EXTENSIONS.has(extension)
+  ) {
+    throw new ApplicationError(
+      "INVALID_INPUT",
+      "Selected file is not a video.",
+      400,
+    );
+  }
+  const source = await deps.getVideoMetadata(
+    context.targetPath,
+    context.session,
+  );
+  const qualityConfig = deps.buildVideoQualityOptions(source.height);
+  const preferredQuality =
+    context.session.selectedVideoQuality || qualityConfig.defaultQuality;
+  const defaultQuality =
+    qualityConfig.options.find(({ id }) => id === preferredQuality)?.id ||
+    qualityConfig.defaultQuality;
+  return {
+    path: context.normalizedPath,
+    source,
+    options: qualityConfig.options,
+    defaultQuality,
+  };
+}
 
 function createQualitiesHandler(deps: VideoRouteDependencies): RequestHandler {
   return async (req, res) => {
-    const context = await resolveVideoContext(req, res, deps);
-    if (!context) return;
-    const contentType =
-      mime.lookup(context.targetPath) || "application/octet-stream";
-    const extension = path.extname(context.targetPath).slice(1).toLowerCase();
-    if (
-      !contentType.startsWith("video/") &&
-      !deps.VIDEO_EXTENSIONS.has(extension)
-    ) {
-      res.status(400).json({ error: "Selected file is not a video." });
-      return;
+    try {
+      res.json(
+        await getVideoQualities(
+          {
+            sessionId: queryText(req.params.id),
+            path: queryText(req.query.path),
+          },
+          deps,
+        ),
+      );
+    } catch (error) {
+      if (!(error instanceof ApplicationError)) throw error;
+      res.status(error.status).json({ error: error.message });
     }
-    const source = await deps.getVideoMetadata(
-      context.targetPath,
-      context.session,
-    );
-    const qualityConfig = deps.buildVideoQualityOptions(source.height);
-    const preferredQuality =
-      context.session.selectedVideoQuality || qualityConfig.defaultQuality;
-    const defaultQuality =
-      qualityConfig.options.find(({ id }) => id === preferredQuality)?.id ||
-      qualityConfig.defaultQuality;
-    res.json({
-      path: context.normalizedPath,
-      source,
-      options: qualityConfig.options,
-      defaultQuality,
-    });
   };
 }
 

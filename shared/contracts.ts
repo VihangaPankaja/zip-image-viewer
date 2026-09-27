@@ -177,6 +177,33 @@ export const mediaPathQuerySchema = z.object({
   path: safeRelativePathSchema,
 });
 
+const videoQualitiesInputSchema = mediaPathQuerySchema.extend({
+  sessionId: z.uuid(),
+});
+const videoQualitiesSchema = z.object({
+  path: safeRelativePathSchema,
+  source: z.object({
+    width: z.number().nonnegative(),
+    height: z.number().nonnegative(),
+    durationSeconds: z.number().nonnegative(),
+  }),
+  options: z.array(
+    z.object({
+      id: z.string().min(1),
+      label: z.string().min(1),
+      height: z.number().nonnegative().nullable(),
+    }),
+  ),
+  defaultQuality: z.string().min(1),
+});
+export type VideoQualitiesInput = z.infer<typeof videoQualitiesInputSchema>;
+export type VideoQualities = z.infer<typeof videoQualitiesSchema>;
+
+const videoQualitiesContract = oc
+  .route({ method: "GET", path: "/sessions/{sessionId}/video/qualities" })
+  .input(videoQualitiesInputSchema)
+  .output(videoQualitiesSchema);
+
 const createSessionContract = oc
   .route({ method: "POST", path: "/sessions" })
   .input(createSessionInputSchema)
@@ -259,6 +286,7 @@ const removeSessionContract = oc
   .output(z.void());
 
 export const serverContract = {
+  video: { qualities: videoQualitiesContract },
   sessions: {
     create: createSessionContract,
     get: getSessionContract,

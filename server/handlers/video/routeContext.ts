@@ -1,7 +1,11 @@
 import { stat, type Stats } from "node:fs";
 import path from "node:path";
 import type { Request, Response } from "express";
-import type { Session, VideoQualityOption } from "../../domain/models.js";
+import {
+  ApplicationError,
+  type Session,
+  type VideoQualityOption,
+} from "../../domain/models.js";
 import { errorMessage, isWithinRoot, queryText } from "../httpUtils.js";
 import type { VideoRouteDependencies } from "./types.js";
 
@@ -33,49 +37,42 @@ export function requireTranscoder(
   return null;
 }
 
-function resolveVideoSession(
-  req: Request,
-  res: Response,
-  deps: VideoRouteDependencies,
-): Session | null {
-  const session = deps.touchSession(queryText(req.params.id));
-  if (session) return session;
-  res.status(404).json({ error: "Session not found or already cleaned up." });
-  return null;
-}
-
-async function resolveVideoFileContext(
-  req: Request,
-  res: Response,
-  deps: VideoRouteDependencies,
-  session: Session,
-): Promise<VideoContext | null> {
-  const requestedPath = queryText(req.query.path);
+export async function resolveVideoFile(
+  sessionId: string,
+  requestedPath: string,
+  deps: Pick<VideoRouteDependencies, "touchSession" | "sanitizeEntryPath">,
+): Promise<VideoContext> {
+  const session = deps.touchSession(sessionId);
+  if (!session) {
+    throw new ApplicationError(
+      "NOT_FOUND",
+      "Session not found or already cleaned up.",
+      404,
+    );
+  }
   if (!requestedPath || requestedPath === ".") {
-    res.status(400).json({ error: "File path is required." });
-    return null;
+    throw new ApplicationError("INVALID_INPUT", "File path is required.", 400);
   }
   let normalizedPath: string;
   try {
     normalizedPath = deps.sanitizeEntryPath(requestedPath);
   } catch (error) {
-    res.status(400).json({
-      error: errorMessage(error, "Unexpected video error."),
-    });
-    return null;
+    throw new ApplicationError(
+      "INVALID_INPUT",
+      errorMessage(error, "Unexpected video error."),
+      400,
+    );
   }
   const targetPath = path.resolve(session.extractDir, normalizedPath);
   const rootPath = path.resolve(session.extractDir);
   if (!isWithinRoot(targetPath, rootPath)) {
-    res.status(400).json({ error: "Invalid file path." });
-    return null;
+    throw new ApplicationError("INVALID_INPUT", "Invalid file path.", 400);
   }
   const fileStats = await new Promise<Stats | null>((resolve) => {
     stat(targetPath, (error, stats) => resolve(error ? null : stats));
   });
   if (!fileStats?.isFile()) {
-    res.status(404).json({ error: "File not found." });
-    return null;
+    throw new ApplicationError("NOT_FOUND", "File not found.", 404);
   }
   return { session, normalizedPath, targetPath, fileStats };
 }
@@ -85,6 +82,15 @@ export async function resolveVideoContext(
   res: Response,
   deps: VideoRouteDependencies,
 ): Promise<VideoContext | null> {
-  const session = resolveVideoSession(req, res, deps);
-  return session ? resolveVideoFileContext(req, res, deps, session) : null;
+  try {
+    return await resolveVideoFile(
+      queryText(req.params.id),
+      queryText(req.query.path),
+      deps,
+    );
+  } catch (error) {
+    if (!(error instanceof ApplicationError)) throw error;
+    res.status(error.status).json({ error: error.message });
+    return null;
+  }
 }

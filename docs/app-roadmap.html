@@ -1551,6 +1551,7 @@
           area: "UI / UX",
           priority: "P1",
           effort: "M",
+          status: "In progress",
           title: "Make the file browser useful for large torrents",
           summary:
             "Keep skipped files visible, filter by media type and select multiple files at once.",
@@ -1559,7 +1560,8 @@
           done: "Find and select an episode set without losing folder context. Keyboard navigation remains usable on a large fixture.",
           depends: "T02",
           evidence:
-            "client/src/components/ExplorerTablePanel.tsx; client/src/components/TreeExplorer.tsx",
+            "client/src/components/TreeExplorer.tsx; client/src/features/workspace/components/TorrentFileDialog.tsx",
+          note: "v3.6.0 adds media-type filters to the explorer and torrent picker, preserving folder context, sorting, hidden selections and selected totals. Keyboard and responsive browser checks include a 10,000-file fixture. Available/downloading/skipped filters and retained skipped entries remain planned.",
         },
         {
           id: "U03",
@@ -1660,6 +1662,7 @@
           area: "Stack / operations",
           priority: "P1",
           effort: "S",
+          status: "Done",
           title: "Finish typed API coverage as features change",
           summary:
             "Use the existing oRPC and Zod contracts for new torrent and playback state.",
@@ -1668,7 +1671,8 @@
           done: "Invalid file IDs and state transitions fail at the boundary. Contract changes are caught by typecheck and focused integration tests.",
           depends: "T02",
           evidence:
-            "client/src/features/player/useVideoQualities.ts; client/src/services/orpcClient.ts; server/rpc/serverRouter.ts",
+            "client/src/features/player/useVideoQualities.ts; shared/contracts.ts; server/rpc/serverRouter.ts",
+          note: "v3.6.0 moves video-quality metadata to a shared Zod/oRPC contract and the typed client. The existing torrent selection and job-state contracts validate selection boundaries. Binary playback stays on HTTP, and the legacy quality endpoint remains compatible. Boundary, hook and browser playback tests cover the migration.",
         },
         {
           id: "Q01",

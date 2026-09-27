@@ -225,6 +225,17 @@ export async function installReviewFixtures(page: Page) {
   await page.clock.setFixedTime(new Date(timestamp));
   await page.route("**/rpc/**", (route) => {
     const endpoint = new URL(route.request().url()).pathname;
+    if (endpoint.endsWith("video/qualities"))
+      return route.fulfill({
+        json: {
+          json: {
+            path: filenames[2],
+            source: { width: 960, height: 540, durationSeconds: 8 },
+            options: [{ id: "source", label: "Original", height: 540 }],
+            defaultQuality: "source",
+          },
+        },
+      });
     if (endpoint.endsWith("jobs/enqueue")) {
       state.jobs = [reviewTorrentJob()];
       return route.fulfill({ json: { json: { items: state.jobs } } });
@@ -294,13 +305,6 @@ export async function installReviewFixtures(page: Page) {
               modifiedAt: timestamp,
             })),
           },
-        },
-      });
-    if (url.pathname.endsWith("/qualities"))
-      return route.fulfill({
-        json: {
-          options: [{ id: "source", label: "Original" }],
-          defaultQuality: "source",
         },
       });
     if (url.pathname.endsWith("/video/storyboard"))

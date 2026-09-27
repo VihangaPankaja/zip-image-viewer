@@ -43,6 +43,10 @@ const requiredScreens = [
   "video-seek-committed",
   "torrent-file-selection",
   "torrent-selection-started",
+  "explorer-text-filter",
+  "explorer-filter-opened",
+  "torrent-video-filter",
+  "torrent-filter-selection",
 ];
 for (const device of ["Mobile", "Tablet", "Desktop", "Ultrawide"]) {
   for (const theme of ["light", "dark"]) {

@@ -10,6 +10,7 @@ import {
   FileArchive,
 } from "lucide-react";
 import { classifyNodeKind } from "../lib/mimeTypeSystem";
+import { MediaTypeFilter } from "./MediaTypeFilter";
 
 export type ExplorerNode = {
   name: string;
@@ -217,7 +218,7 @@ function TreeItem({
   row: FlatTreeItem;
   index: number;
   selectedPath: string;
-  navigation: TreeNavigation;
+  navigation: Omit<TreeNavigation, "rows">;
 }) {
   const isExpanded = navigation.expanded.has(row.id);
   const isSelected = row.id === selectedPath;
@@ -265,33 +266,60 @@ function TreeItem({
   );
 }
 
+function filterMediaTree(
+  node: ExplorerNode,
+  mediaType: string,
+): ExplorerNode | null {
+  if (node.type === "file")
+    return classifyNodeKind(node) === mediaType ? node : null;
+  const children = (node.children ?? [])
+    .map((child) => filterMediaTree(child, mediaType))
+    .filter((child): child is ExplorerNode => child !== null);
+  return children.length ? { ...node, children } : null;
+}
+
 export function TreeExplorer({
   rootNode,
   selectedPath,
   onSelect,
   compact = false,
 }: TreeExplorerProps) {
-  const navigation = useTreeNavigation(rootNode, onSelect);
-  if (!rootNode) {
-    return null;
-  }
+  const [mediaType, setMediaType] = useState("all");
+  const filteredRoot = useMemo(
+    () =>
+      rootNode && mediaType !== "all"
+        ? filterMediaTree(rootNode, mediaType)
+        : rootNode,
+    [rootNode, mediaType],
+  );
+  const navigation = useTreeNavigation(filteredRoot ?? rootNode, onSelect);
+  // Passing every row to each item makes React development prop comparisons quadratic.
+  const { rows, ...itemNavigation } = navigation;
+  if (!rootNode) return null;
 
   return (
-    <div
-      className={`tree-shell ${compact ? "compact" : ""}`}
-      role="tree"
-      aria-label="Explorer tree"
-      onKeyDown={(event) => handleTreeKeyDown(event, navigation)}
-    >
-      {navigation.rows.map((row, index) => (
-        <TreeItem
-          key={row.id}
-          row={row}
-          index={index}
-          selectedPath={selectedPath}
-          navigation={navigation}
-        />
-      ))}
+    <div className="tree-browser">
+      <MediaTypeFilter value={mediaType} onChange={setMediaType} />
+      {!filteredRoot ? (
+        <p role="status">No files match this media type.</p>
+      ) : (
+        <div
+          className={`tree-shell ${compact ? "compact" : ""}`}
+          role="tree"
+          aria-label="Explorer tree"
+          onKeyDown={(event) => handleTreeKeyDown(event, navigation)}
+        >
+          {rows.map((row, index) => (
+            <TreeItem
+              key={row.id}
+              row={row}
+              index={index}
+              selectedPath={selectedPath}
+              navigation={itemNavigation}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

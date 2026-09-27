@@ -201,6 +201,16 @@ for (const device of devices) {
       );
       await save(page, device, theme, "torrent-file-selection");
       await page
+        .getByRole("combobox", { name: "Media type" })
+        .selectOption("video");
+      await expect(page.getByText("2 of 4 files shown")).toBeVisible();
+      await save(page, device, theme, "torrent-video-filter");
+      await page.getByRole("checkbox", { name: "Extras", exact: true }).check();
+      await expect(page.getByRole("dialog").getByRole("status")).toContainText(
+        "4 of 4 files selected",
+      );
+      await save(page, device, theme, "torrent-filter-selection");
+      await page
         .getByRole("button", { name: "Start selected download" })
         .click();
       await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -221,6 +231,26 @@ for (const device of devices) {
         page.getByRole("treeitem", { name: filenames[0], exact: true }),
       ).toBeVisible();
       await save(page, device, theme, "explorer");
+      const mediaFilter = page.getByRole("combobox", { name: "Media type" });
+      await mediaFilter.selectOption("text");
+      await expect(
+        page.getByRole("treeitem", { name: filenames[0], exact: true }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole("treeitem", { name: filenames[1], exact: true }),
+      ).toBeVisible();
+      await save(page, device, theme, "explorer-text-filter");
+      await page
+        .getByRole("treeitem", { name: filenames[1], exact: true })
+        .focus();
+      await page.keyboard.press("Enter");
+      await expect(page.locator("pre")).toContainText("COASTAL COLLECTION");
+      await save(page, device, theme, "explorer-filter-opened");
+      if (mobile)
+        await page
+          .getByRole("radio", { name: "Files", exact: true })
+          .check({ force: true });
+      await mediaFilter.selectOption("all");
       for (const name of filenames) {
         await selectFile(page, name, mobile);
         await save(page, device, theme, `preview-${name.split(".").at(-1)}`);

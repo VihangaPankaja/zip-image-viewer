@@ -97,3 +97,87 @@ it("supports pointer activation and resets navigation when the archive changes",
   );
   expect(screen.queryByRole("tree")).not.toBeInTheDocument();
 });
+
+it("filters media while preserving folder expansion, order and keyboard selection", () => {
+  const onSelect = vi.fn();
+  render(
+    <TreeExplorer
+      rootNode={root}
+      selectedPath="photos/cover.jpg"
+      onSelect={onSelect}
+    />,
+  );
+  fireEvent.click(screen.getByRole("treeitem", { name: "Photos" }));
+  const filter = screen.getByRole("combobox", { name: "Media type" });
+  fireEvent.change(filter, { target: { value: "image" } });
+  expect(
+    screen
+      .getAllByRole("treeitem")
+      .map((item) => item.getAttribute("aria-label")),
+  ).toEqual(["Archive", "Photos", "Cover"]);
+  expect(screen.getByRole("treeitem", { name: "Cover" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  fireEvent.keyDown(screen.getByRole("tree"), { key: "End" });
+  fireEvent.keyDown(screen.getByRole("tree"), { key: "Enter" });
+  expect(onSelect).toHaveBeenLastCalledWith(
+    expect.objectContaining({ path: "photos/cover.jpg" }),
+  );
+  fireEvent.change(filter, { target: { value: "video" } });
+  expect(
+    screen.queryByRole("treeitem", { name: "Photos" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole("treeitem", { name: "sample.mp4" })).toBeVisible();
+  fireEvent.change(filter, { target: { value: "all" } });
+  expect(screen.getByRole("treeitem", { name: "Cover" })).toBeVisible();
+});
+
+it("shows an empty filter result without selecting a folder", () => {
+  const onSelect = vi.fn();
+  render(
+    <TreeExplorer
+      rootNode={{ ...root, children: root.children?.slice(0, 1) }}
+      selectedPath=""
+      onSelect={onSelect}
+    />,
+  );
+  fireEvent.change(screen.getByRole("combobox", { name: "Media type" }), {
+    target: { value: "video" },
+  });
+  expect(screen.getByText("No files match this media type.")).toBeVisible();
+  expect(screen.queryByRole("tree")).not.toBeInTheDocument();
+  expect(onSelect).not.toHaveBeenCalled();
+});
+
+it("filters a single-file root and restores it after no matches", () => {
+  const onSelect = vi.fn();
+  render(
+    <TreeExplorer
+      rootNode={{
+        name: "movie.mp4",
+        path: "movie.mp4",
+        type: "file",
+        extension: "mp4",
+      }}
+      selectedPath="movie.mp4"
+      onSelect={onSelect}
+    />,
+  );
+  const filter = screen.getByRole("combobox", { name: "Media type" });
+  fireEvent.change(filter, { target: { value: "video" } });
+  fireEvent.click(screen.getByRole("treeitem", { name: "movie.mp4" }));
+  expect(onSelect).toHaveBeenCalledWith(
+    expect.objectContaining({ path: "movie.mp4" }),
+  );
+  fireEvent.change(filter, { target: { value: "image" } });
+  expect(screen.queryByRole("tree")).not.toBeInTheDocument();
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "No files match this media type.",
+  );
+  fireEvent.change(filter, { target: { value: "all" } });
+  expect(screen.getByRole("treeitem", { name: "movie.mp4" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+});

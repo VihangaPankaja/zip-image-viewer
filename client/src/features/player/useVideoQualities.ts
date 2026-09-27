@@ -1,5 +1,5 @@
 import { useEffect, type Dispatch, type SetStateAction } from "react";
-import { fetchJson } from "../../services/apiClient";
+import { workspaceRpc } from "../../services/orpcClient";
 import {
   chooseVideoQuality,
   normalizeVideoQualityOptions,
@@ -15,16 +15,8 @@ type VideoQualitiesParams = {
   setSelectedQuality: Dispatch<SetStateAction<string>>;
 };
 
-type VideoQualityPayload = {
-  options?: Array<{ id?: string; label?: string }>;
-  defaultQuality?: string;
-};
-
 async function loadVideoQualities(sessionId: string, path: string) {
-  const query = new URLSearchParams({ path });
-  const payload = await fetchJson<VideoQualityPayload>(
-    `/api/sessions/${sessionId}/video/qualities?${query.toString()}`,
-  );
+  const payload = await workspaceRpc.video.qualities.call({ sessionId, path });
   const options = normalizeVideoQualityOptions(payload.options);
   return {
     options,

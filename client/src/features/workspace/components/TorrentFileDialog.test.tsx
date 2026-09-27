@@ -84,3 +84,69 @@ describe("TorrentFileDialog", () => {
     expect(close).toHaveBeenCalledOnce();
   });
 });
+
+it("combines media and path filters for folder selection without losing hidden choices or totals", async () => {
+  const user = userEvent.setup();
+  const submit = vi.fn().mockResolvedValue(undefined);
+  const episodeJob = job();
+  episodeJob.torrentFiles.push({
+    ...episodeJob.torrentFiles[0],
+    id: "3",
+    path: "film/episode-2.MKV",
+    size: 2000,
+  });
+  render(
+    <TorrentFileDialog job={episodeJob} onClose={vi.fn()} onSubmit={submit} />,
+  );
+  await user.click(screen.getByRole("button", { name: "Select none" }));
+  await user.click(screen.getByRole("checkbox", { name: "notes.txt" }));
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Media type" }),
+    "video",
+  );
+  expect(screen.getByText("2 of 4 files shown")).toBeVisible();
+  expect(
+    screen.queryByRole("checkbox", { name: "film/subtitles.srt" }),
+  ).not.toBeInTheDocument();
+  await user.click(screen.getByRole("checkbox", { name: "film" }));
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "3 of 4 files selected · 2.9 KB",
+  );
+  await user.type(screen.getByRole("searchbox"), "episode");
+  expect(screen.getByText("1 of 4 files shown")).toBeVisible();
+  await user.click(screen.getByRole("checkbox", { name: "film" }));
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "2 of 4 files selected · 1020 B",
+  );
+  await user.clear(screen.getByRole("searchbox"));
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Media type" }),
+    "all",
+  );
+  expect(screen.getByRole("checkbox", { name: "film" })).toBePartiallyChecked();
+  expect(screen.getByRole("checkbox", { name: "notes.txt" })).toBeChecked();
+  await user.click(
+    screen.getByRole("button", { name: "Start selected download" }),
+  );
+  expect(submit).toHaveBeenCalledWith(episodeJob.id, ["0", "2"]);
+});
+
+it("treats dotfiles as extensionless when filtering torrent media", async () => {
+  const user = userEvent.setup();
+  const dotfiles = job();
+  dotfiles.torrentFiles = [".mp4", "folder/.txt", "folder/.notes.txt"].map(
+    (path, index) => ({ ...dotfiles.torrentFiles[0], id: String(index), path }),
+  );
+  render(
+    <TorrentFileDialog job={dotfiles} onClose={vi.fn()} onSubmit={vi.fn()} />,
+  );
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Media type" }),
+    "binary",
+  );
+  expect(screen.getByRole("checkbox", { name: ".mp4" })).toBeVisible();
+  expect(screen.getByRole("checkbox", { name: "folder/.txt" })).toBeVisible();
+  expect(
+    screen.queryByRole("checkbox", { name: "folder/.notes.txt" }),
+  ).not.toBeInTheDocument();
+});

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { Job } from "../../../../../shared/contracts";
 import { formatTransferBytes } from "../../../lib/formatterUtils";
+import { classifyExtension } from "../../../lib/mimeTypeSystem";
+import { MediaTypeFilter } from "../../../components/MediaTypeFilter";
 
 type TorrentFile = Job["torrentFiles"][number];
 type Props = {
@@ -59,6 +61,7 @@ function useTorrentSelection({ job, onClose, onSubmit }: Props) {
     () => new Set(job.torrentFiles.map(({ id }) => id)),
   );
   const [search, setSearch] = useState("");
+  const [mediaType, setMediaType] = useState("all");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -76,18 +79,15 @@ function useTorrentSelection({ job, onClose, onSubmit }: Props) {
   }, []);
   const chosen = job.torrentFiles.filter(({ id }) => selected.has(id));
   const total = chosen.reduce((sum, file) => sum + file.size, 0);
-  const visible = job.torrentFiles.filter(({ path }) =>
-    path.toLowerCase().includes(search.toLowerCase()),
-  );
-  const groups = new Map<string, TorrentFile[]>();
-  for (const file of visible) {
-    const folder = file.path.includes("/")
-      ? file.path.slice(0, file.path.lastIndexOf("/"))
-      : "";
-    const group = groups.get(folder) ?? [];
-    group.push(file);
-    groups.set(folder, group);
-  }
+  const visible = job.torrentFiles.filter(({ path }) => {
+    const filename = path.split("/").at(-1) ?? "";
+    const dot = filename.lastIndexOf(".");
+    const extension = dot > 0 ? filename.slice(dot + 1) : "";
+    return (
+      path.toLowerCase().includes(search.toLowerCase()) &&
+      (mediaType === "all" || classifyExtension(extension) === mediaType)
+    );
+  });
   const change = (files: TorrentFile[], checked: boolean) => {
     setSelected((current) => {
       const next = new Set(current);
@@ -123,12 +123,13 @@ function useTorrentSelection({ job, onClose, onSubmit }: Props) {
     selected,
     search,
     setSearch,
+    mediaType,
+    setMediaType,
     submitting,
     error,
     chosen,
     total,
     visible,
-    groups,
     change,
     submit,
   };
@@ -222,7 +223,15 @@ export function TorrentReviewAction({ job, onSubmit }: Omit<Props, "onClose">) {
 }
 
 function FileTools({ job, selection }: { job: Job; selection: Selection }) {
-  const { search, setSearch, submitting, change, visible } = selection;
+  const {
+    search,
+    setSearch,
+    mediaType,
+    setMediaType,
+    submitting,
+    change,
+    visible,
+  } = selection;
   return (
     <div className="torrent-file-tools">
       <p id="torrent-file-description">
@@ -237,6 +246,11 @@ function FileTools({ job, selection }: { job: Job; selection: Selection }) {
           onChange={(event) => setSearch(event.currentTarget.value)}
         />
       </label>
+      <MediaTypeFilter
+        value={mediaType}
+        onChange={setMediaType}
+        disabled={submitting}
+      />
       <div className="torrent-file-bulk">
         <button
           type="button"
@@ -258,7 +272,7 @@ function FileTools({ job, selection }: { job: Job; selection: Selection }) {
           {visible.length} of {job.torrentFiles.length} files shown
         </span>
       </div>
-      {search ? (
+      {search || mediaType !== "all" ? (
         <p>
           Folder checkboxes affect matching files. Select all and Select none
           affect every file.
@@ -269,7 +283,17 @@ function FileTools({ job, selection }: { job: Job; selection: Selection }) {
 }
 
 function FileList({ selection }: { selection: Selection }) {
-  const { submitting, groups, selected, change, visible } = selection;
+  const { submitting, selected, change, visible } = selection;
+  const groups = new Map<string, TorrentFile[]>();
+  for (const file of visible) {
+    const folder = file.path.includes("/")
+      ? file.path.slice(0, file.path.lastIndexOf("/"))
+      : "";
+    const group = groups.get(folder) ?? [];
+    group.push(file);
+    groups.set(folder, group);
+  }
+
   return (
     <div
       className="torrent-file-list"
@@ -287,7 +311,7 @@ function FileList({ selection }: { selection: Selection }) {
           />
         ))}
       </fieldset>
-      {!visible.length ? <p>No files match your search.</p> : null}
+      {!visible.length ? <p>No files match your filters.</p> : null}
     </div>
   );
 }
@@ -295,7 +319,7 @@ function FileList({ selection }: { selection: Selection }) {
 function trapDialogTab(event: KeyboardEvent<HTMLDialogElement>) {
   if (event.key !== "Tab") return;
   const controls = event.currentTarget.querySelectorAll<HTMLElement>(
-    "button:not(:disabled), input:not(:disabled)",
+    "button:not(:disabled), input:not(:disabled), select:not(:disabled)",
   );
   const first = controls[0];
   const last = controls[controls.length - 1];
