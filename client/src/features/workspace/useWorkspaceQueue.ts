@@ -30,6 +30,9 @@ export function useWorkspaceQueue() {
   const confirmMutation = useMutation(
     workspaceRpc.jobs.confirm.mutationOptions(),
   );
+  const selectFilesMutation = useMutation(
+    workspaceRpc.jobs.selectFiles.mutationOptions(),
+  );
   const retryMutation = useMutation(workspaceRpc.jobs.retry.mutationOptions());
   const removeMutation = useMutation(
     workspaceRpc.jobs.remove.mutationOptions(),
@@ -53,6 +56,8 @@ export function useWorkspaceQueue() {
   }
 
   return {
+    selectFiles: (id: string, fileIds: string[]) =>
+      control(selectFilesMutation.mutateAsync({ id, fileIds })),
     cancel: (id: string) => control(cancelMutation.mutateAsync({ id })),
     confirm: (id: string) => control(confirmMutation.mutateAsync({ id })),
     enqueue: (

@@ -44,6 +44,7 @@ async function createThumbnailApp(
       defaultQuality: "360p",
     }),
     runCommand,
+    trackVideoTask: (_session: Session, task: Promise<void>) => task,
   } as unknown as VideoRouteDependencies);
   return app;
 }

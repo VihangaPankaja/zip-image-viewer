@@ -62,6 +62,26 @@ describe("useKeyboardShortcuts", () => {
     video.remove();
   });
 
+  it("ignores handled events and controls that lose focus during activation", () => {
+    const setSlideshowOpen = vi.fn();
+    renderShortcuts({ selectedKind: "image", setSlideshowOpen });
+    const handled = new KeyboardEvent("keydown", {
+      key: "Enter",
+      cancelable: true,
+    });
+    handled.preventDefault();
+    window.dispatchEvent(handled);
+    const button = document.createElement("button");
+    document.body.append(button);
+    button.focus();
+    button.addEventListener("keydown", () => button.blur());
+    button.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+    );
+    expect(setSlideshowOpen).not.toHaveBeenCalled();
+    button.remove();
+  });
+
   it("cycles previewable video siblings with arrow keys", () => {
     const { setSelectedPath } = renderShortcuts();
 

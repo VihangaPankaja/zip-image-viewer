@@ -105,7 +105,13 @@ async function prepareTorrentEntries(
   extractDir: string,
   deps: ProcessorDependencies,
 ) {
-  const entries = await deps.listExtractedEntries(torrentDir);
+  const selectedPaths = new Set(
+    job.torrentFiles.filter((file) => file.selected).map((file) => file.path),
+  );
+  // Shared torrent pieces may also leave partial, unselected files on disk.
+  const entries = (await deps.listExtractedEntries(torrentDir)).filter(
+    (entry) => entry.type === "file" && selectedPaths.has(entry.relativePath),
+  );
   const files = entries.filter(({ type }) => type === "file");
   if (
     files.length === 1 &&
@@ -200,7 +206,7 @@ async function processTorrentJob(
     { adapter: deps.torrentAdapter, emitJob: deps.emitJob },
   );
   if (result === "paused") {
-    deps.closeJob(job, "awaiting_confirmation");
+    deps.closeJob(job, job.status);
     return;
   }
   const prepared = await prepareTorrentEntries(

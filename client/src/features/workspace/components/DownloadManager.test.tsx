@@ -31,6 +31,7 @@ describe("DownloadManager", () => {
           job({ id: "f86946a1-bcf7-4137-87c6-51502024367a", queuePosition: 1 }),
         ]}
         onCancel={vi.fn()}
+        onSelectFiles={vi.fn()}
         onConfirm={vi.fn()}
         onOpenSession={vi.fn()}
         onPause={onPause}
@@ -75,6 +76,7 @@ describe("DownloadManager", () => {
           }),
         ]}
         onCancel={vi.fn()}
+        onSelectFiles={vi.fn()}
         onConfirm={onConfirm}
         onOpenSession={vi.fn()}
         onPause={vi.fn()}
@@ -115,6 +117,7 @@ describe("DownloadManager", () => {
           }),
         ]}
         onCancel={vi.fn()}
+        onSelectFiles={vi.fn()}
         onConfirm={vi.fn().mockRejectedValue(new Error("Confirmation failed"))}
         onOpenSession={vi.fn()}
         onPause={vi.fn()}
@@ -147,6 +150,7 @@ describe("DownloadManager", () => {
           }),
         ]}
         onCancel={vi.fn()}
+        onSelectFiles={vi.fn()}
         onConfirm={vi.fn().mockResolvedValue(undefined)}
         onOpenSession={vi.fn()}
         onPause={vi.fn()}

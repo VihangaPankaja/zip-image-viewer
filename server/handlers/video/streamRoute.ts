@@ -49,7 +49,7 @@ function pipeTranscode(
   child.stderr.on("data", (chunk: Buffer) => {
     stderr += chunk.toString();
   });
-  req.on("close", () => {
+  res.on("close", () => {
     if (!child.killed) child.kill("SIGTERM");
   });
   child.on("error", () => {
@@ -81,16 +81,42 @@ export function registerVideoStreamRoute(
     const ffmpegPath = context && requireTranscoder(res, deps);
     if (!context || !ffmpegPath) return;
     const quality = queryText(req.query.quality, "source").toLowerCase();
-    const sourceDimensions = await deps.getVideoDimensions(context.targetPath);
+    const sourceDimensions = await deps.getVideoDimensions(
+      context.targetPath,
+      context.session,
+    );
     const { options } = deps.buildVideoQualityOptions(sourceDimensions.height);
     const selected = selectVideoQuality(options, quality);
     res.setHeader("cache-control", "no-store");
     res.type("video/mp4");
-    const child = spawn(
-      ffmpegPath,
-      buildTranscodeArgs(context.targetPath, selected.height),
-      { stdio: ["ignore", "pipe", "pipe"] },
-    );
-    pipeTranscode(req, res, deps, context, selected.quality, child);
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    res.once("close", abort);
+    try {
+      await deps.runVideoTask(
+        context.session,
+        (signal) =>
+          new Promise<void>((resolve, reject) => {
+            if (res.destroyed) {
+              resolve();
+              return;
+            }
+            const child = spawn(
+              ffmpegPath,
+              buildTranscodeArgs(context.targetPath, selected.height),
+              { stdio: ["ignore", "pipe", "pipe"], signal },
+            );
+            pipeTranscode(req, res, deps, context, selected.quality, child);
+            let failure: Error | undefined;
+            child.once("error", (error) => {
+              failure = error;
+            });
+            child.once("close", () => (failure ? reject(failure) : resolve()));
+          }),
+        controller.signal,
+      );
+    } finally {
+      res.removeListener("close", abort);
+    }
   });
 }

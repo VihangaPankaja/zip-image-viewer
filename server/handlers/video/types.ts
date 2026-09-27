@@ -1,3 +1,4 @@
+import type { VideoStoryboard } from "../../../shared/contracts.js";
 import type {
   Session,
   VideoQualityOption,
@@ -9,6 +10,20 @@ type ByteRange = { start: number; end: number };
 type VideoMetadata = { width: number; height: number; durationSeconds: number };
 
 export type VideoRouteDependencies = {
+  ensureVideoStoryboard: (
+    _session: Session,
+    _path: string,
+    _targetPath: string,
+  ) => Promise<VideoStoryboard>;
+  trackVideoTask: <Result>(
+    _session: Session | undefined,
+    _task: Promise<Result>,
+  ) => Promise<Result>;
+  runVideoTask: <Result>(
+    _session: Session | undefined,
+    _task: (_signal?: AbortSignal) => Promise<Result>,
+    _signal?: AbortSignal,
+  ) => Promise<Result>;
   touchSession: (_sessionId: string) => Session | undefined;
   sanitizeEntryPath: (_path: string) => string;
   getSessionQualityOutputPath: (
@@ -21,7 +36,10 @@ export type VideoRouteDependencies = {
     _size: number,
   ) => ByteRange | "invalid" | null;
   VIDEO_EXTENSIONS: ReadonlySet<string>;
-  getVideoMetadata: (_path: string) => Promise<VideoMetadata>;
+  getVideoMetadata: (
+    _path: string,
+    _session?: Session,
+  ) => Promise<VideoMetadata>;
   buildVideoQualityOptions: (_height: number) => {
     options: VideoQualityOption[];
     defaultQuality: string;
@@ -51,11 +69,18 @@ export type VideoRouteDependencies = {
   ) => Promise<void>;
   refreshRenditionAvailability: (_rendition: VideoRendition) => Promise<number>;
   DEFAULT_VIDEO_SEGMENT_SECONDS: number;
-  runCommand: (_command: string, _args: string[]) => Promise<void>;
+  runCommand: (
+    _command: string,
+    _args: string[],
+    _session?: Session,
+  ) => Promise<void>;
   waitForFile: (_path: string, _timeoutMs: number) => Promise<boolean>;
   getVideoTranscodeKey: (_sessionId: string, _path: string) => string;
   videoTranscodeStore: ReadonlyMap<string, VideoTranscodeEntry>;
-  getVideoDimensions: (_path: string) => Promise<{ height: number }>;
+  getVideoDimensions: (
+    _path: string,
+    _session?: Session,
+  ) => Promise<{ height: number }>;
   logEvent: (
     _level: "info" | "warn" | "error",
     _event: string,

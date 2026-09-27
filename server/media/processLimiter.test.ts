@@ -95,3 +95,16 @@ describe("ProcessLimiter", () => {
     expect(remove).toHaveBeenCalledWith("abort", expect.any(Function));
   });
 });
+
+it("does not start a task cancelled just after an immediate permit grant", async () => {
+  const limiter = new ProcessLimiter(1);
+  const controller = new AbortController();
+  const task = vi.fn(() => Promise.resolve());
+  const pending = limiter.run(task, controller.signal);
+  controller.abort();
+  await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+  expect(task).not.toHaveBeenCalled();
+  await expect(limiter.run(() => Promise.resolve("available"))).resolves.toBe(
+    "available",
+  );
+});

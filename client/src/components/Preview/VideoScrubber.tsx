@@ -1,3 +1,4 @@
+import type { VideoStoryboard } from "../../../../shared/contracts";
 import { useEffect, useRef, useState, type RefObject } from "react";
 
 type VideoScrubberProps = {
@@ -6,6 +7,49 @@ type VideoScrubberProps = {
   sessionId: string;
   videoRef: RefObject<HTMLVideoElement | null>;
 };
+
+function useStoryboard(sessionId: string, path: string) {
+  const source = JSON.stringify([sessionId, path]);
+  const [requested, setRequested] = useState<string | null>(null);
+  const [fallbackPosition, setFallbackPosition] = useState<number | null>(null);
+  const [index, setIndex] = useState<VideoStoryboard | null>(null);
+  useEffect(() => {
+    setRequested(null);
+    setIndex(null);
+    setFallbackPosition(null);
+  }, [sessionId, path]);
+  useEffect(() => {
+    if (requested !== source) return;
+    const controller = new AbortController();
+    const query = new URLSearchParams({ path });
+    void fetch(
+      `/api/sessions/${encodeURIComponent(sessionId)}/video/storyboard?${query.toString()}`,
+      { signal: controller.signal },
+    )
+      .then(async (response) => {
+        if (!response.ok) {
+          setFallbackPosition(null);
+          return;
+        }
+        const data = (await response.json()) as VideoStoryboard;
+        if (!controller.signal.aborted && data.frames.length) setIndex(data);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setFallbackPosition(null);
+      });
+    return () => controller.abort();
+  }, [requested, source, sessionId, path]);
+  return {
+    index: requested === source ? index : null,
+    fallbackPosition: requested === source ? fallbackPosition : null,
+    request: (position: number) => {
+      if (requested !== source) {
+        setRequested(source);
+        setFallbackPosition(position);
+      }
+    },
+  };
+}
 
 const THUMBNAIL_INTERVAL_SECONDS = 5;
 
@@ -97,9 +141,54 @@ function useVideoScrubPosition({
   return { duration, position, previewPosition, preview, commit, cancel };
 }
 
+function thumbnailProps(
+  props: VideoScrubberProps,
+  storyboard: VideoStoryboard | null,
+  previewPosition: number,
+  duration: number,
+) {
+  const frame = storyboard
+    ? storyboard.frames[
+        Math.min(
+          storyboard.frames.length - 1,
+          Math.max(0, Math.round(previewPosition / storyboard.intervalSeconds)),
+        )
+      ]
+    : null;
+  const sheetQuery = new URLSearchParams({
+    path: props.path,
+    sheet: String(frame?.sheet ?? 0),
+  });
+  return {
+    style:
+      frame && storyboard
+        ? {
+            width: `${String(storyboard.columns * 100)}%`,
+            height: `${String(storyboard.rows * 100)}%`,
+            maxWidth: "none",
+            transform: `translate(${(-frame.x / (storyboard.width * storyboard.columns)) * 100}%, ${(-frame.y / (storyboard.height * storyboard.rows)) * 100}%)`,
+          }
+        : undefined,
+    src: frame
+      ? `/api/sessions/${encodeURIComponent(props.sessionId)}/video/storyboard/sheet?${sheetQuery.toString()}`
+      : thumbnailUrl(
+          props.sessionId,
+          props.path,
+          props.quality,
+          previewPosition,
+          duration,
+        ),
+  };
+}
+
 export function VideoScrubber(props: VideoScrubberProps) {
   const { duration, position, previewPosition, preview, commit, cancel } =
     useVideoScrubPosition(props);
+  const {
+    index: storyboard,
+    fallbackPosition,
+    request: requestStoryboard,
+  } = useStoryboard(props.sessionId, props.path);
   if (!duration) return null;
   const displayedPosition = previewPosition ?? position;
   return (
@@ -107,11 +196,12 @@ export function VideoScrubber(props: VideoScrubberProps) {
       {previewPosition !== null && (
         <div className="video-scrubber-preview">
           <img
-            src={thumbnailUrl(
-              props.sessionId,
-              props.path,
-              props.quality,
-              previewPosition,
+            {...thumbnailProps(
+              props,
+              storyboard,
+              storyboard
+                ? previewPosition
+                : (fallbackPosition ?? previewPosition),
               duration,
             )}
             alt={`Preview at ${formatTime(previewPosition)}`}
@@ -129,7 +219,11 @@ export function VideoScrubber(props: VideoScrubberProps) {
           max={duration}
           step="0.25"
           value={displayedPosition}
-          onInput={(event) => preview(Number(event.currentTarget.value))}
+          onInput={(event) => {
+            const time = Number(event.currentTarget.value);
+            requestStoryboard(time);
+            preview(time);
+          }}
           onPointerUp={commit}
           onPointerCancel={cancel}
           onBlur={cancel}

@@ -173,6 +173,12 @@ describe("real download flows", () => {
       });
 
       await processJob(job);
+      expect(job.status).toBe("awaiting_selection");
+      expect(job.torrentFiles).toMatchObject([
+        { id: "0", size: expectedFile.length, selected: false },
+      ]);
+      job.torrentFiles[0].selected = true;
+      await processJob(job);
 
       expect(job.status).toBe("ready");
       expect(job.downloadedBytes).toBe(expectedFile.length);
@@ -278,6 +284,7 @@ describe("real download flows", () => {
       createJob: manager.createJob,
       enqueueJob: queue.enqueueSessionJob,
       confirmJob: queue.confirmSessionJob,
+      selectTorrentFiles: queue.selectTorrentFiles,
       listOrderedJobs: queue.getOrderedJobs,
       pauseJob: queue.pauseSessionJob,
       resumeJob: queue.resumeSessionJob,

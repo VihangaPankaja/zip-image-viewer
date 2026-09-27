@@ -1,6 +1,6 @@
 {
   "name": "zip-image-viewer",
-  "version": "3.4.1",
+  "version": "3.5.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@12.1.0",
@@ -34,6 +34,7 @@
     "screenshots:publish": "node tooling/publish-pr-screenshots.mjs",
     "check:roadmap": "node docs/app-roadmap.check.mjs",
     "benchmark:video": "tsx tests/benchmarks/videoLatency.ts",
+    "benchmark:storyboard": "tsx tests/benchmarks/videoStoryboard.ts",
     "start": "node build/server/index.js",
     "fallow:health": "fallow health --coverage coverage/coverage-final.json --min-score 88 --score",
     "fallow:audit": "fallow audit --base origin/master --gate new-only --brief",

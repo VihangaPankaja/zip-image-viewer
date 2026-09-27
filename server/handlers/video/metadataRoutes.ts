@@ -18,7 +18,10 @@ function createQualitiesHandler(deps: VideoRouteDependencies): RequestHandler {
       res.status(400).json({ error: "Selected file is not a video." });
       return;
     }
-    const source = await deps.getVideoMetadata(context.targetPath);
+    const source = await deps.getVideoMetadata(
+      context.targetPath,
+      context.session,
+    );
     const qualityConfig = deps.buildVideoQualityOptions(source.height);
     const preferredQuality =
       context.session.selectedVideoQuality || qualityConfig.defaultQuality;

@@ -5,6 +5,17 @@ import { downloadOptionsToSettings } from "../downloads/downloadOptions.js";
 import type { TorrentAdapter } from "./torrentDownloader.js";
 import { downloadTorrentSource } from "./downloadTorrentSource.js";
 
+function file(path = "image.jpg", size = 100) {
+  return {
+    id: "0",
+    path,
+    size,
+    selected: true,
+    downloadedBytes: 0,
+    complete: false,
+  };
+}
+
 function setup() {
   const emitJob = vi.fn((job: SessionJob, patch: Partial<SessionJob>) => {
     Object.assign(job, patch);
@@ -12,19 +23,48 @@ function setup() {
   const job = createJobManager(new Map(), vi.fn()).createJob(
     "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567",
   );
+  job.torrentFiles = [file()];
   job.abortController = new AbortController();
   const settings = downloadOptionsToSettings(job.downloadOptions);
   return { emitJob, job, settings };
 }
 
 describe("downloadTorrentSource", () => {
+  it("stops after metadata until the user selects files", async () => {
+    const { emitJob, job, settings } = setup();
+    job.torrentFiles = [];
+    const download = vi.fn<TorrentAdapter["download"]>(({ onMetadata }) => {
+      onMetadata({
+        files: [{ ...file(), selected: false }],
+        length: 100,
+        name: "fixture",
+      });
+      return Promise.resolve({ files: [] });
+    });
+    await expect(
+      downloadTorrentSource(
+        job,
+        settings,
+        { confirmOversize: false, downloadDir: "torrent" },
+        { adapter: { close: vi.fn(), download }, emitJob },
+      ),
+    ).resolves.toBe("paused");
+    expect(job).toMatchObject({
+      status: "awaiting_selection",
+      phase: "selecting",
+      torrentFiles: [{ id: "0", selected: false }],
+    });
+    expect(download).toHaveBeenCalledOnce();
+  });
+
   it("requires confirmation after metadata resolves for oversized torrents", async () => {
     const { emitJob, job, settings } = setup();
+    job.torrentFiles = [file("large.bin", 2 * 1024 ** 3)];
     const adapter: TorrentAdapter = {
       close: vi.fn(),
       download: vi.fn<TorrentAdapter["download"]>(({ onMetadata }) => {
         onMetadata({
-          files: ["large.bin"],
+          files: [file("large.bin", 2 * 1024 ** 3)],
           length: 2 * 1024 ** 3,
           name: "large",
         });
@@ -43,13 +83,67 @@ describe("downloadTorrentSource", () => {
     expect(job.status).toBe("awaiting_confirmation");
   });
 
+  it("confirms only the selected bytes and preserves the cached metadata", async () => {
+    const { emitJob, job, settings } = setup();
+    const torrentFile = new Uint8Array([1, 2]);
+    job.torrentMetadata = torrentFile;
+    job.url = "https://example.com/fixture.torrent";
+    const download = vi.fn<TorrentAdapter["download"]>(
+      ({ source, onMetadata }) => {
+        expect(source).toBe(torrentFile);
+        expect(
+          onMetadata({
+            files: [
+              file(),
+              { ...file("large.bin", 2 * 1024 ** 3), id: "1", selected: false },
+            ],
+            length: 2 * 1024 ** 3 + 100,
+            name: "fixture",
+            torrentFile,
+          }),
+        ).toEqual(["0"]);
+        return Promise.resolve({ files: ["image.jpg"] });
+      },
+    );
+    await expect(
+      downloadTorrentSource(
+        job,
+        settings,
+        { confirmOversize: false, downloadDir: "torrent" },
+        { adapter: { close: vi.fn(), download }, emitJob },
+      ),
+    ).resolves.toBe("complete");
+    expect(job.reportedSize).toBe(100);
+  });
+
+  it("rejects a selection if metadata no longer matches its files", async () => {
+    const { emitJob, job, settings } = setup();
+    settings.maxRetries = 0;
+    const download = vi.fn<TorrentAdapter["download"]>(({ onMetadata }) => {
+      onMetadata({
+        files: [file("changed.jpg")],
+        length: 100,
+        name: "changed",
+      });
+      return Promise.resolve({ files: [] });
+    });
+    await expect(
+      downloadTorrentSource(
+        job,
+        settings,
+        { confirmOversize: false, downloadDir: "torrent" },
+        { adapter: { close: vi.fn(), download }, emitJob },
+      ),
+    ).rejects.toThrow("metadata changed");
+  });
+
   it("reports peers, progress, no-peer stalls, retry, and indexing", async () => {
     const { emitJob, job, settings } = setup();
     const download = vi
       .fn<TorrentAdapter["download"]>()
       .mockRejectedValueOnce(new Error("temporary"))
       .mockImplementationOnce(({ onMetadata, onNoPeers, onProgress }) => {
-        onMetadata({ files: ["image.jpg"], length: 100, name: "fixture" });
+        onMetadata({ files: [file()], length: 100, name: "fixture" });
         onNoPeers();
         onProgress({
           downloadedBytes: 50,

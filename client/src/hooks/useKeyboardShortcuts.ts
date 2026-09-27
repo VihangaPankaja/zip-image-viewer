@@ -84,7 +84,13 @@ function handleKeyboardShortcut(
   event: KeyboardEvent,
   context: UseKeyboardShortcutsParams,
 ): void {
-  if (isInteractiveTarget(document.activeElement)) {
+  if (
+    event.defaultPrevented ||
+    isInteractiveTarget(
+      event.target instanceof Element ? event.target : null,
+    ) ||
+    isInteractiveTarget(document.activeElement)
+  ) {
     return;
   }
   if (handleVideoShortcut(event, context)) {

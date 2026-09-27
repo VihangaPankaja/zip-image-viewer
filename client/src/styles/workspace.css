@@ -503,7 +503,8 @@
   font-size: 0.7rem;
 }
 
-.download-status-message {
+.download-status-message,
+.torrent-selection-summary {
   margin: 0;
   overflow-wrap: anywhere;
   color: var(--text-muted);
@@ -1073,5 +1074,113 @@
 
   .draft-index {
     display: none;
+  }
+}
+
+.torrent-file-sheet {
+  grid-template-rows: auto auto minmax(80px, 1fr) auto auto;
+}
+.torrent-file-tools,
+.torrent-file-feedback {
+  padding: 12px var(--space-6);
+}
+.torrent-file-tools p,
+.torrent-file-feedback p {
+  margin: 0 0 8px;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+.torrent-file-tools label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.8125rem;
+}
+.torrent-file-tools input {
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  color: var(--text);
+}
+.torrent-file-bulk {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.torrent-file-bulk span {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.torrent-file-list {
+  min-height: 0;
+  overflow: auto;
+  padding: 0 var(--space-6);
+  border-block: 1px solid var(--border);
+}
+.torrent-file-fields,
+.torrent-file-group {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.torrent-file-group {
+  margin-block: 12px;
+}
+.torrent-file-group legend {
+  max-width: 100%;
+  padding: 0;
+}
+.torrent-file-choice {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+}
+.torrent-file-choice:hover {
+  background: var(--bg-inset);
+}
+.torrent-file-choice input {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+.torrent-file-choice span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.torrent-file-choice small {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--text-muted);
+}
+.torrent-folder-choice {
+  font-weight: 650;
+}
+.torrent-file-feedback p:last-child {
+  margin-bottom: 0;
+}
+.torrent-file-sheet > footer {
+  justify-content: end;
+  padding-block: 12px;
+}
+@media (max-width: 480px) {
+  .torrent-file-sheet > header,
+  .torrent-file-tools,
+  .torrent-file-feedback,
+  .torrent-file-list,
+  .torrent-file-sheet > footer {
+    padding-inline: 14px;
+  }
+  .torrent-file-sheet > header {
+    padding-block: 12px;
   }
 }

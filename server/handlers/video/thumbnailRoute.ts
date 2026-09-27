@@ -8,6 +8,7 @@ import {
   resolveVideoContext,
   selectVideoQuality,
 } from "./routeContext.js";
+import { registerVideoStoryboardRoutes } from "./storyboardRoutes.js";
 import type { VideoRouteDependencies } from "./types.js";
 
 const pendingThumbnails = new Map<string, Promise<void>>();
@@ -41,6 +42,7 @@ export function registerVideoThumbnailRoute(
   app: Express,
   deps: VideoRouteDependencies,
 ): void {
+  registerVideoStoryboardRoutes(app, deps);
   app.get("/api/sessions/:id/video/thumbnail", async (req, res) => {
     const context = await resolveVideoContext(req, res, deps);
     const ffmpegPath = context && requireTranscoder(res, deps);
@@ -50,7 +52,10 @@ export function registerVideoThumbnailRoute(
     const requestedWidth =
       Number.parseInt(queryText(req.query.width, "240"), 10) || 240;
     const width = Math.max(120, Math.min(640, requestedWidth));
-    const source = await deps.getVideoMetadata(context.targetPath);
+    const source = await deps.getVideoMetadata(
+      context.targetPath,
+      context.session,
+    );
     const { options } = deps.buildVideoQualityOptions(source.height);
     const selected = selectVideoQuality(options, quality);
     const thumbDir = path.join(
@@ -77,17 +82,22 @@ export function registerVideoThumbnailRoute(
       let generation = pendingThumbnails.get(thumbPath);
       if (!generation) {
         generation = deps
-          .runCommand(
-            ffmpegPath,
-            buildThumbnailArgs(
-              context.targetPath,
-              `${thumbPath}.pending.jpg`,
-              roundedSeek,
-              width,
-              selected.height,
-            ),
+          .trackVideoTask(
+            context.session,
+            deps
+              .runCommand(
+                ffmpegPath,
+                buildThumbnailArgs(
+                  context.targetPath,
+                  `${thumbPath}.pending.jpg`,
+                  roundedSeek,
+                  width,
+                  selected.height,
+                ),
+                context.session,
+              )
+              .then(() => rename(`${thumbPath}.pending.jpg`, thumbPath)),
           )
-          .then(() => rename(`${thumbPath}.pending.jpg`, thumbPath))
           .finally(() => pendingThumbnails.delete(thumbPath));
         pendingThumbnails.set(thumbPath, generation);
       }

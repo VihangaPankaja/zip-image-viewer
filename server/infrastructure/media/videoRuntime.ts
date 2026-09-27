@@ -1,17 +1,23 @@
+import type { VideoStoryboard } from "../../../shared/contracts.js";
 import { access, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import type {
   Session,
-  VideoQualityOption,
   VideoRendition,
   VideoTranscodeEntry,
 } from "../../domain/models.js";
 import { buildFmp4HlsArgs } from "../../media/ffmpegHls.js";
+import { publishedSegments } from "../../media/hlsManifest.js";
 import {
-  calculateRenditions,
-  publishedSegments,
-} from "../../media/hlsManifest.js";
+  durationFromOutput,
+  dimensionsFromOutput,
+  qualityOptions,
+} from "../../media/videoMetadata.js";
+import {
+  generateStoryboard,
+  storyboardDirectory,
+} from "../../media/videoStoryboard.js";
 import { ProcessLimiter } from "../../media/processLimiter.js";
 import { errorFromUnknown } from "../runtime/mediaClassification.js";
 import { runCommand, runCommandCapture } from "../process/commandRunner.js";
@@ -19,56 +25,113 @@ import { runCommand, runCommandCapture } from "../process/commandRunner.js";
 const SEGMENT_SECONDS = 4;
 const processLimiter = new ProcessLimiter(2);
 type VideoMetadata = { width: number; height: number; durationSeconds: number };
+type SessionWork = {
+  controller: AbortController;
+  pending: Set<Promise<unknown>>;
+  metadata: Map<string, Promise<VideoMetadata>>;
+  storyboards: Map<string, Promise<VideoStoryboard>>;
+};
 type LogEvent = (
   _level: "info" | "warn" | "error",
   _event: string,
   _details?: Record<string, unknown>,
 ) => void;
 
-function durationFromOutput(output: string): number {
-  const match = output.match(/Duration:\s*(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)/);
-  if (!match) return 0;
-  const hours = Number.parseInt(match[1], 10);
-  const minutes = Number.parseInt(match[2], 10);
-  const seconds = Number.parseFloat(match[3]);
-  return hours * 3600 + minutes * 60 + seconds;
-}
-
-function dimensionsFromOutput(output: string): {
-  width: number;
-  height: number;
-} {
-  const videoLine = output
-    .split(/\r?\n/)
-    .find((line) => line.includes("Video:"));
-  const match = videoLine?.match(/\b(\d{2,5})x(\d{2,5})\b/);
-  return {
-    width: Number.parseInt(match?.[1] ?? "0", 10),
-    height: Number.parseInt(match?.[2] ?? "0", 10),
-  };
-}
-
-function qualityOptions(metadata: VideoMetadata): {
-  options: VideoQualityOption[];
-  defaultQuality: string;
-} {
-  const options: VideoQualityOption[] = [
-    { id: "source", label: "Original", height: metadata.height },
-    ...calculateRenditions(metadata)
-      .filter(({ id }) => id !== "source")
-      .map(({ id, height }) => ({ id, label: id, height })),
-  ];
-  return {
-    options,
-    defaultQuality: options.some(({ id }) => id === "720p")
-      ? "720p"
-      : (options.at(-1)?.id ?? "source"),
-  };
-}
-
 class VideoRuntime {
   readonly segmentSeconds = SEGMENT_SECONDS;
-  readonly runCommand = runCommand;
+  private readonly sessions = new WeakMap<Session, SessionWork>();
+
+  private sessionWork(session: Session): SessionWork {
+    let work = this.sessions.get(session);
+    if (!work) {
+      work = {
+        controller: new AbortController(),
+        pending: new Set(),
+        metadata: new Map(),
+        storyboards: new Map(),
+      };
+      this.sessions.set(session, work);
+    }
+    return work;
+  }
+
+  trackVideoTask = <Result>(
+    session: Session | undefined,
+    task: Promise<Result>,
+  ): Promise<Result> => {
+    if (!session) return task;
+    const work = this.sessionWork(session);
+    work.pending.add(task);
+    void task.finally(() => work.pending.delete(task)).catch(() => undefined);
+    return task;
+  };
+
+  runVideoTask = <Result>(
+    session: Session | undefined,
+    task: (_signal?: AbortSignal) => Promise<Result>,
+    requestSignal?: AbortSignal,
+  ): Promise<Result> => {
+    const sessionSignal =
+      session && this.sessionWork(session).controller.signal;
+    const signal =
+      sessionSignal && requestSignal
+        ? AbortSignal.any([sessionSignal, requestSignal])
+        : (sessionSignal ?? requestSignal);
+    return this.trackVideoTask(
+      session,
+      processLimiter.run(() => {
+        this.logEvent("info", "video.process.started", {
+          sessionId: session?.id,
+        });
+        return task(signal);
+      }, signal),
+    );
+  };
+
+  runCommand = (
+    command: string,
+    args: string[],
+    session?: Session,
+  ): Promise<void> =>
+    this.runVideoTask(session, (signal) =>
+      runCommand(command, args, { signal }),
+    );
+
+  cleanupVideoSession = async (session: Session): Promise<void> => {
+    const work = this.sessionWork(session);
+    work.controller.abort();
+    await Promise.allSettled([...work.pending]);
+    work.metadata.clear();
+    work.storyboards.clear();
+  };
+
+  ensureVideoStoryboard = (
+    session: Session,
+    normalizedPath: string,
+    targetPath: string,
+  ): Promise<VideoStoryboard> => {
+    const work = this.sessionWork(session);
+    const existing = work.storyboards.get(normalizedPath);
+    if (existing) return existing;
+    const generation = this.trackVideoTask(
+      session,
+      (async () => {
+        work.controller.signal.throwIfAborted();
+        const metadata = await this.getVideoMetadata(targetPath, session);
+        const executable = this.ffmpegPath;
+        if (!executable) throw new Error("Video transcoder is unavailable.");
+        return generateStoryboard(
+          storyboardDirectory(session.workspaceDir, normalizedPath),
+          targetPath,
+          metadata.durationSeconds,
+          (args) => this.runCommand(executable, args, session),
+        );
+      })(),
+    );
+    work.storyboards.set(normalizedPath, generation);
+    void generation.catch(() => work.storyboards.delete(normalizedPath));
+    return generation;
+  };
 
   constructor(
     private readonly ffmpegPath: string | null,
@@ -79,17 +142,30 @@ class VideoRuntime {
   getVideoTranscodeKey = (sessionId: string, normalizedPath: string): string =>
     `${sessionId}:${normalizedPath}`;
 
-  getVideoMetadata = async (videoPath: string): Promise<VideoMetadata> => {
-    if (!this.ffmpegPath) return { width: 0, height: 0, durationSeconds: 0 };
-    const { stderr } = await runCommandCapture(
-      this.ffmpegPath,
-      ["-hide_banner", "-i", videoPath],
-      { allowNonZeroExit: true },
-    ).catch(() => ({ stdout: "", stderr: "" }));
-    return {
-      ...dimensionsFromOutput(stderr),
-      durationSeconds: durationFromOutput(stderr),
-    };
+  getVideoMetadata = (
+    videoPath: string,
+    session?: Session,
+  ): Promise<VideoMetadata> => {
+    const executable = this.ffmpegPath;
+    if (!executable)
+      return Promise.resolve({ width: 0, height: 0, durationSeconds: 0 });
+    const cached = session && this.sessionWork(session).metadata;
+    const existing = cached && cached.get(videoPath);
+    if (existing) return existing;
+    const metadata = this.runVideoTask(session, async (signal) => {
+      const { stderr } = await runCommandCapture(
+        executable,
+        ["-hide_banner", "-i", videoPath],
+        { allowNonZeroExit: true, signal },
+      );
+      return {
+        ...dimensionsFromOutput(stderr),
+        durationSeconds: durationFromOutput(stderr),
+      };
+    });
+    cached?.set(videoPath, metadata);
+    void metadata.catch(() => cached?.delete(videoPath));
+    return metadata;
   };
 
   ensureVideoTranscodeEntry = async (
@@ -100,7 +176,9 @@ class VideoRuntime {
     const key = this.getVideoTranscodeKey(session.id, normalizedPath);
     const existing = this.transcodes.get(key);
     if (existing) return existing;
-    const metadata = await this.getVideoMetadata(targetPath);
+    const metadata = await this.getVideoMetadata(targetPath, session);
+    const racedEntry = this.transcodes.get(key);
+    if (racedEntry) return racedEntry;
     const qualities = qualityOptions(metadata);
     const entry: VideoTranscodeEntry = {
       sessionId: session.id,
@@ -165,14 +243,13 @@ class VideoRuntime {
     return rendition.availableSegments;
   };
 
-  startRenditionTranscode = async (
+  startRenditionTranscode = (
     entry: VideoTranscodeEntry,
     session: Session,
     rendition: VideoRendition,
   ): Promise<void> => {
     const executable = this.ffmpegPath;
-    if (!executable || rendition.status !== "idle") return;
-    await mkdir(rendition.dir, { recursive: true });
+    if (!executable || rendition.status !== "idle") return Promise.resolve();
     rendition.status = "queued";
     const queuedAt = Date.now();
     rendition.queuedAt = queuedAt;
@@ -183,28 +260,29 @@ class VideoRuntime {
       quality: rendition.qualityId,
       cache: "miss",
     });
-    void processLimiter
-      .run(async () => {
-        startedAt = Date.now();
-        rendition.status = "running";
-        rendition.encoderWaitMs = startedAt - queuedAt;
-        this.logEvent("info", "video.transcode.started", {
-          sessionId: session.id,
-          path: entry.path,
-          quality: rendition.qualityId,
-          cache: "miss",
-          queueMs: startedAt - queuedAt,
-        });
-        await runCommand(
-          executable,
-          buildFmp4HlsArgs({
-            inputPath: entry.targetPath,
-            outputDirectory: rendition.dir,
-            height: rendition.selectedHeight,
-            segmentDurationSeconds: SEGMENT_SECONDS,
-          }),
-        );
-      })
+    void this.runVideoTask(session, async (signal) => {
+      await mkdir(rendition.dir, { recursive: true });
+      startedAt = Date.now();
+      rendition.status = "running";
+      rendition.encoderWaitMs = startedAt - queuedAt;
+      this.logEvent("info", "video.transcode.started", {
+        sessionId: session.id,
+        path: entry.path,
+        quality: rendition.qualityId,
+        cache: "miss",
+        queueMs: startedAt - queuedAt,
+      });
+      await runCommand(
+        executable,
+        buildFmp4HlsArgs({
+          inputPath: entry.targetPath,
+          outputDirectory: rendition.dir,
+          height: rendition.selectedHeight,
+          segmentDurationSeconds: SEGMENT_SECONDS,
+        }),
+        { signal },
+      );
+    })
       .then(async () => {
         await this.refreshRenditionAvailability(rendition);
         rendition.status = "done";
@@ -226,6 +304,7 @@ class VideoRuntime {
           error: errorFromUnknown(error).message,
         });
       });
+    return Promise.resolve();
   };
 
   waitForFile = async (
@@ -245,8 +324,8 @@ class VideoRuntime {
     return false;
   };
 
-  getVideoDimensions = async (videoPath: string) => {
-    const { width, height } = await this.getVideoMetadata(videoPath);
+  getVideoDimensions = async (videoPath: string, session?: Session) => {
+    const { width, height } = await this.getVideoMetadata(videoPath, session);
     return { width, height };
   };
 

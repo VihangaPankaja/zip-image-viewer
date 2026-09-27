@@ -40,6 +40,7 @@ function dependencies(): ServerRpcDependencies {
       phase: "queued",
       requiresConfirmation: false,
     })),
+    selectFiles: vi.fn(() => job()),
     retryJob: vi.fn(() => job("f86946a1-bcf7-4137-87c6-51502024367a")),
     pauseJob: vi.fn((): Job => ({
       ...job(),
@@ -105,6 +106,22 @@ describe("createServerRpcRouter", () => {
       requiresConfirmation: false,
     });
     expect(deps.confirmJob).toHaveBeenCalledWith(id);
+  });
+
+  it("validates file selection before invoking the torrent control", async () => {
+    const deps = dependencies();
+    const router = createServerRpcRouter(deps);
+    const id = job().id;
+    for (const fileIds of [[], ["0", "0"]]) {
+      await expect(
+        call(router.jobs.selectFiles, { id, fileIds }),
+      ).rejects.toThrow();
+    }
+    expect(deps.selectFiles).not.toHaveBeenCalled();
+    await expect(
+      call(router.jobs.selectFiles, { id, fileIds: ["0"] }),
+    ).resolves.toMatchObject({ status: "queued" });
+    expect(deps.selectFiles).toHaveBeenCalledWith(id, ["0"]);
   });
 
   it("exposes pause, resume, remove, reorder, and scheduler controls", async () => {

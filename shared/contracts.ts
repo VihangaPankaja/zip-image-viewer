@@ -80,6 +80,7 @@ const jobStatusSchema = z.enum([
   "downloading",
   "extracting",
   "awaiting_confirmation",
+  "awaiting_selection",
   "paused",
   "ready",
   "cancelled",
@@ -93,11 +94,22 @@ const jobPhaseSchema = z.enum([
   "indexing",
   "extracting",
   "confirm",
+  "selecting",
   "paused",
   "ready",
   "cancelled",
   "error",
 ]);
+
+const torrentFileSchema = z.object({
+  id: z.string().min(1),
+  path: safeRelativePathSchema,
+  size: z.number().int().nonnegative(),
+  selected: z.boolean(),
+  downloadedBytes: z.number().nonnegative(),
+  complete: z.boolean(),
+});
+export type TorrentFile = z.infer<typeof torrentFileSchema>;
 
 export const jobSchema = z.object({
   id: z.uuid(),
@@ -105,6 +117,7 @@ export const jobSchema = z.object({
   sourceKind: z.enum(["http", "torrent"]).default("http"),
   sourcePreference: sourcePreferenceSchema.default("auto"),
   status: jobStatusSchema,
+  torrentFiles: z.array(torrentFileSchema).default([]),
   phase: jobPhaseSchema,
   percent: z.number().min(0).max(100).nullable(),
   downloadedBytes: z.number().nonnegative().default(0),
@@ -188,6 +201,19 @@ const enqueueSessionsContract = oc
   .output(z.object({ items: z.array(jobSchema) }));
 
 const jobControlInputSchema = z.object({ id: z.uuid() });
+const selectTorrentFilesInputSchema = jobControlInputSchema.extend({
+  fileIds: z
+    .array(z.string().min(1))
+    .min(1)
+    .refine(
+      (ids) => new Set(ids).size === ids.length,
+      "File IDs must be unique.",
+    ),
+});
+const selectTorrentFilesContract = oc
+  .route({ method: "POST", path: "/session-jobs/{id}/files" })
+  .input(selectTorrentFilesInputSchema)
+  .output(jobSchema);
 const cancelJobContract = oc
   .route({ method: "POST", path: "/session-jobs/{id}/cancel" })
   .input(jobControlInputSchema)
@@ -244,6 +270,7 @@ export const serverContract = {
     enqueue: enqueueSessionsContract,
     cancel: cancelJobContract,
     confirm: confirmJobContract,
+    selectFiles: selectTorrentFilesContract,
     retry: retryJobContract,
     pause: pauseJobContract,
     resume: resumeJobContract,
@@ -261,3 +288,12 @@ export type EnqueueSessionsInput = z.infer<typeof enqueueSessionsInputSchema>;
 export type Job = z.infer<typeof jobSchema>;
 export type SessionSummary = z.infer<typeof sessionSchema>;
 export type SchedulerSettings = z.infer<typeof schedulerSettingsSchema>;
+
+export type VideoStoryboard = {
+  intervalSeconds: number;
+  width: number;
+  height: number;
+  columns: number;
+  rows: number;
+  frames: { time: number; sheet: number; x: number; y: number }[];
+};
