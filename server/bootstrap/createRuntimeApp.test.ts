@@ -31,7 +31,16 @@ describe("createRuntimeApp", () => {
       });
       return job;
     });
+    const videoQualities = vi.fn(() =>
+      Promise.resolve({
+        path: "clip.mp4",
+        source: { width: 640, height: 360, durationSeconds: 10 },
+        options: [{ id: "source", label: "Original", height: null }],
+        defaultQuality: "source",
+      }),
+    );
     const app = createRuntimeApp({
+      videoQualities,
       metrics: { getSessionCount: () => 0, getJobCount: () => jobs.size },
       distDir: path.resolve("dist"),
       jobs,
@@ -70,6 +79,13 @@ describe("createRuntimeApp", () => {
         status: "queued",
         phase: "queued",
         requiresConfirmation: false,
+      });
+      await expect(
+        rpc.video.qualities({ sessionId: job.id, path: "clip.mp4" }),
+      ).resolves.toMatchObject({ path: "clip.mp4", defaultQuality: "source" });
+      expect(videoQualities).toHaveBeenCalledWith({
+        sessionId: job.id,
+        path: "clip.mp4",
       });
       expect(confirmJob).toHaveBeenCalledWith(job.id);
       expect(job.cleanupAt).toBe(0);

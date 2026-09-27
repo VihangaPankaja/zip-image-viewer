@@ -22,6 +22,7 @@ import { registerRuntimeLifecycle } from "./bootstrap/runtimeLifecycle.js";
 import type { SessionJob } from "./domain/models.js";
 import { registerBaseRoutes } from "./bootstrap/registerRoutes.js";
 import { registerSessionRoutes } from "./handlers/sessions.js";
+import { getVideoQualities } from "./handlers/video/metadataRoutes.js";
 import { registerVideoRoutes } from "./handlers/videoRoutes.js";
 import { registerFileRoutes } from "./handlers/fileRoutes.js";
 import { createSessionJobQueue } from "./application/jobs/sessionJobQueue.js";
@@ -81,7 +82,6 @@ const videoRuntime = createVideoRuntime({
   logEvent,
 });
 const {
-  buildVideoQualityOptions,
   ensureVideoTranscodeEntry,
   ensureVideoStoryboard,
   cleanupVideoSession,
@@ -172,6 +172,14 @@ async function removeSessionJob(jobId: string): Promise<void> {
 }
 
 const app = createRuntimeApp({
+  videoQualities: (input) =>
+    getVideoQualities(input, {
+      touchSession,
+      sanitizeEntryPath: container.runtime.sanitizeEntryPath,
+      VIDEO_EXTENSIONS,
+      getVideoMetadata,
+      buildVideoQualityOptions: videoRuntime.buildVideoQualityOptions,
+    }),
   metrics: container.metrics,
   distDir,
   jobs: jobStore,
@@ -311,7 +319,7 @@ registerVideoRoutes(app, {
   parseRangeHeader: container.runtime.parseRangeHeader,
   VIDEO_EXTENSIONS,
   getVideoMetadata,
-  buildVideoQualityOptions,
+  buildVideoQualityOptions: videoRuntime.buildVideoQualityOptions,
   parseSeekSeconds,
   ensureVideoTranscodeEntry,
   getRenditionState,

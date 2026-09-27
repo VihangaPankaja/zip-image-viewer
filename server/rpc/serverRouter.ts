@@ -1,4 +1,4 @@
-import { implement } from "@orpc/server";
+import { implement, ORPCError } from "@orpc/server";
 import {
   serverContract,
   type CreateSessionInput,
@@ -6,9 +6,14 @@ import {
   type Job,
   type SchedulerSettings,
   type SessionSummary,
+  type VideoQualities,
+  type VideoQualitiesInput,
 } from "../../shared/contracts.js";
 
+import { ApplicationError } from "../domain/models.js";
+
 export type ServerRpcDependencies = {
+  videoQualities: (_input: VideoQualitiesInput) => Promise<VideoQualities>;
   listJobs: () => readonly Job[];
   listSessions: () => readonly SessionSummary[];
   createJob: (_input: CreateSessionInput) => Job | Promise<Job>;
@@ -30,6 +35,21 @@ export type ServerRpcDependencies = {
 export function createServerRpcRouter(deps: ServerRpcDependencies) {
   const contract = implement(serverContract);
   return contract.router({
+    video: {
+      qualities: contract.video.qualities.handler(async ({ input }) => {
+        try {
+          return await deps.videoQualities(input);
+        } catch (error) {
+          if (error instanceof ApplicationError) {
+            throw new ORPCError(error.code, {
+              status: error.status,
+              message: error.message,
+            });
+          }
+          throw error;
+        }
+      }),
+    },
     sessions: {
       create: contract.sessions.create.handler(({ input }) =>
         deps.createJob(input),

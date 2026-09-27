@@ -114,20 +114,22 @@ test("switches HLS quality and resumes real playback after reopening", async ({
         },
       }),
     );
-    await page.route(
-      `**/api/sessions/${sessionId}/video/qualities?*`,
-      (route) =>
-        route.fulfill({
+    await page.route("**/rpc/video/qualities", (route) =>
+      route.fulfill({
+        json: {
           json: {
+            path: filePath,
+            source: { width: 1280, height: 720, durationSeconds: 30 },
             defaultQuality: "auto",
             options: [
-              { id: "source", label: "Original" },
-              { id: "auto", label: "Auto" },
-              { id: "360p", label: "360p" },
-              { id: "720p", label: "720p" },
+              { id: "source", label: "Original", height: 720 },
+              { id: "auto", label: "Auto", height: null },
+              { id: "360p", label: "360p", height: 360 },
+              { id: "720p", label: "720p", height: 720 },
             ],
           },
-        }),
+        },
+      }),
     );
     await page.route(
       `**/api/sessions/${sessionId}/video/hls/**`,

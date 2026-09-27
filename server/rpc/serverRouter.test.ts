@@ -1,5 +1,6 @@
 import { call } from "@orpc/server";
 import { describe, expect, it, vi } from "vitest";
+import { ApplicationError } from "../domain/models.js";
 import { jobSchema, type Job } from "../../shared/contracts.js";
 import {
   createServerRpcRouter,
@@ -22,6 +23,14 @@ function job(id = "2bf886fc-65bf-4e2f-b973-b607766b3131"): Job {
 
 function dependencies(): ServerRpcDependencies {
   return {
+    videoQualities: vi.fn(() =>
+      Promise.resolve({
+        path: "clip.mp4",
+        source: { width: 1280, height: 720, durationSeconds: 30 },
+        options: [{ id: "source", label: "Original", height: null }],
+        defaultQuality: "source",
+      }),
+    ),
     listJobs: () => [job()],
     listSessions: () => [],
     createJob: vi.fn(() => job()),
@@ -146,5 +155,50 @@ describe("createServerRpcRouter", () => {
     await expect(
       call(router.scheduler.update, { maxConcurrent: 4 }),
     ).resolves.toEqual({ activeCount: 0, maxConcurrent: 4 });
+  });
+});
+
+it("validates video metadata paths and output through the contract", async () => {
+  const deps = dependencies();
+  const router = createServerRpcRouter(deps);
+  const input = { sessionId: job().id, path: "clip.mp4" };
+  await expect(call(router.video.qualities, input)).resolves.toMatchObject({
+    path: "clip.mp4",
+    defaultQuality: "source",
+  });
+  expect(deps.videoQualities).toHaveBeenCalledWith(input);
+  vi.mocked(deps.videoQualities).mockClear();
+  for (const path of ["../secret.mp4", "/clip.mp4", "C:/clip.mp4", ""]) {
+    await expect(
+      call(router.video.qualities, { ...input, path }),
+    ).rejects.toThrow();
+  }
+  await expect(
+    call(router.video.qualities, { ...input, sessionId: "invalid" }),
+  ).rejects.toThrow();
+  expect(deps.videoQualities).not.toHaveBeenCalled();
+  vi.mocked(deps.videoQualities).mockResolvedValue({
+    path: "clip.mp4",
+    source: { width: -1, height: 720, durationSeconds: 30 },
+    options: [],
+    defaultQuality: "source",
+  });
+  await expect(call(router.video.qualities, input)).rejects.toThrow();
+});
+
+it("preserves missing-media errors over RPC", async () => {
+  const deps = dependencies();
+  vi.mocked(deps.videoQualities).mockRejectedValue(
+    new ApplicationError("NOT_FOUND", "File not found.", 404),
+  );
+  await expect(
+    call(createServerRpcRouter(deps).video.qualities, {
+      sessionId: job().id,
+      path: "missing.mp4",
+    }),
+  ).rejects.toMatchObject({
+    code: "NOT_FOUND",
+    status: 404,
+    message: "File not found.",
   });
 });

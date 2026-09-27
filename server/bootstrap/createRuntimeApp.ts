@@ -2,9 +2,14 @@ import type { Session, SessionJob } from "../domain/models.js";
 import { ApplicationError } from "../domain/models.js";
 import { isTerminalJobStatus } from "../infrastructure/runtime/runtimePrimitives.js";
 import { createApp } from "./createApp.js";
-import type { Job } from "../../shared/contracts.js";
+import type {
+  Job,
+  VideoQualities,
+  VideoQualitiesInput,
+} from "../../shared/contracts.js";
 
 type Dependencies = {
+  videoQualities: (_input: VideoQualitiesInput) => Promise<VideoQualities>;
   metrics: { getSessionCount: () => number; getJobCount: () => number };
   distDir: string;
   jobs: Map<string, SessionJob>;
@@ -49,6 +54,7 @@ export function createRuntimeApp(deps: Dependencies) {
     listJobs,
     listSessions,
     rpc: {
+      videoQualities: deps.videoQualities,
       listJobs,
       listSessions,
       createJob: (input) => {
