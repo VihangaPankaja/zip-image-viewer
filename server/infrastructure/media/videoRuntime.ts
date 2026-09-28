@@ -70,6 +70,7 @@ class VideoRuntime {
     session: Session | undefined,
     task: (_signal?: AbortSignal) => Promise<Result>,
     requestSignal?: AbortSignal,
+    priority: "interactive" | "background" = "interactive",
   ): Promise<Result> => {
     const sessionSignal =
       session && this.sessionWork(session).controller.signal;
@@ -77,14 +78,15 @@ class VideoRuntime {
       sessionSignal && requestSignal
         ? AbortSignal.any([sessionSignal, requestSignal])
         : (sessionSignal ?? requestSignal);
+    const start = () => {
+      this.logEvent("info", "video.process.started", {
+        sessionId: session?.id,
+      });
+      return task(signal);
+    };
     return this.trackVideoTask(
       session,
-      processLimiter.run(() => {
-        this.logEvent("info", "video.process.started", {
-          sessionId: session?.id,
-        });
-        return task(signal);
-      }, signal),
+      processLimiter.run(start, signal, priority),
     );
   };
 
@@ -260,7 +262,7 @@ class VideoRuntime {
       quality: rendition.qualityId,
       cache: "miss",
     });
-    void this.runVideoTask(session, async (signal) => {
+    const encode = async (signal?: AbortSignal) => {
       await mkdir(rendition.dir, { recursive: true });
       startedAt = Date.now();
       rendition.status = "running";
@@ -282,7 +284,8 @@ class VideoRuntime {
         }),
         { signal },
       );
-    })
+    };
+    void this.runVideoTask(session, encode, undefined, "background")
       .then(async () => {
         await this.refreshRenditionAvailability(rendition);
         rendition.status = "done";

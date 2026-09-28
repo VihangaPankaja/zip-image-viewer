@@ -46,6 +46,39 @@ describe("ProcessLimiter", () => {
     expect(peak).toBe(2);
   });
 
+  it("reserves preview capacity and gives a waiting encode the next opening", async () => {
+    const limiter = new ProcessLimiter(2);
+    const started: string[] = [];
+    const releases = new Map<string, () => void>();
+    const run = (name: string, priority: "interactive" | "background") =>
+      limiter.run(
+        () => {
+          started.push(name);
+          return new Promise<void>((resolve) => releases.set(name, resolve));
+        },
+        undefined,
+        priority,
+      );
+
+    const firstEncode = run("encode 1", "background");
+    const secondEncode = run("encode 2", "background");
+    const firstPreview = run("preview 1", "interactive");
+    const secondPreview = run("preview 2", "interactive");
+    await vi.waitFor(() => expect(started).toEqual(["encode 1", "preview 1"]));
+
+    releases.get("encode 1")?.();
+    await firstEncode;
+    await vi.waitFor(() =>
+      expect(started).toEqual(["encode 1", "preview 1", "encode 2"]),
+    );
+    releases.get("preview 1")?.();
+    await firstPreview;
+    await vi.waitFor(() => expect(started).toContain("preview 2"));
+    releases.get("encode 2")?.();
+    releases.get("preview 2")?.();
+    await Promise.all([secondEncode, secondPreview]);
+  });
+
   it("rejects a queued task when its signal is cancelled", async () => {
     const limiter = new ProcessLimiter(1);
     let release: (() => void) | undefined;

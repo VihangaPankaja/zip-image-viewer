@@ -1,6 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
+import { rmSync } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import sharp from "sharp";
 import { jobSchema, type Job } from "../../shared/contracts";
@@ -15,7 +17,10 @@ export const filenames = [
   "04-audio.wav",
   "05-archive.zip",
 ];
-const mediaDirectory = path.resolve(`test-results/review-media-${process.pid}`);
+const mediaDirectory = path.join(tmpdir(), `ziv-review-media-${process.pid}`);
+process.on("exit", () =>
+  rmSync(mediaDirectory, { recursive: true, force: true }),
+);
 
 export async function prepareMedia() {
   await mkdir(mediaDirectory, { recursive: true });
