@@ -373,9 +373,7 @@ for (const device of devices) {
           await expect
             .poll(activeText)
             .toEqual(["Morning light along the coast"]);
-          await page
-            .getByRole("button", { name: "Load subtitles", exact: true })
-            .scrollIntoViewIfNeeded();
+          await page.locator(".video-subtitle-note").scrollIntoViewIfNeeded();
           await save(page, device, theme, "video-subtitles-loaded");
           await page
             .getByRole("combobox", { name: "Caption size" })
@@ -391,6 +389,7 @@ for (const device of devices) {
           await expect
             .poll(activeText)
             .toEqual(["Morning light along the coast"]);
+          await page.locator(".video-subtitle-note").scrollIntoViewIfNeeded();
           await save(page, device, theme, "video-subtitles-adjusted");
           await upload.setInputFiles({
             name: "broken.srt",
