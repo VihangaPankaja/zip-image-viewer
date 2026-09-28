@@ -217,6 +217,33 @@ export function reviewTorrentJob(): Job {
   });
 }
 
+export function reviewActiveTorrentJob(): Job {
+  const job = reviewTorrentJob();
+  return {
+    ...job,
+    status: "downloading",
+    phase: "downloading",
+    percent: 60,
+    canPause: true,
+    message: "Downloading selected files. Transfer progress is simulated.",
+    torrentFiles: job.torrentFiles.map((file, index) => ({
+      ...file,
+      selected: index !== 3,
+      complete: index === 0,
+      downloadedBytes:
+        index === 0 ? file.size : index === 3 ? 0 : Math.floor(file.size / 2),
+    })),
+  };
+}
+
+export const reviewSubtitles = {
+  name: "Coastal field notes.srt",
+  mimeType: "application/x-subrip",
+  buffer: Buffer.from(
+    "1\n00:00:01,000 --> 00:00:03,000\nMorning light along the coast\n\n2\n00:00:04,000 --> 00:00:07,000\nWaves meet the shore\n",
+  ),
+};
+
 export async function installReviewFixtures(page: Page) {
   const state = {
     jobs: [] as (ReturnType<typeof reviewJobs>[number] | Job)[],

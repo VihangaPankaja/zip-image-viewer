@@ -1,61 +1,7 @@
-import express from "express";
-import { once } from "node:events";
-import { request } from "node:http";
-import path from "node:path";
 import AxeBuilder from "@axe-core/playwright";
-import {
-  expect,
-  test as base,
-  type Page,
-  type Locator,
-} from "@playwright/test";
-import {
-  filenames,
-  installReviewFixtures,
-  prepareMedia,
-} from "../review/fixtures";
-
-const test = base.extend<{ appOrigin: string }>({
-  appOrigin: async ({ baseURL }, provide) => {
-    if (!baseURL) throw new Error("The app base URL is required.");
-    const mediaDirectory = await prepareMedia();
-    const app = express();
-    app.get("/api/sessions/:id/video/play", (_req, res) =>
-      res.sendFile(path.join(mediaDirectory, "sample.mp4")),
-    );
-    app.use((req, res) => {
-      const upstream = request(
-        new URL(req.originalUrl, baseURL),
-        {
-          method: req.method,
-          headers: { ...req.headers, host: new URL(baseURL).host },
-        },
-        (response) => {
-          res.writeHead(response.statusCode ?? 502, response.headers);
-          response.pipe(res);
-        },
-      );
-      upstream.on("error", () => {
-        if (!res.headersSent) res.status(502);
-        res.end();
-      });
-      req.pipe(upstream);
-    });
-    const server = app.listen(0, "127.0.0.1");
-    await once(server, "listening");
-    try {
-      const address = server.address();
-      if (!address || typeof address === "string")
-        throw new Error("Media fixture did not bind.");
-      await provide("http://127.0.0.1:" + String(address.port));
-    } finally {
-      server.closeAllConnections();
-      await new Promise<void>((resolve, reject) =>
-        server.close((error) => (error ? reject(error) : resolve())),
-      );
-    }
-  },
-});
+import { expect, type Page, type Locator } from "@playwright/test";
+import { test } from "./media-fixture";
+import { filenames, installReviewFixtures } from "../review/fixtures";
 
 async function keyboardActivate(page: Page, control: Locator) {
   await control.focus();
@@ -133,7 +79,7 @@ test("keyboard adds a torrent, reviews files, starts selection, seeks and closes
   await expect(dialog).toHaveCount(0);
   expect(state.selectedFileIds).toEqual(["0"]);
   await expect(
-    page.getByRole("heading", { name: "Downloads", exact: true }),
+    page.getByRole("button", { name: "View files", exact: true }),
   ).toBeFocused();
   await expect(
     page.locator(".download-row-title").getByRole("status"),
