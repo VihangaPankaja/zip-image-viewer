@@ -8,6 +8,8 @@ import {
   prepareMedia,
   reviewJobs,
   reviewTorrentJob,
+  reviewActiveTorrentJob,
+  reviewSubtitles,
 } from "./fixtures";
 
 const output = path.resolve("test-results/pr-screenshots");
@@ -218,6 +220,53 @@ for (const device of devices) {
         "Downloading selected files",
       );
       await save(page, device, theme, "torrent-selection-started");
+      state.jobs = [reviewActiveTorrentJob()];
+      await page
+        .getByRole("button", { name: "View files", exact: true })
+        .click();
+      const fileStatus = page.getByRole("combobox", { name: "File status" });
+      await expect(page.getByText("4 of 4 files shown")).toBeVisible();
+      await expect(page.getByRole("dialog").getByRole("status")).toContainText(
+        "3 of 4 files selected",
+      );
+      await expect(
+        page.locator(".torrent-file-state").filter({ hasText: "Downloaded" }),
+      ).toHaveCount(1);
+      await save(page, device, theme, "torrent-file-states");
+      await fileStatus.selectOption("downloading");
+      await page
+        .getByRole("combobox", { name: "Media type" })
+        .selectOption("text");
+      await page
+        .getByRole("searchbox", { name: "Search files" })
+        .fill("location-notes");
+      await expect(page.getByText("1 of 4 files shown")).toBeVisible();
+      await save(page, device, theme, "torrent-state-filter");
+      await page.getByRole("searchbox", { name: "Search files" }).clear();
+      await page
+        .getByRole("combobox", { name: "Media type" })
+        .selectOption("all");
+      await fileStatus.selectOption("skipped");
+      await expect(page.getByText("1 of 4 files shown")).toBeVisible();
+      await save(page, device, theme, "torrent-skipped-files");
+      const readyJob = reviewActiveTorrentJob();
+      state.jobs = [
+        {
+          ...readyJob,
+          status: "ready",
+          phase: "ready",
+          percent: 100,
+          torrentFiles: readyJob.torrentFiles.map((file) => ({
+            ...file,
+            complete: file.selected,
+            downloadedBytes: file.selected ? file.size : 0,
+          })),
+        },
+      ];
+      await fileStatus.selectOption("available");
+      await expect(page.getByText("3 of 4 files shown")).toBeVisible();
+      await save(page, device, theme, "torrent-available-files");
+      await page.keyboard.press("Escape");
       state.jobs = [];
       await expect(page.locator(".download-row")).toHaveCount(0);
       await page.getByRole("tab", { name: "Explore" }).click();
@@ -305,6 +354,75 @@ for (const device of devices) {
             .toBe(true);
           await expect(thumbnail).toHaveCount(0);
           await save(page, device, theme, "video-seek-committed");
+          const video = page.getByLabel("Video preview");
+          const upload = page.getByLabel("Subtitle file", { exact: true });
+          await upload.setInputFiles(reviewSubtitles);
+          await video.evaluate((element: HTMLVideoElement) => {
+            element.currentTime = 2;
+          });
+          const activeText = () =>
+            video.evaluate((element: HTMLVideoElement) =>
+              Array.from(element.textTracks)
+                .filter((track) => track.mode === "showing")
+                .flatMap((track) =>
+                  Array.from(track.activeCues ?? []).map(
+                    (cue) => (cue as VTTCue).text,
+                  ),
+                ),
+            );
+          await expect
+            .poll(activeText)
+            .toEqual(["Morning light along the coast"]);
+          await page
+            .locator(".video-subtitle-note")
+            .evaluate((element) => element.scrollIntoView({ block: "end" }));
+          await page.evaluate(
+            (offset) => window.scrollBy(0, offset),
+            device.name === "Mobile" ? 96 : 32,
+          );
+          await save(page, device, theme, "video-subtitles-loaded");
+          await page
+            .getByRole("combobox", { name: "Caption size" })
+            .selectOption("large");
+          const offset = page.getByRole("spinbutton", {
+            name: "Caption offset (seconds)",
+          });
+          await offset.fill("2");
+          await offset.press("Tab");
+          await video.evaluate((element: HTMLVideoElement) => {
+            element.currentTime = 4;
+          });
+          await expect
+            .poll(activeText)
+            .toEqual(["Morning light along the coast"]);
+          await page
+            .locator(".video-subtitle-note")
+            .evaluate((element) => element.scrollIntoView({ block: "end" }));
+          await page.evaluate(
+            (offset) => window.scrollBy(0, offset),
+            device.name === "Mobile" ? 96 : 32,
+          );
+          await save(page, device, theme, "video-subtitles-adjusted");
+          await upload.setInputFiles({
+            name: "broken.srt",
+            mimeType: "text/plain",
+            buffer: Buffer.from("1\nnot a timestamp\nInvalid subtitle"),
+          });
+          await expect(page.getByRole("alert")).toBeVisible();
+          await page
+            .getByRole("alert")
+            .evaluate((element) => element.scrollIntoView({ block: "center" }));
+          await save(page, device, theme, "video-subtitles-error");
+          await upload.setInputFiles({
+            name: "Recovered.vtt",
+            mimeType: "text/vtt",
+            buffer: Buffer.from(
+              "WEBVTT\n\n00:00:00.000 --> 00:00:07.500\nRecovered coastal captions\n",
+            ),
+          });
+          await expect(page.getByRole("alert")).toHaveCount(0);
+          await expect.poll(activeText).toEqual(["Recovered coastal captions"]);
+          await save(page, device, theme, "video-subtitles-recovered");
         }
       }
       await selectFile(page, filenames[0], mobile);

@@ -47,6 +47,14 @@ const requiredScreens = [
   "explorer-filter-opened",
   "torrent-video-filter",
   "torrent-filter-selection",
+  "torrent-file-states",
+  "torrent-state-filter",
+  "torrent-skipped-files",
+  "torrent-available-files",
+  "video-subtitles-loaded",
+  "video-subtitles-adjusted",
+  "video-subtitles-error",
+  "video-subtitles-recovered",
 ];
 for (const device of ["Mobile", "Tablet", "Desktop", "Ultrawide"]) {
   for (const theme of ["light", "dark"]) {

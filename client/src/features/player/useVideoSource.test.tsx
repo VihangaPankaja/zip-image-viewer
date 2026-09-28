@@ -146,3 +146,28 @@ describe("video quality switching", () => {
     );
   });
 });
+
+it("preserves subtitle tracks when switching between Original and adaptive playback", async () => {
+  instances.length = 0;
+  const load = vi
+    .spyOn(HTMLMediaElement.prototype, "load")
+    .mockImplementation(() => {});
+  try {
+    const { container, rerender } = render(
+      <Harness quality="auto" file="one.mp4" />,
+    );
+    await waitFor(() => expect(instances).toHaveLength(1));
+    const video = container.querySelector("video");
+    if (!video) throw new Error("Video element missing.");
+    const track = document.createElement("track");
+    video.appendChild(track);
+    rerender(<Harness quality="source" file="one.mp4" />);
+    expect(video.contains(track)).toBe(true);
+    rerender(<Harness quality="auto" file="one.mp4" />);
+    await waitFor(() => expect(instances).toHaveLength(2));
+    expect(video.contains(track)).toBe(true);
+    expect(video.querySelector("source")).toBeNull();
+  } finally {
+    load.mockRestore();
+  }
+});
