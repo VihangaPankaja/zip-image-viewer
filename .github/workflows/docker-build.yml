@@ -79,3 +79,41 @@ jobs:
           docker run --rm --entrypoint node \
             --mount type=bind,source="$PWD/tests/integration/containerHlsSmoke.mjs",target=/app/tests/integration/containerHlsSmoke.mjs,readonly \
             ${{ env.IMAGE_NAME }}:latest /app/tests/integration/containerHlsSmoke.mjs
+
+      - name: Set up browser smoke dependencies
+        if: github.event_name == 'pull_request'
+        uses: pnpm/setup@v2
+        with:
+          cache: true
+          install: false
+      - if: github.event_name == 'pull_request'
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - if: github.event_name == 'pull_request'
+        run: pnpm install --frozen-lockfile
+      - if: github.event_name == 'pull_request'
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Play HLS through the production image in Chromium
+        if: github.event_name == 'pull_request'
+        run: |
+          container_id=$(docker run --detach --publish 127.0.0.1:8080:8080 \
+            --entrypoint node \
+            --mount type=bind,source="$PWD/tests/integration/containerBrowserFixture.mjs",target=/app/tests/integration/containerBrowserFixture.mjs,readonly \
+            ${{ env.IMAGE_NAME }}:latest /app/tests/integration/containerBrowserFixture.mjs)
+          trap 'docker logs "$container_id"; docker rm --force "$container_id"' EXIT
+          for attempt in {1..90}; do
+            if curl --fail --silent http://127.0.0.1:8080/health > /dev/null; then break; fi
+            sleep 1
+          done
+          node tests/integration/containerBrowserSmoke.mjs
+
+      - name: Publish container browser screenshot
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: container-browser-playback
+          path: test-results/container-playback.png
+          retention-days: 14
+          if-no-files-found: warn

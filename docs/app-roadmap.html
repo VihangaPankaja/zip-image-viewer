@@ -1641,7 +1641,7 @@
           plan: "Apply a shared media-work budget with deduplication and cancellation. Track running handles, wait for exit before cleanup and reserve capacity for interactive work. Add a disk budget and evict unused derived files.",
           done: "Rapid seeking and session deletion leave no orphan process. Disk use stays within budget while active segments and originals remain available.",
           depends: "V02",
-          note: "v3.5.0 shares the existing two-process budget across metadata probes, thumbnails, storyboards, HLS and streaming, coalesces cached work, and aborts/drains session media work before deleting files. Interactive priority reservation and aggregate disk-budget eviction remain planned; the per-video storyboard frame cap is not a global disk budget.",
+          note: "v3.5.0 shares the two-process budget across media work and drains it before session deletion. v3.8.0 reserves one slot for interactive requests while queued HLS encodes continue. Aggregate disk-budget eviction remains planned; the per-video storyboard frame cap is not a global disk budget.",
           evidence:
             "server/media/processLimiter.ts; server/infrastructure/media/videoRuntime.ts; server/handlers/video/thumbnailRoute.ts; server/application/sessions/sessionManager.ts",
         },
@@ -1689,7 +1689,7 @@
           plan: "Extend fixtures with long GOPs, variable frame rate, no audio and an unsupported codec. Run the built container and decode HLS in a browser. Add controlled network changes and random seeks.",
           done: "The container passes a real media smoke test. Missing init files, truncated segments, codec mismatches and broken seeks produce failures.",
           depends: "V02, V04",
-          note: "v3.3.6 adds long-GOP, variable-frame-rate, silent and codec-conversion fixtures plus a production-image FFmpeg smoke. Browser playback through the container and controlled network checks remain.",
+          note: "v3.3.6 adds long-GOP, variable-frame-rate, silent and codec-conversion fixtures plus a production-image FFmpeg smoke. v3.8.0 adds Chromium playback, throttled networking and repeated seeks through the built container in PR CI. Broader network conditions and seek coverage remain.",
           evidence:
             "tests/integration/ffmpegHlsFixture.test.ts; tests/integration/dockerfile.test.ts; .github/workflows/quality.yml",
         },
