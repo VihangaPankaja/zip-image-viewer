@@ -376,7 +376,10 @@ for (const device of devices) {
           await page
             .locator(".video-subtitle-note")
             .evaluate((element) => element.scrollIntoView({ block: "end" }));
-          await page.evaluate(() => window.scrollBy(0, 32));
+          await page.evaluate(
+            (offset) => window.scrollBy(0, offset),
+            device.name === "Mobile" ? 96 : 32,
+          );
           await save(page, device, theme, "video-subtitles-loaded");
           await page
             .getByRole("combobox", { name: "Caption size" })
@@ -395,7 +398,10 @@ for (const device of devices) {
           await page
             .locator(".video-subtitle-note")
             .evaluate((element) => element.scrollIntoView({ block: "end" }));
-          await page.evaluate(() => window.scrollBy(0, 32));
+          await page.evaluate(
+            (offset) => window.scrollBy(0, offset),
+            device.name === "Mobile" ? 96 : 32,
+          );
           await save(page, device, theme, "video-subtitles-adjusted");
           await upload.setInputFiles({
             name: "broken.srt",
