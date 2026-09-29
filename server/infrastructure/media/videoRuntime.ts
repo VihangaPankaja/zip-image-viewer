@@ -19,6 +19,7 @@ import {
   storyboardDirectory,
 } from "../../media/videoStoryboard.js";
 import { ProcessLimiter } from "../../media/processLimiter.js";
+import { getRenditionState } from "../../media/videoRendition.js";
 import { errorFromUnknown } from "../runtime/mediaClassification.js";
 import { runCommand, runCommandCapture } from "../process/commandRunner.js";
 
@@ -61,8 +62,14 @@ class VideoRuntime {
   ): Promise<Result> => {
     if (!session) return task;
     const work = this.sessionWork(session);
+    const release = this.protectSession(session.id);
     work.pending.add(task);
-    void task.finally(() => work.pending.delete(task)).catch(() => undefined);
+    void task
+      .finally(() => {
+        work.pending.delete(task);
+        release();
+      })
+      .catch(() => undefined);
     return task;
   };
 
@@ -122,16 +129,20 @@ class VideoRuntime {
         const metadata = await this.getVideoMetadata(targetPath, session);
         const executable = this.ffmpegPath;
         if (!executable) throw new Error("Video transcoder is unavailable.");
-        return generateStoryboard(
+        const index = await generateStoryboard(
           storyboardDirectory(session.workspaceDir, normalizedPath),
           targetPath,
           metadata.durationSeconds,
           (args) => this.runCommand(executable, args, session),
         );
+        await this.enforceDerivedMediaBudget();
+        return index;
       })(),
     );
     work.storyboards.set(normalizedPath, generation);
-    void generation.catch(() => work.storyboards.delete(normalizedPath));
+    void generation
+      .finally(() => work.storyboards.delete(normalizedPath))
+      .catch(() => undefined);
     return generation;
   };
 
@@ -139,6 +150,11 @@ class VideoRuntime {
     private readonly ffmpegPath: string | null,
     private readonly transcodes: Map<string, VideoTranscodeEntry>,
     private readonly logEvent: LogEvent,
+    private readonly protectSession: (_sessionId: string) => () => void = () =>
+      () =>
+        undefined,
+    private readonly enforceDerivedMediaBudget: () => Promise<void> = () =>
+      Promise.resolve(),
   ) {}
 
   getVideoTranscodeKey = (sessionId: string, normalizedPath: string): string =>
@@ -199,41 +215,7 @@ class VideoRuntime {
     return entry;
   };
 
-  getRenditionState = (
-    entry: VideoTranscodeEntry,
-    session: Session,
-    qualityId: string,
-  ): VideoRendition => {
-    const existing = entry.renditions.get(qualityId);
-    if (existing) return existing;
-    const height =
-      qualityId === "source"
-        ? 0
-        : Number.parseInt(qualityId.replace("p", ""), 10) || 0;
-    const hash = crypto
-      .createHash("sha1")
-      .update(`${session.id}:${entry.path}:${qualityId}`)
-      .digest("hex");
-    const rendition: VideoRendition = {
-      qualityId,
-      selectedHeight: height,
-      dir: path.join(session.workspaceDir, "video-transcodes", hash),
-      playlistPath: path.join(
-        session.workspaceDir,
-        "video-transcodes",
-        hash,
-        "index.m3u8",
-      ),
-      status: "idle",
-      process: null,
-      priorityJobs: new Map(),
-      availableSegments: 0,
-      expectedSegments: entry.expectedSegments,
-      durationSeconds: entry.durationSeconds,
-    };
-    entry.renditions.set(qualityId, rendition);
-    return rendition;
-  };
+  getRenditionState = getRenditionState;
 
   refreshRenditionAvailability = async (
     rendition: VideoRendition,
@@ -289,6 +271,11 @@ class VideoRuntime {
       .then(async () => {
         await this.refreshRenditionAvailability(rendition);
         rendition.status = "done";
+        void this.enforceDerivedMediaBudget().catch((error: unknown) =>
+          this.logEvent("warn", "media.cache.cleanup.failed", {
+            error: errorFromUnknown(error).message,
+          }),
+        );
         this.logEvent("info", "video.transcode.completed", {
           sessionId: session.id,
           path: entry.path,
@@ -362,10 +349,20 @@ export function createVideoRuntime({
   ffmpegPath,
   transcodes,
   logEvent,
+  protectSession,
+  enforceDerivedMediaBudget,
 }: {
   ffmpegPath: string | null;
   transcodes: Map<string, VideoTranscodeEntry>;
   logEvent: LogEvent;
+  protectSession?: (_sessionId: string) => () => void;
+  enforceDerivedMediaBudget?: () => Promise<void>;
 }) {
-  return new VideoRuntime(ffmpegPath, transcodes, logEvent);
+  return new VideoRuntime(
+    ffmpegPath,
+    transcodes,
+    logEvent,
+    protectSession,
+    enforceDerivedMediaBudget,
+  );
 }

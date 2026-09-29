@@ -113,3 +113,23 @@ it("cancels a disconnected request while both media slots are occupied", async (
   await occupied;
   expect(commands.active).toBe(0);
 });
+
+it("drains rapid queued seeks before a session workspace can be removed", async () => {
+  const runtime = createVideoRuntime({
+    ffmpegPath: "ffmpeg",
+    transcodes: new Map(),
+    logEvent: () => undefined,
+  });
+  const session = { id: "rapid-seeks" } as Session;
+  const requests = Array.from({ length: 40 }, () =>
+    runtime.runCommand("seek", [], session),
+  );
+  const settled = Promise.allSettled(requests);
+  await vi.waitFor(() => expect(commands.active).toBe(2));
+  await runtime.cleanupVideoSession(session);
+  expect((await settled).every(({ status }) => status === "rejected")).toBe(
+    true,
+  );
+  expect(commands.active).toBe(0);
+  expect(commands.started).toHaveLength(2);
+});

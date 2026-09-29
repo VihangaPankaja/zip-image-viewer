@@ -3,16 +3,27 @@ import { z } from "zod";
 
 const runtimeEnvironmentSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65_535).default(8080),
+  MEDIA_CACHE_BUDGET_BYTES: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .default(1024 ** 3),
 });
 
 export function parseRuntimeEnvironment(
   environment: Readonly<Record<string, string | undefined>>,
-): { port: number } {
+): { port: number; mediaCacheBudgetBytes: number } {
   const parsed = runtimeEnvironmentSchema.parse(environment);
-  return { port: parsed.PORT };
+  return {
+    port: parsed.PORT,
+    mediaCacheBudgetBytes: parsed.MEDIA_CACHE_BUDGET_BYTES,
+  };
 }
 
 export const PORT = parseRuntimeEnvironment(process.env).port;
+export const MEDIA_CACHE_BUDGET_BYTES = parseRuntimeEnvironment(
+  process.env,
+).mediaCacheBudgetBytes;
 export const SESSION_TTL_MS = 30 * 60 * 1000;
 export const JOB_TTL_MS = 30 * 60 * 1000;
 export const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
