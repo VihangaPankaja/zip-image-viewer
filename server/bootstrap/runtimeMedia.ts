@@ -41,11 +41,16 @@ export function createRuntimeMedia(
     protectSession: cache.protectSession,
     enforceDerivedMediaBudget: enforceMediaBudget,
   });
-  const pinMediaRequest: RequestHandler = (req, res, next) => {
+  const pinMediaRequest: RequestHandler = async (req, res, next) => {
     const release = cache.protectSession(req.params.id as string);
     res.once("finish", release);
     res.once("close", release);
-    next();
+    try {
+      await cache.waitForEviction(req.params.id as string);
+      if (!res.destroyed) next();
+    } catch (error) {
+      next(error);
+    }
   };
   const ensureThumbnail: typeof ensureRuntimeThumbnail = async (
     session,

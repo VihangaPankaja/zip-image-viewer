@@ -22,7 +22,7 @@ type Candidate = {
   session: Session;
   size: number;
   modifiedAt: number;
-  rendition?: VideoRendition;
+  isTranscode: boolean;
 };
 
 async function diskUsage(
@@ -57,26 +57,30 @@ function protectSession(
   };
 }
 
+function findRendition(
+  transcodes: Map<string, VideoTranscodeEntry>,
+  filePath: string,
+): VideoRendition | undefined {
+  for (const entry of transcodes.values())
+    for (const rendition of entry.renditions.values())
+      if (rendition.dir === filePath) return rendition;
+  return undefined;
+}
+
 export function createDerivedMediaCache(
   sessions: Map<string, Session>,
   transcodes: Map<string, VideoTranscodeEntry>,
   budgetBytes: number,
 ) {
   if (!Number.isFinite(budgetBytes) || budgetBytes < 0)
-    throw new RangeError("Derived media budget must be a non-negative number.");
+    throw new RangeError("Invalid derived media budget.");
   const active = new Map<string, number>();
+  const evicting = new Map<string, Promise<void>>();
   let pending: Promise<void> | undefined;
 
   async function sweep(): Promise<void> {
     const candidates: Candidate[] = [];
     let total = 0;
-    const renditions = new Map(
-      [...transcodes.values()].flatMap((entry) =>
-        [...entry.renditions.values()].map(
-          (rendition) => [rendition.dir, rendition] as const,
-        ),
-      ),
-    );
     for (const session of sessions.values()) {
       for (const directory of DERIVED_DIRS) {
         const root = path.join(session.workspaceDir, directory);
@@ -87,16 +91,12 @@ export function createDerivedMediaCache(
           const { size, modifiedAt } = await diskUsage(filePath);
           total += size;
           if (!size) continue;
-          const rendition =
-            directory === "video-transcodes"
-              ? renditions.get(filePath)
-              : undefined;
           candidates.push({
             path: filePath,
             session,
             size,
             modifiedAt,
-            rendition,
+            isTranscode: directory === "video-transcodes",
           });
         }
       }
@@ -106,20 +106,29 @@ export function createDerivedMediaCache(
       if (total <= budgetBytes) break;
       if (sessions.get(candidate.session.id) !== candidate.session) continue;
       if (active.has(candidate.session.id)) continue;
-      if (
-        candidate.rendition?.status === "queued" ||
-        candidate.rendition?.status === "running"
-      )
+      const rendition = candidate.isTranscode
+        ? findRendition(transcodes, candidate.path)
+        : undefined;
+      if (rendition?.status === "queued" || rendition?.status === "running")
         continue;
       if (
-        candidate.rendition?.lastAccessedAt &&
-        Date.now() - candidate.rendition.lastAccessedAt < ACTIVE_PLAYBACK_MS
+        rendition?.lastAccessedAt &&
+        Date.now() - rendition.lastAccessedAt < ACTIVE_PLAYBACK_MS
       )
         continue;
-      await rm(candidate.path, { recursive: true, force: true });
-      if (candidate.rendition) {
-        candidate.rendition.status = "idle";
-        candidate.rendition.availableSegments = 0;
+      const eviction = rm(candidate.path, {
+        recursive: true,
+        force: true,
+      }).finally(() => {
+        if (!rendition) return;
+        rendition.status = "idle";
+        rendition.availableSegments = 0;
+      });
+      evicting.set(candidate.session.id, eviction);
+      try {
+        await eviction;
+      } finally {
+        evicting.delete(candidate.session.id);
       }
       total -= candidate.size;
     }
@@ -137,5 +146,7 @@ export function createDerivedMediaCache(
   return {
     enforce,
     protectSession: (sessionId: string) => protectSession(active, sessionId),
+    waitForEviction: (sessionId: string) =>
+      evicting.get(sessionId) ?? Promise.resolve(),
   };
 }

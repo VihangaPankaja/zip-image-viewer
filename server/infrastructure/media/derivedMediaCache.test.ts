@@ -138,3 +138,32 @@ it("keeps in-flight reads and recently requested HLS segments while evicting unu
   expect(await readFile(playingFile, "utf8")).toBe("bbbb");
   await expect(readFile(idleFile)).rejects.toMatchObject({ code: "ENOENT" });
 });
+
+it("honors a rendition registered after a sweep starts", async () => {
+  const current = await session("late-rendition");
+  const renditionDir = path.join(
+    current.workspaceDir,
+    "video-transcodes",
+    "late",
+  );
+  const segment = path.join(renditionDir, "segment_000000.m4s");
+  await cachedFile(segment, "123456", 20_000);
+  const transcodes = new Map<string, VideoTranscodeEntry>();
+  const cache = createDerivedMediaCache(
+    new Map([[current.id, current]]),
+    transcodes,
+    0,
+  );
+  const sweep = cache.enforce();
+  const rendition = {
+    dir: renditionDir,
+    status: "running",
+  } as VideoRendition;
+  transcodes.set("late:video", {
+    sessionId: current.id,
+    renditions: new Map([["360p", rendition]]),
+  } as VideoTranscodeEntry);
+  await sweep;
+  expect(await readFile(segment, "utf8")).toBe("123456");
+  expect(rendition.status).toBe("running");
+});

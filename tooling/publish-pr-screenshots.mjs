@@ -56,6 +56,20 @@ const requiredScreens = [
   "video-subtitles-error",
   "video-subtitles-recovered",
 ];
+const featuredScreens = (process.env.PR_SCREENSHOT_FEATURED ?? "")
+  .split(",")
+  .map((screen) => screen.trim())
+  .filter(Boolean);
+if (
+  new Set(featuredScreens).size !== featuredScreens.length ||
+  featuredScreens.some((screen) => !requiredScreens.includes(screen))
+)
+  throw new Error(
+    "PR_SCREENSHOT_FEATURED must list unique gallery screen names.",
+  );
+const featuredRank = new Map(
+  featuredScreens.map((screen, index) => [screen, index]),
+);
 for (const device of ["Mobile", "Tablet", "Desktop", "Ultrawide"]) {
   for (const theme of ["light", "dark"]) {
     for (const screen of requiredScreens) {
@@ -148,7 +162,13 @@ for (const device of ["Mobile", "Tablet", "Desktop", "Ultrawide"]) {
       `<details><summary>${theme === "light" ? "Light" : "Dark"} theme</summary>`,
       "",
     );
-    for (const capture of entries.filter((entry) => entry.theme === theme)) {
+    const themeEntries = entries.filter((entry) => entry.theme === theme);
+    themeEntries.sort(
+      (a, b) =>
+        (featuredRank.get(a.screen) ?? Infinity) -
+        (featuredRank.get(b.screen) ?? Infinity),
+    );
+    for (const capture of themeEntries) {
       const label = capture.screen.replaceAll("-", " ");
       lines.push(
         `**${label}**`,
