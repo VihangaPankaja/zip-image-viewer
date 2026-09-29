@@ -103,6 +103,7 @@ export function registerVideoThumbnailRoute(
                 context.session,
               );
               await rename(`${thumbPath}.pending.jpg`, thumbPath);
+              await deps.enforceDerivedMediaBudget?.();
             })(),
           )
           .finally(() => pendingThumbnails.delete(thumbPath));

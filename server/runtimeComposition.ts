@@ -48,13 +48,11 @@ import {
   shouldPreserveOriginalPreview,
 } from "./infrastructure/runtime/mediaClassification.js";
 import { readPreviewChunk } from "./infrastructure/media/imagePreviews.js";
-import { createVideoRuntime } from "./infrastructure/media/videoRuntime.js";
+import { createRuntimeMedia } from "./bootstrap/runtimeMedia.js";
 import { listExtractedEntries } from "./infrastructure/archive/listExtractedEntries.js";
 import {
   detectRuntimeArchiveEncryption,
   downloadRuntimeSource,
-  ensureRuntimeImagePreview,
-  ensureRuntimeThumbnail,
   extractRuntimeArchive,
 } from "./runtimeAdapters.js";
 
@@ -73,14 +71,13 @@ const ffmpegPath = typeof ffmpegModule === "string" ? ffmpegModule : null;
 const distDir = path.resolve(process.cwd(), "dist");
 const container = createServerContainer();
 let server: Server | undefined;
-const DEFAULT_VIDEO_SEGMENT_SECONDS = 4;
-const MAX_ACTIVE_SESSION_JOBS = 2;
-
-const videoRuntime = createVideoRuntime({
-  ffmpegPath,
-  transcodes: videoTranscodeStore,
-  logEvent,
-});
+const {
+  videoRuntime,
+  enforceMediaBudget,
+  pinMediaRequest,
+  ensureThumbnail,
+  ensureImagePreview,
+} = createRuntimeMedia(ffmpegPath, sessionStore, videoTranscodeStore, logEvent);
 const {
   ensureVideoTranscodeEntry,
   ensureVideoStoryboard,
@@ -121,7 +118,7 @@ const sessionJobQueue = createSessionJobQueue({
   getActiveSessionJobCount,
   incrementActiveSessionJobCount,
   decrementActiveSessionJobCount,
-  maxActiveSessionJobs: MAX_ACTIVE_SESSION_JOBS,
+  maxActiveSessionJobs: 2,
   processSessionJob,
   emitJob,
   pauseJob: (job) => {
@@ -200,6 +197,8 @@ const app = createRuntimeApp({
   updateSchedulerSettings: sessionJobQueue.setMaxActiveSessionJobs,
   removeSession: async (id, reason) => removeSession(id, reason),
 });
+
+app.use("/api/sessions/:id", pinMediaRequest);
 
 app.use((req, res, next) => {
   const isTrackedRequest =
@@ -326,7 +325,7 @@ registerVideoRoutes(app, {
   startRenditionTranscode,
   startPrioritySegmentWindow,
   refreshRenditionAvailability,
-  DEFAULT_VIDEO_SEGMENT_SECONDS,
+  DEFAULT_VIDEO_SEGMENT_SECONDS: 4,
   runCommand,
   ensureVideoStoryboard,
   runVideoTask,
@@ -336,6 +335,7 @@ registerVideoRoutes(app, {
   waitForFile,
   getVideoDimensions,
   logEvent: container.runtime.logEvent,
+  enforceDerivedMediaBudget: enforceMediaBudget,
 });
 
 registerFileRoutes(app, {
@@ -345,9 +345,9 @@ registerFileRoutes(app, {
   formatBytes: container.runtime.formatBytes,
   readPreviewChunk,
   classifyMimeType,
-  ensureThumbnail: ensureRuntimeThumbnail,
+  ensureThumbnail,
   shouldPreserveOriginalPreview,
-  ensureImagePreview: ensureRuntimeImagePreview,
+  ensureImagePreview,
   parseRangeHeader: container.runtime.parseRangeHeader,
 });
 

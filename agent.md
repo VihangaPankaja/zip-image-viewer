@@ -34,8 +34,9 @@ pnpm start
 - Keep changes focused and preserve existing app structure
 - Follow the current plain, minimal style unless asked for a redesign
 - Bump the app version in `package.json` before opening a PR to `master`
-- For every PR, run the [PR screenshots skill](.agents/skills/pr-screenshots/SKILL.md). Capture the complete existing gallery of all 13 scenes in both light and dark themes at Mobile, Tablet, Desktop, and Ultrawide sizes. Keep populated file/download/torrent examples and the disclosure that transfer progress is simulated.
+- For every PR, run the [PR screenshots skill](.agents/skills/pr-screenshots/SKILL.md). Capture the complete existing gallery in both light and dark themes at Mobile, Tablet, Desktop, and Ultrawide sizes. Keep populated file/download/torrent examples and the disclosure that transfer progress is simulated.
 - Add screenshots showing the changed feature working, including interaction and result states. Video scrub preview changes must show a loaded video, the seek thumbnail/time preview, and the playback position after committing the seek.
+- Put screenshots relevant to the PR first within each device and theme gallery, ahead of the standard screens. Set `PR_SCREENSHOT_FEATURED` to their comma-separated screen names when publishing.
 - Visually inspect every screenshot. Fix clipping, missing content, errors, and unusable controls, then recapture. Screenshots must match the reviewed code and be published and embedded in the PR description with verified working URLs under the four device sections.
 - For multi-step feature work, create a commit after each major implementation step
 - Before each major commit, run `pnpm run format`, `pnpm run lint`, `pnpm run typecheck`, and `pnpm run build`

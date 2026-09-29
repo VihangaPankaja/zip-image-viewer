@@ -105,6 +105,7 @@ async function startRendition(
   quality: string,
 ): Promise<VideoRendition> {
   const rendition = deps.getRenditionState(entry, context.session, quality);
+  rendition.lastAccessedAt = Date.now();
   await deps.startRenditionTranscode(entry, context.session, rendition);
   return rendition;
 }

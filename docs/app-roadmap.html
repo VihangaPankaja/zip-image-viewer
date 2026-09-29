@@ -1633,17 +1633,17 @@
           area: "Stack / operations",
           priority: "P0",
           effort: "M",
-          status: "In progress",
+          status: "Done",
           title: "Bound encoder work and cache growth",
           summary:
             "Repeated seeks should not exhaust CPU or leave abandoned encoders writing into deleted sessions.",
           now: "HLS has a two-process limiter; thumbnail jobs use a separate command path. Session cleanup expects rendition process handles.",
           plan: "Apply a shared media-work budget with deduplication and cancellation. Track running handles, wait for exit before cleanup and reserve capacity for interactive work. Add a disk budget and evict unused derived files.",
-          done: "Rapid seeking and session deletion leave no orphan process. Disk use stays within budget while active segments and originals remain available.",
+          done: "Rapid seeking and session deletion leave no orphan process. Idle derived media stays within budget while active playback and originals remain available; protected active media can temporarily exceed the cap.",
           depends: "V02",
-          note: "v3.5.0 shares the two-process budget across media work and drains it before session deletion. v3.8.0 reserves one slot for interactive requests while queued HLS encodes continue. Aggregate disk-budget eviction remains planned; the per-video storyboard frame cap is not a global disk budget.",
+          note: "v3.5.0 shares the two-process budget across media work and drains it before session deletion. v3.8.0 reserves one slot for interactive requests while queued HLS encodes continue. v3.9.0 adds a configurable 1 GiB cross-session budget for derived files, evicts idle outputs, protects in-flight reads and recent HLS playback, and regenerates evicted renditions. Active media may temporarily exceed the cap until playback becomes idle.",
           evidence:
-            "server/media/processLimiter.ts; server/infrastructure/media/videoRuntime.ts; server/handlers/video/thumbnailRoute.ts; server/application/sessions/sessionManager.ts",
+            "server/media/processLimiter.ts; server/infrastructure/media/derivedMediaCache.ts; server/infrastructure/media/videoRuntime.ts; server/application/sessions/sessionManager.ts",
         },
         {
           id: "S03",
@@ -1681,7 +1681,7 @@
           area: "Tooling / quality",
           priority: "P0",
           effort: "M",
-          status: "In progress",
+          status: "Done",
           title: "Test real playback through the shipped container",
           summary:
             "Catch packaging and decoding failures that mocked player tests miss.",
@@ -1689,9 +1689,9 @@
           plan: "Extend fixtures with long GOPs, variable frame rate, no audio and an unsupported codec. Run the built container and decode HLS in a browser. Add controlled network changes and random seeks.",
           done: "The container passes a real media smoke test. Missing init files, truncated segments, codec mismatches and broken seeks produce failures.",
           depends: "V02, V04",
-          note: "v3.3.6 adds long-GOP, variable-frame-rate, silent and codec-conversion fixtures plus a production-image FFmpeg smoke. v3.8.0 adds Chromium playback, throttled networking and repeated seeks through the built container in PR CI. Broader network conditions and seek coverage remain.",
+          note: "v3.3.6 adds long-GOP, variable-frame-rate, silent and codec-conversion fixtures plus a production-image FFmpeg smoke. v3.8.0 adds Chromium playback through the built container in PR CI. v3.9.0 decodes all fixture variants in Chromium, exercises two controlled network profiles and seeded repeated seeks, and rejects missing init data, truncated segments, codec mismatches and broken seeks.",
           evidence:
-            "tests/integration/ffmpegHlsFixture.test.ts; tests/integration/dockerfile.test.ts; .github/workflows/quality.yml",
+            "tests/integration/containerBrowserFixture.mjs; tests/integration/containerBrowserSmoke.mjs; .github/workflows/docker-build.yml",
         },
         {
           id: "Q02",

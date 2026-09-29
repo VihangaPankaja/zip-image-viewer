@@ -140,6 +140,7 @@ export type VideoRendition = {
   priorityJobs: Map<number, Promise<void>>;
   queuedAt?: number;
   encoderWaitMs?: number;
+  lastAccessedAt?: number;
 };
 
 export type VideoTranscodeEntry = {

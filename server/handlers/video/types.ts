@@ -19,6 +19,7 @@ export type VideoRouteDependencies = {
     _session: Session | undefined,
     _task: Promise<Result>,
   ) => Promise<Result>;
+  enforceDerivedMediaBudget?: () => Promise<void>;
   runVideoTask: <Result>(
     _session: Session | undefined,
     _task: (_signal?: AbortSignal) => Promise<Result>,
