@@ -1,0 +1,2094 @@
+{
+  "sourceCommit": "92905cabf87caeb8721881b1d6cf3328044cfb64",
+  "fixtures": "Deterministic local media and simulated HTTP/torrent progress; not a live network benchmark.",
+  "captures": [
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "downloads-empty",
+      "file": "mobile-light-downloads-empty.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "http-and-torrent-downloads",
+      "file": "mobile-light-http-and-torrent-downloads.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "settings",
+      "file": "mobile-light-settings.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "settings-more",
+      "file": "mobile-light-settings-more.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "add-downloads",
+      "file": "mobile-light-add-downloads.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "torrent-file-selection",
+      "file": "mobile-light-torrent-file-selection.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "torrent-video-filter",
+      "file": "mobile-light-torrent-video-filter.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "torrent-filter-selection",
+      "file": "mobile-light-torrent-filter-selection.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "torrent-selection-started",
+      "file": "mobile-light-torrent-selection-started.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "torrent-file-states",
+      "file": "mobile-light-torrent-file-states.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "torrent-state-filter",
+      "file": "mobile-light-torrent-state-filter.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "torrent-skipped-files",
+      "file": "mobile-light-torrent-skipped-files.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "torrent-available-files",
+      "file": "mobile-light-torrent-available-files.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "explorer",
+      "file": "mobile-light-explorer.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "explorer-text-filter",
+      "file": "mobile-light-explorer-text-filter.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "explorer-filter-opened",
+      "file": "mobile-light-explorer-filter-opened.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "preview-png",
+      "file": "mobile-light-preview-png.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "preview-txt",
+      "file": "mobile-light-preview-txt.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "preview-mp4",
+      "file": "mobile-light-preview-mp4.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "video-seek-preview",
+      "file": "mobile-light-video-seek-preview.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "video-seek-committed",
+      "file": "mobile-light-video-seek-committed.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "video-subtitles-loaded",
+      "file": "mobile-light-video-subtitles-loaded.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "video-subtitles-adjusted",
+      "file": "mobile-light-video-subtitles-adjusted.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "video-subtitles-error",
+      "file": "mobile-light-video-subtitles-error.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "video-subtitles-recovered",
+      "file": "mobile-light-video-subtitles-recovered.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "preview-wav",
+      "file": "mobile-light-preview-wav.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "preview-zip",
+      "file": "mobile-light-preview-zip.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "slideshow",
+      "file": "mobile-light-slideshow.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "light",
+      "screen": "explorer-dialog",
+      "file": "mobile-light-explorer-dialog.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "downloads-empty",
+      "file": "mobile-dark-downloads-empty.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "http-and-torrent-downloads",
+      "file": "mobile-dark-http-and-torrent-downloads.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "settings",
+      "file": "mobile-dark-settings.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "settings-more",
+      "file": "mobile-dark-settings-more.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "add-downloads",
+      "file": "mobile-dark-add-downloads.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "torrent-file-selection",
+      "file": "mobile-dark-torrent-file-selection.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "torrent-video-filter",
+      "file": "mobile-dark-torrent-video-filter.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "torrent-filter-selection",
+      "file": "mobile-dark-torrent-filter-selection.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "torrent-selection-started",
+      "file": "mobile-dark-torrent-selection-started.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "torrent-file-states",
+      "file": "mobile-dark-torrent-file-states.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "torrent-state-filter",
+      "file": "mobile-dark-torrent-state-filter.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "torrent-skipped-files",
+      "file": "mobile-dark-torrent-skipped-files.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "torrent-available-files",
+      "file": "mobile-dark-torrent-available-files.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "explorer",
+      "file": "mobile-dark-explorer.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "explorer-text-filter",
+      "file": "mobile-dark-explorer-text-filter.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "explorer-filter-opened",
+      "file": "mobile-dark-explorer-filter-opened.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "preview-png",
+      "file": "mobile-dark-preview-png.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "preview-txt",
+      "file": "mobile-dark-preview-txt.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "preview-mp4",
+      "file": "mobile-dark-preview-mp4.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "video-seek-preview",
+      "file": "mobile-dark-video-seek-preview.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "video-seek-committed",
+      "file": "mobile-dark-video-seek-committed.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "video-subtitles-loaded",
+      "file": "mobile-dark-video-subtitles-loaded.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "video-subtitles-adjusted",
+      "file": "mobile-dark-video-subtitles-adjusted.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "video-subtitles-error",
+      "file": "mobile-dark-video-subtitles-error.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "video-subtitles-recovered",
+      "file": "mobile-dark-video-subtitles-recovered.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "preview-wav",
+      "file": "mobile-dark-preview-wav.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "preview-zip",
+      "file": "mobile-dark-preview-zip.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "slideshow",
+      "file": "mobile-dark-slideshow.png"
+    },
+    {
+      "name": "Mobile",
+      "width": 390,
+      "height": 844,
+      "device": "Mobile",
+      "theme": "dark",
+      "screen": "explorer-dialog",
+      "file": "mobile-dark-explorer-dialog.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "downloads-empty",
+      "file": "tablet-light-downloads-empty.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "http-and-torrent-downloads",
+      "file": "tablet-light-http-and-torrent-downloads.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "settings",
+      "file": "tablet-light-settings.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "settings-more",
+      "file": "tablet-light-settings-more.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "add-downloads",
+      "file": "tablet-light-add-downloads.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "torrent-file-selection",
+      "file": "tablet-light-torrent-file-selection.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "torrent-video-filter",
+      "file": "tablet-light-torrent-video-filter.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "torrent-filter-selection",
+      "file": "tablet-light-torrent-filter-selection.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "torrent-selection-started",
+      "file": "tablet-light-torrent-selection-started.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "torrent-file-states",
+      "file": "tablet-light-torrent-file-states.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "torrent-state-filter",
+      "file": "tablet-light-torrent-state-filter.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "torrent-skipped-files",
+      "file": "tablet-light-torrent-skipped-files.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "torrent-available-files",
+      "file": "tablet-light-torrent-available-files.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "explorer",
+      "file": "tablet-light-explorer.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "explorer-text-filter",
+      "file": "tablet-light-explorer-text-filter.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "explorer-filter-opened",
+      "file": "tablet-light-explorer-filter-opened.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "preview-png",
+      "file": "tablet-light-preview-png.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "preview-txt",
+      "file": "tablet-light-preview-txt.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "preview-mp4",
+      "file": "tablet-light-preview-mp4.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "video-seek-preview",
+      "file": "tablet-light-video-seek-preview.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "video-seek-committed",
+      "file": "tablet-light-video-seek-committed.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "video-subtitles-loaded",
+      "file": "tablet-light-video-subtitles-loaded.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "video-subtitles-adjusted",
+      "file": "tablet-light-video-subtitles-adjusted.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "video-subtitles-error",
+      "file": "tablet-light-video-subtitles-error.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "video-subtitles-recovered",
+      "file": "tablet-light-video-subtitles-recovered.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "preview-wav",
+      "file": "tablet-light-preview-wav.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "preview-zip",
+      "file": "tablet-light-preview-zip.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "slideshow",
+      "file": "tablet-light-slideshow.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "light",
+      "screen": "explorer-dialog",
+      "file": "tablet-light-explorer-dialog.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "downloads-empty",
+      "file": "tablet-dark-downloads-empty.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "http-and-torrent-downloads",
+      "file": "tablet-dark-http-and-torrent-downloads.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "settings",
+      "file": "tablet-dark-settings.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "settings-more",
+      "file": "tablet-dark-settings-more.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "add-downloads",
+      "file": "tablet-dark-add-downloads.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "torrent-file-selection",
+      "file": "tablet-dark-torrent-file-selection.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "torrent-video-filter",
+      "file": "tablet-dark-torrent-video-filter.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "torrent-filter-selection",
+      "file": "tablet-dark-torrent-filter-selection.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "torrent-selection-started",
+      "file": "tablet-dark-torrent-selection-started.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "torrent-file-states",
+      "file": "tablet-dark-torrent-file-states.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "torrent-state-filter",
+      "file": "tablet-dark-torrent-state-filter.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "torrent-skipped-files",
+      "file": "tablet-dark-torrent-skipped-files.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "torrent-available-files",
+      "file": "tablet-dark-torrent-available-files.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "explorer",
+      "file": "tablet-dark-explorer.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "explorer-text-filter",
+      "file": "tablet-dark-explorer-text-filter.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "explorer-filter-opened",
+      "file": "tablet-dark-explorer-filter-opened.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "preview-png",
+      "file": "tablet-dark-preview-png.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "preview-txt",
+      "file": "tablet-dark-preview-txt.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "preview-mp4",
+      "file": "tablet-dark-preview-mp4.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "video-seek-preview",
+      "file": "tablet-dark-video-seek-preview.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "video-seek-committed",
+      "file": "tablet-dark-video-seek-committed.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "video-subtitles-loaded",
+      "file": "tablet-dark-video-subtitles-loaded.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "video-subtitles-adjusted",
+      "file": "tablet-dark-video-subtitles-adjusted.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "video-subtitles-error",
+      "file": "tablet-dark-video-subtitles-error.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "video-subtitles-recovered",
+      "file": "tablet-dark-video-subtitles-recovered.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "preview-wav",
+      "file": "tablet-dark-preview-wav.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "preview-zip",
+      "file": "tablet-dark-preview-zip.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "slideshow",
+      "file": "tablet-dark-slideshow.png"
+    },
+    {
+      "name": "Tablet",
+      "width": 820,
+      "height": 1180,
+      "device": "Tablet",
+      "theme": "dark",
+      "screen": "explorer-dialog",
+      "file": "tablet-dark-explorer-dialog.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "downloads-empty",
+      "file": "desktop-light-downloads-empty.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "http-and-torrent-downloads",
+      "file": "desktop-light-http-and-torrent-downloads.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "settings",
+      "file": "desktop-light-settings.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "settings-more",
+      "file": "desktop-light-settings-more.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "add-downloads",
+      "file": "desktop-light-add-downloads.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "torrent-file-selection",
+      "file": "desktop-light-torrent-file-selection.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "torrent-video-filter",
+      "file": "desktop-light-torrent-video-filter.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "torrent-filter-selection",
+      "file": "desktop-light-torrent-filter-selection.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "torrent-selection-started",
+      "file": "desktop-light-torrent-selection-started.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "torrent-file-states",
+      "file": "desktop-light-torrent-file-states.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "torrent-state-filter",
+      "file": "desktop-light-torrent-state-filter.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "torrent-skipped-files",
+      "file": "desktop-light-torrent-skipped-files.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "torrent-available-files",
+      "file": "desktop-light-torrent-available-files.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "explorer",
+      "file": "desktop-light-explorer.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "explorer-text-filter",
+      "file": "desktop-light-explorer-text-filter.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "explorer-filter-opened",
+      "file": "desktop-light-explorer-filter-opened.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "preview-png",
+      "file": "desktop-light-preview-png.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "preview-txt",
+      "file": "desktop-light-preview-txt.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "preview-mp4",
+      "file": "desktop-light-preview-mp4.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "video-seek-preview",
+      "file": "desktop-light-video-seek-preview.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "video-seek-committed",
+      "file": "desktop-light-video-seek-committed.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "video-subtitles-loaded",
+      "file": "desktop-light-video-subtitles-loaded.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "video-subtitles-adjusted",
+      "file": "desktop-light-video-subtitles-adjusted.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "video-subtitles-error",
+      "file": "desktop-light-video-subtitles-error.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "video-subtitles-recovered",
+      "file": "desktop-light-video-subtitles-recovered.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "preview-wav",
+      "file": "desktop-light-preview-wav.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "preview-zip",
+      "file": "desktop-light-preview-zip.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "slideshow",
+      "file": "desktop-light-slideshow.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "light",
+      "screen": "explorer-dialog",
+      "file": "desktop-light-explorer-dialog.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "downloads-empty",
+      "file": "desktop-dark-downloads-empty.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "http-and-torrent-downloads",
+      "file": "desktop-dark-http-and-torrent-downloads.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "settings",
+      "file": "desktop-dark-settings.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "settings-more",
+      "file": "desktop-dark-settings-more.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "add-downloads",
+      "file": "desktop-dark-add-downloads.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "torrent-file-selection",
+      "file": "desktop-dark-torrent-file-selection.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "torrent-video-filter",
+      "file": "desktop-dark-torrent-video-filter.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "torrent-filter-selection",
+      "file": "desktop-dark-torrent-filter-selection.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "torrent-selection-started",
+      "file": "desktop-dark-torrent-selection-started.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "torrent-file-states",
+      "file": "desktop-dark-torrent-file-states.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "torrent-state-filter",
+      "file": "desktop-dark-torrent-state-filter.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "torrent-skipped-files",
+      "file": "desktop-dark-torrent-skipped-files.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "torrent-available-files",
+      "file": "desktop-dark-torrent-available-files.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "explorer",
+      "file": "desktop-dark-explorer.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "explorer-text-filter",
+      "file": "desktop-dark-explorer-text-filter.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "explorer-filter-opened",
+      "file": "desktop-dark-explorer-filter-opened.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "preview-png",
+      "file": "desktop-dark-preview-png.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "preview-txt",
+      "file": "desktop-dark-preview-txt.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "preview-mp4",
+      "file": "desktop-dark-preview-mp4.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "video-seek-preview",
+      "file": "desktop-dark-video-seek-preview.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "video-seek-committed",
+      "file": "desktop-dark-video-seek-committed.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "video-subtitles-loaded",
+      "file": "desktop-dark-video-subtitles-loaded.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "video-subtitles-adjusted",
+      "file": "desktop-dark-video-subtitles-adjusted.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "video-subtitles-error",
+      "file": "desktop-dark-video-subtitles-error.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "video-subtitles-recovered",
+      "file": "desktop-dark-video-subtitles-recovered.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "preview-wav",
+      "file": "desktop-dark-preview-wav.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "preview-zip",
+      "file": "desktop-dark-preview-zip.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "slideshow",
+      "file": "desktop-dark-slideshow.png"
+    },
+    {
+      "name": "Desktop",
+      "width": 1440,
+      "height": 1000,
+      "device": "Desktop",
+      "theme": "dark",
+      "screen": "explorer-dialog",
+      "file": "desktop-dark-explorer-dialog.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "downloads-empty",
+      "file": "ultrawide-light-downloads-empty.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "http-and-torrent-downloads",
+      "file": "ultrawide-light-http-and-torrent-downloads.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "settings",
+      "file": "ultrawide-light-settings.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "settings-more",
+      "file": "ultrawide-light-settings-more.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "add-downloads",
+      "file": "ultrawide-light-add-downloads.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "torrent-file-selection",
+      "file": "ultrawide-light-torrent-file-selection.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "torrent-video-filter",
+      "file": "ultrawide-light-torrent-video-filter.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "torrent-filter-selection",
+      "file": "ultrawide-light-torrent-filter-selection.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "torrent-selection-started",
+      "file": "ultrawide-light-torrent-selection-started.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "torrent-file-states",
+      "file": "ultrawide-light-torrent-file-states.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "torrent-state-filter",
+      "file": "ultrawide-light-torrent-state-filter.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "torrent-skipped-files",
+      "file": "ultrawide-light-torrent-skipped-files.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "torrent-available-files",
+      "file": "ultrawide-light-torrent-available-files.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "explorer",
+      "file": "ultrawide-light-explorer.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "explorer-text-filter",
+      "file": "ultrawide-light-explorer-text-filter.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "explorer-filter-opened",
+      "file": "ultrawide-light-explorer-filter-opened.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "preview-png",
+      "file": "ultrawide-light-preview-png.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "preview-txt",
+      "file": "ultrawide-light-preview-txt.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "preview-mp4",
+      "file": "ultrawide-light-preview-mp4.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "video-seek-preview",
+      "file": "ultrawide-light-video-seek-preview.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "video-seek-committed",
+      "file": "ultrawide-light-video-seek-committed.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "video-subtitles-loaded",
+      "file": "ultrawide-light-video-subtitles-loaded.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "video-subtitles-adjusted",
+      "file": "ultrawide-light-video-subtitles-adjusted.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "video-subtitles-error",
+      "file": "ultrawide-light-video-subtitles-error.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "video-subtitles-recovered",
+      "file": "ultrawide-light-video-subtitles-recovered.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "preview-wav",
+      "file": "ultrawide-light-preview-wav.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "preview-zip",
+      "file": "ultrawide-light-preview-zip.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "slideshow",
+      "file": "ultrawide-light-slideshow.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "light",
+      "screen": "explorer-dialog",
+      "file": "ultrawide-light-explorer-dialog.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "downloads-empty",
+      "file": "ultrawide-dark-downloads-empty.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "http-and-torrent-downloads",
+      "file": "ultrawide-dark-http-and-torrent-downloads.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "settings",
+      "file": "ultrawide-dark-settings.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "settings-more",
+      "file": "ultrawide-dark-settings-more.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "add-downloads",
+      "file": "ultrawide-dark-add-downloads.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "torrent-file-selection",
+      "file": "ultrawide-dark-torrent-file-selection.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "torrent-video-filter",
+      "file": "ultrawide-dark-torrent-video-filter.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "torrent-filter-selection",
+      "file": "ultrawide-dark-torrent-filter-selection.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "torrent-selection-started",
+      "file": "ultrawide-dark-torrent-selection-started.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "torrent-file-states",
+      "file": "ultrawide-dark-torrent-file-states.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "torrent-state-filter",
+      "file": "ultrawide-dark-torrent-state-filter.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "torrent-skipped-files",
+      "file": "ultrawide-dark-torrent-skipped-files.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "torrent-available-files",
+      "file": "ultrawide-dark-torrent-available-files.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "explorer",
+      "file": "ultrawide-dark-explorer.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "explorer-text-filter",
+      "file": "ultrawide-dark-explorer-text-filter.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "explorer-filter-opened",
+      "file": "ultrawide-dark-explorer-filter-opened.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "preview-png",
+      "file": "ultrawide-dark-preview-png.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "preview-txt",
+      "file": "ultrawide-dark-preview-txt.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "preview-mp4",
+      "file": "ultrawide-dark-preview-mp4.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "video-seek-preview",
+      "file": "ultrawide-dark-video-seek-preview.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "video-seek-committed",
+      "file": "ultrawide-dark-video-seek-committed.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "video-subtitles-loaded",
+      "file": "ultrawide-dark-video-subtitles-loaded.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "video-subtitles-adjusted",
+      "file": "ultrawide-dark-video-subtitles-adjusted.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "video-subtitles-error",
+      "file": "ultrawide-dark-video-subtitles-error.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "video-subtitles-recovered",
+      "file": "ultrawide-dark-video-subtitles-recovered.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "preview-wav",
+      "file": "ultrawide-dark-preview-wav.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "preview-zip",
+      "file": "ultrawide-dark-preview-zip.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "slideshow",
+      "file": "ultrawide-dark-slideshow.png"
+    },
+    {
+      "name": "Ultrawide",
+      "width": 2560,
+      "height": 1080,
+      "device": "Ultrawide",
+      "theme": "dark",
+      "screen": "explorer-dialog",
+      "file": "ultrawide-dark-explorer-dialog.png"
+    }
+  ]
+}
