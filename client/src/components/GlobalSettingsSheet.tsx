@@ -7,6 +7,8 @@ import type {
   ExplorerColumns,
 } from "../features/workspace/settingsStorage";
 import { CustomDropdown } from "./Common/CustomDropdown";
+import { TorrentBandwidthSettings } from "./TorrentBandwidthSettings";
+import type { TorrentLimits } from "../../../shared/contracts";
 
 type DropdownOption = {
   label: string;
@@ -18,6 +20,8 @@ type GlobalSettingsSheetProps = {
   setTheme: (value: ThemePreference) => void;
   maxConcurrent: number;
   onSetConcurrency: (value: number) => Promise<void>;
+  torrentLimits: TorrentLimits;
+  onSetTorrentLimits: (limits: TorrentLimits) => Promise<void>;
   settingsOpen: boolean;
   setSettingsOpen: (value: boolean) => void;
   downloadSettings: DownloadSettings;
@@ -156,6 +160,10 @@ function DownloadConfiguration(props: DownloadConfigurationProps) {
     <fieldset className="settings-group">
       <legend>Downloads</legend>
       <ConcurrencyConfiguration {...props} />
+      <p className="settings-hint">
+        Thread controls below apply to HTTP downloads only. Torrent peers and
+        file priority are managed separately.
+      </p>
       <CustomDropdown
         id="settings-download-thread-mode"
         label="Thread mode"
@@ -327,9 +335,7 @@ function showModalDialog(dialog: HTMLDialogElement | null): void {
 }
 
 export function GlobalSettingsSheet(props: GlobalSettingsSheetProps) {
-  if (!props.settingsOpen) {
-    return null;
-  }
+  if (!props.settingsOpen) return null;
 
   return (
     <dialog
@@ -343,6 +349,10 @@ export function GlobalSettingsSheet(props: GlobalSettingsSheetProps) {
         <div className="download-settings-grid">
           <AppearanceConfiguration {...props} />
           <DownloadConfiguration {...props} />
+          <TorrentBandwidthSettings
+            key={`${props.torrentLimits.downloadBytesPerSec}-${props.torrentLimits.uploadBytesPerSec}`}
+            {...props}
+          />
           <PreviewConfiguration {...props} />
           <KeyboardConfiguration {...props} />
           <ToggleConfiguration {...props} />

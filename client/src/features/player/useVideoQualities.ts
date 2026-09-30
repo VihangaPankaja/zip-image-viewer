@@ -1,4 +1,4 @@
-import { useEffect, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { workspaceRpc } from "../../services/orpcClient";
 import {
   chooseVideoQuality,
@@ -25,6 +25,7 @@ async function loadVideoQualities(sessionId: string, path: string) {
 }
 
 export function useVideoQualities(params: VideoQualitiesParams) {
+  const [loadedFile, setLoadedFile] = useState("");
   const {
     isFile,
     path,
@@ -34,6 +35,7 @@ export function useVideoQualities(params: VideoQualitiesParams) {
     setSelectedQuality,
   } = params;
   useEffect(() => {
+    setLoadedFile("");
     if (selectedKind !== "video" || !sessionId || !isFile) {
       setOptions([]);
       setSelectedQuality("source");
@@ -45,12 +47,14 @@ export function useVideoQualities(params: VideoQualitiesParams) {
         if (!cancelled) {
           setOptions(options);
           setSelectedQuality(selected);
+          setLoadedFile(JSON.stringify([sessionId, path]));
         }
       },
       () => {
         if (!cancelled) {
           setOptions([{ id: "source", label: "Original" }]);
           setSelectedQuality("source");
+          setLoadedFile(JSON.stringify([sessionId, path]));
         }
       },
     );
@@ -58,4 +62,5 @@ export function useVideoQualities(params: VideoQualitiesParams) {
       cancelled = true;
     };
   }, [isFile, path, selectedKind, sessionId, setOptions, setSelectedQuality]);
+  return loadedFile === JSON.stringify([sessionId, path]);
 }

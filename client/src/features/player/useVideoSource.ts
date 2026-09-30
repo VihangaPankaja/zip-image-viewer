@@ -30,17 +30,18 @@ type VideoSourceParams = {
 
 type AdaptiveSourceParams = Pick<
   VideoSourceParams,
-  | "extension"
-  | "hlsRef"
-  | "hlsUrl"
-  | "originalUrl"
-  | "setPlaybackError"
-  | "setVideoHeight"
+  "hlsRef" | "hlsUrl" | "setPlaybackError" | "setVideoHeight"
 >;
 
 function destroyHls(hlsRef: RefObject<Hls | null>) {
   hlsRef.current?.destroy();
   hlsRef.current = null;
+}
+
+function resetVideoSource(player: HTMLVideoElement) {
+  player.removeAttribute("src");
+  player.querySelectorAll("source").forEach((source) => source.remove());
+  player.load();
 }
 
 function attachOriginalSource(
@@ -49,11 +50,27 @@ function attachOriginalSource(
   extension?: string,
 ) {
   player.querySelectorAll("source").forEach((source) => source.remove());
+  player.removeAttribute("src");
   const source = document.createElement("source");
   source.src = originalUrl;
   source.type = getVideoMimeType(extension ?? "");
   player.appendChild(source);
   player.load();
+}
+
+function attachFileSource(
+  player: HTMLVideoElement,
+  originalUrl: string,
+  quality: string,
+  extension?: string,
+) {
+  const url = new URL(originalUrl, window.location.origin);
+  url.searchParams.set("quality", quality);
+  attachOriginalSource(
+    player,
+    quality === "remux" ? `${url.pathname}${url.search}` : originalUrl,
+    quality === "remux" ? "mp4" : extension,
+  );
 }
 
 function restorePlayback(
@@ -90,7 +107,7 @@ async function attachAdaptiveSource(
       player.src = params.hlsUrl;
       player.load();
     } else {
-      attachOriginalSource(player, params.originalUrl, params.extension);
+      params.setPlaybackError("This browser cannot play transcoded video.");
     }
     return;
   }
@@ -144,7 +161,9 @@ function useAttachedVideoSource(
     videoRef,
   } = params;
   const sourceRef = useRef("");
-  const isOriginal = params.selectedQuality === "source";
+  const fileQuality = ["source", "remux"].includes(params.selectedQuality)
+    ? params.selectedQuality
+    : "";
   useEffect(() => {
     const player = videoRef.current;
     if (!player || selectedKind !== "video" || !originalUrl) {
@@ -165,15 +184,14 @@ function useAttachedVideoSource(
     player.addEventListener("resize", onResize);
     player.addEventListener("loadedmetadata", onLoadedMetadata, { once: true });
     let cancelled = false;
-    if (isOriginal) {
-      attachOriginalSource(player, originalUrl, extension);
-    } else {
+    if (fileQuality)
+      attachFileSource(player, originalUrl, fileQuality, extension);
+    else {
+      resetVideoSource(player);
       void attachAdaptiveSource(
         {
-          extension,
           hlsRef,
           hlsUrl,
-          originalUrl,
           setPlaybackError,
           setVideoHeight,
         },
@@ -198,7 +216,7 @@ function useAttachedVideoSource(
     hlsUrl,
     originalUrl,
     selectedKind,
-    isOriginal,
+    fileQuality,
     setPlaybackError,
     setPlaybackStatus,
     setVideoHeight,
@@ -213,7 +231,11 @@ export function useVideoSource(params: VideoSourceParams) {
   useEffect(() => {
     qualityRef.current = selectedQuality;
     const hls = hlsRef.current;
-    if (hls && selectedQuality !== "source" && hls.levels.length) {
+    if (
+      hls &&
+      !["source", "remux"].includes(selectedQuality) &&
+      hls.levels.length
+    ) {
       hls.loadLevel = resolveManualLevel(
         selectedQuality,
         hls.levels.map((level) => level.height),

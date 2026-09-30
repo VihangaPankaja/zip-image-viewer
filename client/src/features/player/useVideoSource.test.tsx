@@ -76,6 +76,32 @@ function Harness({
 }
 
 describe("video quality switching", () => {
+  it("attaches remux as byte-range MP4, preserves position, and explicitly switches to transcode", async () => {
+    instances.length = 0;
+    const load = vi
+      .spyOn(HTMLMediaElement.prototype, "load")
+      .mockImplementation(() => {});
+    try {
+      const { container, rerender } = render(
+        <Harness quality="remux" file="one.mkv" />,
+      );
+      const video = container.querySelector("video");
+      if (!video) throw new Error("Video element was not rendered.");
+      expect(video.querySelector("source")?.getAttribute("src")).toBe(
+        "/play?path=one.mkv&quality=remux",
+      );
+      expect(video.querySelector("source")?.type).toBe("video/mp4");
+      expect(instances).toHaveLength(0);
+      video.currentTime = 12;
+      rerender(<Harness quality="auto" file="one.mkv" />);
+      await waitFor(() => expect(instances).toHaveLength(1));
+      act(() => instances[0].emit(FakeHls.Events.MANIFEST_PARSED));
+      expect(video.currentTime).toBe(12);
+      expect(video.querySelector("source")).toBeNull();
+    } finally {
+      load.mockRestore();
+    }
+  });
   it("reattaches the source after leaving and reopening the player view", async () => {
     instances.length = 0;
     const { rerender, container } = render(

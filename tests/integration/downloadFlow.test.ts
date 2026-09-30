@@ -286,6 +286,7 @@ describe("real download flows", () => {
       enqueueJob: queue.enqueueSessionJob,
       confirmJob: queue.confirmSessionJob,
       selectTorrentFiles: queue.selectTorrentFiles,
+      setTorrentFilePriority: vi.fn(),
       listOrderedJobs: queue.getOrderedJobs,
       pauseJob: queue.pauseSessionJob,
       resumeJob: queue.resumeSessionJob,
@@ -298,6 +299,11 @@ describe("real download flows", () => {
       reorderJobs: queue.reorderSessionJobs,
       getSchedulerSettings: queue.getSchedulerState,
       updateSchedulerSettings: queue.setMaxActiveSessionJobs,
+      getTorrentLimits: () => ({
+        downloadBytesPerSec: 0,
+        uploadBytesPerSec: 0,
+      }),
+      updateTorrentLimits: (limits) => limits,
       removeSession: () => Promise.resolve(),
     });
     const rpcServer = app.listen(0, "127.0.0.1");

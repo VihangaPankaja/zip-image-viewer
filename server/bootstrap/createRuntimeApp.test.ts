@@ -50,6 +50,7 @@ describe("createRuntimeApp", () => {
       enqueueJob: vi.fn(),
       confirmJob,
       selectTorrentFiles: vi.fn(),
+      setTorrentFilePriority: vi.fn(),
       listOrderedJobs: () => [job],
       pauseJob: vi.fn(),
       resumeJob: vi.fn(),
@@ -59,6 +60,11 @@ describe("createRuntimeApp", () => {
       reorderJobs: vi.fn(),
       getSchedulerSettings: () => ({ activeCount: 0, maxConcurrent: 2 }),
       updateSchedulerSettings: vi.fn(),
+      getTorrentLimits: () => ({
+        downloadBytesPerSec: 0,
+        uploadBytesPerSec: 0,
+      }),
+      updateTorrentLimits: (limits) => limits,
       removeSession: vi.fn(),
     });
 

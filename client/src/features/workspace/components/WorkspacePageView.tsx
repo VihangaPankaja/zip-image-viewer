@@ -78,6 +78,9 @@ function WorkspaceDownloads({ controller }: ViewProps) {
       onSelectFiles={(id, fileIds) =>
         queue.selectFiles(id, fileIds).then(() => undefined)
       }
+      onFilePriority={(id, fileId, priority) =>
+        queue.setFilePriority(id, fileId, priority).then(() => undefined)
+      }
       onConfirm={(id) => queue.confirm(id).then(() => undefined)}
       onOpenSession={(jobId) => {
         const sessionId = queue.jobs.find(({ id }) => id === jobId)?.sessionId;
@@ -237,6 +240,10 @@ function WorkspaceSettings({ controller }: ViewProps) {
       {...settings}
       {...state}
       maxConcurrent={queue.maxConcurrent}
+      torrentLimits={queue.torrentLimits}
+      onSetTorrentLimits={(limits) =>
+        queue.setTorrentLimits(limits).then(() => undefined)
+      }
       onSetConcurrency={(value) =>
         queue.setMaxConcurrent(value).then(() => undefined)
       }

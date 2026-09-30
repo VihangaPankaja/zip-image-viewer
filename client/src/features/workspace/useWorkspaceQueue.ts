@@ -1,7 +1,36 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Job, SessionSummary } from "../../../../shared/contracts";
+import type {
+  Job,
+  SessionSummary,
+  TorrentLimits,
+  TorrentPriority,
+} from "../../../../shared/contracts";
 import type { DownloadOptions } from "../../types/download";
 import { workspaceRpc } from "../../services/orpcClient";
+
+function useTorrentControls(
+  control: <Result>(promise: Promise<Result>) => Promise<Result>,
+) {
+  const filePriorityMutation = useMutation(
+    workspaceRpc.jobs.setFilePriority.mutationOptions(),
+  );
+  const torrentLimitsQuery = useQuery(
+    workspaceRpc.torrentLimits.get.queryOptions({ refetchInterval: 2_000 }),
+  );
+  const torrentLimitsMutation = useMutation(
+    workspaceRpc.torrentLimits.update.mutationOptions(),
+  );
+  return {
+    setFilePriority: (id: string, fileId: string, priority: TorrentPriority) =>
+      control(filePriorityMutation.mutateAsync({ id, fileId, priority })),
+    torrentLimits: torrentLimitsQuery.data ?? {
+      downloadBytesPerSec: 0,
+      uploadBytesPerSec: 0,
+    },
+    setTorrentLimits: (limits: TorrentLimits) =>
+      control(torrentLimitsMutation.mutateAsync(limits)),
+  };
+}
 
 export function useWorkspaceQueue() {
   const queryClient = useQueryClient();
@@ -55,7 +84,9 @@ export function useWorkspaceQueue() {
     return result;
   }
 
+  const torrent = useTorrentControls(control);
   return {
+    ...torrent,
     selectFiles: (id: string, fileIds: string[]) =>
       control(selectFilesMutation.mutateAsync({ id, fileIds })),
     cancel: (id: string) => control(cancelMutation.mutateAsync({ id })),

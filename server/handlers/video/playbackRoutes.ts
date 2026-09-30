@@ -33,7 +33,30 @@ function createPlayHandler(deps: VideoRouteDependencies): RequestHandler {
     let targetPath = context.targetPath;
     let targetStats = context.fileStats;
     let sourceMode = "raw";
-    if (quality !== "source") {
+    if (quality === "remux") {
+      const metadata = await deps.getVideoMetadata(
+        context.targetPath,
+        context.session,
+      );
+      if (metadata.playbackMode !== "remux") {
+        res.status(400).json({ error: "This video does not need a remux." });
+        return;
+      }
+      try {
+        targetPath = await deps.prepareVideoRemux(
+          context.session,
+          context.normalizedPath,
+          context.targetPath,
+        );
+      } catch {
+        res
+          .status(503)
+          .json({ error: "Video remux failed. Try Auto playback." });
+        return;
+      }
+      targetStats = await stat(targetPath);
+      sourceMode = "remux";
+    } else if (quality !== "source") {
       const qualityPath = deps.getSessionQualityOutputPath(
         context.session,
         context.normalizedPath,
@@ -45,6 +68,11 @@ function createPlayHandler(deps: VideoRouteDependencies): RequestHandler {
         targetStats = qualityStats;
         sourceMode = quality;
       }
+    } else if (
+      (await deps.getVideoMetadata(context.targetPath, context.session))
+        .playbackMode === "direct"
+    ) {
+      sourceMode = "direct";
     }
     res.setHeader("cache-control", "no-store");
     res.setHeader("accept-ranges", "bytes");

@@ -140,3 +140,135 @@ it("reviews without transfer and completes one selected file from a real three-f
     await rm(workspace, { recursive: true, force: true });
   }
 }, 30_000);
+
+it("changes real piece scheduling and shares bandwidth controls across active torrents", async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), "torrent-priority-"));
+  const seedDir = path.join(workspace, "seed");
+  await mkdir(seedDir);
+  // One shared boundary piece must not promote all of the low-priority file.
+  const contents = [randomBytes(32 * 16_384 + 13), randomBytes(32 * 16_384)];
+  await Promise.all(
+    contents.map((bytes, i) =>
+      writeFile(path.join(seedDir, `${i}.bin`), bytes),
+    ),
+  );
+  const seed = new WebTorrent({
+    dht: false,
+    tracker: false,
+    lsd: false,
+    utp: false,
+    natUpnp: false,
+    natPmp: false,
+  });
+  const adapter = createWebTorrentAdapter();
+  const add = vi.spyOn(WebTorrent.prototype, "add");
+  const down = vi.spyOn(WebTorrent.prototype, "throttleDownload");
+  const up = vi.spyOn(WebTorrent.prototype, "throttleUpload");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000);
+  try {
+    const seedOptions = { announce: [], pieceLength: 16_384 };
+    const otherOptions = { name: "other.bin", announce: [] };
+    const torrent = await new Promise<Torrent>((resolve) =>
+      seed.seed(seedDir, seedOptions, resolve),
+    );
+    const other = await new Promise<Torrent>((resolve) =>
+      seed.seed(Buffer.from("Another active torrent"), otherOptions, resolve),
+    );
+    const requestedPieces: number[] = [];
+    torrent.on("wire", (wire) =>
+      wire.on("request", (index) => requestedPieces.push(index)),
+    );
+    const address = seed.address();
+    if (!address || typeof address === "string")
+      throw new Error("Local seeder has no TCP port");
+    const input = {
+      signal: controller.signal,
+      retainStoreOnAbort: () => false,
+      onNoPeers: () => undefined,
+      onMetadata: () => ["0"],
+      onProgress: () => undefined,
+    };
+    let otherReady!: () => void;
+    const ready = new Promise<void>((resolve) => {
+      otherReady = resolve;
+    });
+    const otherDownload = adapter
+      .download({
+        ...input,
+        jobId: "other",
+        source: other.torrentFile,
+        downloadDir: path.join(workspace, "other"),
+        onProgress: otherReady,
+      })
+      .catch((error: unknown) => error);
+    await ready;
+    let changed = false;
+    await adapter.download({
+      ...input,
+      jobId: "priority",
+      source: torrent.torrentFile,
+      downloadDir: path.join(workspace, "download"),
+      onMetadata: () => ["0", "1"],
+      priorities: { "0": "low", "1": "normal" },
+      onProgress: () => {
+        if (changed) return;
+        changed = true;
+        expect(() =>
+          adapter.setFilePriority?.("priority", "unknown", "high"),
+        ).toThrow("actively downloading");
+        adapter.setFilePriority?.("priority", "1", "high");
+        adapter.setFilePriority?.("other", "0", "low");
+        expect(
+          adapter.setLimits?.({
+            downloadBytesPerSec: 512 * 1024,
+            uploadBytesPerSec: 256 * 1024,
+          }),
+        ).toEqual({
+          downloadBytesPerSec: 512 * 1024,
+          uploadBytesPerSec: 256 * 1024,
+        });
+        const client = down.mock.contexts.at(-1);
+        expect(up.mock.contexts.at(-1)).toBe(client);
+        expect(add.mock.contexts.slice(-2)).toEqual([client, client]);
+        expect(down).toHaveBeenLastCalledWith(512 * 1024);
+        expect(up).toHaveBeenLastCalledWith(256 * 1024);
+        expect(adapter.getLimits?.()).toEqual({
+          downloadBytesPerSec: 512 * 1024,
+          uploadBytesPerSec: 256 * 1024,
+        });
+        const activeTorrent = add.mock.results.at(-1)?.value as Torrent;
+        activeTorrent.addPeer(`127.0.0.1:${String(address.port)}`);
+      },
+    });
+    expect(requestedPieces.length).toBeGreaterThan(5);
+    // WebTorrent probes one low-priority piece to validate a new peer first.
+    expect(
+      requestedPieces.slice(1, 6).every((piece) => piece >= 32),
+      requestedPieces.slice(0, 8).join(","),
+    ).toBe(true);
+    expect(
+      await readFile(path.join(workspace, "download", "seed", "0.bin")),
+    ).toEqual(contents[0]);
+    expect(
+      await readFile(path.join(workspace, "download", "seed", "1.bin")),
+    ).toEqual(contents[1]);
+    expect(() => adapter.setFilePriority?.("priority", "1", "normal")).toThrow(
+      "actively downloading",
+    );
+    adapter.setLimits?.({ downloadBytesPerSec: 0, uploadBytesPerSec: 0 });
+    expect(down).toHaveBeenLastCalledWith(-1);
+    expect(up).toHaveBeenLastCalledWith(-1);
+    controller.abort();
+    expect(await otherDownload).toMatchObject({ name: "AbortError" });
+  } finally {
+    clearTimeout(timer);
+    controller.abort();
+    add.mockRestore();
+    down.mockRestore();
+    up.mockRestore();
+    await adapter.close();
+    await new Promise<void>((resolve) => seed.destroy(() => resolve()));
+    await rm(workspace, { recursive: true, force: true });
+  }
+}, 30_000);

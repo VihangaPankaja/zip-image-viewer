@@ -1,7 +1,7 @@
 import { TorrentReviewAction } from "./TorrentFileDialog";
 import { Download } from "lucide-react";
 import { useMemo, useState, type DragEvent } from "react";
-import type { Job } from "../../../../../shared/contracts";
+import type { Job, TorrentPriority } from "../../../../../shared/contracts";
 import {
   formatEta,
   formatSpeed,
@@ -19,6 +19,11 @@ type DownloadManagerProps = {
   onResume: (id: string) => void;
   onRetry: (id: string) => void;
   onSelectFiles: (id: string, fileIds: string[]) => Promise<void>;
+  onFilePriority: (
+    id: string,
+    fileId: string,
+    priority: TorrentPriority,
+  ) => Promise<void>;
 };
 
 function moveJob(ids: string[], from: number, to: number): string[] {
@@ -36,10 +41,7 @@ function downloadTitle(job: Job): string {
     : url.pathname.split("/").at(-1) || job.url;
 }
 
-function JobActions({
-  job,
-  ...actions
-}: { job: Job } & Pick<
+type JobActionsProps = { job: Job } & Pick<
   DownloadManagerProps,
   | "onCancel"
   | "onConfirm"
@@ -49,7 +51,10 @@ function JobActions({
   | "onResume"
   | "onRetry"
   | "onSelectFiles"
->) {
+  | "onFilePriority"
+>;
+
+function JobActions({ job, ...actions }: JobActionsProps) {
   const [isConfirming, setIsConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState("");
   const confirm = async () => {
@@ -70,7 +75,11 @@ function JobActions({
   const terminal = ["ready", "cancelled", "error"].includes(job.status);
   return (
     <div className="download-row-actions">
-      <TorrentReviewAction job={job} onSubmit={actions.onSelectFiles} />
+      <TorrentReviewAction
+        job={job}
+        onSubmit={actions.onSelectFiles}
+        onPriorityChange={actions.onFilePriority}
+      />
       {job.status === "awaiting_confirmation" ? (
         <button
           type="button"
@@ -140,14 +149,14 @@ function DownloadTelemetry({ job }: { job: Job }) {
           {job.retryCount} / {job.maxRetries === -1 ? "∞" : job.maxRetries}
         </dd>
       </div>
-      <div>
-        <dt>Threads</dt>
-        <dd>
-          {job.sourceKind === "torrent"
-            ? "Torrent"
-            : `${job.threadMode} · ${String(job.threadCount)}`}
-        </dd>
-      </div>
+      {job.sourceKind === "http" ? (
+        <div>
+          <dt>HTTP threads</dt>
+          <dd>
+            {job.threadMode} · {String(job.threadCount)}
+          </dd>
+        </div>
+      ) : null}
       {job.sourceKind === "torrent" ? (
         <>
           <div>

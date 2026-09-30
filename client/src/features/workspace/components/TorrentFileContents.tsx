@@ -1,4 +1,8 @@
-import type { Job, TorrentFile } from "../../../../../shared/contracts";
+import type {
+  Job,
+  TorrentFile,
+  TorrentPriority,
+} from "../../../../../shared/contracts";
 import type { Selection } from "./TorrentFileDialog";
 import { formatTransferBytes } from "../../../lib/formatterUtils";
 import { MediaTypeFilter } from "../../../components/MediaTypeFilter";
@@ -89,7 +93,7 @@ export function FileTools({
       <p id="torrent-file-description">
         {selecting
           ? "Review the metadata and choose what to download. File contents have not started downloading."
-          : "Reported file status for this download. Files become available when the selected download is ready and remain subject to session expiry. Skipped files cannot be added to this download."}
+          : "Reported file status for this download. Files become available when the selected download is ready and remain subject to session expiry. Skipped files cannot be added to this download. File priority changes download order when peers have the pieces; it cannot make unavailable pieces appear."}
       </p>
       <label>
         Search files
@@ -197,6 +201,7 @@ export function FileList({
               job={job}
               folder={folder}
               files={files}
+              selection={selection}
             />
           ),
         )}
@@ -210,10 +215,12 @@ function FileStatusGroup({
   job,
   folder,
   files,
+  selection,
 }: {
   job: Job;
   folder: string;
   files: TorrentFile[];
+  selection: Selection;
 }) {
   return (
     <fieldset className="torrent-file-group">
@@ -228,6 +235,26 @@ function FileStatusGroup({
             <span className="torrent-file-state">
               {fileStates[fileState(file, job)]}
             </span>
+            {file.selected &&
+            job.status === "downloading" &&
+            selection.canChangePriority ? (
+              <label>
+                <select
+                  aria-label={`Priority for ${file.path}`}
+                  value={file.priority ?? "normal"}
+                  onChange={(event) =>
+                    void selection.changePriority(
+                      file.id,
+                      event.currentTarget.value as TorrentPriority,
+                    )
+                  }
+                >
+                  <option value="low">Low</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                </select>
+              </label>
+            ) : null}
           </li>
         ))}
       </ul>

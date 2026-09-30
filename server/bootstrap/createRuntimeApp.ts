@@ -6,6 +6,8 @@ import type {
   Job,
   VideoQualities,
   VideoQualitiesInput,
+  TorrentLimits,
+  TorrentPriority,
 } from "../../shared/contracts.js";
 
 type Dependencies = {
@@ -23,6 +25,11 @@ type Dependencies = {
   enqueueJob: (_job: SessionJob, _confirmOversize: boolean) => void;
   confirmJob: (_id: string) => SessionJob;
   selectTorrentFiles: (_id: string, _fileIds: string[]) => SessionJob;
+  setTorrentFilePriority: (
+    _id: string,
+    _fileId: string,
+    _priority: TorrentPriority,
+  ) => SessionJob;
   listOrderedJobs: () => readonly SessionJob[];
   pauseJob: (_id: string) => Promise<SessionJob>;
   resumeJob: (_id: string) => SessionJob;
@@ -32,6 +39,8 @@ type Dependencies = {
   reorderJobs: (_ids: readonly string[]) => void;
   getSchedulerSettings: () => { activeCount: number; maxConcurrent: number };
   updateSchedulerSettings: (_value: number) => void;
+  getTorrentLimits: () => TorrentLimits;
+  updateTorrentLimits: (_limits: TorrentLimits) => TorrentLimits;
   removeSession: (_id: string, _reason: string) => Promise<void>;
 };
 
@@ -92,6 +101,8 @@ export function createRuntimeApp(deps: Dependencies) {
       confirmJob: (id) => deps.sanitizeJob(deps.confirmJob(id)),
       selectFiles: (id, fileIds) =>
         deps.sanitizeJob(deps.selectTorrentFiles(id, fileIds)),
+      setFilePriority: (id, fileId, priority) =>
+        deps.sanitizeJob(deps.setTorrentFilePriority(id, fileId, priority)),
       retryJob: (id) => {
         const previous = deps.jobs.get(id);
         if (!previous)
@@ -117,6 +128,8 @@ export function createRuntimeApp(deps: Dependencies) {
         deps.updateSchedulerSettings(maxConcurrent);
         return deps.getSchedulerSettings();
       },
+      getTorrentLimits: deps.getTorrentLimits,
+      updateTorrentLimits: deps.updateTorrentLimits,
     },
   });
 }

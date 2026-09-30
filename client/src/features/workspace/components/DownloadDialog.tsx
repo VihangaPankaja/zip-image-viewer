@@ -96,11 +96,17 @@ function DraftSettings({
           </select>
         </label>
         <label>
-          <span>Threads</span>
+          <span>HTTP threads</span>
           <input
             type="number"
             min="1"
             max="8"
+            disabled={
+              draft.sourcePreference === "torrent" ||
+              (draft.sourcePreference === "auto" &&
+                (draft.url.startsWith("magnet:") ||
+                  /\.torrent(?:[?#]|$)/i.test(draft.url)))
+            }
             value={draft.downloadOptions.transport.threads}
             onChange={(event) =>
               updateTransport(Number(event.currentTarget.value))

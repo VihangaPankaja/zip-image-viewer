@@ -42,6 +42,7 @@ function useVideoHlsStatus(
     if (
       selectedKind !== "video" ||
       quality === "source" ||
+      quality === "remux" ||
       !sessionId ||
       !path
     ) {
@@ -77,6 +78,14 @@ export function useVideoPlaybackController({
 }: UseVideoPlaybackControllerParams) {
   const state = useVideoPlaybackState();
   const playback = state.publicState;
+  const qualitiesReady = useVideoQualities({
+    path: selectedNode?.path,
+    selectedKind,
+    sessionId: session?.id,
+    isFile: selectedNode?.type === "file",
+    setOptions: state.setters.setVideoQualityOptions,
+    setSelectedQuality: state.setters.setSelectedVideoQuality,
+  });
   const videoHlsStatus = useVideoHlsStatus(
     selectedKind,
     playback.selectedVideoQuality,
@@ -99,7 +108,7 @@ export function useVideoPlaybackController({
     hlsRef: state.hlsRef,
     hlsUrl: urls.hlsUrl,
     originalUrl: urls.originalUrl,
-    selectedKind,
+    selectedKind: qualitiesReady ? selectedKind : "",
     selectedQuality: playback.selectedVideoQuality,
     setVideoHeight: state.setters.setVideoHeight,
     setPlaybackError: state.setters.setVideoPlaybackError,
@@ -111,14 +120,6 @@ export function useVideoPlaybackController({
     selectedKind,
     videoRef: playback.videoRef,
     volume: playback.videoVolume,
-  });
-  useVideoQualities({
-    path: selectedNode?.path,
-    selectedKind,
-    sessionId: session?.id,
-    isFile: selectedNode?.type === "file",
-    setOptions: state.setters.setVideoQualityOptions,
-    setSelectedQuality: state.setters.setSelectedVideoQuality,
   });
   const retryVideoPlayback = () => {
     state.setters.setVideoPlaybackError("");

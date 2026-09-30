@@ -7,7 +7,12 @@ import type {
 } from "../../domain/models.js";
 
 type ByteRange = { start: number; end: number };
-type VideoMetadata = { width: number; height: number; durationSeconds: number };
+type VideoMetadata = {
+  width: number;
+  height: number;
+  durationSeconds: number;
+  playbackMode?: "direct" | "remux" | "transcode";
+};
 
 export type VideoRouteDependencies = {
   ensureVideoStoryboard: (
@@ -32,6 +37,11 @@ export type VideoRouteDependencies = {
     _path: string,
     _quality: string,
   ) => string;
+  prepareVideoRemux: (
+    _session: Session,
+    _path: string,
+    _targetPath: string,
+  ) => Promise<string>;
   parseRangeHeader: (
     _header: string | undefined,
     _size: number,

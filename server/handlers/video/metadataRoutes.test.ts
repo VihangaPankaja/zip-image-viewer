@@ -120,3 +120,49 @@ it("reports queued encoder time", async () => {
   expect(body.renditions[0].status).toBe("queued");
   vi.restoreAllMocks();
 });
+
+it("prefers the probed playback mode and still offers a transcode fallback", async () => {
+  directory = await mkdtemp(path.join(os.tmpdir(), "video-modes-"));
+  await writeFile(path.join(directory, "clip.mp4"), "fixture");
+  const session = {
+    id: "2bf886fc-65bf-4e2f-b973-b607766b3131",
+    extractDir: directory,
+    selectedVideoQuality: "720p",
+  } as Session;
+  const metadata = {
+    width: 1280,
+    height: 720,
+    durationSeconds: 10,
+    playbackMode: "direct" as "direct" | "remux" | "transcode",
+  };
+  const deps = {
+    touchSession: () => session,
+    sanitizeEntryPath,
+    VIDEO_EXTENSIONS: new Set(["mp4"]),
+    getVideoMetadata: () => Promise.resolve(metadata),
+    buildVideoQualityOptions: () => ({
+      options: [
+        { id: "source", label: "Original", height: 720 },
+        { id: "auto", label: "Auto", height: null },
+      ],
+      defaultQuality: "auto",
+    }),
+  };
+  const input = { sessionId: session.id, path: "clip.mp4" };
+  expect(await getVideoQualities(input, deps)).toMatchObject({
+    defaultQuality: "source",
+  });
+  metadata.playbackMode = "remux";
+  expect(await getVideoQualities(input, deps)).toMatchObject({
+    defaultQuality: "remux",
+    options: [
+      { id: "source" },
+      { id: "remux", label: "Remuxed MP4" },
+      { id: "auto" },
+    ],
+  });
+  metadata.playbackMode = "transcode";
+  expect(await getVideoQualities(input, deps)).toMatchObject({
+    defaultQuality: "auto",
+  });
+});

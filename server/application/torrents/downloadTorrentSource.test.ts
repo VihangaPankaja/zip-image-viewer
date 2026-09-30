@@ -194,3 +194,48 @@ describe("downloadTorrentSource", () => {
     expect(download).toHaveBeenCalledOnce();
   });
 });
+
+it("clears a connected-peer stall when data arrives before piece verification", async () => {
+  const { emitJob, job, settings } = setup();
+  const now = vi.spyOn(Date, "now").mockReturnValue(0);
+  job.torrentFiles[0].priority = "high";
+  const download = vi.fn<TorrentAdapter["download"]>(
+    ({ jobId, priorities, onMetadata, onProgress }) => {
+      expect(jobId).toBe(job.id);
+      expect(priorities).toEqual({ "0": "high" });
+      onMetadata({ files: [file()], length: 100, name: "fixture" });
+      const progress = {
+        downloadedBytes: 0,
+        downloadSpeedBytesPerSec: 0,
+        peerCount: 1,
+        progress: 0,
+        uploadedBytes: 0,
+        uploadSpeedBytesPerSec: 0,
+      };
+      now.mockReturnValue(16_000);
+      onProgress(progress);
+      expect(job.isStalled).toBe(true);
+      expect(job.message).toContain("Waiting for availability");
+      now.mockReturnValue(32_000);
+      onProgress({ ...progress, downloadSpeedBytesPerSec: 1024 });
+      expect(job.isStalled).toBe(false);
+      expect(job.verifiedBytes).toBe(0);
+      now.mockReturnValue(48_000);
+      onProgress({ ...progress, downloadSpeedBytesPerSec: 1024 });
+      expect(job.isStalled).toBe(false);
+      onProgress({ ...progress, downloadedBytes: 50, progress: 0.5 });
+      expect(job.isStalled).toBe(false);
+      return Promise.resolve({ files: ["image.jpg"] });
+    },
+  );
+  try {
+    await downloadTorrentSource(
+      job,
+      settings,
+      { confirmOversize: true, downloadDir: "torrent" },
+      { adapter: { close: vi.fn(), download }, emitJob },
+    );
+  } finally {
+    now.mockRestore();
+  }
+});

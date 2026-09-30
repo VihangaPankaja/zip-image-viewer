@@ -39,15 +39,32 @@ export async function getVideoQualities(
     context.session,
   );
   const qualityConfig = deps.buildVideoQualityOptions(source.height);
+  const options =
+    source.playbackMode === "remux"
+      ? [
+          qualityConfig.options[0],
+          { id: "remux", label: "Remuxed MP4", height: source.height },
+          ...qualityConfig.options.slice(1),
+        ]
+      : qualityConfig.options;
+  if (source.playbackMode === "direct")
+    options[0] = { ...options[0], label: "Direct play" };
   const preferredQuality =
-    context.session.selectedVideoQuality || qualityConfig.defaultQuality;
+    source.playbackMode === "direct"
+      ? "source"
+      : source.playbackMode === "remux"
+        ? "remux"
+        : source.playbackMode === "transcode"
+          ? "auto"
+          : context.session.selectedVideoQuality ||
+            qualityConfig.defaultQuality;
   const defaultQuality =
-    qualityConfig.options.find(({ id }) => id === preferredQuality)?.id ||
+    options.find(({ id }) => id === preferredQuality)?.id ||
     qualityConfig.defaultQuality;
   return {
     path: context.normalizedPath,
     source,
-    options: qualityConfig.options,
+    options,
     defaultQuality,
   };
 }

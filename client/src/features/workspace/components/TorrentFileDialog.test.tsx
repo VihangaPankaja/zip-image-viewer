@@ -263,3 +263,32 @@ it.each([
     ).toHaveLength(2);
   },
 );
+
+it("forwards selected file priority changes and keeps failures visible", async () => {
+  const user = userEvent.setup();
+  const active = job();
+  active.status = "downloading";
+  active.torrentFiles[0].selected = true;
+  const onPriorityChange = vi
+    .fn()
+    .mockRejectedValueOnce(new Error("Peers disconnected"));
+  render(
+    <TorrentReviewAction
+      job={active}
+      onSubmit={vi.fn()}
+      onPriorityChange={onPriorityChange}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "View files" }));
+  expect(
+    screen.getAllByRole("combobox", { name: /^Priority for/ }),
+  ).toHaveLength(1);
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Priority for film/movie.mp4" }),
+    "high",
+  );
+  expect(onPriorityChange).toHaveBeenCalledWith(active.id, "0", "high");
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Peers disconnected",
+  );
+});
