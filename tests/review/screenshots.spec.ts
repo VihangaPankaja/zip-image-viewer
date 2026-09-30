@@ -175,6 +175,17 @@ async function captureDialogs(
       downloadBytesPerSec: 512 * 1024,
       uploadBytesPerSec: 128 * 1024,
     });
+  await expect(
+    page.getByRole("button", { name: "Save torrent limits" }),
+  ).toBeEnabled();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect(
+    page.getByRole("spinbutton", { name: "Torrent download limit (KiB/s)" }),
+  ).toHaveValue("512");
+  await expect(
+    page.getByRole("spinbutton", { name: "Torrent upload limit (KiB/s)" }),
+  ).toHaveValue("128");
   await page
     .getByRole("group", { name: "Torrent bandwidth" })
     .scrollIntoViewIfNeeded();
