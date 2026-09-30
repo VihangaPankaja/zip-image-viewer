@@ -101,7 +101,7 @@ function SettingsHeader({
       <div className="panel-title-group">
         <p className="panel-label">Your workspace</p>
         <h2 id="global-settings-title">Settings</h2>
-        <p className="settings-description">Changes save automatically.</p>
+        <p className="settings-description">Preferences and transfer limits.</p>
       </div>
       <button
         className="ghost-button compact-button"

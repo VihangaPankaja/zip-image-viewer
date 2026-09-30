@@ -8,12 +8,9 @@ export function TorrentBandwidthSettings({
   torrentLimits: TorrentLimits;
   onSetTorrentLimits: (limits: TorrentLimits) => Promise<void>;
 }) {
-  const [download, setDownload] = useState(
-    String(torrentLimits.downloadBytesPerSec / 1024),
-  );
-  const [upload, setUpload] = useState(
-    String(torrentLimits.uploadBytesPerSec / 1024),
-  );
+  const { downloadBytesPerSec, uploadBytesPerSec } = torrentLimits;
+  const [download, setDownload] = useState(String(downloadBytesPerSec / 1024));
+  const [upload, setUpload] = useState(String(uploadBytesPerSec / 1024));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const save = async () => {
@@ -71,7 +68,12 @@ export function TorrentBandwidthSettings({
           onChange={(event) => setUpload(event.currentTarget.value)}
         />
       </label>
-      <button type="button" disabled={saving} onClick={() => void save()}>
+      <button
+        className="primary-button"
+        type="button"
+        disabled={saving}
+        onClick={() => void save()}
+      >
         {saving ? "Saving…" : "Save torrent limits"}
       </button>
       {error ? <p role="alert">{error}</p> : null}

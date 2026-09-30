@@ -7,6 +7,7 @@ import path from "node:path";
 import sharp from "sharp";
 import { jobSchema, type Job } from "../../shared/contracts";
 import type { Page } from "@playwright/test";
+import { buildFmp4HlsArgs } from "../../server/media/ffmpegHls";
 
 const sessionId = "00000000-0000-4000-8000-000000000008";
 const timestamp = Date.UTC(2026, 0, 15, 12);
@@ -16,6 +17,7 @@ export const filenames = [
   "03-film.mp4",
   "04-audio.wav",
   "05-archive.zip",
+  "06-film.mkv",
 ];
 const mediaDirectory = path.join(tmpdir(), `ziv-review-media-${process.pid}`);
 process.on("exit", () =>
@@ -71,6 +73,34 @@ export async function prepareMedia() {
       { timeout: 30_000 },
     );
   }
+  execFileSync(
+    ffmpeg,
+    [
+      "-y",
+      "-loglevel",
+      "error",
+      "-i",
+      path.join(mediaDirectory, "sample.mp4"),
+      "-c",
+      "copy",
+      path.join(mediaDirectory, "sample.mkv"),
+    ],
+    { timeout: 30_000 },
+  );
+  const hlsDirectory = path.join(mediaDirectory, "hls");
+  await mkdir(hlsDirectory, { recursive: true });
+  execFileSync(
+    ffmpeg,
+    [
+      "-y",
+      ...buildFmp4HlsArgs({
+        inputPath: path.join(mediaDirectory, "sample.mp4"),
+        outputDirectory: hlsDirectory,
+        height: 540,
+      }),
+    ],
+    { timeout: 30_000 },
+  );
   await sharp({
     create: { width: 1600, height: 900, channels: 3, background: "#000000" },
   })
@@ -253,21 +283,75 @@ export async function installReviewFixtures(page: Page) {
   const state = {
     jobs: [] as (ReturnType<typeof reviewJobs>[number] | Job)[],
     selectedFileIds: [] as string[],
+    torrentLimits: { downloadBytesPerSec: 0, uploadBytesPerSec: 0 },
   };
   await page.clock.setFixedTime(new Date(timestamp));
   await page.route("**/rpc/**", (route) => {
     const endpoint = new URL(route.request().url()).pathname;
-    if (endpoint.endsWith("video/qualities"))
+    if (
+      endpoint.endsWith("torrentLimits/get") ||
+      endpoint.endsWith("torrentLimits/update")
+    ) {
+      if (endpoint.endsWith("torrentLimits/update")) {
+        const payload = route.request().postDataJSON() as {
+          json: { downloadBytesPerSec: number; uploadBytesPerSec: number };
+        };
+        state.torrentLimits = payload.json;
+      }
+      return route.fulfill({ json: { json: state.torrentLimits } });
+    }
+    if (endpoint.endsWith("jobs/setFilePriority")) {
+      const payload = route.request().postDataJSON() as {
+        json: {
+          id: string;
+          fileId: string;
+          priority: "low" | "normal" | "high";
+        };
+      };
+      const { id: jobId, fileId } = payload.json;
+      const job = state.jobs.find(({ id }) => id === jobId);
+      if (!job) return route.fulfill({ status: 404 });
+      const updated = jobSchema.parse({
+        ...job,
+        torrentFiles: job.torrentFiles.map((file) =>
+          file.id === fileId
+            ? { ...file, priority: payload.json.priority }
+            : file,
+        ),
+      });
+      state.jobs = state.jobs.map((item) =>
+        item.id === jobId ? updated : item,
+      );
+      return route.fulfill({ json: { json: updated } });
+    }
+    if (endpoint.endsWith("video/qualities")) {
+      const payload = route.request().postDataJSON() as {
+        json?: { path?: string };
+      } | null;
+      const videoPath = payload?.json?.path ?? filenames[2];
+      const remux = videoPath.endsWith(".mkv");
       return route.fulfill({
         json: {
           json: {
-            path: filenames[2],
+            path: videoPath,
             source: { width: 960, height: 540, durationSeconds: 8 },
-            options: [{ id: "source", label: "Original", height: 540 }],
-            defaultQuality: "source",
+            options: [
+              {
+                id: "source",
+                label: remux ? "Original" : "Direct play",
+                height: 540,
+              },
+              ...(remux
+                ? [{ id: "remux", label: "Remuxed MP4", height: 540 }]
+                : []),
+              { id: "auto", label: "Auto", height: null },
+              { id: "540p", label: "540p", height: 540 },
+            ],
+            defaultQuality: remux ? "remux" : "source",
           },
         },
       });
+    }
     if (endpoint.endsWith("jobs/enqueue")) {
       state.jobs = [reviewTorrentJob()];
       return route.fulfill({ json: { json: { items: state.jobs } } });
@@ -308,7 +392,7 @@ export async function installReviewFixtures(page: Page) {
               {
                 id: sessionId,
                 firstFilePath: "Coastal collection",
-                fileCount: 5,
+                fileCount: filenames.length,
                 lastAccessedAt: timestamp,
               },
             ],
@@ -318,6 +402,22 @@ export async function installReviewFixtures(page: Page) {
   });
   await page.route("**/api/**", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/video/hls/master"))
+      return route.fulfill({
+        contentType: "application/vnd.apple.mpegurl",
+        body: "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=2200000,RESOLUTION=960x540\n/api/review-hls/index.m3u8\n",
+      });
+    if (url.pathname.startsWith("/api/review-hls/")) {
+      const filename = path.basename(url.pathname);
+      if (!/^(index\.m3u8|init\.mp4|segment_\d{6}\.m4s)$/.test(filename))
+        return route.fulfill({ status: 404 });
+      return route.fulfill({
+        contentType: filename.endsWith(".m3u8")
+          ? "application/vnd.apple.mpegurl"
+          : "video/mp4",
+        body: await readFile(path.join(mediaDirectory, "hls", filename)),
+      });
+    }
     if (url.pathname.endsWith("/tree"))
       return route.fulfill({
         json: {
@@ -386,7 +486,9 @@ export async function installReviewFixtures(page: Page) {
         ? ["sample.png", "image/png"]
         : name.endsWith(".wav")
           ? ["sample.wav", "audio/wav"]
-          : ["sample.mp4", "video/mp4"];
+          : name.endsWith(".mkv") && url.searchParams.get("quality") !== "remux"
+            ? ["sample.mkv", "video/x-matroska"]
+            : ["sample.mp4", "video/mp4"];
       const body = await readFile(path.join(mediaDirectory, file));
       const headers = route.request().headers();
       const range =
