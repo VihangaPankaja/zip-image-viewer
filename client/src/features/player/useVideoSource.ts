@@ -39,6 +39,7 @@ function destroyHls(hlsRef: RefObject<Hls | null>) {
 }
 
 function resetVideoSource(player: HTMLVideoElement) {
+  player.pause();
   player.removeAttribute("src");
   player.querySelectorAll("source").forEach((source) => source.remove());
   player.load();
@@ -168,6 +169,7 @@ function useAttachedVideoSource(
     const player = videoRef.current;
     if (!player || selectedKind !== "video" || !originalUrl) {
       destroyHls(hlsRef);
+      if (player) resetVideoSource(player);
       return;
     }
     const sameFile = sourceRef.current === originalUrl;

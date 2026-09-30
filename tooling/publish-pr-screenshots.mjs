@@ -37,6 +37,8 @@ const requiredScreens = [
   "preview-mp4",
   "video-remux-playback",
   "video-transcode-fallback",
+  "video-qualities-pending",
+  "video-probe-fallback",
   "preview-wav",
   "preview-zip",
   "slideshow",

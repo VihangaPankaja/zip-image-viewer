@@ -69,8 +69,11 @@ function createPlayHandler(deps: VideoRouteDependencies): RequestHandler {
         sourceMode = quality;
       }
     } else if (
-      (await deps.getVideoMetadata(context.targetPath, context.session))
-        .playbackMode === "direct"
+      (
+        await deps
+          .getVideoMetadata(context.targetPath, context.session)
+          .catch(() => null)
+      )?.playbackMode === "direct"
     ) {
       sourceMode = "direct";
     }

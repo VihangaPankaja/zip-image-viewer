@@ -506,6 +506,54 @@ for (const device of devices) {
           await save(page, device, theme, "video-subtitles-recovered");
         }
       }
+      let releaseProbe!: () => void;
+      const pendingProbe = new Promise<void>((resolve) => {
+        releaseProbe = resolve;
+      });
+      await page.route("**/rpc/video/qualities", async (route) => {
+        await pendingProbe;
+        await route.fulfill({ status: 500, json: { error: "Probe failed" } });
+      });
+      try {
+        if (mobile)
+          await page
+            .getByRole("radio", { name: "Files", exact: true })
+            .check({ force: true });
+        await page
+          .getByRole("treeitem", { name: filenames[2], exact: true })
+          .click();
+        await expect(page.locator(".preview-panel h2")).toHaveText(
+          filenames[2],
+        );
+        const video = page.getByLabel("Video preview");
+        await expect(video).toHaveJSProperty("paused", true);
+        await expect(video).toHaveJSProperty("readyState", 0);
+        await expect(video.locator("source")).toHaveCount(0);
+        if (mobile)
+          await page
+            .getByRole("radio", { name: "Preview", exact: true })
+            .check({ force: true });
+        await video.scrollIntoViewIfNeeded();
+        await save(page, device, theme, "video-qualities-pending");
+        releaseProbe();
+        await expect(
+          page.getByText("Mode: Original file", { exact: true }),
+        ).toBeVisible();
+        await expect(video).toHaveJSProperty("readyState", 4);
+        await video.evaluate(async (element: HTMLVideoElement) => {
+          element.muted = true;
+          await element.play();
+        });
+        await expect
+          .poll(() =>
+            video.evaluate((element: HTMLVideoElement) => element.currentTime),
+          )
+          .toBeGreaterThan(0.1);
+        await video.evaluate((element: HTMLVideoElement) => element.pause());
+        await save(page, device, theme, "video-probe-fallback");
+      } finally {
+        releaseProbe();
+      }
       await selectFile(page, filenames[0], mobile);
       await page
         .getByRole("button", { name: "Slideshow", exact: true })
