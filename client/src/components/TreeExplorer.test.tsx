@@ -181,3 +181,53 @@ it("filters a single-file root and restores it after no matches", () => {
     "true",
   );
 });
+
+it("finds nested files by path while retaining order, folder context and prior expansion", () => {
+  render(<TreeExplorer rootNode={root} selectedPath="" onSelect={vi.fn()} />);
+  const search = screen.getByRole("searchbox", {
+    name: "Search explorer files",
+  });
+  fireEvent.change(search, { target: { value: "PHOTOS" } });
+  expect(
+    screen
+      .getAllByRole("treeitem")
+      .map((item) => item.getAttribute("aria-label")),
+  ).toEqual(["Archive", "Photos", "Cover"]);
+  fireEvent.change(search, { target: { value: "unmatched" } });
+  expect(screen.queryByRole("tree")).not.toBeInTheDocument();
+  fireEvent.change(search, { target: { value: "" } });
+  expect(screen.getByRole("treeitem", { name: "Photos" })).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+  expect(
+    screen.queryByRole("treeitem", { name: "Cover" }),
+  ).not.toBeInTheDocument();
+});
+
+it("keeps a large tree bounded and focuses an initially unmounted last file", async () => {
+  const largeRoot = {
+    ...root,
+    children: Array.from({ length: 1000 }, (_, index) => ({
+      name: `episode-${index}.txt`,
+      path: `episode-${index}.txt`,
+      type: "file" as const,
+      extension: "txt",
+    })),
+  };
+  render(
+    <TreeExplorer rootNode={largeRoot} selectedPath="" onSelect={vi.fn()} />,
+  );
+  expect(screen.getAllByRole("treeitem").length).toBeLessThan(100);
+  fireEvent.keyDown(screen.getByRole("tree"), { key: "End" });
+  expect(
+    await screen.findByRole("treeitem", { name: "episode-999.txt" }),
+  ).toHaveFocus();
+  expect(
+    screen.getByRole("treeitem", { name: "episode-999.txt" }),
+  ).toHaveAttribute("aria-posinset", "1000");
+  fireEvent.keyDown(screen.getByRole("tree"), { key: "Home" });
+  expect(
+    await screen.findByRole("treeitem", { name: "Archive" }),
+  ).toHaveFocus();
+});

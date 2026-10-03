@@ -175,20 +175,22 @@
 
 .tree-browser {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(44px, 1fr);
   gap: var(--space-2);
   min-height: 0;
   min-width: 0;
 }
 
-.media-type-filter {
+.media-type-filter,
+.explorer-search {
   display: grid;
   gap: 6px;
   min-width: 0;
   font-size: 0.8125rem;
 }
 
-.media-type-filter select {
+.media-type-filter select,
+.explorer-search input {
   width: 100%;
   min-width: 0;
   min-height: 44px;
@@ -202,4 +204,49 @@
 
 .torrent-file-tools .media-type-filter {
   margin-top: 8px;
+}
+
+.explorer-tools {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.tree-windowed {
+  display: block;
+  max-height: 65vh;
+  overflow: auto;
+  overflow-anchor: none;
+}
+
+.tree-windowed .tree-item {
+  height: 44px;
+  min-height: 44px;
+  margin-block-end: 3px;
+}
+
+.torrent-file-results {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+}
+
+.torrent-file-results:not(:has(.torrent-file-pagination)) {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.torrent-file-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px var(--space-6);
+  font-size: 0.8125rem;
+}
+
+@media (max-width: 480px) {
+  .torrent-file-pagination {
+    padding-inline: 14px;
+  }
 }

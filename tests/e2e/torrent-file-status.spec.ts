@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { tapVisibleTarget } from "./touch";
 import {
   installReviewFixtures,
   reviewActiveTorrentJob,
@@ -21,7 +22,7 @@ test("torrent file status filters compose without changing selection", async ({
   });
   await page.goto("/");
   const open = page.getByRole("button", { name: "View files", exact: true });
-  await open.tap();
+  await tapVisibleTarget(open);
   const dialog = page.getByRole("dialog", { name: "Torrent files" });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("checkbox")).toHaveCount(0);
