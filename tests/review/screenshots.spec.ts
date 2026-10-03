@@ -66,12 +66,324 @@ async function save(
   const file = `${device.name.toLowerCase()}-${theme}-${screen}.png`;
   await page.screenshot({
     path: path.join(output, file),
-    fullPage: screen === "http-and-torrent-downloads",
+    fullPage:
+      screen === "http-and-torrent-downloads" ||
+      screen === "loaded-video-downloads-visit",
     animations: "disabled",
     caret: "hide",
     scale: "css",
   });
   captures.push({ ...device, device: device.name, theme, screen, file });
+}
+
+async function installSearchTree(page: Page) {
+  const modifiedAt = Date.UTC(2026, 0, 15, 12);
+  await page.route("**/rpc/sessions/list", (route) =>
+    route.fulfill({
+      json: {
+        json: {
+          items: [
+            {
+              id: "00000000-0000-4000-8000-000000000008",
+              firstFilePath: "Coastal collection",
+              fileCount: filenames.length + 2,
+              lastAccessedAt: modifiedAt,
+            },
+          ],
+        },
+      },
+    }),
+  );
+  await page.route("**/api/sessions/*/tree", (route) => {
+    const id = new URL(route.request().url()).pathname.split("/")[3];
+    const file = (name: string, parentPath = ".") => ({
+      name,
+      path: parentPath === "." ? name : `${parentPath}/${name}`,
+      parentPath,
+      type: "file",
+      extension: name.split(".").at(-1),
+      size: 2400000,
+      modifiedAt,
+    });
+    return route.fulfill({
+      json: {
+        id,
+        firstFilePath: filenames[0],
+        tree: {
+          name: "Coastal collection",
+          path: ".",
+          type: "directory",
+          children: [
+            ...filenames.map((name) => file(name)),
+            {
+              name: "Field notes",
+              path: "Field notes",
+              type: "directory",
+              children: ["north-shore", "south-shore"].map((name) => ({
+                name,
+                path: `Field notes/${name}`,
+                parentPath: "Field notes",
+                type: "directory",
+                children: [file("location-notes.txt", `Field notes/${name}`)],
+              })),
+            },
+          ],
+        },
+      },
+    });
+  });
+}
+
+async function captureExplorerSearch(
+  page: Page,
+  device: (typeof devices)[number],
+  theme: string,
+  mobile: boolean,
+) {
+  if (mobile)
+    await page
+      .getByRole("radio", { name: "Files", exact: true })
+      .check({ force: true });
+  const search = page.getByRole("searchbox", { name: "Search explorer files" });
+  await search.fill("Field notes/");
+  const results = page.getByRole("treeitem", {
+    name: "location-notes.txt",
+    exact: true,
+    includeHidden: true,
+  });
+  await expect(results).toHaveCount(2);
+  for (const name of ["Field notes", "north-shore", "south-shore"])
+    await expect(
+      page.getByRole("treeitem", { name, exact: true }),
+    ).toBeVisible();
+  await expect(
+    page.getByRole("treeitem", { name: filenames[0], exact: true }),
+  ).toHaveCount(0);
+  await save(page, device, theme, "explorer-path-search");
+  await results.first().focus();
+  await page.keyboard.press("End");
+  await expect(results.last()).toBeFocused();
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("ArrowUp");
+  await expect(results.first()).toBeFocused();
+  await save(page, device, theme, "explorer-search-keyboard-focused");
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".preview-panel h2")).toHaveText(
+    "location-notes.txt",
+  );
+  await expect(page.locator("pre")).toContainText("COASTAL COLLECTION");
+  await expect(page.locator(".workspace-metadata-panel")).toContainText(
+    "Field notes/north-shore/location-notes.txt",
+  );
+  await expect(results.first()).toHaveAttribute("aria-selected", "true");
+  await save(page, device, theme, "explorer-search-keyboard-opened");
+  if (mobile)
+    await page
+      .getByRole("radio", { name: "Files", exact: true })
+      .check({ force: true });
+  await search.clear();
+  await expect(
+    page.getByRole("treeitem", { name: filenames[0], exact: true }),
+  ).toBeVisible();
+  await expect(results).toHaveCount(0);
+}
+
+async function captureVideoQueueReturn(
+  page: Page,
+  device: (typeof devices)[number],
+  theme: string,
+  state: Awaited<ReturnType<typeof installReviewFixtures>>,
+  mobile: boolean,
+) {
+  const video = page.locator("video");
+  const seek = page.getByRole("slider", { name: "Seek video" });
+  await expect(video).toHaveJSProperty("paused", true);
+  await expect(video).toHaveJSProperty("currentTime", 7.75);
+  state.jobs = reviewJobs();
+  if (mobile) {
+    await page
+      .locator(".video-subtitle-note")
+      .evaluate((element) => element.scrollIntoView({ block: "end" }));
+    const downloads = page
+      .getByRole("navigation", { name: "Workspace views" })
+      .getByRole("button", { name: "Downloads", exact: true });
+    await expect(downloads).toBeInViewport({ ratio: 1 });
+    await downloads.click();
+  } else {
+    await page.getByRole("tab", { name: "Downloads", exact: true }).click();
+  }
+  await expect(page.locator(".download-row")).toHaveCount(4);
+  await expect(video).toBeHidden();
+  await expect(video).toHaveJSProperty("paused", true);
+  await expect(video).toHaveJSProperty("currentTime", 7.75);
+  await save(page, device, theme, "loaded-video-downloads-visit");
+  await page.getByRole("tab", { name: "Explore", exact: true }).click();
+  await expect(video).toBeVisible();
+  await expect(video).toHaveJSProperty("paused", true);
+  await expect(video).toHaveJSProperty("currentTime", 7.75);
+  await expect(video).toHaveJSProperty("readyState", 4);
+  await expect(page.locator(".preview-panel h2")).toHaveText(filenames[2]);
+  await expect(seek).toHaveValue("7.75");
+  await seek.evaluate((element) => element.scrollIntoView({ block: "center" }));
+  if (mobile) await expect(seek).toBeInViewport({ ratio: 1 });
+  await save(page, device, theme, "video-return-paused-position");
+  state.jobs = [];
+}
+
+async function captureLargeTorrent(
+  page: Page,
+  device: (typeof devices)[number],
+  theme: string,
+  state: Awaited<ReturnType<typeof installReviewFixtures>>,
+) {
+  const job = reviewTorrentJob();
+  job.torrentFiles = Array.from({ length: 10_000 }, (_, index) => ({
+    ...job.torrentFiles[0],
+    id: String(index),
+    path: `Coastal collection/film-${String(index).padStart(5, "0")}.mp4`,
+  }));
+  job.reportedSize = job.torrentFiles.reduce(
+    (size, file) => size + file.size,
+    0,
+  );
+  state.jobs = [job];
+  await page.getByRole("button", { name: "Review files", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Choose files" });
+  await expect(
+    dialog.getByText("Files 1–200 of 10000", { exact: true }),
+  ).toBeVisible();
+  await expect(dialog.getByRole("status")).toContainText(
+    "10000 of 10000 files selected",
+  );
+  await expect(dialog.getByRole("checkbox")).toHaveCount(201);
+  await save(page, device, theme, "torrent-large-folder-page");
+  await dialog
+    .getByRole("button", { name: "Select none", exact: true })
+    .click();
+  await expect(dialog.getByRole("status")).toContainText(
+    "0 of 10000 files selected",
+  );
+  await dialog
+    .getByRole("checkbox", { name: "Coastal collection", exact: true })
+    .check();
+  await expect(dialog.getByRole("status")).toContainText(
+    "10000 of 10000 files selected",
+  );
+  await dialog.getByRole("button", { name: "Next files", exact: true }).click();
+  await expect(
+    dialog.getByText("Files 201–400 of 10000", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("checkbox", {
+      name: "Coastal collection/film-00200.mp4",
+      exact: true,
+    }),
+  ).toBeChecked();
+  await expect(
+    dialog.getByRole("checkbox", { name: "Coastal collection", exact: true }),
+  ).toBeChecked();
+  await expect(dialog.getByRole("status")).toContainText(
+    "10000 of 10000 files selected",
+  );
+  await save(page, device, theme, "torrent-large-folder-selection");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  state.jobs = [reviewTorrentJob()];
+}
+
+async function captureLargeExplorer(
+  page: Page,
+  device: (typeof devices)[number],
+  theme: string,
+  mobile: boolean,
+) {
+  const id = "00000000-0000-4000-8000-000000000008";
+  const files = Array.from({ length: 10_000 }, (_, index) => {
+    const name = `location-notes-${String(index).padStart(5, "0")}.txt`;
+    return {
+      name,
+      path: name,
+      parentPath: ".",
+      type: "file",
+      extension: "txt",
+      size: 12000,
+    };
+  });
+  const treeRoute = "**/api/sessions/*/tree";
+  const sessionsRoute = "**/rpc/sessions/list";
+  const treeHandler: Parameters<Page["route"]>[1] = (route) =>
+    route.fulfill({
+      json: {
+        id,
+        firstFilePath: files[0].path,
+        tree: {
+          name: "Coastal collection",
+          path: ".",
+          type: "directory",
+          children: files,
+        },
+      },
+    });
+  const sessionsHandler: Parameters<Page["route"]>[1] = (route) =>
+    route.fulfill({
+      json: {
+        json: {
+          items: [
+            {
+              id,
+              firstFilePath: "Coastal collection",
+              fileCount: files.length,
+              lastAccessedAt: Date.UTC(2026, 0, 15, 12),
+            },
+          ],
+        },
+      },
+    });
+  await page.route(treeRoute, treeHandler);
+  await page.route(sessionsRoute, sessionsHandler);
+  try {
+    await page.reload();
+    await page.getByRole("tab", { name: "Explore", exact: true }).click();
+    if (mobile)
+      await page.getByRole("button", { name: "Show sessions" }).click();
+    await page
+      .getByRole("button", { name: "Open Coastal collection", exact: true })
+      .click();
+    await expect(page.locator(".explorer-tree-panel .panel-chip")).toHaveText(
+      "10000",
+    );
+    const tree = page.getByRole("tree", { name: "Explorer tree" });
+    await tree.getByRole("treeitem").first().focus();
+    await page.keyboard.press("End");
+    const last = tree.getByRole("treeitem", {
+      name: files[9999].name,
+      exact: true,
+    });
+    await expect(last).toBeFocused();
+    await expect(last).toBeVisible();
+    await expect(last).toHaveAttribute("aria-posinset", "10000");
+    expect(await tree.getByRole("treeitem").count()).toBeLessThan(100);
+    if (mobile) {
+      await last.evaluate((element) =>
+        element.scrollIntoView({ block: "center" }),
+      );
+      const item = await last.boundingBox();
+      const navigation = await page
+        .locator(".workspace-mobile-nav")
+        .boundingBox();
+      if (!item || !navigation)
+        throw new Error("Large collection or mobile navigation is missing.");
+      expect(item.y + item.height).toBeLessThanOrEqual(navigation.y);
+    }
+    await save(page, device, theme, "explorer-large-collection");
+  } finally {
+    await page.unroute(treeRoute, treeHandler);
+    await page.unroute(sessionsRoute, sessionsHandler);
+    await page.reload();
+    await expect(
+      page.getByRole("heading", { name: "Downloads", exact: true }),
+    ).toBeVisible();
+  }
 }
 
 async function selectFile(page: Page, name: string, mobile: boolean) {
@@ -213,6 +525,7 @@ for (const device of devices) {
       await page.setViewportSize(device);
       await page.emulateMedia({ colorScheme: theme });
       const state = await installReviewFixtures(page);
+      await installSearchTree(page);
       await page.goto("/");
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
       await save(page, device, theme, "downloads-empty");
@@ -220,7 +533,7 @@ for (const device of devices) {
       await expect(page.locator(".download-row")).toHaveCount(4);
       await save(page, device, theme, "http-and-torrent-downloads");
       await captureDialogs(page, device, theme, state);
-      state.jobs = [reviewTorrentJob()];
+      await captureLargeTorrent(page, device, theme, state);
       await page
         .getByRole("button", { name: "Review files", exact: true })
         .click();
@@ -231,6 +544,26 @@ for (const device of devices) {
         "3 of 4 files selected",
       );
       await save(page, device, theme, "torrent-file-selection");
+      const lastTorrentFile = page.getByRole("checkbox", {
+        name: "Extras/Behind the scenes.mp4",
+        exact: true,
+      });
+      await page
+        .getByRole("checkbox", {
+          name: "Coastal collection/03-film.mp4",
+          exact: true,
+        })
+        .focus();
+      await page.keyboard.press("End");
+      await expect(lastTorrentFile).toBeFocused();
+      await page.keyboard.press("Space");
+      await expect(lastTorrentFile).toBeChecked();
+      await expect(page.getByRole("dialog").getByRole("status")).toContainText(
+        "4 of 4 files selected",
+      );
+      await save(page, device, theme, "torrent-keyboard-selection");
+      await page.keyboard.press("Space");
+      await expect(lastTorrentFile).not.toBeChecked();
       await page
         .getByRole("combobox", { name: "Media type" })
         .selectOption("video");
@@ -321,6 +654,7 @@ for (const device of devices) {
         page.getByRole("treeitem", { name: filenames[0], exact: true }),
       ).toBeVisible();
       await save(page, device, theme, "explorer");
+      await captureExplorerSearch(page, device, theme, mobile);
       const mediaFilter = page.getByRole("combobox", { name: "Media type" });
       await mediaFilter.selectOption("text");
       await expect(
@@ -435,6 +769,7 @@ for (const device of devices) {
             .toBe(true);
           await expect(thumbnail).toHaveCount(0);
           await save(page, device, theme, "video-seek-committed");
+          await captureVideoQueueReturn(page, device, theme, state, mobile);
           const video = page.getByLabel("Video preview");
           const upload = page.getByLabel("Subtitle file", { exact: true });
           await upload.setInputFiles(reviewSubtitles);
@@ -569,6 +904,8 @@ for (const device of devices) {
         .getByRole("button", { name: "Open explorer", exact: true })
         .click();
       await save(page, device, theme, "explorer-dialog");
+      await page.keyboard.press("Escape");
+      await captureLargeExplorer(page, device, theme, mobile);
     });
   }
 }

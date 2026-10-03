@@ -299,10 +299,56 @@ test("switches HLS quality and resumes real playback after reopening", async ({
         (element: HTMLVideoElement) => element.currentTime,
       );
     };
+    const retainedVideo = await video.elementHandle();
+    const retainedSource = await video.evaluate(
+      (element: HTMLVideoElement) => element.currentSrc,
+    );
+    expect(retainedSource).not.toBe("");
     await page.getByRole("tab", { name: "Downloads" }).click();
-    await expect(video).toHaveCount(0);
+    await expect(video).toHaveCount(1);
+    await expect(video).toBeHidden();
+    expect(await retainedVideo.evaluate((element) => element.isConnected)).toBe(
+      true,
+    );
+    const hiddenPlayback = await video.evaluate(
+      (element: HTMLVideoElement) => ({
+        source: element.currentSrc,
+        time: element.currentTime,
+        paused: element.paused,
+        readyState: element.readyState,
+      }),
+    );
+    expect(hiddenPlayback.source).toBe(retainedSource);
+    expect(hiddenPlayback.time).toBeCloseTo(savedTime, 1);
+    expect(hiddenPlayback.paused).toBe(true);
+    expect(hiddenPlayback.readyState).toBeGreaterThanOrEqual(2);
     await page.getByRole("tab", { name: "Explore" }).click();
-    await continuePlayback();
+    await expect(video).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^Continue from / }),
+    ).toHaveCount(0);
+    expect(
+      await video.evaluate((element: HTMLVideoElement) => element.currentSrc),
+    ).toBe(retainedSource);
+    expect(masterRequests).toBe(1);
+    await video.evaluate(async (element: HTMLVideoElement) => {
+      await element.play();
+    });
+    await expect
+      .poll(() =>
+        video.evaluate(
+          (element: HTMLVideoElement, position) =>
+            !element.paused &&
+            element.readyState >= 2 &&
+            element.currentTime > position + 0.1,
+          savedTime,
+        ),
+      )
+      .toBe(true);
+    await video.evaluate((element: HTMLVideoElement) => element.pause());
+    savedTime = await video.evaluate(
+      (element: HTMLVideoElement) => element.currentTime,
+    );
 
     const reopen = async () => {
       await page.reload();
