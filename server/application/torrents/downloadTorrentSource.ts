@@ -90,7 +90,7 @@ function emitProgress(
     isStalled: progress.peerCount === 0,
     message:
       progress.peerCount === 0
-        ? "Torrent stalled: waiting for peers."
+        ? "No peers connected. Download resumes when peers become available."
         : `Downloading from ${String(progress.peerCount)} peers`,
   });
 }
@@ -125,6 +125,27 @@ function waitForUser(
   return false;
 }
 
+function monitorProgress(job: SessionJob, emitJob: EmitJob) {
+  let lastProgressBytes = job.downloadedBytes;
+  let lastProgressAt = Date.now();
+  return (progress: TorrentProgress) => {
+    if (
+      progress.downloadedBytes > lastProgressBytes ||
+      progress.downloadSpeedBytesPerSec > 0
+    ) {
+      lastProgressBytes = progress.downloadedBytes;
+      lastProgressAt = Date.now();
+    }
+    emitProgress(job, emitJob, progress);
+    if (progress.peerCount > 0 && Date.now() - lastProgressAt > 15_000)
+      emitJob(job, {
+        isStalled: true,
+        message:
+          "No data received for 15 seconds. Connected peers may not have the selected pieces. Waiting for availability.",
+      });
+  };
+}
+
 export async function downloadTorrentSource(
   job: SessionJob,
   settings: DownloadSettings,
@@ -157,18 +178,26 @@ export async function downloadTorrentSource(
     job.retryCount = attempt;
     try {
       await deps.adapter.download({
+        jobId: job.id,
+        priorities: Object.fromEntries(
+          job.torrentFiles.map(({ id, priority }) => [
+            id,
+            priority ?? "normal",
+          ]),
+        ),
         source,
         downloadDir: input.downloadDir,
         signal,
         retainStoreOnAbort: () => job.pauseRequested,
         onMetadata: (metadata) =>
           handleMetadata(job, input.confirmOversize, deps.emitJob, metadata),
-        onProgress: (progress) => emitProgress(job, deps.emitJob, progress),
+        onProgress: monitorProgress(job, deps.emitJob),
         onNoPeers: () =>
           deps.emitJob(job, {
             isStalled: true,
             peerCount: 0,
-            message: "Torrent stalled: no peers are available.",
+            message:
+              "No peers connected. Download resumes when peers become available.",
           }),
       });
       deps.emitJob(job, {

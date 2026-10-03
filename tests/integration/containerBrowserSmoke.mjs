@@ -155,6 +155,14 @@ try {
   async function open(file) {
     activeFile = file;
     mediaResponses.clear();
+    const qualitiesResponse = page.waitForResponse(async (response) => {
+      if (
+        new URL(response.url()).pathname !== "/rpc/video/qualities" ||
+        response.status() !== 200
+      )
+        return false;
+      return (await response.json()).json.path === file;
+    });
     await page.goto(origin);
     await page.getByRole("tab", { name: "Explore" }).click();
     await page.getByRole("button", { name: "Open " + firstFilePath }).click();
@@ -169,6 +177,35 @@ try {
         .getByRole("treeitem", { name: path.basename(file), exact: true })
         .click();
     }
+    const { defaultQuality } = (await (await qualitiesResponse).json()).json;
+    const compatible = file !== "direct/unsupported-mpeg4.mp4";
+    assert.equal(defaultQuality, compatible ? "source" : "auto");
+    await page
+      .getByText("Mode: " + (compatible ? "Direct play" : "Transcode"), {
+        exact: true,
+      })
+      .waitFor({ timeout: 30_000 });
+    await page.waitForFunction(
+      ({ file, compatible }) => {
+        const video = globalThis.document.querySelector(
+          'video[aria-label="Video preview"]',
+        );
+        if (!video?.currentSrc || video.readyState < 2) return false;
+        return compatible
+          ? new URL(video.currentSrc).searchParams.get("path") === file
+          : video.currentSrc.startsWith("blob:");
+      },
+      { file, compatible },
+      { timeout: 90_000 },
+    );
+    const quality = page.getByRole("button", { name: "Quality", exact: true });
+    assert.equal(
+      await quality.textContent(),
+      compatible ? "Direct play" : "Auto",
+      "Browser did not apply the default playback mode for " + file,
+    );
+    await quality.click();
+    await page.getByRole("option", { name: "360p", exact: true }).click();
     for (
       let attempt = 0;
       attempt < 180 && !mediaResponses.has("segment");

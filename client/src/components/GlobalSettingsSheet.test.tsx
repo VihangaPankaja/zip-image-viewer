@@ -4,6 +4,7 @@ import { GlobalSettingsSheet } from "./GlobalSettingsSheet";
 describe("GlobalSettingsSheet", () => {
   it("groups controls in a native dialog and saves theme and concurrency", async () => {
     const setTheme = vi.fn();
+    const onSetTorrentLimits = vi.fn().mockResolvedValue(undefined);
     const onSetConcurrency = vi.fn().mockRejectedValue(new Error("Offline"));
     render(
       <GlobalSettingsSheet
@@ -11,6 +12,8 @@ describe("GlobalSettingsSheet", () => {
         setTheme={setTheme}
         maxConcurrent={2}
         onSetConcurrency={onSetConcurrency}
+        torrentLimits={{ downloadBytesPerSec: 0, uploadBytesPerSec: 0 }}
+        onSetTorrentLimits={onSetTorrentLimits}
         settingsOpen
         setSettingsOpen={vi.fn()}
         downloadSettings={{
@@ -42,6 +45,25 @@ describe("GlobalSettingsSheet", () => {
       />,
     );
 
+    fireEvent.change(
+      screen.getByRole("spinbutton", {
+        name: "Torrent download limit (KiB/s)",
+      }),
+      { target: { value: "256" } },
+    );
+    fireEvent.change(
+      screen.getByRole("spinbutton", { name: "Torrent upload limit (KiB/s)" }),
+      { target: { value: "64" } },
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Save torrent limits" }),
+    );
+    await waitFor(() =>
+      expect(onSetTorrentLimits).toHaveBeenCalledWith({
+        downloadBytesPerSec: 262144,
+        uploadBytesPerSec: 65536,
+      }),
+    );
     fireEvent.click(screen.getByRole("radio", { name: "Dark" }));
     expect(setTheme).toHaveBeenCalledWith("dark");
     fireEvent.change(

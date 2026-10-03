@@ -1,7 +1,11 @@
 import { call } from "@orpc/server";
 import { describe, expect, it, vi } from "vitest";
 import { ApplicationError } from "../domain/models.js";
-import { jobSchema, type Job } from "../../shared/contracts.js";
+import {
+  jobSchema,
+  type Job,
+  type TorrentLimits,
+} from "../../shared/contracts.js";
 import {
   createServerRpcRouter,
   type ServerRpcDependencies,
@@ -50,6 +54,7 @@ function dependencies(): ServerRpcDependencies {
       requiresConfirmation: false,
     })),
     selectFiles: vi.fn(() => job()),
+    setFilePriority: vi.fn(() => job()),
     retryJob: vi.fn(() => job("f86946a1-bcf7-4137-87c6-51502024367a")),
     pauseJob: vi.fn((): Job => ({
       ...job(),
@@ -64,6 +69,11 @@ function dependencies(): ServerRpcDependencies {
       activeCount: 0,
       maxConcurrent: 4,
     })),
+    getTorrentLimits: vi.fn(() => ({
+      downloadBytesPerSec: 0,
+      uploadBytesPerSec: 0,
+    })),
+    updateTorrentLimits: vi.fn((limits: TorrentLimits) => limits),
     removeSession: vi.fn(() => undefined),
   };
 }
@@ -201,4 +211,34 @@ it("preserves missing-media errors over RPC", async () => {
     status: 404,
     message: "File not found.",
   });
+});
+
+it("validates file priorities and global bandwidth limits at the RPC boundary", async () => {
+  const deps = dependencies();
+  const router = createServerRpcRouter(deps);
+  const id = job().id;
+  await call(router.jobs.setFilePriority, {
+    id,
+    fileId: "0",
+    priority: "high",
+  });
+  expect(deps.setFilePriority).toHaveBeenCalledWith(id, "0", "high");
+  await expect(
+    call(router.jobs.setFilePriority, { id, fileId: "", priority: "low" }),
+  ).rejects.toThrow();
+  const limits = { downloadBytesPerSec: 262144, uploadBytesPerSec: 65536 };
+  await expect(call(router.torrentLimits.update, limits)).resolves.toEqual(
+    limits,
+  );
+  expect(deps.updateTorrentLimits).toHaveBeenCalledWith(limits);
+  await expect(call(router.torrentLimits.get, undefined)).resolves.toEqual({
+    downloadBytesPerSec: 0,
+    uploadBytesPerSec: 0,
+  });
+  for (const downloadBytesPerSec of [-1, 0.5, 1_073_741_825]) {
+    await expect(
+      call(router.torrentLimits.update, { ...limits, downloadBytesPerSec }),
+    ).rejects.toThrow();
+  }
+  expect(deps.updateTorrentLimits).toHaveBeenCalledOnce();
 });

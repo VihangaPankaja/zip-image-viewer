@@ -100,7 +100,7 @@ async function selectFile(page: Page, name: string, mobile: boolean) {
   }
   if (name.endsWith(".txt"))
     await expect(page.locator("pre")).toContainText("COASTAL COLLECTION");
-  if (name.endsWith(".mp4")) {
+  if (name.endsWith(".mp4") || name.endsWith(".mkv")) {
     await expect
       .poll(() =>
         page
@@ -156,11 +156,40 @@ async function captureDialogs(
   page: Page,
   device: (typeof devices)[number],
   theme: string,
+  state: Awaited<ReturnType<typeof installReviewFixtures>>,
 ) {
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await save(page, device, theme, "settings");
   await page.getByLabel("Show Path column").scrollIntoViewIfNeeded();
   await save(page, device, theme, "settings-more");
+  await page
+    .getByRole("spinbutton", { name: "Torrent download limit (KiB/s)" })
+    .fill("512");
+  await page
+    .getByRole("spinbutton", { name: "Torrent upload limit (KiB/s)" })
+    .fill("128");
+  await page.getByRole("button", { name: "Save torrent limits" }).click();
+  await expect
+    .poll(() => state.torrentLimits)
+    .toEqual({
+      downloadBytesPerSec: 512 * 1024,
+      uploadBytesPerSec: 128 * 1024,
+    });
+  await expect(
+    page.getByRole("button", { name: "Save torrent limits" }),
+  ).toBeEnabled();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect(
+    page.getByRole("spinbutton", { name: "Torrent download limit (KiB/s)" }),
+  ).toHaveValue("512");
+  await expect(
+    page.getByRole("spinbutton", { name: "Torrent upload limit (KiB/s)" }),
+  ).toHaveValue("128");
+  await page
+    .getByRole("group", { name: "Torrent bandwidth" })
+    .scrollIntoViewIfNeeded();
+  await save(page, device, theme, "torrent-transfer-limits");
   await page.keyboard.press("Escape");
   await page
     .getByRole("button", { name: "Add downloads", exact: true })
@@ -190,7 +219,7 @@ for (const device of devices) {
       state.jobs = reviewJobs();
       await expect(page.locator(".download-row")).toHaveCount(4);
       await save(page, device, theme, "http-and-torrent-downloads");
-      await captureDialogs(page, device, theme);
+      await captureDialogs(page, device, theme, state);
       state.jobs = [reviewTorrentJob()];
       await page
         .getByRole("button", { name: "Review files", exact: true })
@@ -233,6 +262,18 @@ for (const device of devices) {
         page.locator(".torrent-file-state").filter({ hasText: "Downloaded" }),
       ).toHaveCount(1);
       await save(page, device, theme, "torrent-file-states");
+      const priority = page.getByRole("combobox", {
+        name: "Priority for Coastal collection/subtitles/English.srt",
+      });
+      await priority.selectOption("high");
+      await expect
+        .poll(
+          () =>
+            state.jobs[0]?.torrentFiles.find(({ id }) => id === "1")?.priority,
+        )
+        .toBe("high");
+      await expect(priority).toHaveValue("high");
+      await save(page, device, theme, "torrent-priority-changed");
       await fileStatus.selectOption("downloading");
       await page
         .getByRole("combobox", { name: "Media type" })
@@ -302,7 +343,47 @@ for (const device of devices) {
       await mediaFilter.selectOption("all");
       for (const name of filenames) {
         await selectFile(page, name, mobile);
-        await save(page, device, theme, `preview-${name.split(".").at(-1)}`);
+        await save(
+          page,
+          device,
+          theme,
+          name.endsWith(".mkv")
+            ? "video-remux-playback"
+            : `preview-${name.split(".").at(-1)}`,
+        );
+        if (name.endsWith(".mkv")) {
+          await expect(
+            page.getByText("Mode: Remux", { exact: true }),
+          ).toBeVisible();
+          await page.getByRole("button", { name: "Transcode instead" }).click();
+          await expect
+            .poll(() =>
+              page
+                .locator("video")
+                .evaluate((video: HTMLVideoElement) => video.readyState),
+            )
+            .toBeGreaterThanOrEqual(3);
+          await page
+            .locator("video")
+            .evaluate(async (video: HTMLVideoElement) => {
+              video.muted = true;
+              await video.play();
+            });
+          await expect
+            .poll(() =>
+              page
+                .locator("video")
+                .evaluate((video: HTMLVideoElement) => video.currentTime),
+            )
+            .toBeGreaterThan(0.1);
+          await page
+            .locator("video")
+            .evaluate((video: HTMLVideoElement) => video.pause());
+          await expect(
+            page.getByText("Mode: Transcode", { exact: true }),
+          ).toBeVisible();
+          await save(page, device, theme, "video-transcode-fallback");
+        }
         if (name.endsWith(".mp4")) {
           const seek = page.getByRole("slider", { name: "Seek video" });
           await seek.focus();
@@ -424,6 +505,54 @@ for (const device of devices) {
           await expect.poll(activeText).toEqual(["Recovered coastal captions"]);
           await save(page, device, theme, "video-subtitles-recovered");
         }
+      }
+      let releaseProbe!: () => void;
+      const pendingProbe = new Promise<void>((resolve) => {
+        releaseProbe = resolve;
+      });
+      await page.route("**/rpc/video/qualities", async (route) => {
+        await pendingProbe;
+        await route.fulfill({ status: 500, json: { error: "Probe failed" } });
+      });
+      try {
+        if (mobile)
+          await page
+            .getByRole("radio", { name: "Files", exact: true })
+            .check({ force: true });
+        await page
+          .getByRole("treeitem", { name: filenames[2], exact: true })
+          .click();
+        await expect(page.locator(".preview-panel h2")).toHaveText(
+          filenames[2],
+        );
+        const video = page.getByLabel("Video preview");
+        await expect(video).toHaveJSProperty("paused", true);
+        await expect(video).toHaveJSProperty("readyState", 0);
+        await expect(video.locator("source")).toHaveCount(0);
+        if (mobile)
+          await page
+            .getByRole("radio", { name: "Preview", exact: true })
+            .check({ force: true });
+        await video.scrollIntoViewIfNeeded();
+        await save(page, device, theme, "video-qualities-pending");
+        releaseProbe();
+        await expect(
+          page.getByText("Mode: Original file", { exact: true }),
+        ).toBeVisible();
+        await expect(video).toHaveJSProperty("readyState", 4);
+        await video.evaluate(async (element: HTMLVideoElement) => {
+          element.muted = true;
+          await element.play();
+        });
+        await expect
+          .poll(() =>
+            video.evaluate((element: HTMLVideoElement) => element.currentTime),
+          )
+          .toBeGreaterThan(0.1);
+        await video.evaluate((element: HTMLVideoElement) => element.pause());
+        await save(page, device, theme, "video-probe-fallback");
+      } finally {
+        releaseProbe();
       }
       await selectFile(page, filenames[0], mobile);
       await page

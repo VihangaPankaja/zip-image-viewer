@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import type { Job } from "../../../../../shared/contracts";
+import type { Job, TorrentPriority } from "../../../../../shared/contracts";
 import { formatTransferBytes } from "../../../lib/formatterUtils";
 import { classifyExtension } from "../../../lib/mimeTypeSystem";
 import { FileList, FileTools, fileState } from "./TorrentFileContents";
@@ -9,6 +9,11 @@ type Props = {
   job: Job;
   onClose: () => void;
   onSubmit: (id: string, fileIds: string[]) => Promise<void>;
+  onPriorityChange?: (
+    id: string,
+    fileId: string,
+    priority: TorrentPriority,
+  ) => Promise<void>;
 };
 
 function useTorrentDialog() {
@@ -29,7 +34,52 @@ function useTorrentDialog() {
   return dialogRef;
 }
 
-function useTorrentSelection({ job, onClose, onSubmit }: Props) {
+function filterFiles(
+  job: Job,
+  selecting: boolean,
+  search: string,
+  mediaType: string,
+  status: string,
+) {
+  return job.torrentFiles.filter((file) => {
+    const { path } = file;
+    const filename = path.split("/").at(-1) ?? "";
+    const dot = filename.lastIndexOf(".");
+    const extension = dot > 0 ? filename.slice(dot + 1) : "";
+    return (
+      path.toLowerCase().includes(search.toLowerCase()) &&
+      (selecting || status === "all" || fileState(file, job) === status) &&
+      (mediaType === "all" || classifyExtension(extension) === mediaType)
+    );
+  });
+}
+
+function filePriorityAction(
+  job: Job,
+  onPriorityChange: Props["onPriorityChange"],
+  setError: (_error: string) => void,
+) {
+  return async (fileId: string, priority: TorrentPriority) => {
+    if (!onPriorityChange) return;
+    setError("");
+    try {
+      await onPriorityChange(job.id, fileId, priority);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not change file priority.",
+      );
+    }
+  };
+}
+
+function useTorrentSelection({
+  job,
+  onClose,
+  onSubmit,
+  onPriorityChange,
+}: Props) {
   const selecting = job.status === "awaiting_selection";
   const dialogRef = useTorrentDialog();
   const [selected, setSelected] = useState(
@@ -44,17 +94,7 @@ function useTorrentSelection({ job, onClose, onSubmit }: Props) {
     selecting ? selected.has(file.id) : file.selected,
   );
   const total = chosen.reduce((sum, file) => sum + file.size, 0);
-  const visible = job.torrentFiles.filter((file) => {
-    const { path } = file;
-    const filename = path.split("/").at(-1) ?? "";
-    const dot = filename.lastIndexOf(".");
-    const extension = dot > 0 ? filename.slice(dot + 1) : "";
-    return (
-      path.toLowerCase().includes(search.toLowerCase()) &&
-      (selecting || status === "all" || fileState(file, job) === status) &&
-      (mediaType === "all" || classifyExtension(extension) === mediaType)
-    );
-  });
+  const visible = filterFiles(job, selecting, search, mediaType, status);
   const change = (files: TorrentFile[], checked: boolean) => {
     setSelected((current) => {
       const next = new Set(current);
@@ -85,6 +125,7 @@ function useTorrentSelection({ job, onClose, onSubmit }: Props) {
       setSubmitting(false);
     }
   };
+  const changePriority = filePriorityAction(job, onPriorityChange, setError);
   return {
     dialogRef,
     selecting,
@@ -102,13 +143,16 @@ function useTorrentSelection({ job, onClose, onSubmit }: Props) {
     visible,
     change,
     submit,
+    changePriority,
+    canChangePriority: Boolean(onPriorityChange),
   };
 }
 
 export type Selection = ReturnType<typeof useTorrentSelection>;
 
-export function TorrentFileDialog({ job, onClose, onSubmit }: Props) {
-  const selection = useTorrentSelection({ job, onClose, onSubmit });
+export function TorrentFileDialog(props: Props) {
+  const { job, onClose } = props;
+  const selection = useTorrentSelection(props);
   const { dialogRef, selecting, submitting, error, chosen, total, submit } =
     selection;
   return (
@@ -179,7 +223,11 @@ export function TorrentFileDialog({ job, onClose, onSubmit }: Props) {
   );
 }
 
-export function TorrentReviewAction({ job, onSubmit }: Omit<Props, "onClose">) {
+export function TorrentReviewAction({
+  job,
+  onSubmit,
+  onPriorityChange,
+}: Omit<Props, "onClose">) {
   const [reviewing, setReviewing] = useState(false);
   return (
     <>
@@ -192,6 +240,7 @@ export function TorrentReviewAction({ job, onSubmit }: Omit<Props, "onClose">) {
         <TorrentFileDialog
           job={job}
           onSubmit={onSubmit}
+          onPriorityChange={onPriorityChange}
           onClose={() => setReviewing(false)}
         />
       ) : null}

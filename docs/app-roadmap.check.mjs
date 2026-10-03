@@ -17,7 +17,7 @@ try {
     await page.getByLabel("V01 status", { exact: true }).inputValue(),
     "Done",
   );
-  for (const id of ["S02", "Q01"]) {
+  for (const id of ["S02", "Q01", "T04", "V10"]) {
     assert.equal(
       await page.getByLabel(`${id} status`, { exact: true }).inputValue(),
       "Done",
@@ -27,7 +27,7 @@ try {
     await page.locator("#note-V01").inputValue(),
     /baseline report/i,
   );
-  assert.equal(await page.locator("#percent").textContent(), "46%");
+  assert.equal(await page.locator("#percent").textContent(), "54%");
   await page
     .getByLabel("V01 status", { exact: true })
     .selectOption("In progress");
@@ -44,13 +44,13 @@ try {
     await page.locator("#note-V01").inputValue(),
     "Verified locally <script>never execute</script>",
   );
-  assert.equal(await page.locator("#percent").textContent(), "43%");
+  assert.equal(await page.locator("#percent").textContent(), "50%");
   await page.getByLabel("V01 status", { exact: true }).selectOption("Done");
   await page.getByLabel("Search ideas").fill("SQLite");
   assert.equal(await page.locator(".card:visible").count(), 1);
   await page.getByRole("button", { name: "Clear filters" }).click();
   await page.locator("#status").selectOption("Done");
-  assert.equal(await page.locator(".card:visible").count(), 13);
+  assert.equal(await page.locator(".card:visible").count(), 15);
   await page.getByLabel("Search ideas").fill("nothing-will-match-this");
   assert.equal(await page.locator("#empty").isVisible(), true);
   await page.getByRole("button", { name: "Clear filters" }).click();
@@ -121,7 +121,7 @@ try {
     await blockedPage.locator("#notice").textContent(),
     /storage is unavailable/,
   );
-  assert.equal(await blockedPage.locator("#percent").textContent(), "43%");
+  assert.equal(await blockedPage.locator("#percent").textContent(), "50%");
   console.log(
     "Roadmap checks passed: persistence, filters, export/import, invalid data, print, responsive widths and blocked storage.",
   );

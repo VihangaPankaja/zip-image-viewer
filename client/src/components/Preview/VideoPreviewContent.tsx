@@ -10,6 +10,24 @@ type VideoPreviewDetailsProps = Omit<
   "videoRef" | "videoShellRef"
 >;
 
+function transcodeAction(
+  props: Pick<
+    VideoPreviewDetailsProps,
+    "selectedVideoQuality" | "videoQualityOptions" | "setSelectedVideoQuality"
+  >,
+  label: string,
+) {
+  return ["source", "remux"].includes(props.selectedVideoQuality) &&
+    props.videoQualityOptions.some(({ id }) => id === "auto") ? (
+    <button
+      className="ghost-button"
+      type="button"
+      onClick={() => props.setSelectedVideoQuality("auto")}
+    >
+      {label}
+    </button>
+  ) : null;
+}
 function VideoPreviewToolbar(props: VideoPreviewDetailsProps) {
   const qualityOptions = props.videoQualityOptions.length
     ? props.videoQualityOptions.map((item) => ({
@@ -30,6 +48,18 @@ function VideoPreviewToolbar(props: VideoPreviewDetailsProps) {
         options={qualityOptions}
         onChange={(value) => props.setSelectedVideoQuality(String(value))}
       />
+      <span>
+        Mode:{" "}
+        {props.selectedVideoQuality === "source"
+          ? props.videoQualityOptions.find(({ id }) => id === "source")
+              ?.label === "Direct play"
+            ? "Direct play"
+            : "Original file"
+          : props.selectedVideoQuality === "remux"
+            ? "Remux"
+            : "Transcode"}
+      </span>
+      {transcodeAction(props, "Transcode instead")}
       <span>{props.formatDate(props.selectedNode.modifiedAt ?? 0)}</span>
     </div>
   );
@@ -53,13 +83,15 @@ function playbackLabel(props: VideoPreviewDetailsProps) {
   const quality =
     props.selectedVideoQuality === "source"
       ? "Original"
-      : props.selectedVideoQuality === "auto"
-        ? `Auto${props.videoHeight ? ` · ${props.videoHeight}p` : ""}`
-        : props.selectedVideoQuality;
+      : props.selectedVideoQuality === "remux"
+        ? "Remux"
+        : props.selectedVideoQuality === "auto"
+          ? `Auto${props.videoHeight ? ` · ${props.videoHeight}p` : ""}`
+          : props.selectedVideoQuality;
   if (props.videoPlaybackError) return "Playback needs attention";
   const rendition = selectedRendition(props);
   const preparing =
-    props.selectedVideoQuality !== "source" &&
+    !["source", "remux"].includes(props.selectedVideoQuality) &&
     props.videoPlaybackStatus !== "ready";
   if (preparing && rendition?.status === "queued")
     return "Waiting for video encoder";
@@ -149,34 +181,26 @@ function PlaybackRecovery(
   return props.videoPlaybackError ? (
     <div className="navigation-hint" role="alert">
       <span>{props.videoPlaybackError}</span>{" "}
-      {props.videoPlaybackError === "This browser cannot play Original." &&
-      props.videoQualityOptions.some(({ id }) => id === "auto") ? (
-        <button
-          className="ghost-button"
-          type="button"
-          onClick={() => props.setSelectedVideoQuality("auto")}
-        >
-          Try adaptive playback
-        </button>
-      ) : props.videoPlaybackError ===
+      {transcodeAction(props, "Try adaptive playback") ??
+        (props.videoPlaybackError ===
           "This browser cannot decode this stream." &&
         props.selectedVideoQuality !== "source" ? (
-        <button
-          className="ghost-button"
-          type="button"
-          onClick={() => props.setSelectedVideoQuality("source")}
-        >
-          Try Original
-        </button>
-      ) : (
-        <button
-          className="ghost-button"
-          type="button"
-          onClick={props.retryVideoPlayback}
-        >
-          Retry playback
-        </button>
-      )}
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={() => props.setSelectedVideoQuality("source")}
+          >
+            Try Original
+          </button>
+        ) : (
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={props.retryVideoPlayback}
+          >
+            Retry playback
+          </button>
+        ))}
     </div>
   ) : null;
 }
@@ -194,6 +218,16 @@ export function VideoPreviewContent({
   return (
     <div className="preview-stage">
       <VideoPreviewToolbar {...props} />
+      <p className="navigation-hint">
+        {props.selectedVideoQuality === "source"
+          ? props.videoQualityOptions.find(({ id }) => id === "source")
+              ?.label === "Direct play"
+            ? "Compatible MP4: plays the original file without encoding."
+            : "Original file: browser support depends on its container and codecs."
+          : props.selectedVideoQuality === "remux"
+            ? "Compatible codecs: copies video and audio into MP4 without encoding."
+            : "Transcode: converts video and audio for browser playback when the original is incompatible or a converted quality is selected."}
+      </p>
       <div className="image-frame media-frame" ref={videoShellRef}>
         <video
           ref={videoRef}

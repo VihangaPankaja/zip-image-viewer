@@ -47,9 +47,11 @@ function readPlayback(props: Props) {
     mode:
       props.selectedVideoQuality === "source"
         ? "Original"
-        : hls
-          ? "HLS.js"
-          : "Native or fallback",
+        : props.selectedVideoQuality === "remux"
+          ? "Remux"
+          : hls
+            ? "HLS.js"
+            : "Native or fallback",
     activeLevel: level ? `${level}p` : "Unknown",
     bandwidthMbps: hls?.bandwidthEstimate
       ? Number((hls.bandwidthEstimate / 1_000_000).toFixed(1))

@@ -43,10 +43,12 @@ function Harness({
   quality,
   file,
   active = true,
+  ready = true,
 }: {
   quality: string;
   file: string;
   active?: boolean;
+  ready?: boolean;
 }) {
   const hlsRef = useRef<InstanceType<typeof import("hls.js").default> | null>(
     null,
@@ -60,7 +62,7 @@ function Harness({
     hlsRef,
     hlsUrl: `/hls/master?path=${file}`,
     originalUrl: `/play?path=${file}`,
-    selectedKind: active ? "video" : "",
+    selectedKind: active && ready ? "video" : "",
     selectedQuality: quality,
     setPlaybackError: setError,
     setPlaybackStatus: setStatus,
@@ -76,6 +78,62 @@ function Harness({
 }
 
 describe("video quality switching", () => {
+  it("detaches and pauses the previous file while qualities are pending", () => {
+    const load = vi
+      .spyOn(HTMLMediaElement.prototype, "load")
+      .mockImplementation(() => {});
+    const pause = vi
+      .spyOn(HTMLMediaElement.prototype, "pause")
+      .mockImplementation(() => {});
+    try {
+      const { container, rerender } = render(
+        <Harness quality="source" file="one.mp4" />,
+      );
+      const video = container.querySelector("video");
+      if (!video) throw new Error("Video element was not rendered.");
+      video.setAttribute("src", "blob:old-video");
+      load.mockClear();
+      rerender(<Harness quality="source" file="two.mp4" ready={false} />);
+      expect(container.querySelector("video")).toBe(video);
+      expect(pause).toHaveBeenCalled();
+      expect(video.hasAttribute("src")).toBe(false);
+      expect(video.querySelector("source")).toBeNull();
+      expect(load).toHaveBeenCalled();
+      rerender(<Harness quality="source" file="two.mp4" />);
+      expect(video.querySelector("source")?.getAttribute("src")).toBe(
+        "/play?path=two.mp4",
+      );
+    } finally {
+      load.mockRestore();
+      pause.mockRestore();
+    }
+  });
+  it("attaches remux as byte-range MP4, preserves position, and explicitly switches to transcode", async () => {
+    instances.length = 0;
+    const load = vi
+      .spyOn(HTMLMediaElement.prototype, "load")
+      .mockImplementation(() => {});
+    try {
+      const { container, rerender } = render(
+        <Harness quality="remux" file="one.mkv" />,
+      );
+      const video = container.querySelector("video");
+      if (!video) throw new Error("Video element was not rendered.");
+      expect(video.querySelector("source")?.getAttribute("src")).toBe(
+        "/play?path=one.mkv&quality=remux",
+      );
+      expect(video.querySelector("source")?.type).toBe("video/mp4");
+      expect(instances).toHaveLength(0);
+      video.currentTime = 12;
+      rerender(<Harness quality="auto" file="one.mkv" />);
+      await waitFor(() => expect(instances).toHaveLength(1));
+      act(() => instances[0].emit(FakeHls.Events.MANIFEST_PARSED));
+      expect(video.currentTime).toBe(12);
+      expect(video.querySelector("source")).toBeNull();
+    } finally {
+      load.mockRestore();
+    }
+  });
   it("reattaches the source after leaving and reopening the player view", async () => {
     instances.length = 0;
     const { rerender, container } = render(

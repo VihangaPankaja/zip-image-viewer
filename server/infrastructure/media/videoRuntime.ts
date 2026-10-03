@@ -1,7 +1,6 @@
 import type { VideoStoryboard } from "../../../shared/contracts.js";
 import { access, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
-import crypto from "node:crypto";
 import type {
   Session,
   VideoRendition,
@@ -12,7 +11,10 @@ import { publishedSegments } from "../../media/hlsManifest.js";
 import {
   durationFromOutput,
   dimensionsFromOutput,
+  playbackModeFromOutput,
   qualityOptions,
+  buildVideoQualityOptions,
+  type VideoMetadata,
 } from "../../media/videoMetadata.js";
 import {
   generateStoryboard,
@@ -22,10 +24,10 @@ import { ProcessLimiter } from "../../media/processLimiter.js";
 import { getRenditionState } from "../../media/videoRendition.js";
 import { errorFromUnknown } from "../runtime/mediaClassification.js";
 import { runCommand, runCommandCapture } from "../process/commandRunner.js";
+import { getSessionQualityOutputPath, remuxVideo } from "./videoRemux.js";
 
 const SEGMENT_SECONDS = 4;
 const processLimiter = new ProcessLimiter(2);
-type VideoMetadata = { width: number; height: number; durationSeconds: number };
 type SessionWork = {
   controller: AbortController;
   pending: Set<Promise<unknown>>;
@@ -160,6 +162,20 @@ class VideoRuntime {
   getVideoTranscodeKey = (sessionId: string, normalizedPath: string): string =>
     `${sessionId}:${normalizedPath}`;
 
+  prepareVideoRemux = (
+    session: Session,
+    normalizedPath: string,
+    targetPath: string,
+  ): Promise<string> =>
+    remuxVideo(
+      session,
+      normalizedPath,
+      targetPath,
+      this.ffmpegPath,
+      (task) => this.runVideoTask(session, task),
+      this.enforceDerivedMediaBudget,
+    );
+
   getVideoMetadata = (
     videoPath: string,
     session?: Session,
@@ -179,6 +195,10 @@ class VideoRuntime {
       return {
         ...dimensionsFromOutput(stderr),
         durationSeconds: durationFromOutput(stderr),
+        playbackMode: playbackModeFromOutput(
+          stderr,
+          path.extname(videoPath).slice(1).toLowerCase(),
+        ),
       };
     });
     cached?.set(videoPath, metadata);
@@ -319,30 +339,11 @@ class VideoRuntime {
     return { width, height };
   };
 
-  buildVideoQualityOptions = (sourceHeight: number) =>
-    qualityOptions({
-      width: sourceHeight,
-      height: sourceHeight,
-      durationSeconds: 0,
-    });
+  buildVideoQualityOptions = buildVideoQualityOptions;
 
-  startPrioritySegmentWindow = async (
-    entry: VideoTranscodeEntry,
-    session: Session,
-    rendition: VideoRendition,
-  ) => this.startRenditionTranscode(entry, session, rendition);
+  startPrioritySegmentWindow = this.startRenditionTranscode;
 
-  getSessionQualityOutputPath = (
-    session: Session,
-    normalizedPath: string,
-    quality: string,
-  ) =>
-    path.join(
-      session.workspaceDir,
-      "video-quality",
-      quality,
-      `${crypto.createHash("sha1").update(normalizedPath).digest("hex")}.mp4`,
-    );
+  getSessionQualityOutputPath = getSessionQualityOutputPath;
 }
 
 export function createVideoRuntime({

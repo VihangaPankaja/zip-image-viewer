@@ -26,7 +26,7 @@ import { getVideoQualities } from "./handlers/video/metadataRoutes.js";
 import { registerVideoRoutes } from "./handlers/videoRoutes.js";
 import { registerFileRoutes } from "./handlers/fileRoutes.js";
 import { createSessionJobQueue } from "./application/jobs/sessionJobQueue.js";
-import { createWebTorrentAdapter } from "./application/torrents/torrentDownloader.js";
+import { createTorrentControls } from "./application/torrents/torrentControls.js";
 import { createProcessSessionJob } from "./application/jobs/processSessionJob.js";
 import { createJobManager } from "./application/jobs/jobManager.js";
 import { createSessionManager } from "./application/sessions/sessionManager.js";
@@ -82,23 +82,20 @@ const {
   ensureVideoTranscodeEntry,
   ensureVideoStoryboard,
   cleanupVideoSession,
-  runVideoTask,
-  trackVideoTask,
-  getRenditionState,
   getSessionQualityOutputPath,
-  getVideoDimensions,
+  prepareVideoRemux,
   getVideoMetadata,
   getVideoTranscodeKey,
-  refreshRenditionAvailability,
-  runCommand,
   startPrioritySegmentWindow,
   startRenditionTranscode,
-  waitForFile,
 } = videoRuntime;
 
 const { createJob, sanitizeJob, closeJob, emitJob, cleanupJob } =
   createJobManager(jobStore, logEvent);
-const torrentAdapter = createWebTorrentAdapter();
+const { torrentAdapter, ...torrentControls } = createTorrentControls(
+  jobStore,
+  emitJob,
+);
 const processSessionJob = createProcessSessionJob({
   sessionStore,
   emitJob,
@@ -186,6 +183,7 @@ const app = createRuntimeApp({
   enqueueJob: enqueueSessionJob,
   confirmJob: sessionJobQueue.confirmSessionJob,
   selectTorrentFiles: sessionJobQueue.selectTorrentFiles,
+  ...torrentControls,
   listOrderedJobs: sessionJobQueue.getOrderedJobs,
   pauseJob: sessionJobQueue.pauseSessionJob,
   resumeJob: sessionJobQueue.resumeSessionJob,
@@ -315,25 +313,26 @@ registerVideoRoutes(app, {
   ffmpegPath,
   sanitizeEntryPath: container.runtime.sanitizeEntryPath,
   getSessionQualityOutputPath,
+  prepareVideoRemux,
   parseRangeHeader: container.runtime.parseRangeHeader,
   VIDEO_EXTENSIONS,
   getVideoMetadata,
   buildVideoQualityOptions: videoRuntime.buildVideoQualityOptions,
   parseSeekSeconds,
   ensureVideoTranscodeEntry,
-  getRenditionState,
+  getRenditionState: videoRuntime.getRenditionState,
   startRenditionTranscode,
   startPrioritySegmentWindow,
-  refreshRenditionAvailability,
+  refreshRenditionAvailability: videoRuntime.refreshRenditionAvailability,
   DEFAULT_VIDEO_SEGMENT_SECONDS: 4,
-  runCommand,
+  runCommand: videoRuntime.runCommand,
   ensureVideoStoryboard,
-  runVideoTask,
-  trackVideoTask,
+  runVideoTask: videoRuntime.runVideoTask,
+  trackVideoTask: videoRuntime.trackVideoTask,
   getVideoTranscodeKey,
   videoTranscodeStore,
-  waitForFile,
-  getVideoDimensions,
+  waitForFile: videoRuntime.waitForFile,
+  getVideoDimensions: videoRuntime.getVideoDimensions,
   logEvent: container.runtime.logEvent,
   enforceDerivedMediaBudget: enforceMediaBudget,
 });

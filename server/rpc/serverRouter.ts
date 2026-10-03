@@ -5,6 +5,8 @@ import {
   type EnqueueSessionsInput,
   type Job,
   type SchedulerSettings,
+  type TorrentLimits,
+  type TorrentPriority,
   type SessionSummary,
   type VideoQualities,
   type VideoQualitiesInput,
@@ -22,6 +24,11 @@ export type ServerRpcDependencies = {
   cancelJob: (_id: string) => Job | Promise<Job>;
   confirmJob: (_id: string) => Job | Promise<Job>;
   selectFiles: (_id: string, _fileIds: string[]) => Job | Promise<Job>;
+  setFilePriority: (
+    _id: string,
+    _fileId: string,
+    _priority: TorrentPriority,
+  ) => Job | Promise<Job>;
   retryJob: (_id: string) => Job | Promise<Job>;
   pauseJob: (_id: string) => Job | Promise<Job>;
   resumeJob: (_id: string) => Job | Promise<Job>;
@@ -29,26 +36,34 @@ export type ServerRpcDependencies = {
   reorderJobs: (_jobIds: readonly string[]) => Job[] | Promise<Job[]>;
   getSchedulerSettings: () => SchedulerSettings;
   updateSchedulerSettings: (_maxConcurrent: number) => SchedulerSettings;
+  getTorrentLimits: () => TorrentLimits;
+  updateTorrentLimits: (_limits: TorrentLimits) => TorrentLimits;
   removeSession: (_id: string) => void | Promise<void>;
 };
 
+async function videoQualities(
+  deps: ServerRpcDependencies,
+  input: VideoQualitiesInput,
+) {
+  try {
+    return await deps.videoQualities(input);
+  } catch (error) {
+    if (error instanceof ApplicationError) {
+      throw new ORPCError(error.code, {
+        status: error.status,
+        message: error.message,
+      });
+    }
+    throw error;
+  }
+}
 export function createServerRpcRouter(deps: ServerRpcDependencies) {
   const contract = implement(serverContract);
   return contract.router({
     video: {
-      qualities: contract.video.qualities.handler(async ({ input }) => {
-        try {
-          return await deps.videoQualities(input);
-        } catch (error) {
-          if (error instanceof ApplicationError) {
-            throw new ORPCError(error.code, {
-              status: error.status,
-              message: error.message,
-            });
-          }
-          throw error;
-        }
-      }),
+      qualities: contract.video.qualities.handler(({ input }) =>
+        videoQualities(deps, input),
+      ),
     },
     sessions: {
       create: contract.sessions.create.handler(({ input }) =>
@@ -82,6 +97,9 @@ export function createServerRpcRouter(deps: ServerRpcDependencies) {
       selectFiles: contract.jobs.selectFiles.handler(({ input }) =>
         deps.selectFiles(input.id, input.fileIds),
       ),
+      setFilePriority: contract.jobs.setFilePriority.handler(({ input }) =>
+        deps.setFilePriority(input.id, input.fileId, input.priority),
+      ),
       retry: contract.jobs.retry.handler(({ input }) =>
         deps.retryJob(input.id),
       ),
@@ -102,6 +120,12 @@ export function createServerRpcRouter(deps: ServerRpcDependencies) {
       get: contract.scheduler.get.handler(() => deps.getSchedulerSettings()),
       update: contract.scheduler.update.handler(({ input }) =>
         deps.updateSchedulerSettings(input.maxConcurrent),
+      ),
+    },
+    torrentLimits: {
+      get: contract.torrentLimits.get.handler(() => deps.getTorrentLimits()),
+      update: contract.torrentLimits.update.handler(({ input }) =>
+        deps.updateTorrentLimits(input),
       ),
     },
   });

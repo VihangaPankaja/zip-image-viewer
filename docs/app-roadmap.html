@@ -1443,14 +1443,16 @@
           area: "Video",
           priority: "P2",
           effort: "M",
+          status: "Done",
           title: "Choose direct play or remux before encoding",
           summary: "Save CPU when the browser can already decode the source.",
           now: "Original playback and transcoded HLS are separate choices. Metadata extraction focuses on dimensions and duration.",
           plan: "Probe codecs and container support. Prefer byte-range original playback when compatible; offer a remux when only the container is unsuitable. Preserve an explicit transcode fallback and explain the chosen mode.",
           done: "Compatible MP4 plays with no encoder job. A supported codec in an unsuitable container remuxes correctly. Unsupported input falls back cleanly.",
           depends: "V01, V04",
+          note: "v3.10.0 probes container, video/audio codecs and pixel format, defaults compatible MP4 to direct byte-range playback, copies supported streams into a cached MP4 remux, and sends unsupported sources to adaptive HLS. The player explains its mode and offers explicit transcode recovery. Real MP4, MKV and MPEG-4 fixtures verify ranges, remux packet preservation, encoder-free direct playback and decoded browser playback; unprobed sources retain Original when FFmpeg is unavailable.",
           evidence:
-            "server/handlers/video/playbackRoutes.ts; server/infrastructure/media/videoRuntime.ts; client/src/features/player/useVideoSource.ts",
+            "server/handlers/video/playbackRoutes.ts; server/infrastructure/media/videoRuntime.ts; client/src/features/player/useVideoSource.ts; tests/integration/videoPlaybackModes.test.ts; tests/e2e/video-playback-modes.spec.ts",
         },
         {
           id: "T01",
@@ -1506,6 +1508,7 @@
           area: "Torrents",
           priority: "P1",
           effort: "M",
+          status: "Done",
           title: "Set file priority and transfer limits",
           summary:
             "Move the next episode ahead of the rest and leave bandwidth for playback.",
@@ -1513,8 +1516,9 @@
           plan: "Add file priority and global upload/download limits with a quiet-hours schedule only if requested. Use torrent-specific controls and explain stalled peer availability.",
           done: "Prioritizing a file changes scheduling; limits apply across active torrents. HTTP thread settings are not presented as torrent parallelism controls.",
           depends: "T01, T02",
+          note: "v3.10.0 adds live Low/Normal/High file priority and shared WebTorrent upload/download limits. Independent piece ranges preserve file scheduling priorities, including shared-piece boundaries. A real local seeder verifies request order and two torrents sharing the capped client. The UI explains peer availability without calling slow active transfers stalled, identifies HTTP-only thread controls, and verifies priority and limit updates through touch, keyboard and browser flows.",
           evidence:
-            "client/src/features/workspace/components/DownloadDialog.tsx; server/application/torrents/torrentDownloader.ts",
+            "client/src/features/workspace/components/TorrentFileDialog.tsx; client/src/components/GlobalSettingsSheet.tsx; server/application/torrents/torrentDownloader.ts; tests/e2e/torrent-priority-limits.spec.ts",
         },
         {
           id: "T05",

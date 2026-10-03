@@ -51,6 +51,7 @@ registerVideoRoutes(app, {
   getVideoMetadata: runtime.getVideoMetadata,
   getVideoDimensions: runtime.getVideoDimensions,
   getSessionQualityOutputPath: runtime.getSessionQualityOutputPath,
+  prepareVideoRemux: runtime.prepareVideoRemux,
   buildVideoQualityOptions: runtime.buildVideoQualityOptions,
   ensureVideoTranscodeEntry: runtime.ensureVideoTranscodeEntry,
   getRenditionState: runtime.getRenditionState,

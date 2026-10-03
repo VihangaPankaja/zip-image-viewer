@@ -108,8 +108,10 @@ const torrentFileSchema = z.object({
   selected: z.boolean(),
   downloadedBytes: z.number().nonnegative(),
   complete: z.boolean(),
+  priority: z.enum(["low", "normal", "high"]).optional(),
 });
 export type TorrentFile = z.infer<typeof torrentFileSchema>;
+export type TorrentPriority = NonNullable<TorrentFile["priority"]>;
 
 export const jobSchema = z.object({
   id: z.uuid(),
@@ -241,6 +243,18 @@ const selectTorrentFilesContract = oc
   .route({ method: "POST", path: "/session-jobs/{id}/files" })
   .input(selectTorrentFilesInputSchema)
   .output(jobSchema);
+const setTorrentFilePriorityContract = oc
+  .route({
+    method: "PATCH",
+    path: "/session-jobs/{id}/files/{fileId}/priority",
+  })
+  .input(
+    jobControlInputSchema.extend({
+      fileId: z.string().min(1),
+      priority: z.enum(["low", "normal", "high"]),
+    }),
+  )
+  .output(jobSchema);
 const cancelJobContract = oc
   .route({ method: "POST", path: "/session-jobs/{id}/cancel" })
   .input(jobControlInputSchema)
@@ -280,6 +294,17 @@ const updateSchedulerContract = oc
   .route({ method: "PATCH", path: "/scheduler" })
   .input(schedulerSettingsSchema.pick({ maxConcurrent: true }))
   .output(schedulerSettingsSchema);
+const torrentLimitsSchema = z.object({
+  downloadBytesPerSec: z.number().int().min(0).max(1_073_741_824),
+  uploadBytesPerSec: z.number().int().min(0).max(1_073_741_824),
+});
+const getTorrentLimitsContract = oc
+  .route({ method: "GET", path: "/torrent-limits" })
+  .output(torrentLimitsSchema);
+const updateTorrentLimitsContract = oc
+  .route({ method: "PATCH", path: "/torrent-limits" })
+  .input(torrentLimitsSchema)
+  .output(torrentLimitsSchema);
 const removeSessionContract = oc
   .route({ method: "DELETE", path: "/sessions/{id}" })
   .input(z.object({ id: z.uuid() }))
@@ -299,6 +324,7 @@ export const serverContract = {
     cancel: cancelJobContract,
     confirm: confirmJobContract,
     selectFiles: selectTorrentFilesContract,
+    setFilePriority: setTorrentFilePriorityContract,
     retry: retryJobContract,
     pause: pauseJobContract,
     resume: resumeJobContract,
@@ -309,6 +335,10 @@ export const serverContract = {
     get: getSchedulerContract,
     update: updateSchedulerContract,
   },
+  torrentLimits: {
+    get: getTorrentLimitsContract,
+    update: updateTorrentLimitsContract,
+  },
 };
 
 export type CreateSessionInput = z.infer<typeof createSessionInputSchema>;
@@ -316,6 +346,7 @@ export type EnqueueSessionsInput = z.infer<typeof enqueueSessionsInputSchema>;
 export type Job = z.infer<typeof jobSchema>;
 export type SessionSummary = z.infer<typeof sessionSchema>;
 export type SchedulerSettings = z.infer<typeof schedulerSettingsSchema>;
+export type TorrentLimits = z.infer<typeof torrentLimitsSchema>;
 
 export type VideoStoryboard = {
   intervalSeconds: number;

@@ -70,6 +70,7 @@ it("shares two permits across runtime instances, coalesces probes and cancels qu
     width: 640,
     height: 360,
     durationSeconds: 8,
+    playbackMode: "transcode",
   });
   await runtime.getVideoMetadata("clip", firstSession);
   expect(commands.started.filter((name) => name === "metadata")).toHaveLength(

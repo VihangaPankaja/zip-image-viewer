@@ -247,6 +247,7 @@ async function main(): Promise<void> {
     touchSession: (id) => sessions.get(id),
     sanitizeEntryPath,
     getSessionQualityOutputPath: runtime.getSessionQualityOutputPath,
+    prepareVideoRemux: runtime.prepareVideoRemux,
     parseRangeHeader,
     VIDEO_EXTENSIONS,
     getVideoMetadata: runtime.getVideoMetadata,
