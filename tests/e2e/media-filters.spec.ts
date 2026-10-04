@@ -1,10 +1,36 @@
 import AxeBuilder from "@axe-core/playwright";
 import { writeFile } from "node:fs/promises";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Locator } from "@playwright/test";
 import { installReviewFixtures, reviewTorrentJob } from "../review/fixtures";
 
 const sessionId = "00000000-0000-4000-8000-000000000008";
 
+async function expectRowFullyVisible(row: Locator) {
+  await expect
+    .poll(() =>
+      row.evaluate((element) => {
+        const rowBounds = element.getBoundingClientRect();
+        const tree = element.closest('[role="tree"]');
+        if (!tree) return Infinity;
+        const clip = tree.getBoundingClientRect();
+        return Math.max(
+          Math.max(0, clip.top + tree.clientTop) - rowBounds.top,
+          rowBounds.bottom -
+            Math.min(
+              window.innerHeight,
+              clip.top + tree.clientTop + tree.clientHeight,
+            ),
+          Math.max(0, clip.left + tree.clientLeft) - rowBounds.left,
+          rowBounds.right -
+            Math.min(
+              window.innerWidth,
+              clip.left + tree.clientLeft + tree.clientWidth,
+            ),
+        );
+      }),
+    )
+    .toBeLessThanOrEqual(1);
+}
 async function openCollection(page: Page, mobile = false) {
   await page.goto("/");
   await page.getByRole("tab", { name: "Explore" }).click();
@@ -219,6 +245,29 @@ test("profiles filtering and keyboard navigation with 10,000 files", async ({
   await expect(page.locator('[role="treeitem"]').first()).toBeVisible();
   expect(await page.locator('[role="treeitem"]').count()).toBeLessThan(100);
   const loaded = Date.now();
+  const rootRow = page.getByRole("treeitem", {
+    name: "Coastal collection",
+    exact: true,
+  });
+  const lastFile = page.getByRole("treeitem", {
+    name: files[files.length - 1].name,
+    exact: true,
+  });
+  const unfilteredKeyboardEndMs: Record<string, number> = {};
+  for (const reducedMotion of ["no-preference", "reduce"] as const) {
+    await page.emulateMedia({ reducedMotion });
+    const unfilteredEndStarted = Date.now();
+    await rootRow.focus();
+    await page.keyboard.press("End");
+    await expect(lastFile).toBeFocused();
+    await expect(lastFile).toHaveAttribute("aria-posinset", "10000");
+    await expect(lastFile).toHaveAttribute("aria-setsize", "10000");
+    await expectRowFullyVisible(lastFile);
+    unfilteredKeyboardEndMs[reducedMotion] = Date.now() - unfilteredEndStarted;
+    await page.keyboard.press("Home");
+    await expect(rootRow).toBeFocused();
+  }
+  const filterStarted = Date.now();
   await page.getByRole("combobox", { name: "Media type" }).selectOption("text");
   await expect(
     page.getByRole("treeitem", { name: "file-00001.txt", exact: true }),
@@ -237,34 +286,7 @@ test("profiles filtering and keyboard navigation with 10,000 files", async ({
     "aria-label",
     files[files.length - 1].name,
   );
-  const lastFile = page.getByRole("treeitem", {
-    name: files[files.length - 1].name,
-    exact: true,
-  });
-  await expect
-    .poll(() =>
-      lastFile.evaluate((element) => {
-        const row = element.getBoundingClientRect();
-        const tree = element.closest('[role="tree"]');
-        if (!tree) return Infinity;
-        const clip = tree.getBoundingClientRect();
-        return Math.max(
-          Math.max(0, clip.top + tree.clientTop) - row.top,
-          row.bottom -
-            Math.min(
-              window.innerHeight,
-              clip.top + tree.clientTop + tree.clientHeight,
-            ),
-          Math.max(0, clip.left + tree.clientLeft) - row.left,
-          row.right -
-            Math.min(
-              window.innerWidth,
-              clip.left + tree.clientLeft + tree.clientWidth,
-            ),
-        );
-      }),
-    )
-    .toBeLessThanOrEqual(1);
+  await expectRowFullyVisible(lastFile);
   const keyboardEndMs = Date.now() - filtered;
   await expect(page.locator('[role="treeitem"]:focus')).toHaveAttribute(
     "aria-posinset",
@@ -293,7 +315,8 @@ test("profiles filtering and keyboard navigation with 10,000 files", async ({
     JSON.stringify({
       files: 10_000,
       loadAndRenderMs: loaded - started,
-      filterAndRenderMs: filtered - loaded,
+      filterAndRenderMs: filtered - filterStarted,
+      unfilteredKeyboardEndMs,
       keyboardEndMs,
     }),
   );

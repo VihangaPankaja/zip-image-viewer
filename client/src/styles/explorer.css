@@ -251,6 +251,11 @@
   }
 }
 
+/* Window geometry must settle before keyboard focus, including in reduced motion. */
+.tree-window-canvas,
+.tree-window-rows {
+  transition-property: none;
+}
 .tree-window-canvas {
   position: relative;
 }
