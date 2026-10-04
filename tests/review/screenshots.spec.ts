@@ -134,16 +134,40 @@ async function installSearchTree(page: Page) {
   });
 }
 
+async function resizeExplorer(page: Page, targetX: number) {
+  const handle = await page.locator(".workspace-resize-handle").boundingBox();
+  if (!handle) throw new Error("Explorer resize handle is missing.");
+  const centerX = handle.x + handle.width / 2;
+  const centerY = handle.y + Math.min(handle.height / 2, 200);
+  await page.mouse.move(centerX, centerY);
+  await page.mouse.down();
+  await page.mouse.move(targetX, centerY, { steps: 10 });
+  await page.mouse.up();
+  return centerX;
+}
+
+async function widenTabletExplorer(page: Page) {
+  const group = await page.locator(".workspace-panel-group").boundingBox();
+  if (!group) throw new Error("Explorer panel group is missing.");
+  return resizeExplorer(page, group.x + group.width * 0.53);
+}
+
 async function captureExplorerSearch(
   page: Page,
   device: (typeof devices)[number],
   theme: string,
   mobile: boolean,
 ) {
-  if (mobile)
+  const originalDivider =
+    device.name === "Tablet" ? await widenTabletExplorer(page) : undefined;
+  if (mobile) {
     await page
       .getByRole("radio", { name: "Files", exact: true })
       .check({ force: true });
+    await page
+      .getByRole("button", { name: "Hide sessions", exact: true })
+      .click();
+  }
   const search = page.getByRole("searchbox", { name: "Search explorer files" });
   await search.fill("Field notes/");
   const results = page.getByRole("treeitem", {
@@ -152,6 +176,13 @@ async function captureExplorerSearch(
     includeHidden: true,
   });
   await expect(results).toHaveCount(2);
+  if (device.name === "Tablet")
+    for (const result of [results.first(), results.last()])
+      expect(
+        await result
+          .locator(".tree-item-label")
+          .evaluate((label) => label.scrollWidth <= label.clientWidth),
+      ).toBe(true);
   for (const name of ["Field notes", "north-shore", "south-shore"])
     await expect(
       page.getByRole("treeitem", { name, exact: true }),
@@ -159,6 +190,18 @@ async function captureExplorerSearch(
   await expect(
     page.getByRole("treeitem", { name: filenames[0], exact: true }),
   ).toHaveCount(0);
+  if (mobile) {
+    const navigation = await page
+      .locator(".workspace-mobile-nav")
+      .boundingBox();
+    if (!navigation) throw new Error("Mobile navigation is missing.");
+    for (const result of [results.first(), results.last()]) {
+      await expect(result).toBeInViewport({ ratio: 1 });
+      const bounds = await result.boundingBox();
+      if (!bounds) throw new Error("Explorer search result is missing.");
+      expect(bounds.y + bounds.height).toBeLessThanOrEqual(navigation.y);
+    }
+  }
   await save(page, device, theme, "explorer-path-search");
   await results.first().focus();
   await page.keyboard.press("End");
@@ -186,6 +229,8 @@ async function captureExplorerSearch(
     page.getByRole("treeitem", { name: filenames[0], exact: true }),
   ).toBeVisible();
   await expect(results).toHaveCount(0);
+  if (originalDivider !== undefined)
+    await resizeExplorer(page, originalDivider);
 }
 
 async function captureVideoQueueReturn(
@@ -224,8 +269,18 @@ async function captureVideoQueueReturn(
   await expect(video).toHaveJSProperty("readyState", 4);
   await expect(page.locator(".preview-panel h2")).toHaveText(filenames[2]);
   await expect(seek).toHaveValue("7.75");
-  await seek.evaluate((element) => element.scrollIntoView({ block: "center" }));
-  if (mobile) await expect(seek).toBeInViewport({ ratio: 1 });
+  if (device.name === "Desktop" || device.name === "Tablet") {
+    await video.evaluate((element) =>
+      element.scrollIntoView({ block: "start" }),
+    );
+    await expect(video).toBeInViewport({ ratio: 1 });
+    await expect(seek).toBeInViewport({ ratio: 1 });
+  } else {
+    await seek.evaluate((element) =>
+      element.scrollIntoView({ block: "center" }),
+    );
+    if (mobile) await expect(seek).toBeInViewport({ ratio: 1 });
+  }
   await save(page, device, theme, "video-return-paused-position");
   state.jobs = [];
 }
@@ -352,6 +407,7 @@ async function captureLargeExplorer(
     await expect(page.locator(".explorer-tree-panel .panel-chip")).toHaveText(
       "10000",
     );
+    if (device.name === "Tablet") await widenTabletExplorer(page);
     const tree = page.getByRole("tree", { name: "Explorer tree" });
     await tree.getByRole("treeitem").first().focus();
     await page.keyboard.press("End");
@@ -362,6 +418,12 @@ async function captureLargeExplorer(
     await expect(last).toBeFocused();
     await expect(last).toBeVisible();
     await expect(last).toHaveAttribute("aria-posinset", "10000");
+    if (device.name === "Tablet")
+      expect(
+        await last
+          .locator(".tree-item-label")
+          .evaluate((label) => label.scrollWidth <= label.clientWidth),
+      ).toBe(true);
     expect(await tree.getByRole("treeitem").count()).toBeLessThan(100);
     if (mobile) {
       await last.evaluate((element) =>

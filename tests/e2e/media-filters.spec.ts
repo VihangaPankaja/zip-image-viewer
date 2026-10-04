@@ -223,6 +223,12 @@ test("profiles filtering and keyboard navigation with 10,000 files", async ({
   await expect(
     page.getByRole("treeitem", { name: "file-00001.txt", exact: true }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("treeitem", { name: "file-00001.txt", exact: true }),
+  ).toHaveAttribute("aria-setsize", "5000");
+  await expect(
+    page.getByRole("treeitem", { name: "file-00000.wav", exact: true }),
+  ).toHaveCount(0);
   expect(await page.locator('[role="treeitem"]').count()).toBeLessThan(100);
   const filtered = Date.now();
   await page.locator('[role="treeitem"]').first().focus();
@@ -231,6 +237,34 @@ test("profiles filtering and keyboard navigation with 10,000 files", async ({
     "aria-label",
     files[files.length - 1].name,
   );
+  const lastFile = page.getByRole("treeitem", {
+    name: files[files.length - 1].name,
+    exact: true,
+  });
+  await expect
+    .poll(() =>
+      lastFile.evaluate((element) => {
+        const row = element.getBoundingClientRect();
+        const tree = element.closest('[role="tree"]');
+        if (!tree) return Infinity;
+        const clip = tree.getBoundingClientRect();
+        return Math.max(
+          Math.max(0, clip.top + tree.clientTop) - row.top,
+          row.bottom -
+            Math.min(
+              window.innerHeight,
+              clip.top + tree.clientTop + tree.clientHeight,
+            ),
+          Math.max(0, clip.left + tree.clientLeft) - row.left,
+          row.right -
+            Math.min(
+              window.innerWidth,
+              clip.left + tree.clientLeft + tree.clientWidth,
+            ),
+        );
+      }),
+    )
+    .toBeLessThanOrEqual(1);
   const keyboardEndMs = Date.now() - filtered;
   await expect(page.locator('[role="treeitem"]:focus')).toHaveAttribute(
     "aria-posinset",

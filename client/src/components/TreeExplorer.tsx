@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   ChevronRight,
   Folder,
@@ -151,6 +151,17 @@ export function TreeExplorer({
   const { rows, ...itemNavigation } = navigation;
   const windowed = rows.length > 500;
   const [start, end] = range(rows.length);
+  const items = rows
+    .slice(start, end)
+    .map((row, offset) => (
+      <TreeItem
+        key={row.id}
+        row={row}
+        index={start + offset}
+        selectedPath={selectedPath}
+        navigation={itemNavigation}
+      />
+    ));
   if (!rootNode) return null;
 
   return (
@@ -182,30 +193,37 @@ export function TreeExplorer({
           aria-label="Explorer tree"
           onKeyDown={(event) => handleTreeKeyDown(event, navigation)}
         >
-          {windowed && start > 0 ? (
-            <div aria-hidden="true" style={{ height: start * 47 }} />
-          ) : null}
-          {rows.slice(start, end).map((row, offset) => (
-            <TreeItem
-              key={row.id}
-              row={row}
-              index={start + offset}
-              selectedPath={selectedPath}
-              navigation={itemNavigation}
-            />
-          ))}
-          {windowed && end < rows.length ? (
-            <div
-              aria-hidden="true"
-              style={{ height: (rows.length - end) * 47 }}
-            />
-          ) : null}
+          {windowed ? (
+            <TreeWindow start={start} rowCount={rows.length}>
+              {items}
+            </TreeWindow>
+          ) : (
+            items
+          )}
         </div>
       )}
     </div>
   );
 }
 
+function TreeWindow({
+  start,
+  rowCount,
+  children,
+}: {
+  start: number;
+  rowCount: number;
+  children: ReactNode;
+}) {
+  // Keep scroll height stable while React replaces rows at either end of the window.
+  return (
+    <div className="tree-window-canvas" style={{ height: rowCount * 47 }}>
+      <div className="tree-window-rows" style={{ top: start * 47 }}>
+        {children}
+      </div>
+    </div>
+  );
+}
 function ExplorerTools({
   search,
   onSearch,

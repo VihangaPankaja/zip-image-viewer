@@ -231,3 +231,20 @@ it("keeps a large tree bounded and focuses an initially unmounted last file", as
     await screen.findByRole("treeitem", { name: "Archive" }),
   ).toHaveFocus();
 });
+
+it("does not restore a completed tree focus request after the user leaves the tree", () => {
+  const onSelect = vi.fn();
+  const { rerender } = render(
+    <TreeExplorer rootNode={root} selectedPath="" onSelect={onSelect} />,
+  );
+  fireEvent.keyDown(screen.getByRole("tree"), { key: "Home" });
+  expect(screen.getByRole("treeitem", { name: "Archive" })).toHaveFocus();
+  const search = screen.getByRole("searchbox", {
+    name: "Search explorer files",
+  });
+  search.focus();
+  rerender(
+    <TreeExplorer rootNode={root} selectedPath="" onSelect={onSelect} />,
+  );
+  expect(search).toHaveFocus();
+});

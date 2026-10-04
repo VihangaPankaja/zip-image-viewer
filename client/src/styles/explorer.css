@@ -250,3 +250,12 @@
     padding-inline: 14px;
   }
 }
+
+.tree-window-canvas {
+  position: relative;
+}
+
+.tree-window-rows {
+  position: absolute;
+  inset-inline: 0;
+}

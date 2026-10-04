@@ -197,7 +197,9 @@ export function useTreeNavigation(
   function focusItem(index: number) {
     pendingFocus.current = index;
     revealIndex(index);
-    itemRefs.current[index]?.focus();
+    const item = itemRefs.current[index];
+    item?.focus();
+    if (item && item === document.activeElement) pendingFocus.current = null;
   }
   function setItemRef(index: number, element: HTMLButtonElement | null) {
     itemRefs.current[index] = element;

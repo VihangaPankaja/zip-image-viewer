@@ -1,5 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "./media-fixture";
+import { tapVisibleTarget } from "./touch";
 import {
   filenames,
   installReviewFixtures,
@@ -15,6 +16,9 @@ test("local SRT and WebVTT captions render, shift, resize and recover at 360px",
 }) => {
   test.setTimeout(90_000);
   await installReviewFixtures(page);
+  await page.route("**/api/sessions/*/video/play?*", (route) =>
+    route.continue(),
+  );
   await page.setViewportSize({ width: 360, height: 844 });
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
@@ -77,7 +81,7 @@ test("local SRT and WebVTT captions render, shift, resize and recover at 360px",
     page.getByRole("combobox", { name: "Caption size" }),
   ).toHaveValue("large");
   await expect(video).toHaveAttribute("data-caption-size", "large");
-  await captions.tap();
+  await tapVisibleTarget(captions);
   await expect(captions).toHaveAttribute("aria-pressed", "false");
   await expect.poll(activeText).toEqual([]);
   await captions.focus();
@@ -112,16 +116,14 @@ test("local SRT and WebVTT captions render, shift, resize and recover at 360px",
     await expect.poll(activeText).toEqual(["Recovered coastal captions"]);
     await page.evaluate(() => document.exitFullscreen());
   }
-  await page.getByRole("button", { name: "Remove subtitles" }).tap();
+  await tapVisibleTarget(
+    page.getByRole("button", { name: "Remove subtitles" }),
+  );
   await expect.poll(activeText).toEqual([]);
   await upload.setInputFiles(reviewSubtitles);
-  await page
-    .getByRole("radio", { name: "Files", exact: true })
-    .check({ force: true });
+  await tapVisibleTarget(page.locator('label[for="workspace-pane-files"]'));
   await page.getByRole("treeitem", { name: filenames[1], exact: true }).click();
-  await page
-    .getByRole("radio", { name: "Files", exact: true })
-    .check({ force: true });
+  await tapVisibleTarget(page.locator('label[for="workspace-pane-files"]'));
   await page.getByRole("treeitem", { name: filenames[2], exact: true }).click();
   await expect(page.getByText(reviewSubtitles.name)).toHaveCount(0);
   expect(
