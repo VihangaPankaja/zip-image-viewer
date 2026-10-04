@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { test } from "./media-fixture";
+import { audioTest, test } from "./media-fixture";
 import { tapVisibleTarget } from "./touch";
 import { installReviewFixtures, reviewJobs } from "../review/fixtures";
 
@@ -135,64 +135,74 @@ test("mobile file selection opens preview and retains it across queue visits and
 });
 
 // Catch losing the loaded media element when switching workspace views.
-test("loaded mobile video retains seek and paused state across an active queue visit", async ({
-  page,
-  appOrigin,
-}, testInfo) => {
-  await openMobileVideo(page, appOrigin);
-  const video = page.getByLabel("Video preview");
-  const seek = page.getByRole("slider", { name: "Seek video" });
-  await expect(seek).toHaveAttribute("max", "8");
-  await seek.focus();
-  for (const time of [0.25, 0.5, 0.75, 1]) {
-    await page.keyboard.press("ArrowRight");
+audioTest(
+  "loaded mobile video retains seek and paused state across an active queue visit",
+  async ({ page, appOrigin, browserName }, testInfo) => {
+    await openMobileVideo(page, appOrigin);
+    const video = page.getByLabel("Video preview");
+    const seek = page.getByRole("slider", { name: "Seek video" });
+    await expect(seek).toHaveAttribute("max", "8");
+    await seek.focus();
+    for (const time of [0.25, 0.5, 0.75, 1]) {
+      await page.keyboard.press("ArrowRight");
+      await expect
+        .poll(() =>
+          video.evaluate((element: HTMLVideoElement) => element.currentTime),
+        )
+        .toBeCloseTo(time, 1);
+    }
     await expect
       .poll(() =>
         video.evaluate((element: HTMLVideoElement) => element.currentTime),
       )
-      .toBeCloseTo(time, 1);
-  }
-  await expect
-    .poll(() =>
-      video.evaluate((element: HTMLVideoElement) => element.currentTime),
-    )
-    .toBeCloseTo(1, 1);
-  await page.getByRole("tab", { name: "Downloads" }).click();
-  await expect(page.locator(".download-row").first()).toContainText("62%");
-  await expect(page.getByLabel("Video preview")).toBeHidden();
-  await page.getByRole("tab", { name: "Explore" }).click();
-  await expect(
-    page.getByRole("radio", { name: "Preview", exact: true }),
-  ).toBeChecked();
-  await expect
-    .poll(() =>
-      video.evaluate((element: HTMLVideoElement) => element.currentTime),
-    )
-    .toBeCloseTo(1, 1);
-  await expect(video).toHaveJSProperty("paused", true);
-  await page.screenshot({
-    path: testInfo.outputPath("mobile-video-return.png"),
-    fullPage: true,
-  });
-  await video.evaluate(async (element: HTMLVideoElement) => {
-    element.muted = true;
-    await element.play();
-  });
-  await tapVisibleTarget(
-    page
-      .getByRole("navigation", { name: "Workspace views" })
-      .getByRole("button", { name: "Downloads", exact: true }),
-  );
-  await expect(video).toHaveJSProperty("paused", false);
-  await expect
-    .poll(() =>
-      video.evaluate((element: HTMLVideoElement) => element.currentTime),
-    )
-    .toBeGreaterThan(1.25);
-  await page.getByRole("tab", { name: "Explore" }).click();
-  await expect(video).toHaveJSProperty("paused", false);
-  await video.evaluate((element: HTMLVideoElement) => element.pause());
-});
+      .toBeCloseTo(1, 1);
+    await page.getByRole("tab", { name: "Downloads" }).click();
+    await expect(page.locator(".download-row").first()).toContainText("62%");
+    await expect(page.getByLabel("Video preview")).toBeHidden();
+    await page.getByRole("tab", { name: "Explore" }).click();
+    await expect(
+      page.getByRole("radio", { name: "Preview", exact: true }),
+    ).toBeChecked();
+    await expect
+      .poll(() =>
+        video.evaluate((element: HTMLVideoElement) => element.currentTime),
+      )
+      .toBeCloseTo(1, 1);
+    await expect(video).toHaveJSProperty("paused", true);
+    await page.screenshot({
+      path: testInfo.outputPath("mobile-video-return.png"),
+      fullPage: true,
+    });
+    await expect(video).toHaveJSProperty("muted", false);
+    if (browserName === "webkit") {
+      await tapVisibleTarget(video);
+    } else {
+      await video.focus();
+      await page.keyboard.press("Space");
+    }
+    await expect(video).toHaveJSProperty("paused", false);
+    await tapVisibleTarget(
+      page
+        .getByRole("navigation", { name: "Workspace views" })
+        .getByRole("button", { name: "Downloads", exact: true }),
+    );
+    await expect(
+      page.getByRole("heading", { name: "Downloads", exact: true }),
+    ).toBeVisible();
+    await expect(video).toHaveJSProperty("paused", false);
+    const hiddenTime = await video.evaluate(
+      (element: HTMLVideoElement) => element.currentTime,
+    );
+    await expect
+      .poll(() =>
+        video.evaluate((element: HTMLVideoElement) => element.currentTime),
+      )
+      .toBeGreaterThan(Math.max(1.25, hiddenTime + 0.25));
+    await page.getByRole("tab", { name: "Explore" }).click();
+    await expect(video).toHaveJSProperty("paused", false);
+    await video.evaluate((element: HTMLVideoElement) => element.pause());
+  },
+);
 
 // Catch a queue action disappearing as the phone user scrolls to player controls.
 test("mobile playback keeps Downloads within one tap in portrait and landscape", async ({
