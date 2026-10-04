@@ -61,6 +61,15 @@ const requiredScreens = [
   "video-subtitles-adjusted",
   "video-subtitles-error",
   "video-subtitles-recovered",
+  "explorer-path-search",
+  "explorer-search-keyboard-focused",
+  "explorer-search-keyboard-opened",
+  "torrent-keyboard-selection",
+  "loaded-video-downloads-visit",
+  "video-return-paused-position",
+  "torrent-large-folder-page",
+  "torrent-large-folder-selection",
+  "explorer-large-collection",
 ];
 const featuredScreens = (process.env.PR_SCREENSHOT_FEATURED ?? "")
   .split(",")
@@ -177,9 +186,7 @@ for (const device of ["Mobile", "Tablet", "Desktop", "Ultrawide"]) {
     for (const capture of themeEntries) {
       const label = capture.screen.replaceAll("-", " ");
       lines.push(
-        `**${label}**`,
-        "",
-        `![${device} ${theme}: ${label}](https://raw.githubusercontent.com/${repository}/${assetCommit}/${capture.file})`,
+        `![${label}](https://raw.githubusercontent.com/${repository}/${assetCommit}/${capture.file})`,
         "",
       );
     }

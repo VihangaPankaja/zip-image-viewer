@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { tapVisibleTarget } from "./touch";
 import {
   installReviewFixtures,
   reviewActiveTorrentJob,
@@ -17,7 +18,7 @@ test("changes selected torrent file priorities and saves global bandwidth limits
   await page.goto("/");
   const open = page.getByRole("button", { name: "View files", exact: true });
   await open.waitFor();
-  await open.tap();
+  await tapVisibleTarget(open);
   const dialog = page.getByRole("dialog", { name: "Torrent files" });
   const priority = dialog.getByRole("combobox", {
     name: `Priority for ${job.torrentFiles[0].path}`,
@@ -39,9 +40,13 @@ test("changes selected torrent file priorities and saves global bandwidth limits
   expect(
     (await new AxeBuilder({ page }).include("dialog").analyze()).violations,
   ).toEqual([]);
-  await dialog.getByRole("button", { name: "Close", exact: true }).tap();
+  await tapVisibleTarget(
+    dialog.getByRole("button", { name: "Close", exact: true }),
+  );
   await expect(dialog).toHaveCount(0);
-  await page.getByRole("button", { name: "Settings", exact: true }).tap();
+  await tapVisibleTarget(
+    page.getByRole("button", { name: "Settings", exact: true }),
+  );
   const settings = page.getByRole("dialog", { name: "Settings", exact: true });
   await expect(settings.getByText(/HTTP downloads only/)).toBeVisible();
   const download = settings.getByRole("spinbutton", {
@@ -52,7 +57,9 @@ test("changes selected torrent file priorities and saves global bandwidth limits
   });
   await download.fill("256");
   await upload.fill("64");
-  await settings.getByRole("button", { name: "Save torrent limits" }).tap();
+  await tapVisibleTarget(
+    settings.getByRole("button", { name: "Save torrent limits" }),
+  );
   await expect
     .poll(() => state.torrentLimits)
     .toEqual({ downloadBytesPerSec: 262144, uploadBytesPerSec: 65536 });
@@ -67,13 +74,19 @@ test("changes selected torrent file priorities and saves global bandwidth limits
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await settings.getByRole("button", { name: "Close", exact: true }).tap();
-  await page.getByRole("button", { name: "Settings", exact: true }).tap();
+  await tapVisibleTarget(
+    settings.getByRole("button", { name: "Close", exact: true }),
+  );
+  await tapVisibleTarget(
+    page.getByRole("button", { name: "Settings", exact: true }),
+  );
   await expect(download).toHaveValue("256");
   await expect(upload).toHaveValue("64");
   await download.fill("0");
   await upload.fill("0");
-  await settings.getByRole("button", { name: "Save torrent limits" }).tap();
+  await tapVisibleTarget(
+    settings.getByRole("button", { name: "Save torrent limits" }),
+  );
   await expect
     .poll(() => state.torrentLimits)
     .toEqual({ downloadBytesPerSec: 0, uploadBytesPerSec: 0 });

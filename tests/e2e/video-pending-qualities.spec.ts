@@ -1,16 +1,16 @@
-import { expect, test } from "@playwright/test";
-import {
-  filenames,
-  installReviewFixtures,
-  prepareMedia,
-} from "../review/fixtures";
+import { expect } from "@playwright/test";
+import { test } from "./media-fixture";
+import { filenames, installReviewFixtures } from "../review/fixtures";
 
 test("clears the playing video until the next file's qualities resolve", async ({
   page,
+  appOrigin,
 }) => {
   test.setTimeout(60_000);
-  await prepareMedia();
   await installReviewFixtures(page);
+  await page.route("**/api/sessions/*/video/play?*", (route) =>
+    route.continue(),
+  );
   let release!: () => void;
   const pending = new Promise<void>((resolve) => {
     release = resolve;
@@ -27,7 +27,7 @@ test("clears the playing video until the next file's qualities resolve", async (
     await route.fallback();
   });
   try {
-    await page.goto("/");
+    await page.goto(appOrigin);
     await page.getByRole("tab", { name: "Explore" }).click();
     await page.getByRole("button", { name: "Open Coastal collection" }).click();
     await page

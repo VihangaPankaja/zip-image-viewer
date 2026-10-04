@@ -38,7 +38,7 @@ function useWorkspaceMedia(state: WorkspacePageState) {
     sessionId: state.session?.id || "",
   });
   const video = useVideoPlaybackController({
-    selectedKind: state.activeView === "explore" ? selection.selectedKind : "",
+    selectedKind: selection.selectedKind,
     selectedNode: selection.selectedNode,
     session: state.session,
   });
@@ -114,11 +114,13 @@ function useWorkspaceKeyboard(
 ): void {
   useKeyboardShortcuts({
     currentFolderImages: media.selection.currentFolderPreviewables,
-    currentImageIndex: media.selection.currentPreviewIndex,
+    currentImageIndex:
+      state.activeView === "explore" ? media.selection.currentPreviewIndex : -1,
     keyboardSettings: settings.keyboardSettings,
     nextImagePath: media.selection.nextPreviewPath,
     previousImagePath: media.selection.previousPreviewPath,
-    selectedKind: media.selection.selectedKind,
+    selectedKind:
+      state.activeView === "explore" ? media.selection.selectedKind : "",
     setSelectedPath: state.setSelectedPath,
     setSlideshowOpen: state.setSlideshowOpen,
     setVideoPlaybackRate: media.video.setVideoPlaybackRate,

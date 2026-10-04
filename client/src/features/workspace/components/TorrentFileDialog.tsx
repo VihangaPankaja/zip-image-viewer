@@ -1,8 +1,15 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import type { Job, TorrentPriority } from "../../../../../shared/contracts";
 import { formatTransferBytes } from "../../../lib/formatterUtils";
 import { classifyExtension } from "../../../lib/mimeTypeSystem";
-import { FileList, FileTools, fileState } from "./TorrentFileContents";
+import { FileTools, fileState } from "./TorrentFileContents";
+import { FileList } from "./TorrentFileList";
 
 type TorrentFile = Job["torrentFiles"][number];
 type Props = {
@@ -90,11 +97,18 @@ function useTorrentSelection({
   const [status, setStatus] = useState("all");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const chosen = job.torrentFiles.filter((file) =>
-    selecting ? selected.has(file.id) : file.selected,
+  const chosen = useMemo(
+    () =>
+      job.torrentFiles.filter((file) =>
+        selecting ? selected.has(file.id) : file.selected,
+      ),
+    [job.torrentFiles, selecting, selected],
   );
   const total = chosen.reduce((sum, file) => sum + file.size, 0);
-  const visible = filterFiles(job, selecting, search, mediaType, status);
+  const visible = useMemo(
+    () => filterFiles(job, selecting, search, mediaType, status),
+    [job, selecting, search, mediaType, status],
+  );
   const change = (files: TorrentFile[], checked: boolean) => {
     setSelected((current) => {
       const next = new Set(current);
@@ -232,7 +246,13 @@ export function TorrentReviewAction({
   return (
     <>
       {job.torrentFiles.length ? (
-        <button type="button" onClick={() => setReviewing(true)}>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.currentTarget.focus();
+            setReviewing(true);
+          }}
+        >
           {job.status === "awaiting_selection" ? "Review files" : "View files"}
         </button>
       ) : null}

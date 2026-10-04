@@ -4,6 +4,7 @@ import { Group, Panel, Separator } from "react-resizable-panels";
 type WorkspaceLayoutProps = {
   mobilePane: "files" | "preview";
   onMobilePaneChange: (pane: "files" | "preview") => void;
+  onOpenDownloads: () => void;
   files: ReactNode;
   metadata: ReactNode;
   preview: ReactNode;
@@ -21,6 +22,7 @@ const mobileViews: ReadonlyArray<{
 export function WorkspaceLayout({
   mobilePane,
   onMobilePaneChange,
+  onOpenDownloads,
   files,
   metadata,
   preview,
@@ -74,24 +76,44 @@ export function WorkspaceLayout({
           </section>
         </Panel>
       </Group>
-      <nav className="workspace-mobile-nav" aria-label="Workspace views">
-        {mobileViews.map((view) => (
-          <div className="workspace-mobile-view" key={view.id}>
-            <input
-              className="workspace-pane-control"
-              type="radio"
-              name="workspace-pane"
-              id={`workspace-pane-${view.id}`}
-              aria-label={view.label}
-              checked={mobilePane === view.id}
-              onChange={() => onMobilePaneChange(view.id)}
-            />
-            <label htmlFor={`workspace-pane-${view.id}`} data-pane={view.id}>
-              {view.label}
-            </label>
-          </div>
-        ))}
-      </nav>
+      <WorkspaceMobileNavigation
+        mobilePane={mobilePane}
+        onMobilePaneChange={onMobilePaneChange}
+        onOpenDownloads={onOpenDownloads}
+      />
     </>
+  );
+}
+
+function WorkspaceMobileNavigation({
+  mobilePane,
+  onMobilePaneChange,
+  onOpenDownloads,
+}: Pick<
+  WorkspaceLayoutProps,
+  "mobilePane" | "onMobilePaneChange" | "onOpenDownloads"
+>) {
+  return (
+    <nav className="workspace-mobile-nav" aria-label="Workspace views">
+      <button type="button" onClick={onOpenDownloads}>
+        Downloads
+      </button>
+      {mobileViews.map((view) => (
+        <div className="workspace-mobile-view" key={view.id}>
+          <input
+            className="workspace-pane-control"
+            type="radio"
+            name="workspace-pane"
+            id={`workspace-pane-${view.id}`}
+            aria-label={view.label}
+            checked={mobilePane === view.id}
+            onChange={() => onMobilePaneChange(view.id)}
+          />
+          <label htmlFor={`workspace-pane-${view.id}`} data-pane={view.id}>
+            {view.label}
+          </label>
+        </div>
+      ))}
+    </nav>
   );
 }

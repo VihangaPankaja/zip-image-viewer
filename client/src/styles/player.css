@@ -89,10 +89,17 @@ audio.video-player {
   cursor: pointer;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 760px), (max-width: 960px) and (max-height: 500px) {
   .media-frame {
+    width: 100%;
     min-height: 0;
+    max-height: calc(100dvh - 160px - env(safe-area-inset-bottom));
     aspect-ratio: 16 / 9;
+    scroll-margin-block: 12px calc(88px + env(safe-area-inset-bottom));
+  }
+
+  .video-player {
+    max-height: calc(100dvh - 162px - env(safe-area-inset-bottom));
   }
 
   .progress-meta-row {

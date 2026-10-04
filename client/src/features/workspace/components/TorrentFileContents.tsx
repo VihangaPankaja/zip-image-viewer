@@ -1,13 +1,8 @@
-import type {
-  Job,
-  TorrentFile,
-  TorrentPriority,
-} from "../../../../../shared/contracts";
+import type { Job, TorrentFile } from "../../../../../shared/contracts";
 import type { Selection } from "./TorrentFileDialog";
-import { formatTransferBytes } from "../../../lib/formatterUtils";
 import { MediaTypeFilter } from "../../../components/MediaTypeFilter";
 
-const fileStates = {
+export const fileStates = {
   available: "Available",
   downloading: "Downloading",
   skipped: "Skipped",
@@ -33,50 +28,6 @@ export function fileState(
   if (job.phase === "resolving") return "checking";
   if (file.complete) return job.status === "ready" ? "available" : "downloaded";
   return "downloading";
-}
-
-function FileGroup({
-  folder,
-  files,
-  selected,
-  onChange,
-}: {
-  folder: string;
-  files: TorrentFile[];
-  selected: Set<string>;
-  onChange: (files: TorrentFile[], checked: boolean) => void;
-}) {
-  const count = files.filter((file) => selected.has(file.id)).length;
-  return (
-    <fieldset className="torrent-file-group">
-      <legend>
-        <label className="torrent-file-choice torrent-folder-choice">
-          <input
-            type="checkbox"
-            checked={count === files.length}
-            ref={(input) => {
-              if (input)
-                input.indeterminate = count > 0 && count < files.length;
-            }}
-            onChange={(event) => onChange(files, event.currentTarget.checked)}
-          />
-          <span>{folder || "Top-level files"}</span>
-        </label>
-      </legend>
-      {files.map((file) => (
-        <label className="torrent-file-choice" key={file.id}>
-          <input
-            type="checkbox"
-            checked={selected.has(file.id)}
-            aria-label={file.path}
-            onChange={(event) => onChange([file], event.currentTarget.checked)}
-          />
-          <span>{file.path.slice(folder ? folder.length + 1 : 0)}</span>
-          <small>{formatTransferBytes(file.size)}</small>
-        </label>
-      ))}
-    </fieldset>
-  );
 }
 
 export function FileTools({
@@ -149,115 +100,23 @@ export function FileTools({
           {visible.length} of {job.torrentFiles.length} files shown
         </span>
       </div>
+      <SelectionHelp selecting={selecting} />
       {selecting && (search || mediaType !== "all") ? (
         <p>
           Folder checkboxes affect matching files. Select all and Select none
-          affect every file.
+          affect every file, including other pages.
         </p>
       ) : null}
     </div>
   );
 }
 
-export function FileList({
-  job,
-  selection,
-}: {
-  job: Job;
-  selection: Selection;
-}) {
-  const { selecting, submitting, selected, change, visible } = selection;
-  const groups = new Map<string, TorrentFile[]>();
-  for (const file of visible) {
-    const folder = file.path.includes("/")
-      ? file.path.slice(0, file.path.lastIndexOf("/"))
-      : "";
-    const group = groups.get(folder) ?? [];
-    group.push(file);
-    groups.set(folder, group);
-  }
-
-  return (
-    <div
-      className="torrent-file-list"
-      role="region"
-      aria-label="Torrent files"
-      aria-busy={submitting}
-      tabIndex={selecting ? undefined : 0}
-    >
-      <fieldset disabled={submitting} className="torrent-file-fields">
-        {[...groups].map(([folder, files]) =>
-          selecting ? (
-            <FileGroup
-              key={folder}
-              folder={folder}
-              files={files}
-              selected={selected}
-              onChange={change}
-            />
-          ) : (
-            <FileStatusGroup
-              key={folder}
-              job={job}
-              folder={folder}
-              files={files}
-              selection={selection}
-            />
-          ),
-        )}
-      </fieldset>
-      {!visible.length ? <p>No files match your filters.</p> : null}
-    </div>
-  );
-}
-
-function FileStatusGroup({
-  job,
-  folder,
-  files,
-  selection,
-}: {
-  job: Job;
-  folder: string;
-  files: TorrentFile[];
-  selection: Selection;
-}) {
-  return (
-    <fieldset className="torrent-file-group">
-      <legend className="torrent-file-choice torrent-folder-choice">
-        {folder || "Top-level files"}
-      </legend>
-      <ul className="torrent-file-status-list">
-        {files.map((file) => (
-          <li className="torrent-file-status-row" key={file.id}>
-            <span>{file.path.slice(folder ? folder.length + 1 : 0)}</span>
-            <small>{formatTransferBytes(file.size)}</small>
-            <span className="torrent-file-state">
-              {fileStates[fileState(file, job)]}
-            </span>
-            {file.selected &&
-            job.status === "downloading" &&
-            selection.canChangePriority ? (
-              <label>
-                <select
-                  aria-label={`Priority for ${file.path}`}
-                  value={file.priority ?? "normal"}
-                  onChange={(event) =>
-                    void selection.changePriority(
-                      file.id,
-                      event.currentTarget.value as TorrentPriority,
-                    )
-                  }
-                >
-                  <option value="low">Low</option>
-                  <option value="normal">Normal</option>
-                  <option value="high">High</option>
-                </select>
-              </label>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-    </fieldset>
-  );
+function SelectionHelp({ selecting }: { selecting: boolean }) {
+  return selecting ? (
+    <p id="torrent-keyboard-help">
+      Use ↑ and ↓ to move between choices, Home and End to jump to the first or
+      last file, and Space to select. Folder checkboxes affect all matching
+      files, including other pages.
+    </p>
+  ) : null;
 }

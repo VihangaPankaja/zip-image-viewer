@@ -40,16 +40,21 @@ export function WorkspacePageView({ controller }: ViewProps) {
           </header>
           {state.activeView === "downloads" ? (
             <WorkspaceDownloads controller={controller} />
-          ) : (
+          ) : null}
+          <div
+            className="workspace-explore-content"
+            hidden={state.activeView !== "explore"}
+          >
             <WorkspaceLayout
               mobilePane={state.mobilePane}
               onMobilePaneChange={state.setMobilePane}
+              onOpenDownloads={() => state.setActiveView("downloads")}
               sessions={<WorkspaceSessions controller={controller} />}
               files={<WorkspaceFiles controller={controller} />}
               preview={<WorkspacePreview controller={controller} />}
               metadata={<WorkspaceMetadata controller={controller} />}
             />
-          )}
+          </div>
         </section>
       </main>
       <WorkspaceSettings controller={controller} />

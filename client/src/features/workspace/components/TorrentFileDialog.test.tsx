@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { jobSchema } from "../../../../../shared/contracts";
@@ -291,4 +297,114 @@ it("forwards selected file priority changes and keeps failures visible", async (
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "Peers disconnected",
   );
+});
+
+it("moves through matching torrent checkboxes with arrows and Home/End and leaves the list with Tab", async () => {
+  const user = userEvent.setup();
+  render(
+    <TorrentFileDialog job={job()} onClose={vi.fn()} onSubmit={vi.fn()} />,
+  );
+  const folder = screen.getByRole("checkbox", { name: "film" });
+  folder.focus();
+  fireEvent.keyDown(folder, { key: "End" });
+  expect(screen.getByRole("checkbox", { name: "notes.txt" })).toHaveFocus();
+  fireEvent.keyDown(screen.getByRole("checkbox", { name: "notes.txt" }), {
+    key: "ArrowUp",
+  });
+  expect(
+    screen.getByRole("checkbox", { name: "Top-level files" }),
+  ).toHaveFocus();
+  fireEvent.keyDown(screen.getByRole("checkbox", { name: "notes.txt" }), {
+    key: "Home",
+  });
+  fireEvent.keyDown(folder, { key: "ArrowDown" });
+  await user.keyboard(" ");
+  expect(
+    screen.getByRole("checkbox", { name: "film/movie.mp4" }),
+  ).not.toBeChecked();
+  await user.tab();
+  expect(
+    screen.getByRole("button", { name: "Start selected download" }),
+  ).toHaveFocus();
+});
+
+it("pages a large folder without narrowing folder selection or losing hidden totals", async () => {
+  const user = userEvent.setup();
+  const many = job();
+  many.torrentFiles = Array.from({ length: 201 }, (_, index) => ({
+    ...many.torrentFiles[0],
+    id: String(index),
+    path: `Season 1/episode-${index}.mp4`,
+  }));
+  render(<TorrentFileDialog job={many} onClose={vi.fn()} onSubmit={vi.fn()} />);
+  expect(screen.getByLabelText("Season 1/episode-0.mp4")).toBeChecked();
+  expect(
+    screen.queryByLabelText("Season 1/episode-200.mp4"),
+  ).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Select none" }));
+  await user.click(screen.getByLabelText("Season 1", { exact: true }));
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "201 of 201 files selected",
+  );
+  await user.click(screen.getByRole("button", { name: "Next files" }));
+  expect(screen.getByLabelText("Season 1/episode-200.mp4")).toBeChecked();
+  fireEvent.keyDown(screen.getByLabelText("Season 1", { exact: true }), {
+    key: "End",
+  });
+  expect(
+    await screen.findByLabelText("Season 1/episode-200.mp4"),
+  ).toHaveFocus();
+  await user.keyboard(" ");
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "200 of 201 files selected",
+  );
+  fireEvent.keyDown(screen.getByLabelText("Season 1/episode-200.mp4"), {
+    key: "Home",
+  });
+  expect(
+    await screen.findByLabelText("Season 1", { exact: true }),
+  ).toHaveFocus();
+  fireEvent.change(screen.getByRole("searchbox"), {
+    target: { value: "episode-20" },
+  });
+  await user.click(screen.getByLabelText("Season 1", { exact: true }));
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "201 of 201 files selected",
+  );
+  await user.click(screen.getByLabelText("Season 1", { exact: true }));
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "199 of 201 files selected",
+  );
+});
+
+it("keeps the last file as the Tab stop when its folder is reused across pages", async () => {
+  const user = userEvent.setup();
+  const many = job();
+  many.torrentFiles = Array.from({ length: 201 }, (_, index) => ({
+    ...many.torrentFiles[0],
+    id: String(index),
+    path: `One folder/episode-${index}.mp4`,
+  }));
+  render(<TorrentFileDialog job={many} onClose={vi.fn()} onSubmit={vi.fn()} />);
+  const folder = screen.getByLabelText("One folder", { exact: true });
+  folder.focus();
+  fireEvent.keyDown(folder, { key: "End" });
+  const last = await screen.findByLabelText("One folder/episode-200.mp4");
+  expect(last).toHaveFocus();
+  await user.tab();
+  expect(
+    screen.getByRole("button", { name: "Start selected download" }),
+  ).toHaveFocus();
+  await user.tab({ shift: true });
+  expect(last).toHaveFocus();
+});
+
+it("restores focus to the review opener after activation that does not focus buttons", async () => {
+  const active = job();
+  active.status = "downloading";
+  render(<TorrentReviewAction job={active} onSubmit={vi.fn()} />);
+  const opener = screen.getByRole("button", { name: "View files" });
+  fireEvent.click(opener);
+  fireEvent.click(screen.getByRole("button", { name: "Close" }));
+  await waitFor(() => expect(opener).toHaveFocus());
 });

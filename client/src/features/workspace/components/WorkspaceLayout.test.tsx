@@ -11,6 +11,7 @@ describe("WorkspaceLayout", () => {
       <WorkspaceLayout
         mobilePane="files"
         onMobilePaneChange={onMobilePaneChange}
+        onOpenDownloads={vi.fn()}
         files={<p>Files pane</p>}
         metadata={<p>Metadata pane</p>}
         preview={<p>Preview pane</p>}
