@@ -126,6 +126,12 @@ describe("createProcessSessionJob", () => {
           name: "fixture",
         });
         onProgress({
+          files: torrentFiles.map((file) => ({
+            ...file,
+            selected: true,
+            complete: true,
+            downloadedBytes: file.size,
+          })),
           downloadedBytes: 100,
           downloadSpeedBytesPerSec: 50,
           peerCount: 1,

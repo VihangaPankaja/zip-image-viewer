@@ -28,9 +28,9 @@ const cleanupPaths: string[] = [];
 
 afterEach(async () => {
   await Promise.all(
-    cleanupPaths
-      .splice(0)
-      .map((entry) => rm(entry, { recursive: true, force: true })),
+    [...new Set(cleanupPaths.splice(0))].map((entry) =>
+      rm(entry, { recursive: true, force: true }),
+    ),
   );
 });
 

@@ -39,6 +39,8 @@ export type ExplorerNode = {
 };
 
 export type Session = {
+  retained?: boolean;
+  availablePaths?: Set<string>;
   id: string;
   workspaceDir: string;
   extractDir: string;

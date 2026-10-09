@@ -1,4 +1,5 @@
-import { createRequire } from "node:module";
+import { path7za } from "7zip-bin";
+import ffmpegPath from "ffmpeg-static";
 import path from "node:path";
 import { createServer, type Server } from "node:http";
 import { attachJobWebSocketServer } from "./realtime/jobSocketServer.js";
@@ -19,7 +20,6 @@ import {
 import { createServerContainer } from "./bootstrap/container.js";
 import { createRuntimeApp } from "./bootstrap/createRuntimeApp.js";
 import { registerRuntimeLifecycle } from "./bootstrap/runtimeLifecycle.js";
-import type { SessionJob } from "./domain/models.js";
 import { registerBaseRoutes } from "./bootstrap/registerRoutes.js";
 import { registerSessionRoutes } from "./handlers/sessions.js";
 import { getVideoQualities } from "./handlers/video/metadataRoutes.js";
@@ -27,9 +27,14 @@ import { registerVideoRoutes } from "./handlers/videoRoutes.js";
 import { registerFileRoutes } from "./handlers/fileRoutes.js";
 import { createSessionJobQueue } from "./application/jobs/sessionJobQueue.js";
 import { createTorrentControls } from "./application/torrents/torrentControls.js";
-import { createProcessSessionJob } from "./application/jobs/processSessionJob.js";
+import {
+  createProcessSessionJob,
+  restoreTorrentSession,
+} from "./application/jobs/processSessionJob.js";
 import { createJobManager } from "./application/jobs/jobManager.js";
-import { createSessionManager } from "./application/sessions/sessionManager.js";
+import { createRetainedTorrentStore } from "./repositories/retainedTorrents.js";
+import { restoreRetainedTorrents } from "./application/torrents/restoreRetainedTorrents.js";
+import { createRuntimeJobActions } from "./bootstrap/runtimeJobActions.js";
 import {
   getLogEntries,
   isTerminalJobStatus,
@@ -56,19 +61,10 @@ import {
   extractRuntimeArchive,
 } from "./runtimeAdapters.js";
 
-const require = createRequire(import.meta.url);
-const sevenZipModule: unknown = require("7zip-bin");
-const path7za =
-  typeof sevenZipModule === "object" &&
-  sevenZipModule !== null &&
-  "path7za" in sevenZipModule &&
-  typeof sevenZipModule.path7za === "string"
-    ? sevenZipModule.path7za
-    : "";
-const ffmpegModule: unknown = require("ffmpeg-static");
-const ffmpegPath = typeof ffmpegModule === "string" ? ffmpegModule : null;
-
 const distDir = path.resolve(process.cwd(), "dist");
+const retainedTorrents = createRetainedTorrentStore(
+  path.resolve(process.cwd(), "sessions"),
+);
 const container = createServerContainer();
 let server: Server | undefined;
 const {
@@ -90,27 +86,36 @@ const {
   startRenditionTranscode,
 } = videoRuntime;
 
-const { createJob, sanitizeJob, closeJob, emitJob, cleanupJob } =
-  createJobManager(jobStore, logEvent);
+const jobManager = createJobManager(jobStore, logEvent, retainedTorrents);
+const { createJob, sanitizeJob, closeJob, emitJob, cleanupJob } = jobManager;
 const { torrentAdapter, ...torrentControls } = createTorrentControls(
   jobStore,
   emitJob,
 );
-const processSessionJob = createProcessSessionJob({
+const processorDependencies = {
   sessionStore,
   emitJob,
   closeJob,
   download: downloadRuntimeSource,
-  detectEncryption: (archivePath) =>
+  detectEncryption: (archivePath: string) =>
     detectRuntimeArchiveEncryption(path7za, archivePath),
-  extractWith7zip: (archivePath, extractDir) =>
+  extractWith7zip: (archivePath: string, extractDir: string) =>
     extractRuntimeArchive(path7za, archivePath, extractDir),
   listExtractedEntries,
   logEvent,
   torrentAdapter,
-});
+};
+const processSessionJob = createProcessSessionJob(processorDependencies);
+
+await restoreRetainedTorrents(
+  retainedTorrents,
+  jobStore,
+  torrentAdapter,
+  (job) => restoreTorrentSession(job, processorDependencies),
+);
 
 const sessionJobQueue = createSessionJobQueue({
+  initialJobs: [...jobStore.values()],
   pendingSessionJobs,
   getActiveSessionJobCount,
   incrementActiveSessionJobCount,
@@ -137,33 +142,21 @@ const sessionJobQueue = createSessionJobQueue({
 });
 const { enqueueSessionJob } = sessionJobQueue;
 
-function cancelSessionJob(job: SessionJob) {
-  sessionJobQueue.cancelSessionJob(job.id);
-  closeJob(job, "cancelled");
-  emitJob(job, { phase: "cancelled", message: "Cancelled" }, "cancelled");
-  return job;
-}
-
-function retrySessionJob(previous: SessionJob) {
-  const job = createJob(
-    previous.url,
-    previous.downloadOptions,
-    previous.sourcePreference,
-  );
-  job.torrentFiles = previous.torrentFiles.map((file) => ({
-    ...file,
-    downloadedBytes: 0,
-    complete: false,
-  }));
-  job.torrentMetadata = previous.torrentMetadata;
-  enqueueSessionJob(job, false);
-  return job;
-}
-
-async function removeSessionJob(jobId: string): Promise<void> {
-  sessionJobQueue.removeSessionJob(jobId);
-  await cleanupJob(jobId, "removed");
-}
+const {
+  cancelSessionJob,
+  retrySessionJob,
+  removeSessionJob,
+  removeSession,
+  touchSession,
+} = createRuntimeJobActions(
+  jobStore,
+  sessionStore,
+  videoTranscodeStore,
+  jobManager,
+  sessionJobQueue,
+  logEvent,
+  cleanupVideoSession,
+);
 
 const app = createRuntimeApp({
   videoQualities: (input) =>
@@ -225,12 +218,6 @@ app.use((req, res, next) => {
   next();
 });
 
-const { removeSession, touchSession } = createSessionManager(
-  sessionStore,
-  videoTranscodeStore,
-  logEvent,
-  cleanupVideoSession,
-);
 const dashboard = shouldUseTerminalDashboard({
   inputTTY: process.stdin.isTTY,
   outputTTY: process.stdout.isTTY,
@@ -273,6 +260,7 @@ registerRuntimeLifecycle({
   sessions: sessionStore,
   jobs: jobStore,
   getServer: () => server,
+  stopWorkers: sessionJobQueue.stopSessionJobs,
   removeSession,
   cleanupJob,
   logEvent,
@@ -282,10 +270,15 @@ registerRuntimeLifecycle({
       return Promise.resolve();
     },
     () => torrentAdapter.close(),
+    () => {
+      retainedTorrents.close();
+      return Promise.resolve();
+    },
   ],
 });
 
 registerBaseRoutes(app, {
+  removeJob: removeSessionJob,
   getSessionCount: container.metrics.getSessionCount,
   getJobCount: container.metrics.getJobCount,
   getJob: (jobId) => jobStore.get(jobId),

@@ -28,6 +28,7 @@ export type TorrentProgress = {
 export type TorrentDownloadInput = {
   jobId?: string;
   priorities?: Record<string, TorrentPriority>;
+  peerHints?: string[];
   source: string | Uint8Array;
   downloadDir: string;
   signal: AbortSignal;
@@ -100,11 +101,27 @@ function describeTorrentFiles(
       path: file.path.replaceAll("\\", "/"),
       size: file.length,
       selected: false,
-      downloadedBytes: 0,
-      complete: false,
+      downloadedBytes: verifiedFileBytes(torrent, file),
+      complete: verifiedFileBytes(torrent, file) === file.length,
       priority: "normal",
     };
   });
+}
+
+function verifiedFileBytes(torrent: Torrent, file: Torrent["files"][number]) {
+  let downloadedBytes = 0;
+  const end = file.offset + file.length;
+  for (
+    let piece = Math.floor(file.offset / torrent.pieceLength);
+    piece * torrent.pieceLength < end;
+    piece += 1
+  ) {
+    if (torrent.pieces[piece] === null)
+      downloadedBytes +=
+        Math.min(end, (piece + 1) * torrent.pieceLength) -
+        Math.max(file.offset, piece * torrent.pieceLength);
+  }
+  return downloadedBytes;
 }
 
 function selectedProgress(
@@ -113,26 +130,14 @@ function selectedProgress(
   priorities: Map<string, TorrentPriority>,
 ): TorrentProgress {
   const files = torrent.files.map((file, index) => {
-    let downloadedBytes = 0;
-    const end = file.offset + file.length;
-    for (
-      let piece = Math.floor(file.offset / torrent.pieceLength);
-      piece * torrent.pieceLength < end;
-      piece += 1
-    ) {
-      if (torrent.pieces[piece] === null) {
-        downloadedBytes +=
-          Math.min(end, (piece + 1) * torrent.pieceLength) -
-          Math.max(file.offset, piece * torrent.pieceLength);
-      }
-    }
+    const downloadedBytes = verifiedFileBytes(torrent, file);
     return {
       id: String(index),
       path: file.path.replaceAll("\\", "/"),
       size: file.length,
       selected: selectedIds.has(String(index)),
       downloadedBytes,
-      complete: file.done,
+      complete: downloadedBytes === file.length,
       priority: priorities.get(String(index)) ?? "normal",
     };
   });
@@ -253,6 +258,7 @@ function downloadTorrent(
             .filter((_file, index) => selectedIds.has(String(index)))
             .map((file) => file.path.replaceAll("\\", "/"));
           applyFilePriorities(readyTorrent, selectedIds, priorities, ranges);
+          for (const peer of input.peerHints ?? []) readyTorrent.addPeer(peer);
           if (input.jobId)
             active.set(input.jobId, {
               torrent: readyTorrent,
@@ -298,7 +304,6 @@ function downloadTorrent(
         finish();
     };
     const progressTimer = setInterval(emitProgress, 250);
-    progressTimer.unref();
     torrent.on("download", emitProgress);
     torrent.on("upload", emitProgress);
     torrent.on("noPeers", input.onNoPeers);

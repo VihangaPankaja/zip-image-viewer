@@ -106,7 +106,9 @@ async function prepareTorrentEntries(
   deps: ProcessorDependencies,
 ) {
   const selectedPaths = new Set(
-    job.torrentFiles.filter((file) => file.selected).map((file) => file.path),
+    job.torrentFiles
+      .filter((file) => file.selected && file.complete)
+      .map((file) => file.path),
   );
   // Shared torrent pieces may also leave partial, unselected files on disk.
   const entries = (await deps.listExtractedEntries(torrentDir)).filter(
@@ -137,7 +139,9 @@ function completeSession(
   deps: ProcessorDependencies,
 ): void {
   deps.sessionStore.set(session.id, session);
-  Object.assign(job, { workspaceDir: "", extractDir: "", zipPath: "" });
+  if (job.sourceKind === "http")
+    Object.assign(job, { workspaceDir: "", extractDir: "", zipPath: "" });
+  session.retained = job.sourceKind === "torrent";
   deps.emitJob(
     job,
     {
@@ -209,9 +213,17 @@ async function processTorrentJob(
     deps.closeJob(job, job.status);
     return;
   }
+  const session = await restoreTorrentSession(job, deps);
+  completeSession(job, session, "Torrent is ready to browse.", deps);
+}
+
+export async function restoreTorrentSession(
+  job: SessionJob,
+  deps: ProcessorDependencies,
+): Promise<Session> {
   const prepared = await prepareTorrentEntries(
     job,
-    torrentDir,
+    path.join(job.workspaceDir, "torrent"),
     job.extractDir,
     deps,
   );
@@ -221,7 +233,15 @@ async function processTorrentJob(
     torrentDisplayName(job.url),
     prepared.entries,
   );
-  completeSession(job, session, "Torrent is ready to browse.", deps);
+  session.id = job.sessionId || session.id;
+  session.availablePaths = new Set(
+    prepared.entries
+      .filter((entry) => entry.type === "file")
+      .map((entry) => entry.relativePath),
+  );
+  session.retained = true;
+  deps.sessionStore.set(session.id, session);
+  return session;
 }
 
 async function processHttpJob(
@@ -298,7 +318,8 @@ async function processSessionJob(
       );
       return;
     }
-    await rm(workspaceDir, { recursive: true, force: true });
+    if (job.sourceKind === "http")
+      await rm(workspaceDir, { recursive: true, force: true });
     if (jobError.name !== "AbortError") {
       deps.logEvent("error", "session.create.failed", {
         jobId: job.id,

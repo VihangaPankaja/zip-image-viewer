@@ -1,5 +1,7 @@
 import { rm } from "node:fs/promises";
 import crypto from "node:crypto";
+import path from "node:path";
+import type { RetainedTorrentStore } from "../../repositories/retainedTorrents.js";
 import {
   DEFAULT_DOWNLOAD_OPTIONS,
   DEFAULT_DOWNLOAD_SETTINGS,
@@ -26,6 +28,7 @@ class JobManager {
   constructor(
     private readonly jobStore: Map<string, SessionJob>,
     private readonly logEvent: LogEvent,
+    private readonly retained?: RetainedTorrentStore,
   ) {}
 
   createJob = (
@@ -86,6 +89,10 @@ class JobManager {
       downloadOptions: normalizeDownloadOptions(downloadOptions),
     };
     this.jobStore.set(job.id, job);
+    if (job.sourceKind === "torrent" && this.retained) {
+      job.workspaceDir = path.join(this.retained.directory, job.id);
+      this.retained.save(job);
+    }
     return job;
   };
 
@@ -143,6 +150,7 @@ class JobManager {
       updatedAt: Date.now(),
       cleanupAt: Date.now() + JOB_TTL_MS,
     });
+    this.retained?.save(job);
   };
 
   emitJob = (
@@ -151,6 +159,7 @@ class JobManager {
     event = "progress",
   ): void => {
     Object.assign(job, patch, { updatedAt: Date.now() });
+    this.retained?.save(job);
     const sanitized = this.sanitizeJob(job);
     const socketPayload = JSON.stringify({ type: event, job: sanitized });
     for (const response of job.subscribers) {
@@ -169,15 +178,18 @@ class JobManager {
   cleanupJob = async (jobId: string, reason = "cleanup"): Promise<void> => {
     const job = this.jobStore.get(jobId);
     if (!job) return;
-    if (job.workspaceDir && !job.sessionId) {
-      await rm(job.workspaceDir, { recursive: true, force: true }).catch(
-        () => undefined,
-      );
-    }
+    if (job.sourceKind === "torrent" && reason === "expired") return;
     for (const response of job.subscribers) response.end();
     for (const socket of job.socketSubscribers)
       socket.close(1000, "job-cleanup");
+    job.subscribers.clear();
+    job.socketSubscribers.clear();
+    if (job.sourceKind === "torrent" && reason === "shutdown") return;
+    if (job.workspaceDir && !job.sessionId) {
+      await rm(job.workspaceDir, { recursive: true, force: true });
+    }
     this.jobStore.delete(jobId);
+    this.retained?.remove(jobId);
     this.logEvent("info", "job.removed", { jobId, reason });
   };
 }
@@ -185,6 +197,7 @@ class JobManager {
 export function createJobManager(
   jobStore: Map<string, SessionJob>,
   logEvent: LogEvent,
+  retained?: RetainedTorrentStore,
 ) {
-  return new JobManager(jobStore, logEvent);
+  return new JobManager(jobStore, logEvent, retained);
 }

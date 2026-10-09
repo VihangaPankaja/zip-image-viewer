@@ -16,6 +16,11 @@ export function createSessionManager(
   async function removeSession(sessionId: string, reason = "manual"): Promise<void> {
     const session = sessions.get(sessionId);
     if (!session) return;
+    if (session.retained && (reason === "expired" || reason === "viewer")) return;
+    if (session.retained && reason === "shutdown") {
+      await cleanupVideoSession(session);
+      return;
+    }
     sessions.delete(sessionId);
     await cleanupVideoSession(session);
     for (const [key, entry] of transcodes.entries()) {

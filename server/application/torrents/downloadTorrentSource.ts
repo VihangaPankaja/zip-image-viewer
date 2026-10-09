@@ -167,9 +167,11 @@ export async function downloadTorrentSource(
     phase: "resolving",
     message: "Resolving torrent metadata...",
   });
-  const source = job.url.startsWith("magnet:")
-    ? job.url
-    : (job.torrentMetadata ?? (await fetchTorrentMetadata(job.url, signal)));
+  const source =
+    job.torrentMetadata ??
+    (job.url.startsWith("magnet:")
+      ? job.url
+      : await fetchTorrentMetadata(job.url, signal));
   for (
     let attempt = 0;
     settings.maxRetries === -1 || attempt <= settings.maxRetries;
@@ -186,9 +188,12 @@ export async function downloadTorrentSource(
           ]),
         ),
         source,
+        peerHints: job.url.startsWith("magnet:")
+          ? new URL(job.url).searchParams.getAll("x.pe")
+          : [],
         downloadDir: input.downloadDir,
         signal,
-        retainStoreOnAbort: () => job.pauseRequested,
+        retainStoreOnAbort: () => true,
         onMetadata: (metadata) =>
           handleMetadata(job, input.confirmOversize, deps.emitJob, metadata),
         onProgress: monitorProgress(job, deps.emitJob),
