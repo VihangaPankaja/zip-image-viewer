@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { tapVisibleTarget } from "./touch";
 import {
   installReviewFixtures,
   reviewActiveTorrentJob,
@@ -30,7 +31,7 @@ for (const width of [360, 1440]) {
     ];
     await page.goto("/");
     const view = page.getByRole("button", { name: "View files", exact: true });
-    if (width === 360) await view.tap();
+    if (width === 360) await tapVisibleTarget(view);
     else {
       await view.focus();
       await page.keyboard.press("Enter");
@@ -55,7 +56,7 @@ for (const width of [360, 1440]) {
       name: "Coastal collection/subtitles/English.srt",
       exact: true,
     });
-    if (width === 360) await subtitle.tap();
+    if (width === 360) await tapVisibleTarget(subtitle);
     else {
       await subtitle.focus();
       await page.keyboard.press("Space");

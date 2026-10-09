@@ -1493,6 +1493,7 @@
           area: "Torrents",
           priority: "P0",
           effort: "L",
+          status: "Done",
           title: "Download skipped files later",
           summary:
             "Keep the full torrent file list with a Download action beside skipped entries.",
@@ -1500,8 +1501,9 @@
           plan: "Persist torrent metadata, selection and retained storage. Re-add retained torrents and verify existing pieces. Allow selection updates by file ID without duplicating the torrent or deleting completed files.",
           done: "Download A, skip B, restart the server, request B and finish it. A is unchanged, verified pieces are reused and both files remain visible.",
           depends: "T01, T02, S01",
+          note: "Completed in v3.12.0: Download skipped files opens an additive picker on ready or paused torrents. Earlier selections and originals stay retained, verified pieces are reused, and the same session gains the added files. Local-seed integration tests download A, restart offline, then download B without requesting A's pieces again. Keyboard, touch, narrow-layout and same-session tree refresh regressions cover the browser flow.",
           evidence:
-            "server/application/torrents/torrentDownloader.ts; server/bootstrap/runtimeLifecycle.ts; server/repositories/memoryStores.ts",
+            "server/application/jobs/sessionJobQueue.ts; client/src/features/workspace/components/TorrentFileDialog.tsx; tests/integration/retainedTorrent.test.ts; tests/e2e/retained-torrents.spec.ts",
         },
         {
           id: "T04",
@@ -1567,7 +1569,7 @@
           depends: "T02",
           evidence:
             "client/src/components/TreeExplorer.tsx; client/src/components/useTreeWindow.ts; client/src/features/workspace/components/TorrentFileList.tsx; tests/e2e/media-filters.spec.ts",
-          note: "v3.6.0 adds media-type filters to the explorer and torrent picker, preserving folder context, sorting, hidden selections and selected totals. Keyboard and responsive browser checks include a 10,000-file fixture. v3.7.0 adds a read-only torrent file view after selection with available/downloading/skipped and lifecycle-state filters, search and media filters. Downloaded files are available only after indexing; failed or cancelled jobs do not claim availability. Skipped metadata remains visible while the job exists. Cross-restart retention and downloading skipped files later remain planned under S01/T03. Completed in v3.11.0: profiled the 10,000-file fixture before windowing explorer rows and paging torrent selection/status at 200 files. Full-path search reveals matching ancestors; folder selection covers every matching page, preserving hidden selections and full totals. Arrow/Home/End/Space navigation reaches the complete list with one Tab exit. Chromium, Firefox and WebKit verify large fixtures and cross-page focus. Measured Chromium explorer load/filter/End improved from 9022/11024/3403 ms to 1165/239/130 ms; torrent open/clear/filter improved from 7696/2721/771 ms to 1505/472/330 ms.",
+          note: "v3.6.0 adds media-type filters to the explorer and torrent picker, preserving folder context, sorting, hidden selections and selected totals. Keyboard and responsive browser checks include a 10,000-file fixture. v3.7.0 adds a read-only torrent file view after selection with available/downloading/skipped and lifecycle-state filters, search and media filters. Downloaded files are available only after indexing; failed or cancelled jobs do not claim availability. Skipped metadata remains visible while the job exists. Cross-restart retention and downloading skipped files later are completed in v3.12.0 under S01/T03. Completed in v3.11.0: profiled the 10,000-file fixture before windowing explorer rows and paging torrent selection/status at 200 files. Full-path search reveals matching ancestors; folder selection covers every matching page, preserving hidden selections and full totals. Arrow/Home/End/Space navigation reaches the complete list with one Tab exit. Chromium, Firefox and WebKit verify large fixtures and cross-page focus. Measured Chromium explorer load/filter/End improved from 9022/11024/3403 ms to 1165/239/130 ms; torrent open/clear/filter improved from 7696/2721/771 ms to 1505/472/330 ms.",
         },
         {
           id: "U03",
@@ -1623,14 +1625,16 @@
           area: "Stack / operations",
           priority: "P0",
           effort: "L",
+          status: "Done",
           title: "Persist downloads beyond temporary sessions",
           summary: "Make server restarts safe for the Download later workflow.",
           now: "Jobs, sessions and transcodes use Maps. Shutdown removes sessions and cleans jobs.",
           plan: "Add transactional SQLite state for retained jobs, torrent metadata, file selections and storage ownership. Reconcile disk state on startup. Close workers on shutdown without deleting retained data; keep temporary-session expiry explicit.",
           done: "Graceful shutdown and forced termination recover retained state. Missing or changed disk files are detected and reverified rather than assumed complete.",
           depends: "None",
+          note: "Completed in v3.12.0: transactional SQLite retains torrent jobs, metadata, selections, queue order and stable storage/session ownership under sessions/. Graceful shutdown drains workers without deleting originals; forced restart rechecks actual disk pieces before rebuilding browsable files. Missing files and same-size corruption restore paused for repair. Viewer close and expiry preserve retained data; explicit Delete files removes payload and state. HTTP sessions remain temporary. README documents keeping the database and payloads together in a persistent Docker volume.",
           evidence:
-            "server/repositories/memoryStores.ts; server/bootstrap/runtimeLifecycle.ts; server/application/sessions/sessionManager.ts",
+            "server/repositories/retainedTorrents.ts; server/application/torrents/restoreRetainedTorrents.ts; server/bootstrap/runtimeLifecycle.ts; tests/integration/retainedTorrentStore.test.ts; tests/integration/retainedTorrent.test.ts; README.md",
         },
         {
           id: "S02",
@@ -1702,6 +1706,7 @@
           area: "Tooling / quality",
           priority: "P0",
           effort: "M",
+          status: "Done",
           title: "Use deterministic selective-torrent tests",
           summary:
             "Test file choices and recovery without relying on a public swarm.",
@@ -1709,8 +1714,9 @@
           plan: "Run a local seed with multiple files and shared boundary pieces. Exercise initial selection, later selection, pause, restart, missing storage and peer loss.",
           done: "CI proves skipped payload is limited to shared-piece needs, hashes match and completed data is reused after restart.",
           depends: "T03",
+          note: "Completed in v3.12.0: a private localhost seed with 16 KiB pieces and misaligned file boundaries checks initial metadata without payload, exact file bytes, shared-piece request limits, additive selection and reuse after restart. Tests include graceful shutdown with SSE open, forced termination, offline restore, corruption, missing storage, throttled pause, peer loss, resumed completion, safe deletion and retained ZIP reindexing. No public swarm is needed.",
           evidence:
-            "server/application/torrents/downloadTorrentSource.test.ts; server/application/torrents/torrentSource.test.ts",
+            "tests/integration/retainedTorrent.test.ts; tests/integration/downloadFlow.test.ts; server/application/torrents/downloadTorrentSource.test.ts",
         },
         {
           id: "Q03",

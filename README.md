@@ -77,8 +77,17 @@ Or use the hardened multi-stage image:
 
 ```bash
 docker build -t media-workspace .
-docker run --init -p 8080:8080 media-workspace
+docker run --init -p 8080:8080 -v media-workspace-downloads:/app/sessions media-workspace
 ```
+
+Torrent downloads are retained in `sessions/`, alongside transactional SQLite metadata.
+Mount `/app/sessions` as a persistent volume when running in Docker. Keep the database
+and torrent payloads together when backing up or moving storage. On startup, the
+server hashes existing torrent pieces before rebuilding sessions. Interrupted or
+damaged downloads return paused and can be resumed. In View files, use Download
+skipped files to add selections. Close session releases the viewer; Delete files
+permanently removes the torrent and its payloads after confirmation. HTTP downloads
+continue to use temporary sessions and the existing expiry policy.
 
 ## Architecture
 
