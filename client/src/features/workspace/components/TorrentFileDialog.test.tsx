@@ -48,6 +48,35 @@ const job = () =>
   });
 
 describe("TorrentFileDialog", () => {
+  it("lets a completed torrent download skipped files while preserving its originals", async () => {
+    const user = userEvent.setup();
+    const completed = job();
+    completed.sourceKind = "torrent";
+    completed.status = "ready";
+    completed.phase = "ready";
+    completed.torrentFiles[0] = {
+      ...completed.torrentFiles[0],
+      selected: true,
+      complete: true,
+      downloadedBytes: 1000,
+    };
+    const submit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <TorrentFileDialog job={completed} onClose={vi.fn()} onSubmit={submit} />,
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Download skipped files" }),
+    );
+    expect(
+      screen.queryByRole("checkbox", { name: "film/movie.mp4" }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: "notes.txt" }));
+    await user.click(
+      screen.getByRole("button", { name: "Start selected download" }),
+    );
+    expect(submit).toHaveBeenCalledWith(completed.id, ["1"]);
+  });
+
   it("filters without losing choices, toggles folders and submits only known selected IDs", async () => {
     const user = userEvent.setup();
     const submit = vi

@@ -358,13 +358,18 @@ export async function installReviewFixtures(page: Page) {
     }
     if (endpoint.endsWith("jobs/selectFiles")) {
       const payload = route.request().postDataJSON() as {
-        json: { fileIds: string[] };
+        json: { id: string; fileIds: string[] };
       };
       state.selectedFileIds = payload.json.fileIds;
-      const job = reviewTorrentJob();
+      const job = jobSchema.parse(
+        state.jobs.find(({ id }) => id === payload.json.id) ??
+          reviewTorrentJob(),
+      );
       const files = job.torrentFiles.map((file) => ({
         ...file,
-        selected: state.selectedFileIds.includes(file.id),
+        selected:
+          state.selectedFileIds.includes(file.id) ||
+          (job.status !== "awaiting_selection" && file.selected),
       }));
       const selectedSize = files
         .filter(({ selected }) => selected)

@@ -37,9 +37,9 @@ export function useArchiveCleanup({
         );
       }
       if (jobId)
-        await fetch(`/api/session-jobs/${jobId}`, { method: "DELETE" }).catch(
-          () => {},
-        );
+        await fetch(`/api/session-jobs/${jobId}?release=true`, {
+          method: "DELETE",
+        }).catch(() => {});
     },
     [
       closeJobEvents,
@@ -65,7 +65,7 @@ export function useArchiveCleanup({
           keepalive: true,
         });
       if (jobId)
-        void fetch(`/api/session-jobs/${jobId}`, {
+        void fetch(`/api/session-jobs/${jobId}?release=true`, {
           method: "DELETE",
           keepalive: true,
         });

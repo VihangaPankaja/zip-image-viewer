@@ -702,6 +702,47 @@ for (const device of devices) {
       await fileStatus.selectOption("available");
       await expect(page.getByText("3 of 4 files shown")).toBeVisible();
       await save(page, device, theme, "torrent-available-files");
+      await page
+        .getByRole("button", { name: "Download skipped files", exact: true })
+        .click();
+      await expect(
+        page.getByRole("checkbox", {
+          name: "Extras/Behind the scenes.mp4",
+          exact: true,
+        }),
+      ).toBeChecked();
+      await expect(page.getByRole("dialog").getByRole("status")).toContainText(
+        "1 of 1 files selected",
+      );
+      await save(page, device, theme, "torrent-download-skipped-selection");
+      await page
+        .getByRole("button", { name: "Start selected download" })
+        .click();
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await save(page, device, theme, "torrent-download-skipped-started");
+      state.jobs = [
+        {
+          ...readyJob,
+          status: "ready",
+          phase: "ready",
+          percent: 100,
+          message:
+            "All four retained files are ready. Transfer progress is simulated.",
+          torrentFiles: readyJob.torrentFiles.map((file) => ({
+            ...file,
+            selected: true,
+            complete: true,
+            downloadedBytes: file.size,
+          })),
+        },
+      ];
+      await page
+        .getByRole("button", { name: "View files", exact: true })
+        .click();
+      await expect(
+        page.locator(".torrent-file-state").filter({ hasText: "Available" }),
+      ).toHaveCount(4);
+      await save(page, device, theme, "torrent-retained-files-ready");
       await page.keyboard.press("Escape");
       state.jobs = [];
       await expect(page.locator(".download-row")).toHaveCount(0);

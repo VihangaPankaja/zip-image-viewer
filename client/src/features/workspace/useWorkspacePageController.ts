@@ -80,11 +80,7 @@ type WorkspaceQueue = ReturnType<typeof useWorkspaceQueue>;
 function useWorkspaceActions(state: WorkspacePageState, queue: WorkspaceQueue) {
   const openSession = useCallback(
     async (sessionId: string) => {
-      if (
-        sessionId === state.session?.id ||
-        !queue.sessions.some((item) => item.id === sessionId)
-      )
-        return;
+      if (!queue.sessions.some((item) => item.id === sessionId)) return;
       const response = await fetch(`/api/sessions/${sessionId}/tree`);
       if (!response.ok) {
         state.setError("That session is not ready to browse yet.");
