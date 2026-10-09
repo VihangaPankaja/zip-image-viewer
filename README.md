@@ -89,6 +89,10 @@ skipped files to add selections. Close session releases the viewer; Delete files
 permanently removes the torrent and its payloads after confirmation. HTTP downloads
 continue to use temporary sessions and the existing expiry policy.
 
+For torrents containing archives, the first selected archive stays extracted at the
+same paths when more files are added. Added siblings appear under `Torrent files`
+(with a suffix if the archive already uses that name). Original payloads stay retained.
+
 ## Architecture
 
 The React application is organized by workspace and player features. TanStack

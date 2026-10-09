@@ -79,6 +79,7 @@ export type SessionJob = {
   status: JobStatus;
   torrentFiles: TorrentFile[];
   torrentMetadata?: Uint8Array;
+  torrentArchivePath?: string;
   phase: JobPhase;
   percent: number | null;
   downloadedBytes: number;

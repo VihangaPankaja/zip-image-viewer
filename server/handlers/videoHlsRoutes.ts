@@ -1,9 +1,8 @@
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Express, Request, Response } from "express";
 import {
   ApplicationError,
-  type Session,
   type VideoRendition,
   type VideoTranscodeEntry,
 } from "../domain/models.js";
@@ -16,44 +15,7 @@ import {
   publishedSegments,
 } from "../media/hlsManifest.js";
 import type { VideoRouteDependencies } from "./videoRoutes.js";
-
-type VideoContext = {
-  session: Session;
-  normalizedPath: string;
-  targetPath: string;
-};
-
-async function resolveVideoContext(
-  deps: VideoRouteDependencies,
-  sessionId: string,
-  requestedPath: unknown,
-): Promise<VideoContext> {
-  const session = deps.touchSession(sessionId);
-  if (!session)
-    throw new ApplicationError("NOT_FOUND", "Session not found.", 404);
-  const rawPath = queryText(requestedPath);
-  if (!rawPath || rawPath === ".") {
-    throw new ApplicationError("INVALID_INPUT", "File path is required.", 400);
-  }
-  let normalizedPath: string;
-  try {
-    normalizedPath = deps.sanitizeEntryPath(rawPath);
-  } catch (error) {
-    throw new ApplicationError("INVALID_INPUT", "Invalid file path.", 400, {
-      cause: error,
-    });
-  }
-  const targetPath = path.resolve(session.extractDir, normalizedPath);
-  const rootPath = path.resolve(session.extractDir);
-  if (!targetPath.startsWith(`${rootPath}${path.sep}`)) {
-    throw new ApplicationError("INVALID_INPUT", "Invalid file path.", 400);
-  }
-  const fileStats = await stat(targetPath).catch(() => null);
-  if (!fileStats?.isFile()) {
-    throw new ApplicationError("NOT_FOUND", "File not found.", 404);
-  }
-  return { session, normalizedPath, targetPath };
-}
+import { resolveVideoFile, type VideoContext } from "./video/routeContext.js";
 
 function renditionUri(
   request: Request,
@@ -85,10 +47,10 @@ async function resolveHlsEntry(
   deps: VideoRouteDependencies,
 ): Promise<{ context: VideoContext; entry: VideoTranscodeEntry }> {
   requireTranscoder(deps);
-  const context = await resolveVideoContext(
-    deps,
+  const context = await resolveVideoFile(
     queryText(request.params.id),
-    request.query.path,
+    queryText(request.query.path),
+    deps,
   );
   const entry = await deps.ensureVideoTranscodeEntry(
     context.session,

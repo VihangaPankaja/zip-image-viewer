@@ -3,6 +3,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { jobSchema } from "../../shared/contracts.js";
 import { z } from "zod";
+import { sanitizeEntryPath } from "../infrastructure/runtime/runtimePrimitives.js";
 import type { SessionJob } from "../domain/models.js";
 
 export function createRetainedTorrentStore(directory: string) {
@@ -28,6 +29,7 @@ export function createRetainedTorrentStore(directory: string) {
       const snapshot = {
         ...jobSchema.parse(job),
         downloadOptions: job.downloadOptions,
+        torrentArchivePath: job.torrentArchivePath,
       };
       database.exec("BEGIN IMMEDIATE");
       try {
@@ -44,7 +46,13 @@ export function createRetainedTorrentStore(directory: string) {
         .all()
         .map((row) => ({
           job: jobSchema
-            .extend({ downloadOptions: z.unknown() })
+            .extend({
+              downloadOptions: z.unknown(),
+              torrentArchivePath: z
+                .string()
+                .transform(sanitizeEntryPath)
+                .optional(),
+            })
             .parse(JSON.parse(String(row.snapshot))),
           metadata:
             row.metadata instanceof Uint8Array ? row.metadata : undefined,

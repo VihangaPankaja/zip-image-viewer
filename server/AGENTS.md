@@ -1,6 +1,6 @@
 # Server Agent Scope
 
-For backend/API changes under `server/`, inherit root guidance from `../agent.md` and apply these specifics:
+For backend/API changes under `server/`, inherit root guidance from `../AGENTS.md` and apply these specifics:
 
 - Stack: Express + TypeScript
 - Primary checks:

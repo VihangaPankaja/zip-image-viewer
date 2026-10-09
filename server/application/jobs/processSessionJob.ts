@@ -19,6 +19,7 @@ import {
 import { extractSessionSource } from "./extractSessionSource.js";
 import { downloadTorrentSource } from "../torrents/downloadTorrentSource.js";
 import type { TorrentAdapter } from "../torrents/torrentDownloader.js";
+import { prepareTorrentEntries } from "../torrents/prepareTorrentEntries.js";
 
 type ProcessorDependencies = DownloadSourceDependencies & {
   torrentAdapter: TorrentAdapter;
@@ -92,44 +93,9 @@ function createSession(
   };
 }
 
-const ARCHIVE_EXTENSION = /\.(zip|rar|7z|tar|gz|tgz)$/i;
-
 function torrentDisplayName(source: string): string {
   if (!source.startsWith("magnet:")) return new URL(source).pathname;
   return new URL(source).searchParams.get("dn") || "torrent";
-}
-
-async function prepareTorrentEntries(
-  job: SessionJob,
-  torrentDir: string,
-  extractDir: string,
-  deps: ProcessorDependencies,
-) {
-  const selectedPaths = new Set(
-    job.torrentFiles
-      .filter((file) => file.selected && file.complete)
-      .map((file) => file.path),
-  );
-  // Shared torrent pieces may also leave partial, unselected files on disk.
-  const entries = (await deps.listExtractedEntries(torrentDir)).filter(
-    (entry) => entry.type === "file" && selectedPaths.has(entry.relativePath),
-  );
-  const files = entries.filter(({ type }) => type === "file");
-  if (
-    files.length === 1 &&
-    ARCHIVE_EXTENSION.test(files[0]?.relativePath ?? "")
-  ) {
-    return {
-      entries: await extractSessionSource(
-        job,
-        path.join(torrentDir, files[0]?.relativePath ?? ""),
-        extractDir,
-        deps,
-      ),
-      sessionDir: extractDir,
-    };
-  }
-  return { entries, sessionDir: torrentDir };
 }
 
 function completeSession(

@@ -6,6 +6,42 @@ import { createJobManager } from "../../server/application/jobs/jobManager.js";
 import { createRetainedTorrentStore } from "../../server/repositories/retainedTorrents.js";
 import { createSessionJobQueue } from "../../server/application/jobs/sessionJobQueue.js";
 
+it("bounds progress writes while immediately committing lifecycle and shutdown state", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "retained-progress-"));
+  const store = createRetainedTorrentStore(directory);
+  vi.useFakeTimers();
+  try {
+    const manager = createJobManager(new Map(), vi.fn(), store);
+    const job = manager.createJob(
+      "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567",
+    );
+    manager.emitJob(job, { status: "downloading", phase: "downloading" });
+    const save = vi.spyOn(store, "save");
+    for (
+      let downloadedBytes = 1;
+      downloadedBytes <= 1_000;
+      downloadedBytes += 1
+    )
+      manager.emitJob(job, { downloadedBytes });
+    expect(save).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(1_000);
+    manager.emitJob(job, { downloadedBytes: 1_001 });
+    expect(save).toHaveBeenCalledTimes(2);
+    manager.emitJob(job, { status: "paused", phase: "paused" });
+    expect(store.read()[0].job.downloadedBytes).toBe(1_001);
+    manager.emitJob(job, { status: "downloading", phase: "downloading" });
+    manager.emitJob(job, { downloadedBytes: 1_002 });
+    await manager.cleanupJob(job.id, "shutdown");
+    expect(store.read()[0].job.downloadedBytes).toBe(1_002);
+    manager.closeJob(job, "ready");
+    expect(store.read()[0].job.status).toBe("ready");
+  } finally {
+    vi.useRealTimers();
+    store.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 it("commits torrent metadata and state together and removes only the requested record", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "retained-torrents-"));
   let store = createRetainedTorrentStore(directory);

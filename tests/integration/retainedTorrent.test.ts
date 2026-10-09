@@ -325,15 +325,32 @@ it("retains and reverifies selective downloads across graceful and forced restar
   }
 }, 120_000);
 
-it("restores a retained archive as ready and browsable after offline reindexing", async () => {
+it("preserves extracted archive paths when adding siblings and restoring offline", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "retained-archive-"));
   const sourceDir = path.join(directory, "source");
   await mkdir(sourceDir);
   await writeFile(path.join(sourceDir, "notes.txt"), "retained archive notes");
-  const archive = path.join(directory, "notes.zip");
-  await runCommand(path7za, ["a", "-tzip", archive, "notes.txt"], {
-    cwd: sourceDir,
-  });
+  await mkdir(path.join(sourceDir, "torrent files"));
+  await writeFile(
+    path.join(sourceDir, "torrent files", "collision.txt"),
+    "archive owns this folder",
+  );
+  const bundle = path.join(directory, "bundle");
+  await mkdir(bundle);
+  const archive = path.join(bundle, "notes.zip");
+  await runCommand(
+    path7za,
+    ["a", "-tzip", archive, "notes.txt", "torrent files"],
+    {
+      cwd: sourceDir,
+    },
+  );
+  await writeFile(path.join(bundle, "sibling.txt"), "added sibling");
+  await runCommand(
+    path7za,
+    ["a", "-tzip", path.join(bundle, "earlier.zip"), "notes.txt"],
+    { cwd: sourceDir },
+  );
   const original = await readFile(archive);
   const seed = new WebTorrent({
     dht: false,
@@ -346,7 +363,7 @@ it("restores a retained archive as ready and browsable after offline reindexing"
   let server: Awaited<ReturnType<typeof startServer>> | undefined;
   try {
     const torrent = await new Promise<Torrent>((resolve) =>
-      seed.seed(archive, { announce: [], private: true }, resolve),
+      seed.seed(bundle, { announce: [], private: true }, resolve),
     );
     server = await startServer(directory);
     const { items } = await server.client.jobs.enqueue({
@@ -360,13 +377,49 @@ it("restores a retained archive as ready and browsable after offline reindexing"
         timeout: 20_000,
       })
       .toBe("awaiting_selection");
-    await client.jobs.selectFiles({ id: items[0].id, fileIds: ["0"] });
+    const files = (await client.jobs.list()).items[0].torrentFiles;
+    const archiveFile = files.find((file) => file.path.endsWith("/notes.zip"));
+    if (!archiveFile) throw new Error("Missing archive fixture");
+    await client.jobs.selectFiles({
+      id: items[0].id,
+      fileIds: [archiveFile.id],
+    });
     await expect
       .poll(async () => (await client.jobs.list()).items[0].status, {
         timeout: 20_000,
       })
       .toBe("ready");
     const job = (await client.jobs.list()).items[0];
+    const fileUrl = (relativePath: string) =>
+      `${server?.origin}/api/sessions/${job.sessionId}/file?path=${encodeURIComponent(relativePath)}`;
+    expect(
+      await fetch(fileUrl("notes.txt")).then((response) => response.text()),
+    ).toBe("retained archive notes");
+    await client.jobs.selectFiles({
+      id: job.id,
+      fileIds: files
+        .filter((file) => file.id !== archiveFile.id)
+        .map((file) => file.id),
+    });
+    await expect
+      .poll(async () => (await client.jobs.list()).items[0].status, {
+        timeout: 20_000,
+      })
+      .toBe("ready");
+    expect((await client.jobs.list()).items[0].sessionId).toBe(job.sessionId);
+    expect(
+      await fetch(fileUrl("notes.txt")).then((response) => response.text()),
+    ).toBe("retained archive notes");
+    expect(
+      await fetch(fileUrl("Torrent files-/bundle/sibling.txt")).then(
+        (response) => response.text(),
+      ),
+    ).toBe("added sibling");
+    expect(
+      await fetch(fileUrl("torrent files/collision.txt")).then((response) =>
+        response.text(),
+      ),
+    ).toBe("archive owns this folder");
     await stopServer(server.child);
     await new Promise<void>((resolve) => seed.destroy(() => resolve()));
     server = await startServer(directory);
@@ -381,8 +434,24 @@ it("restores a retained archive as ready and browsable after offline reindexing"
     ).then((response) => response.json());
     expect(JSON.stringify(tree)).toContain("notes.txt");
     expect(
+      await fetch(fileUrl("notes.txt")).then((response) => response.text()),
+    ).toBe("retained archive notes");
+    expect(
+      await fetch(fileUrl("Torrent files-/bundle/sibling.txt")).then(
+        (response) => response.text(),
+      ),
+    ).toBe("added sibling");
+    expect(JSON.stringify(tree)).toContain("earlier.zip");
+    expect(
       await readFile(
-        path.join(directory, "sessions", job.id, "torrent", "notes.zip"),
+        path.join(
+          directory,
+          "sessions",
+          job.id,
+          "torrent",
+          "bundle",
+          "notes.zip",
+        ),
       ),
     ).toEqual(original);
   } finally {

@@ -25,6 +25,7 @@ type LogEvent = (
 ) => void;
 
 class JobManager {
+  private readonly progressSavedAt = new WeakMap<SessionJob, number>();
   constructor(
     private readonly jobStore: Map<string, SessionJob>,
     private readonly logEvent: LogEvent,
@@ -159,7 +160,17 @@ class JobManager {
     event = "progress",
   ): void => {
     Object.assign(job, patch, { updatedAt: Date.now() });
-    this.retained?.save(job);
+    if (this.retained && job.sourceKind === "torrent") {
+      const progress =
+        job.status === "downloading" && patch.downloadedBytes !== undefined;
+      if (
+        !progress ||
+        Date.now() - (this.progressSavedAt.get(job) ?? 0) >= 1_000
+      ) {
+        this.retained.save(job);
+        if (progress) this.progressSavedAt.set(job, Date.now());
+      }
+    }
     const sanitized = this.sanitizeJob(job);
     const socketPayload = JSON.stringify({ type: event, job: sanitized });
     for (const response of job.subscribers) {
@@ -184,7 +195,10 @@ class JobManager {
       socket.close(1000, "job-cleanup");
     job.subscribers.clear();
     job.socketSubscribers.clear();
-    if (job.sourceKind === "torrent" && reason === "shutdown") return;
+    if (job.sourceKind === "torrent" && reason === "shutdown") {
+      this.retained?.save(job);
+      return;
+    }
     if (job.workspaceDir && !job.sessionId) {
       await rm(job.workspaceDir, { recursive: true, force: true });
     }
