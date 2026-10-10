@@ -81,6 +81,9 @@ docker run --init -p 8080:8080 -v media-workspace-downloads:/app/sessions media-
 ```
 
 Torrent downloads are retained in `sessions/`, alongside transactional SQLite metadata.
+During restart verification, `/health` returns HTTP 200 with `ready: false` so large
+retained downloads do not cause liveness restarts. Application routes return HTTP 503
+until verification finishes and `/health` reports `ready: true`.
 Mount `/app/sessions` as a persistent volume when running in Docker. Keep the database
 and torrent payloads together when backing up or moving storage. On startup, the
 server hashes existing torrent pieces before rebuilding sessions. Interrupted or

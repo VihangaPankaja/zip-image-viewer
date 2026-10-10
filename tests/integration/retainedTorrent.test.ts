@@ -54,7 +54,11 @@ async function startServer(directory: string) {
     if (child.exitCode !== null) throw new Error(output);
     if (
       await fetch(`${origin}/health`)
-        .then((response) => response.ok)
+        .then(
+          async (response) =>
+            response.ok &&
+            ((await response.json()) as { ready?: unknown }).ready === true,
+        )
         .catch(() => false)
     )
       return { child, client, origin };

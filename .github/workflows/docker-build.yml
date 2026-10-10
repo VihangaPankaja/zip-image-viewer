@@ -60,18 +60,30 @@ jobs:
       - name: Smoke-test Docker image
         if: github.event_name == 'pull_request'
         run: |
-          container_id=$(docker run --detach ${{ env.IMAGE_NAME }}:latest)
-          trap 'docker logs "$container_id"; docker rm --force "$container_id"' EXIT
-          for attempt in {1..30}; do
-            status=$(docker inspect --format '{{.State.Health.Status}}' "$container_id")
-            if [ "$status" = healthy ]; then
-              docker logs "$container_id" 2>&1 | grep --fixed-strings "[INFO] server.started"
-              exit 0
-            fi
-            if [ "$status" = unhealthy ]; then exit 1; fi
-            sleep 1
-          done
-          exit 1
+          volume_name="retention-smoke-${{ github.run_id }}-${{ github.run_attempt }}"
+          docker volume create "$volume_name"
+          container_id=$(docker run --detach \
+            --mount type=volume,source="$volume_name",target=/app/sessions \
+            --mount type=bind,source="$PWD/tests/integration/containerRetentionSmoke.mjs",target=/app/tests/integration/containerRetentionSmoke.mjs,readonly \
+            ${{ env.IMAGE_NAME }}:latest)
+          trap 'docker logs "$container_id"; docker rm --force "$container_id"; docker volume rm "$volume_name"' EXIT
+          wait_ready() {
+            for attempt in {1..60}; do
+              status=$(docker inspect --format '{{.State.Health.Status}}' "$container_id")
+              if [ "$status" = healthy ] && docker exec "$container_id" node -e "fetch('http://127.0.0.1:8080/health').then(async r=>{if(!(await r.json()).ready)process.exit(1)}).catch(()=>process.exit(1))"; then
+                docker logs "$container_id" 2>&1 | grep --fixed-strings "[INFO] server.started"
+                return 0
+              fi
+              if [ "$status" = unhealthy ]; then return 1; fi
+              sleep 1
+            done
+            return 1
+          }
+          wait_ready
+          docker exec "$container_id" node tests/integration/containerRetentionSmoke.mjs seed
+          docker restart "$container_id"
+          wait_ready
+          docker exec "$container_id" node tests/integration/containerRetentionSmoke.mjs verify
 
       - name: Decode HLS in production image
         if: github.event_name == 'pull_request'

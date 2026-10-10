@@ -1,7 +1,7 @@
 import { path7za } from "7zip-bin";
 import ffmpegPath from "ffmpeg-static";
 import path from "node:path";
-import { createServer, type Server } from "node:http";
+import { createStartupServer } from "./bootstrap/startupServer.js";
 import { attachJobWebSocketServer } from "./realtime/jobSocketServer.js";
 import {
   CLEANUP_INTERVAL_MS,
@@ -66,7 +66,7 @@ const retainedTorrents = createRetainedTorrentStore(
   path.resolve(process.cwd(), "sessions"),
 );
 const container = createServerContainer();
-let server: Server | undefined;
+const { server, setApp } = createStartupServer(() => retainedTorrents.close());
 const {
   videoRuntime,
   enforceMediaBudget,
@@ -106,6 +106,8 @@ const processorDependencies = {
   torrentAdapter,
 };
 const processSessionJob = createProcessSessionJob(processorDependencies);
+
+server.listen(PORT, "0.0.0.0");
 
 await restoreRetainedTorrents(
   retainedTorrents,
@@ -351,15 +353,13 @@ app.get(/.*/, (_req, res) => {
   res.sendFile(path.join(distDir, "index.html"));
 });
 
-server = createServer(app);
+setApp(app);
 attachJobWebSocketServer(server, { jobStore, sanitizeJob });
 
 dashboard?.start();
 
-server.listen(PORT, "0.0.0.0", () => {
-  logEvent("info", "server.started", {
-    url: `http://0.0.0.0:${PORT}`,
-    sessionTtlMs: SESSION_TTL_MS,
-    cleanupIntervalMs: CLEANUP_INTERVAL_MS,
-  });
+logEvent("info", "server.started", {
+  url: `http://0.0.0.0:${PORT}`,
+  sessionTtlMs: SESSION_TTL_MS,
+  cleanupIntervalMs: CLEANUP_INTERVAL_MS,
 });
