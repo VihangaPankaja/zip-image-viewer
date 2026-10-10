@@ -8,6 +8,30 @@ import {
 } from "../../shared/contracts.js";
 
 describe("server contracts", () => {
+  it.each([
+    "127.0.0.1:80",
+    "10.1.2.3:80",
+    "169.254.169.254:80",
+    "[::1]:80",
+    "seed.example.com:6881",
+    "8.8.8.8:6881",
+  ])("rejects caller-supplied direct peer hint %s", (hint) => {
+    const url = `magnet:?xt=urn:btih:${"a".repeat(40)}&x.pe=${encodeURIComponent(hint)}`;
+    const result = enqueueSessionsInputSchema.safeParse({ items: [{ url }] });
+    expect(result.success).toBe(false);
+    if (!result.success)
+      expect(
+        result.error.issues.some(({ message }) =>
+          message.includes("Direct peer hints"),
+        ),
+      ).toBe(true);
+  });
+  it("rejects malformed magnets without throwing from direct hint validation", () => {
+    expect(
+      enqueueSessionsInputSchema.safeParse({ items: [{ url: "magnet://[" }] })
+        .success,
+    ).toBe(false);
+  });
   it("accepts a public HTTP archive URL and normalizes defaults", () => {
     const input = createSessionInputSchema.parse({
       url: "https://example.com/photos.zip",

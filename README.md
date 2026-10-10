@@ -77,8 +77,24 @@ Or use the hardened multi-stage image:
 
 ```bash
 docker build -t media-workspace .
-docker run --init -p 8080:8080 media-workspace
+docker run --init -p 8080:8080 -v media-workspace-downloads:/app/sessions media-workspace
 ```
+
+Torrent downloads are retained in `sessions/`, alongside transactional SQLite metadata.
+During restart verification, `/health` returns HTTP 200 with `ready: false` so large
+retained downloads do not cause liveness restarts. Application routes return HTTP 503
+until verification finishes and `/health` reports `ready: true`.
+Mount `/app/sessions` as a persistent volume when running in Docker. Keep the database
+and torrent payloads together when backing up or moving storage. On startup, the
+server hashes existing torrent pieces before rebuilding sessions. Interrupted or
+damaged downloads return paused and can be resumed. In View files, use Download
+skipped files to add selections. Close session releases the viewer; Delete files
+permanently removes the torrent and its payloads after confirmation. HTTP downloads
+continue to use temporary sessions and the existing expiry policy.
+
+For torrents containing archives, the first selected archive stays extracted at the
+same paths when more files are added. Added siblings appear under `Torrent files`
+(with a suffix if the archive already uses that name). Original payloads stay retained.
 
 ## Architecture
 
@@ -108,3 +124,5 @@ map.
 - `WS /ws/jobs?jobId=...` - realtime job progress
 
 Only public HTTP(S) URLs and safe relative paths pass contract validation.
+Submitted magnets cannot contain direct peer hints (`x.pe`). Tracker and DHT
+discovery still work; this restriction does not isolate BitTorrent network traffic.

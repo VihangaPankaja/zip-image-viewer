@@ -17,6 +17,7 @@ type Dependencies = {
   removeSession: (_id: string, _reason: string) => Promise<void>;
   cleanupJob: (_id: string, _reason: string) => Promise<void>;
   shutdownServices?: Array<() => Promise<void>>;
+  stopWorkers?: () => Promise<void>;
   logEvent: LogEvent;
 };
 
@@ -62,6 +63,10 @@ export function registerRuntimeLifecycle(deps: Dependencies): void {
       activeSessions: deps.sessions.size,
     });
     const server = deps.getServer();
+    await deps.stopWorkers?.();
+    await Promise.all(
+      [...deps.jobs.keys()].map((id) => deps.cleanupJob(id, "shutdown")),
+    );
     if (server) {
       await new Promise<void>((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()));
@@ -69,9 +74,6 @@ export function registerRuntimeLifecycle(deps: Dependencies): void {
     }
     await Promise.all(
       [...deps.sessions.keys()].map((id) => deps.removeSession(id, "shutdown")),
-    );
-    await Promise.all(
-      [...deps.jobs.keys()].map((id) => deps.cleanupJob(id, "shutdown")),
     );
     await Promise.all((deps.shutdownServices ?? []).map((close) => close()));
     deps.logEvent("info", "shutdown.complete");

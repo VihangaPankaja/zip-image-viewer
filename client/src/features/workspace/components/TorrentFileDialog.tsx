@@ -87,11 +87,10 @@ function useTorrentSelection({
   onSubmit,
   onPriorityChange,
 }: Props) {
-  const selecting = job.status === "awaiting_selection";
+  const { adding, setAdding, displayJob, selected, setSelected } =
+    useTorrentChoices(job);
+  const selecting = job.status === "awaiting_selection" || adding;
   const dialogRef = useTorrentDialog();
-  const [selected, setSelected] = useState(
-    () => new Set(job.torrentFiles.map(({ id }) => id)),
-  );
   const [search, setSearch] = useState("");
   const [mediaType, setMediaType] = useState("all");
   const [status, setStatus] = useState("all");
@@ -99,15 +98,14 @@ function useTorrentSelection({
   const [error, setError] = useState("");
   const chosen = useMemo(
     () =>
-      job.torrentFiles.filter((file) =>
+      displayJob.torrentFiles.filter((file) =>
         selecting ? selected.has(file.id) : file.selected,
       ),
-    [job.torrentFiles, selecting, selected],
+    [displayJob.torrentFiles, selecting, selected],
   );
-  const total = chosen.reduce((sum, file) => sum + file.size, 0);
   const visible = useMemo(
-    () => filterFiles(job, selecting, search, mediaType, status),
-    [job, selecting, search, mediaType, status],
+    () => filterFiles(displayJob, selecting, search, mediaType, status),
+    [displayJob, selecting, search, mediaType, status],
   );
   const change = (files: TorrentFile[], checked: boolean) => {
     setSelected((current) => {
@@ -120,27 +118,29 @@ function useTorrentSelection({
     });
     setError("");
   };
-  const submit = async () => {
-    if (!selecting || !chosen.length || submitting) return;
-    setSubmitting(true);
-    setError("");
-    try {
-      await onSubmit(
-        job.id,
-        chosen.map(({ id }) => id),
-      );
-      onClose();
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Could not start the selected download. Try again.",
-      );
-      setSubmitting(false);
-    }
-  };
+  const submit = () =>
+    selecting && chosen.length && !submitting
+      ? submitSelection(
+          { job, onSubmit, onClose },
+          chosen,
+          setSubmitting,
+          setError,
+        )
+      : Promise.resolve();
   const changePriority = filePriorityAction(job, onPriorityChange, setError);
   return {
+    adding,
+    displayJob,
+    startAdding: () => {
+      setSelected(
+        new Set(
+          job.torrentFiles.filter((file) => !file.selected).map(({ id }) => id),
+        ),
+      );
+      setSearch("");
+      setMediaType("all");
+      setAdding(true);
+    },
     dialogRef,
     selecting,
     status,
@@ -153,7 +153,7 @@ function useTorrentSelection({
     submitting,
     error,
     chosen,
-    total,
+    total: chosen.reduce((sum, file) => sum + file.size, 0),
     visible,
     change,
     submit,
@@ -192,7 +192,11 @@ export function TorrentFileDialog(props: Props) {
           <div>
             <p className="panel-label">Torrent contents</p>
             <h2 id="torrent-file-title">
-              {selecting ? "Choose files" : "Torrent files"}
+              {selection.adding
+                ? "Download skipped files"
+                : selecting
+                  ? "Choose files"
+                  : "Torrent files"}
             </h2>
           </div>
           <button
@@ -204,13 +208,13 @@ export function TorrentFileDialog(props: Props) {
             Close
           </button>
         </header>
-        <FileTools job={job} selection={selection} />
-        <FileList job={job} selection={selection} />
+        <FileTools job={selection.displayJob} selection={selection} />
+        <FileList job={selection.displayJob} selection={selection} />
         <div className="torrent-file-feedback">
           <p role="status" aria-atomic="true">
             {submitting
               ? "Starting selected download…"
-              : `${chosen.length} of ${job.torrentFiles.length} files selected · ${formatTransferBytes(total)}`}
+              : `${chosen.length} of ${selection.displayJob.torrentFiles.length} files selected · ${formatTransferBytes(total)}`}
           </p>
           {selecting && !chosen.length ? (
             <p>Select at least one file to start.</p>
@@ -221,17 +225,7 @@ export function TorrentFileDialog(props: Props) {
             </p>
           ) : null}
         </div>
-        {selecting ? (
-          <footer>
-            <button
-              type="submit"
-              className="primary-button"
-              disabled={!chosen.length || submitting}
-            >
-              {submitting ? "Starting…" : "Start selected download"}
-            </button>
-          </footer>
-        ) : null}
+        <TorrentFileFooter job={job} selection={selection} />
       </form>
     </dialog>
   );
@@ -282,4 +276,84 @@ function trapDialogTab(event: KeyboardEvent<HTMLDialogElement>) {
     event.preventDefault();
     first.focus();
   }
+}
+
+async function submitSelection(
+  { job, onSubmit, onClose }: Props,
+  chosen: TorrentFile[],
+  setSubmitting: (_value: boolean) => void,
+  setError: (_value: string) => void,
+) {
+  setSubmitting(true);
+  setError("");
+  try {
+    await onSubmit(
+      job.id,
+      chosen.map(({ id }) => id),
+    );
+    onClose();
+  } catch (cause) {
+    setError(
+      cause instanceof Error
+        ? cause.message
+        : "Could not start the selected download. Try again.",
+    );
+    setSubmitting(false);
+  }
+}
+
+function TorrentFileFooter({
+  job,
+  selection,
+}: {
+  job: Job;
+  selection: Selection;
+}) {
+  const { selecting, submitting, chosen } = selection;
+  return (
+    <>
+      {selecting ? (
+        <footer>
+          <button
+            key="start-selected"
+            type="submit"
+            className="primary-button"
+            disabled={!chosen.length || submitting}
+          >
+            {submitting ? "Starting…" : "Start selected download"}
+          </button>
+        </footer>
+      ) : ["ready", "paused"].includes(job.status) &&
+        job.torrentFiles.some((file) => !file.selected) ? (
+        <footer>
+          <button
+            key="download-skipped"
+            type="button"
+            className="primary-button"
+            onClick={selection.startAdding}
+          >
+            Download skipped files
+          </button>
+        </footer>
+      ) : null}
+    </>
+  );
+}
+
+function useTorrentChoices(job: Job) {
+  const [adding, setAdding] = useState(false);
+  const displayJob = useMemo(
+    () =>
+      adding
+        ? {
+            ...job,
+            torrentFiles: job.torrentFiles.filter((file) => !file.selected),
+          }
+        : job,
+    [adding, job],
+  );
+  const [selected, setSelected] = useState(
+    () => new Set(job.torrentFiles.map(({ id }) => id)),
+  );
+  return { adding, setAdding, displayJob, selected, setSelected };
 }

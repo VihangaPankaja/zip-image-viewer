@@ -4,16 +4,14 @@ type QueueItem = { job: SessionJob; confirmOversize: boolean };
 
 type SessionJobQueueDeps = {
   pendingSessionJobs: QueueItem[];
+  initialJobs?: readonly SessionJob[];
   emitJob?: (_job: SessionJob, _patch: Partial<SessionJob>) => void;
   getActiveSessionJobCount: () => number;
   incrementActiveSessionJobCount: () => void;
   decrementActiveSessionJobCount: () => void;
   maxActiveSessionJobs: number;
-  processSessionJob: (
-    job: QueueItem["job"],
-    confirmOversize: boolean,
-  ) => Promise<void>;
-  pauseJob?: (job: QueueItem["job"]) => Promise<void>;
+  processSessionJob: (job: SessionJob, confirmed: boolean) => Promise<void>;
+  pauseJob?: (job: SessionJob) => Promise<void>;
   logEvent: (
     level: "info" | "warn" | "error",
     event: string,
@@ -28,6 +26,8 @@ type QueueState = SessionJobQueueDeps & {
   jobOrder: string[];
   pausing: Set<string>;
   requeueAfterActive: Set<string>;
+  stopping: boolean;
+  running: Set<Promise<void>>;
 };
 
 function validateConcurrency(value: number): void {
@@ -40,7 +40,10 @@ function validateConcurrency(value: number): void {
 function refreshPositions(state: QueueState): void {
   state.jobOrder.forEach((id, index) => {
     const item = state.jobs.get(id);
-    if (item) item.job.queuePosition = index;
+    if (item && item.job.queuePosition !== index) {
+      item.job.queuePosition = index;
+      state.emitJob?.(item.job, {});
+    }
   });
 }
 
@@ -54,6 +57,7 @@ function sortPending(state: QueueState): void {
 }
 
 function scheduleSessionJobs(state: QueueState): void {
+  if (state.stopping) return;
   while (
     state.getActiveSessionJobCount() < state.maxConcurrent &&
     state.pendingSessionJobs.length > 0
@@ -62,7 +66,7 @@ function scheduleSessionJobs(state: QueueState): void {
     if (!next) break;
     state.incrementActiveSessionJobCount();
     state.activeItems.set(next.job.id, next);
-    state
+    const task = state
       .processSessionJob(next.job, next.confirmOversize)
       .catch((error: unknown) => {
         const jobError = error instanceof Error ? error : new Error("Unknown");
@@ -73,6 +77,7 @@ function scheduleSessionJobs(state: QueueState): void {
         });
       })
       .finally(() => {
+        state.running.delete(task);
         state.activeItems.delete(next.job.id);
         state.pausing.delete(next.job.id);
         state.decrementActiveSessionJobCount();
@@ -82,6 +87,7 @@ function scheduleSessionJobs(state: QueueState): void {
         }
         scheduleSessionJobs(state);
       });
+    state.running.add(task);
   }
 }
 
@@ -179,7 +185,8 @@ function resumeSessionJob(state: QueueState, jobId: string): SessionJob {
     message: "Waiting to resume",
     canPause: false,
   });
-  if (!state.pendingSessionJobs.some(({ job }) => job.id === jobId)) {
+  if (state.activeItems.has(jobId)) state.requeueAfterActive.add(jobId);
+  else if (!state.pendingSessionJobs.some(({ job }) => job.id === jobId)) {
     state.pendingSessionJobs.push(item);
     sortPending(state);
   }
@@ -227,7 +234,7 @@ function selectTorrentFiles(
   if (!item) throw new ApplicationError("NOT_FOUND", "Job not found.", 404);
   if (
     item.job.sourceKind !== "torrent" ||
-    item.job.status !== "awaiting_selection"
+    !["awaiting_selection", "ready", "paused"].includes(item.job.status)
   ) {
     throw new ApplicationError(
       "CONFLICT",
@@ -250,7 +257,9 @@ function selectTorrentFiles(
   }
   item.job.torrentFiles = item.job.torrentFiles.map((file) => ({
     ...file,
-    selected: ids.has(file.id),
+    selected:
+      ids.has(file.id) ||
+      (item.job.status !== "awaiting_selection" && file.selected),
   }));
   Object.assign(item.job, {
     status: "queued",
@@ -312,12 +321,27 @@ export function createSessionJobQueue(deps: SessionJobQueueDeps) {
     ...deps,
     maxConcurrent: deps.maxActiveSessionJobs,
     activeItems: new Map(),
-    jobs: new Map(),
-    jobOrder: [],
+    jobs: new Map(
+      (deps.initialJobs ?? []).map((job) => [
+        job.id,
+        { job, confirmOversize: false },
+      ]),
+    ),
+    jobOrder: (deps.initialJobs ?? []).map(({ id }) => id),
     pausing: new Set(),
     requeueAfterActive: new Set(),
+    stopping: false,
+    running: new Set(),
   };
   return {
+    stopSessionJobs: async () => {
+      state.stopping = true;
+      for (const { job } of state.activeItems.values()) {
+        job.pauseRequested = true;
+        job.abortController?.abort();
+      }
+      await Promise.all(state.running);
+    },
     cancelSessionJob: (jobId: string) => cancelSessionJob(state, jobId),
     confirmSessionJob: (jobId: string) => confirmSessionJob(state, jobId),
     selectTorrentFiles: (jobId: string, fileIds: string[]) =>
@@ -328,12 +352,10 @@ export function createSessionJobQueue(deps: SessionJobQueueDeps) {
       activeCount: state.getActiveSessionJobCount(),
       maxConcurrent: state.maxConcurrent,
     }),
-    getJobOrder: () => [...state.jobOrder],
     getOrderedJobs: () =>
-      state.jobOrder.flatMap((id) => {
-        const item = state.jobs.get(id);
-        return item ? [item.job] : [];
-      }),
+      state.jobOrder
+        .map((id) => state.jobs.get(id)?.job)
+        .filter((job) => job !== undefined),
     pauseSessionJob: (jobId: string) => pauseSessionJob(state, jobId),
     reorderSessionJobs: (jobIds: readonly string[]) =>
       reorderSessionJobs(state, jobIds),

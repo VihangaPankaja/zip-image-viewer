@@ -64,6 +64,9 @@ export async function resolveVideoFile(
     );
   }
   const targetPath = path.resolve(session.extractDir, normalizedPath);
+  if (session.availablePaths && !session.availablePaths.has(normalizedPath)) {
+    throw new ApplicationError("NOT_FOUND", "File is not available yet.", 404);
+  }
   const rootPath = path.resolve(session.extractDir);
   if (!isWithinRoot(targetPath, rootPath)) {
     throw new ApplicationError("INVALID_INPUT", "Invalid file path.", 400);

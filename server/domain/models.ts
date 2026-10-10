@@ -39,6 +39,8 @@ export type ExplorerNode = {
 };
 
 export type Session = {
+  retained?: boolean;
+  availablePaths?: Set<string>;
   id: string;
   workspaceDir: string;
   extractDir: string;
@@ -77,6 +79,7 @@ export type SessionJob = {
   status: JobStatus;
   torrentFiles: TorrentFile[];
   torrentMetadata?: Uint8Array;
+  torrentArchivePath?: string;
   phase: JobPhase;
   percent: number | null;
   downloadedBytes: number;

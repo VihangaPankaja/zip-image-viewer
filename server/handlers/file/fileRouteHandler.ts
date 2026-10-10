@@ -86,6 +86,10 @@ async function resolveFileContext(
     return null;
   }
   const targetPath = path.resolve(session.extractDir, normalizedPath);
+  if (session.availablePaths && !session.availablePaths.has(normalizedPath)) {
+    res.status(404).json({ error: "File is not available yet." });
+    return null;
+  }
   const rootPath = path.resolve(session.extractDir);
   if (!isWithinRoot(targetPath, rootPath)) {
     deps.logEvent("warn", "session.file.rejected", {

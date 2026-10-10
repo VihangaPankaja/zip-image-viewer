@@ -79,6 +79,36 @@ function queueDependencies(maxActiveSessionJobs: number) {
 }
 
 describe("createSessionJobQueue", () => {
+  it("registers restored jobs without starting them and drains only active work on shutdown", async () => {
+    const restored = createJob("restored");
+    restored.status = "paused";
+    const active = createJob("active");
+    active.abortController = new AbortController();
+    let finish: (() => void) | undefined;
+    const dependencies = queueDependencies(1);
+    dependencies.processSessionJob.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const queue = createSessionJobQueue({
+      ...dependencies,
+      initialJobs: [restored],
+    });
+    expect(queue.getOrderedJobs()).toEqual([restored]);
+    expect(dependencies.processSessionJob).not.toHaveBeenCalled();
+    queue.enqueueSessionJob(active, false);
+    queue.enqueueSessionJob(createJob("pending"), false);
+    const stopped = queue.stopSessionJobs();
+    expect(active.abortController.signal.aborted).toBe(true);
+    expect(active.pauseRequested).toBe(true);
+    finish?.();
+    await stopped;
+    expect(dependencies.processSessionJob).toHaveBeenCalledTimes(1);
+    expect(queue.getSchedulerState().activeCount).toBe(0);
+    expect(queue.getOrderedJobs()).toHaveLength(3);
+  });
   it.each([0, 9, 1.5, Number.NaN])("rejects worker limit %s", (limit) => {
     expect(() => createSessionJobQueue(queueDependencies(limit))).toThrow(
       "Session job concurrency must be between one and eight.",
@@ -256,6 +286,38 @@ describe("createSessionJobQueue", () => {
     job.status = "awaiting_selection";
     queue.selectTorrentFiles(job.id, ["0"]);
     expect(emitJob).toHaveBeenCalledWith(job, {});
+    expect(deps.processSessionJob).toHaveBeenCalledTimes(2);
+  });
+
+  it("adds skipped files to a completed torrent without dropping earlier selections", async () => {
+    const deps = queueDependencies(1);
+    const queue = createSessionJobQueue(deps);
+    const job = createJob("torrent");
+    job.sourceKind = "torrent";
+    job.torrentFiles = ["0", "1"].map((id) => ({
+      id,
+      path: `${id}.bin`,
+      size: 10,
+      selected: id === "0",
+      complete: id === "0",
+      downloadedBytes: id === "0" ? 10 : 0,
+    }));
+    queue.enqueueSessionJob(job, false);
+    await vi.waitFor(() =>
+      expect(queue.getSchedulerState().activeCount).toBe(0),
+    );
+    job.status = "ready";
+    for (const ids of [[], ["missing"], ["1", "1"]])
+      expect(() => queue.selectTorrentFiles(job.id, ids)).toThrow(
+        "Choose one or more known",
+      );
+    queue.selectTorrentFiles(job.id, ["1"]);
+    expect(job.torrentFiles.map(({ selected }) => selected)).toEqual([
+      true,
+      true,
+    ]);
+    expect(job.torrentFiles[0].complete).toBe(true);
+    expect(job.reportedSize).toBe(20);
     expect(deps.processSessionJob).toHaveBeenCalledTimes(2);
   });
 
@@ -457,6 +519,35 @@ describe("createSessionJobQueue", () => {
     await vi.waitFor(() => expect(active).toBe(0));
   });
 
+  it("waits for a pausing worker to settle before resuming with a spare slot", async () => {
+    let release: (() => void) | undefined;
+    const dependencies = queueDependencies(2);
+    dependencies.processSessionJob.mockImplementation(
+      () => new Promise<void>((resolve) => (release = resolve)),
+    );
+    const queue = createSessionJobQueue({
+      ...dependencies,
+      pauseJob: (job) => {
+        job.status = "paused";
+        return Promise.resolve();
+      },
+    });
+    const job = createJob("one");
+    queue.enqueueSessionJob(job, false);
+    await queue.pauseSessionJob(job.id);
+    queue.resumeSessionJob(job.id);
+    expect(dependencies.processSessionJob).toHaveBeenCalledTimes(1);
+    release?.();
+    await vi.waitFor(() =>
+      expect(dependencies.processSessionJob).toHaveBeenCalledTimes(2),
+    );
+    expect(dependencies.getActiveSessionJobCount()).toBe(1);
+    release?.();
+    await vi.waitFor(() =>
+      expect(dependencies.getActiveSessionJobCount()).toBe(0),
+    );
+  });
+
   it("cancels waiting work before it can start and removes terminal history", async () => {
     let release: (() => void) | undefined;
     const dependencies = queueDependencies(1);
@@ -479,7 +570,7 @@ describe("createSessionJobQueue", () => {
     );
     queue.removeSessionJob(second.id);
 
-    expect(queue.getJobOrder()).toEqual([first.id]);
+    expect(queue.getOrderedJobs().map(({ id }) => id)).toEqual([first.id]);
   });
 
   it("logs rejected jobs and continues draining the queue", async () => {

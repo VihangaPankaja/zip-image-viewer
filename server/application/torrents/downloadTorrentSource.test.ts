@@ -30,6 +30,41 @@ function setup() {
 }
 
 describe("downloadTorrentSource", () => {
+  it("removes direct hints from persisted magnets before native parsing and forwarding", async () => {
+    const { emitJob, job, settings } = setup();
+    job.url += "&x.pe=127.0.0.1%3A80&x.pe=%5B%3A%3A1%5D%3A80";
+    const download = vi
+      .fn<TorrentAdapter["download"]>()
+      .mockResolvedValue({ files: [] });
+    await downloadTorrentSource(
+      job,
+      settings,
+      { confirmOversize: true, downloadDir: "torrent" },
+      { adapter: { download, close: vi.fn() }, emitJob },
+    );
+    const input = download.mock.calls[0][0];
+    expect(new URL(String(input.source)).searchParams.has("x.pe")).toBe(false);
+    expect(input.peerHints).toBeUndefined();
+  });
+  it("does not retry retained-storage failures even with unlimited transfer retries", async () => {
+    const { emitJob, job, settings } = setup();
+    settings.maxRetries = -1;
+    const failure = Object.assign(new Error("SQLITE_FULL"), {
+      name: "RetainedTorrentStorageError",
+    });
+    const download = vi
+      .fn<TorrentAdapter["download"]>()
+      .mockRejectedValue(failure);
+    await expect(
+      downloadTorrentSource(
+        job,
+        settings,
+        { confirmOversize: true, downloadDir: "torrent" },
+        { adapter: { download, close: vi.fn() }, emitJob },
+      ),
+    ).rejects.toBe(failure);
+    expect(download).toHaveBeenCalledTimes(1);
+  });
   it("stops after metadata until the user selects files", async () => {
     const { emitJob, job, settings } = setup();
     job.torrentFiles = [];

@@ -28,9 +28,9 @@ const cleanupPaths: string[] = [];
 
 afterEach(async () => {
   await Promise.all(
-    cleanupPaths
-      .splice(0)
-      .map((entry) => rm(entry, { recursive: true, force: true })),
+    [...new Set(cleanupPaths.splice(0))].map((entry) =>
+      rm(entry, { recursive: true, force: true }),
+    ),
   );
 });
 
@@ -155,7 +155,7 @@ describe("real download flows", () => {
           (readyTorrent) => resolve(readyTorrent),
         );
       });
-      const magnet = `${torrent.magnetURI}&x.pe=127.0.0.1:${String(seeder.torrentPort)}`;
+      const magnet = torrent.magnetURI;
       const jobs = new Map<string, SessionJob>();
       const manager = createJobManager(jobs, vi.fn());
       job = manager.createJob(magnet);
@@ -169,11 +169,22 @@ describe("real download flows", () => {
           extractRuntimeArchive(path7za, archive, output),
         listExtractedEntries,
         logEvent: vi.fn(),
-        torrentAdapter: adapter,
+        torrentAdapter: {
+          ...adapter,
+          download: (input) =>
+            adapter.download({
+              ...input,
+              source:
+                typeof input.source === "string"
+                  ? `${input.source}&x.pe=127.0.0.1:${String(seeder.torrentPort)}`
+                  : input.source,
+              peerHints: [`127.0.0.1:${String(seeder.torrentPort)}`],
+            }),
+        },
       });
 
       await processJob(job);
-      expect(job.status).toBe("awaiting_selection");
+      expect(job.status, job.error).toBe("awaiting_selection");
       expect(job.torrentFiles).toMatchObject([
         { id: "0", size: expectedFile.length, selected: false },
       ]);

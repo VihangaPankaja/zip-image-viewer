@@ -89,7 +89,8 @@ test("queues a magnet on blur, clears the composer, and contains long content", 
 
   await composer.getByRole("button", { name: "Close" }).click();
   await row.getByRole("button", { name: "Cancel" }).click();
-  await row.getByRole("button", { name: "Remove" }).click();
+  page.once("dialog", (dialog) => dialog.accept());
+  await row.getByRole("button", { name: "Delete files" }).click();
   await expect(row).toBeHidden();
 });
 

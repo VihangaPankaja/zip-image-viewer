@@ -17,6 +17,7 @@ export function registerBaseRoutes(app: Express, deps: RouteDependencies) {
     emitJob: deps.emitJob,
     closeJob: deps.closeJob,
     cleanupJob: deps.cleanupJob,
+    removeJob: deps.removeJob,
   });
   registerSseRoutes(app);
 }

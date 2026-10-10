@@ -5,6 +5,20 @@ export type SourcePreference = "auto" | SourceKind;
 
 const INFO_HASH = /^[a-f\d]{40}$|^[a-z2-7]{32}$/i;
 
+export function withoutDirectPeerHints(value: string): string {
+  // Persisted magnets may predate the submission restriction.
+  // Preserve literal BTIH colons required by WebTorrent's magnet parser.
+  const queryStart = value.indexOf("?") + 1;
+  return (
+    value.slice(0, queryStart) +
+    value
+      .slice(queryStart)
+      .split("&")
+      .filter((parameter) => !new URLSearchParams(parameter).has("x.pe"))
+      .join("&")
+  );
+}
+
 function validateMagnet(value: string): void {
   const url = new URL(value);
   const hashes = url.searchParams

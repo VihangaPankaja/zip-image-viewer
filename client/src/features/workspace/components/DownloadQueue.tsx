@@ -116,10 +116,20 @@ function JobActions({ job, ...actions }: JobActionsProps) {
       <button
         type="button"
         onClick={() =>
-          terminal ? actions.onRemove(job.id) : actions.onCancel(job.id)
+          terminal
+            ? (job.sourceKind !== "torrent" ||
+                window.confirm(
+                  "Delete this torrent download and all its downloaded files? This cannot be undone.",
+                )) &&
+              actions.onRemove(job.id)
+            : actions.onCancel(job.id)
         }
       >
-        {terminal ? "Remove" : "Cancel"}
+        {terminal
+          ? job.sourceKind === "torrent"
+            ? "Delete files"
+            : "Remove"
+          : "Cancel"}
       </button>
     </div>
   );

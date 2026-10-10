@@ -1,6 +1,6 @@
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
-import type { Express } from "express";
+import type { Express, Response } from "express";
 import mime from "mime-types";
 import type { SessionJob } from "../domain/models.js";
 import { applyByteRange } from "./httpUtils.js";
@@ -22,6 +22,7 @@ export type SessionJobRouteDependencies = {
   ) => void;
   closeJob: (_job: SessionJob, _reason: SessionJob["status"]) => void;
   cleanupJob: (_jobId: string, _reason: string) => Promise<void>;
+  removeJob?: (_jobId: string) => Promise<void>;
 };
 
 function registerStateRoutes(
@@ -111,6 +112,10 @@ function registerCancelRoute(
   app.delete("/api/session-jobs/:id", async (req, res) => {
     const job = deps.getJob(req.params.id);
     if (!job) return res.status(404).json({ error: "Job not found." });
+    if (job.sourceKind === "torrent") {
+      if (req.query.release === "true") return res.status(204).end();
+      if (deps.removeJob) return deleteTorrentJob(job.id, deps.removeJob, res);
+    }
     job.abortController?.abort();
     deps.emitJob(
       job,
@@ -127,6 +132,21 @@ function registerCancelRoute(
     await deps.cleanupJob(job.id, "cancelled");
     return res.status(204).end();
   });
+}
+
+async function deleteTorrentJob(
+  id: string,
+  remove: NonNullable<SessionJobRouteDependencies["removeJob"]>,
+  res: Response,
+) {
+  try {
+    await remove(id);
+    return res.status(204).end();
+  } catch {
+    return res.status(409).json({
+      error: "Pause or finish the transfer before deleting its files.",
+    });
+  }
 }
 
 export function registerSessionJobRoutes(

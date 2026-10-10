@@ -41,11 +41,7 @@ export function FileTools({
     selection;
   return (
     <div className="torrent-file-tools">
-      <p id="torrent-file-description">
-        {selecting
-          ? "Review the metadata and choose what to download. File contents have not started downloading."
-          : "Reported file status for this download. Files become available when the selected download is ready and remain subject to session expiry. Skipped files cannot be added to this download. File priority changes download order when peers have the pieces; it cannot make unavailable pieces appear."}
-      </p>
+      <TorrentDescription selection={selection} />
       <label>
         Search files
         <input
@@ -119,4 +115,17 @@ function SelectionHelp({ selecting }: { selecting: boolean }) {
       files, including other pages.
     </p>
   ) : null;
+}
+
+function TorrentDescription({ selection }: { selection: Selection }) {
+  const { selecting } = selection;
+  return (
+    <p id="torrent-file-description">
+      {selection.adding
+        ? "Choose skipped files to add to this download. Previously selected files are kept and their verified pieces are reused."
+        : selecting
+          ? "Review the metadata and choose what to download. File contents have not started downloading."
+          : "Torrent downloads are kept across server restarts until you delete their files. Download skipped files when the transfer is ready or paused. File priority changes download order when peers have the pieces; it cannot make unavailable pieces appear."}
+    </p>
+  );
 }

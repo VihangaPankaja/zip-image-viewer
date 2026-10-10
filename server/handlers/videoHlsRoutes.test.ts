@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type {
   Session,
   VideoRendition,
@@ -37,7 +37,7 @@ describe("HLS routes", () => {
       ffmpegPath: "ffmpeg",
       touchSession: () => session,
       sanitizeEntryPath: (value: string) => value,
-      ensureVideoTranscodeEntry: () => Promise.resolve(entry),
+      ensureVideoTranscodeEntry: vi.fn(() => Promise.resolve(entry)),
       getRenditionState: () => rendition,
       startRenditionTranscode: () => Promise.resolve(),
     } as unknown as VideoRouteDependencies;
@@ -89,6 +89,13 @@ describe("HLS routes", () => {
         .get(`${resource}/segment${query}&index=0`)
         .set("If-None-Match", media.headers.etag)
         .expect(304);
+      session.availablePaths = new Set();
+      vi.mocked(deps.ensureVideoTranscodeEntry).mockClear();
+      for (const route of ["master", "playlist", "init", "segment"])
+        await request(app)
+          .get(`${resource}/${route}${query}&index=0`)
+          .expect(404);
+      expect(deps.ensureVideoTranscodeEntry).not.toHaveBeenCalled();
     } finally {
       await rm(workspace, { recursive: true, force: true });
     }

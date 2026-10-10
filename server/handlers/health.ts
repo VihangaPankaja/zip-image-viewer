@@ -9,6 +9,7 @@ export function registerHealthRoute(app: Express, deps: HealthDependencies) {
   app.get("/health", (_req, res) => {
     res.json({
       ok: true,
+      ready: true,
       sessions: deps.getSessionCount(),
       jobs: deps.getJobCount(),
     });

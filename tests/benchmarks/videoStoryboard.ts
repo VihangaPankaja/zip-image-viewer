@@ -80,7 +80,9 @@ app.get("/scrubber", (_req, res) =>
 );
 const harnessDirectory = path.join(workspace, "harness");
 app.get("/player.css", (_req, res) =>
-  res.sendFile(path.resolve("client/src/styles/player.css")),
+  res.sendFile(path.resolve("client/src/styles/player.css"), {
+    dotfiles: "allow",
+  }),
 );
 app.use(express.static(harnessDirectory));
 const server = createServer(app);

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Session, SessionJob } from "../../domain/models.js";
 import type { TorrentAdapter } from "../torrents/torrentDownloader.js";
 import { createJobManager } from "./jobManager.js";
+import { createRetainedTorrentStore } from "../../repositories/retainedTorrents.js";
 
 const mocks = vi.hoisted(() => ({
   downloadSessionSource: vi.fn(),
@@ -28,6 +29,68 @@ afterEach(async () => {
 });
 
 describe("createProcessSessionJob", () => {
+  it.each(["indexing", "ready"])(
+    "keeps a transient persistence failure at %s in a controlled error state",
+    async (phase) => {
+      const workspace = await mkdtemp(
+        path.join(os.tmpdir(), "torrent-lifecycle-full-"),
+      );
+      workspaces.push(workspace);
+      const store = createRetainedTorrentStore(workspace);
+      try {
+        const manager = createJobManager(new Map(), vi.fn(), store);
+        const job = manager.createJob("magnet:?xt=urn:btih:" + "a".repeat(40));
+        job.torrentFiles = [
+          {
+            id: "0",
+            path: "fixture.txt",
+            size: 4,
+            selected: true,
+            complete: true,
+            downloadedBytes: 4,
+          },
+        ];
+        const original = store.save.bind(store);
+        let failed = false;
+        vi.spyOn(store, "save").mockImplementation((changed) => {
+          if (!failed && changed.phase === phase) {
+            failed = true;
+            throw new Error("SQLITE_FULL");
+          }
+          original(changed);
+        });
+        const processJob = createProcessSessionJob({
+          sessionStore: new Map(),
+          torrentAdapter: {
+            download: vi.fn().mockResolvedValue({ files: ["fixture.txt"] }),
+            close: vi.fn(),
+          },
+          emitJob: manager.emitJob,
+          closeJob: manager.closeJob,
+          download: vi.fn(),
+          detectEncryption: vi.fn(),
+          extractWith7zip: vi.fn(),
+          listExtractedEntries: vi.fn().mockResolvedValue([
+            {
+              name: "fixture.txt",
+              type: "file",
+              relativePath: "fixture.txt",
+              size: 4,
+              modifiedAt: 1,
+            },
+          ]),
+          logEvent: vi.fn(),
+        });
+        await processJob(job);
+        expect(failed).toBe(true);
+        expect(job.status).toBe("error");
+        expect(job.error).toContain("SQLITE_FULL");
+        expect(store.read()[0].job.status).toBe("error");
+      } finally {
+        store.close();
+      }
+    },
+  );
   it("keeps resumable partial files when a pause aborts the download", async () => {
     const workspace = await mkdtemp(path.join(os.tmpdir(), "queue-pause-"));
     workspaces.push(workspace);
@@ -126,6 +189,12 @@ describe("createProcessSessionJob", () => {
           name: "fixture",
         });
         onProgress({
+          files: torrentFiles.map((file) => ({
+            ...file,
+            selected: true,
+            complete: true,
+            downloadedBytes: file.size,
+          })),
           downloadedBytes: 100,
           downloadSpeedBytesPerSec: 50,
           peerCount: 1,

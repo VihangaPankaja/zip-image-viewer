@@ -9,7 +9,7 @@ Create a review gallery from the actual app using deterministic Playwright fixtu
 
 Run from the repository root. On Windows use `pnpm.cmd` if the PowerShell shim does not execute. Use the pinned Node version in `.nvmrc`.
 
-1. Finish implementation, run required checks in `agent.md`, and commit the code. Captures must match the commit being reviewed.
+1. Finish implementation, run required checks in `AGENTS.md`, and commit the code. Captures must match the commit being reviewed.
 2. Install Chromium if needed: `pnpm exec playwright install chromium`.
 3. Capture: `pnpm run screenshots:pr`. This starts the Vite app on `127.0.0.1:5174`, generates local media using the installed ffmpeg and sharp, and mocks network progress. No remote download or torrent swarm is required.
 4. Inspect images under `test-results/pr-screenshots/`, including every screen and theme at each device size. Fix clipping, missing content, errors, or unusable controls, then commit and recapture. Tests assert overflow and loaded media; screenshots still need visual inspection.

@@ -73,7 +73,7 @@ export function registerSessionRoutes(
       return res.status(404).json({ error: "Session not found." });
     }
 
-    await deps.removeSession(req.params.id, "manual");
+    await deps.removeSession(req.params.id, "viewer");
     return res.status(204).end();
   });
 }

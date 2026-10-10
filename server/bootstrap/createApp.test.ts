@@ -11,7 +11,12 @@ describe("createApp", () => {
 
     const response = await request(app).get("/health").expect(200);
 
-    expect(response.body).toEqual({ ok: true, sessions: 2, jobs: 3 });
+    expect(response.body).toEqual({
+      ok: true,
+      ready: true,
+      sessions: 2,
+      jobs: 3,
+    });
   });
 
   it("rejects malformed JSON with a stable typed error", async () => {

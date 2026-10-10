@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import WebTorrent, { type Torrent } from "webtorrent";
 import { expect, it, vi } from "vitest";
+import { createJobManager } from "../jobs/jobManager.js";
+import { createRetainedTorrentStore } from "../../repositories/retainedTorrents.js";
 import {
   createWebTorrentAdapter,
   type TorrentProgress,
@@ -131,6 +133,45 @@ it("reviews without transfer and completes one selected file from a real three-f
           value.downloadedBytes <= (contents[1]?.length ?? 0),
       ),
     ).toBe(true);
+
+    const retained = createRetainedTorrentStore(
+      path.join(workspace, "retained"),
+    );
+    const manager = createJobManager(new Map(), vi.fn(), retained);
+    const job = manager.createJob(source);
+    job.abortController = new AbortController();
+    const save = vi.spyOn(retained, "save");
+    const failureTimer = setTimeout(() => job.abortController?.abort(), 5_000);
+    try {
+      await expect(
+        adapter.download({
+          ...input,
+          downloadDir: path.join(job.workspaceDir, "torrent"),
+          signal: job.abortController.signal,
+          retainStoreOnAbort: () => true,
+          onMetadata: () => ["0"],
+          onProgress: (value) => {
+            if (value.downloadedBytes > 0)
+              save.mockImplementation(() => {
+                throw new Error("SQLITE_FULL");
+              });
+            manager.emitJob(job, {
+              status: "downloading",
+              downloadedBytes: value.downloadedBytes,
+            });
+            if (value.progress === 1) manager.closeJob(job, "ready");
+          },
+        }),
+      ).rejects.toMatchObject({ name: "RetainedTorrentStorageError" });
+      expect(job.status).toBe("error");
+      expect(
+        await readFile(path.join(job.workspaceDir, "torrent/seed/0.bin")),
+      ).toEqual(contents[0]);
+    } finally {
+      clearTimeout(failureTimer);
+      save.mockRestore();
+      retained.close();
+    }
   } finally {
     clearTimeout(timer);
     controller.abort();

@@ -1,6 +1,6 @@
 # Client Agent Scope
 
-For frontend changes under `client/`, inherit root guidance from `../agent.md` and apply these specifics:
+For frontend changes under `client/`, inherit root guidance from `../AGENTS.md` and apply these specifics:
 
 - Stack: React + Vite + TypeScript
 - Primary checks:
