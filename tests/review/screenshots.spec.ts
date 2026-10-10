@@ -68,6 +68,7 @@ async function save(
     path: path.join(output, file),
     fullPage:
       screen === "http-and-torrent-downloads" ||
+      screen === "download-storage-rejected" ||
       screen === "loaded-video-downloads-visit",
     animations: "disabled",
     caret: "hide",
