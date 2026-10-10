@@ -164,7 +164,13 @@ export const enqueueSessionsInputSchema = z.object({
   items: z
     .array(
       z.object({
-        url: downloadSourceSchema,
+        url: downloadSourceSchema.refine(
+          (value) =>
+            !value.startsWith("magnet:") ||
+            !URL.canParse(value) ||
+            !new URL(value).searchParams.has("x.pe"),
+          "Direct peer hints (x.pe) are not supported. Use tracker or DHT discovery.",
+        ),
         sourcePreference: sourcePreferenceSchema.default("auto"),
         downloadOptions: z.unknown().optional(),
       }),

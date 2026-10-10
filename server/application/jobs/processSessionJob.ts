@@ -121,7 +121,9 @@ function completeSession(
     },
     "ready",
   );
+  job.abortController?.signal.throwIfAborted();
   deps.closeJob(job, "ready");
+  job.abortController?.signal.throwIfAborted();
   deps.logEvent("info", "session.create.complete", {
     jobId: job.id,
     sessionId: session.id,

@@ -1,6 +1,7 @@
 import path from "node:path";
 import type { SessionJob } from "../../domain/models.js";
 import type { RetainedTorrentStore } from "../../repositories/retainedTorrents.js";
+import { saveRetainedTorrent } from "../../repositories/retainedTorrents.js";
 import type { TorrentAdapter } from "./torrentDownloader.js";
 import { normalizeDownloadOptions } from "../downloads/downloadOptions.js";
 
@@ -57,7 +58,7 @@ export async function restoreRetainedTorrents(
             "Restored download. Resume to recheck and fetch missing pieces.",
         });
       }
-      store.save(job);
+      saveRetainedTorrent(store, job);
     } catch (error) {
       Object.assign(job, {
         status: "error",
@@ -70,7 +71,7 @@ export async function restoreRetainedTorrents(
         message:
           "Stored torrent data could not be verified. Download files again to recover.",
       });
-      store.save(job);
+      saveRetainedTorrent(store, job);
     }
   }
 }

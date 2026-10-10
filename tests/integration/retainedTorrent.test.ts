@@ -15,7 +15,7 @@ import type { ContractRouterClient } from "@orpc/contract";
 import { expect, it } from "vitest";
 import { serverContract } from "../../shared/contracts.js";
 
-async function startServer(directory: string) {
+async function startServer(directory: string, seedPort: number) {
   const reservation = createServer();
   reservation.listen(0, "127.0.0.1");
   await once(reservation, "listening");
@@ -32,7 +32,16 @@ async function startServer(directory: string) {
       "--input-type",
       "module",
       "--eval",
-      `process.on("message", (message) => { if (message === "shutdown") process.emit("SIGTERM"); }); await import(${JSON.stringify(pathToFileURL(path.resolve("server/index.ts")).href)});`,
+      `process.on("message", (message) => { if (message === "shutdown") process.emit("SIGTERM"); });
+      const { default: WebTorrent } = await import(${JSON.stringify(pathToFileURL(path.resolve("node_modules/webtorrent/index.js")).href)});
+      const add = WebTorrent.prototype.add;
+      WebTorrent.prototype.add = function (...args) {
+        const torrent = add.apply(this, args);
+        const connect = () => { if (!torrent.destroyed) torrent.addPeer("127.0.0.1:${seedPort}"); };
+        if (torrent.infoHash) connect(); else torrent.once("infoHash", connect);
+        return torrent;
+      };
+      await import(${JSON.stringify(pathToFileURL(path.resolve("server/index.ts")).href)});`,
     ],
     {
       cwd: directory,
@@ -118,8 +127,8 @@ it("retains and reverifies selective downloads across graceful and forced restar
     torrent.on("wire", (wire) =>
       wire.on("request", (piece) => requests.push(piece)),
     );
-    const source = `${torrent.magnetURI}&x.pe=127.0.0.1:${seed.torrentPort}`;
-    server = await startServer(directory);
+    const source = torrent.magnetURI;
+    server = await startServer(directory, seed.torrentPort);
     const { items } = await server.client.jobs.enqueue({
       items: [{ url: source }],
     });
@@ -158,7 +167,7 @@ it("retains and reverifies selective downloads across graceful and forced restar
     await eventStream.body?.cancel();
     const seedPort = seed.torrentPort;
     await new Promise<void>((resolve) => seed.destroy(() => resolve()));
-    server = await startServer(directory);
+    server = await startServer(directory, seed.torrentPort);
     job = (await server.client.jobs.list()).items[0];
     expect(job).toMatchObject({ id, status: "ready", sessionId });
     expect(requests.length).toBe(firstRequests);
@@ -225,7 +234,7 @@ it("retains and reverifies selective downloads across graceful and forced restar
       Buffer.alloc(contents[0].length, 0),
     );
     await rm(path.join(downloadDir, "1.bin"));
-    server = await startServer(directory);
+    server = await startServer(directory, seed.torrentPort);
     job = (await server.client.jobs.list()).items[0];
     expect(job.status).toBe("paused");
     expect(job.torrentFiles.slice(0, 2).map((file) => file.complete)).toEqual([
@@ -280,7 +289,7 @@ it("retains and reverifies selective downloads across graceful and forced restar
       .poll(async () => (await currentClient().jobs.list()).items[0].phase)
       .toBe("paused");
     await stopServer(server.child);
-    server = await startServer(directory);
+    server = await startServer(directory, seed.torrentPort);
     expect((await server.client.jobs.list()).items[0].status).toBe("paused");
     const restoredTree: unknown = await fetch(
       `${server.origin}/api/sessions/${sessionId}/tree`,
@@ -319,7 +328,7 @@ it("retains and reverifies selective downloads across graceful and forced restar
       readFile(path.join(downloadDir, "0.bin")),
     ).rejects.toMatchObject({ code: "ENOENT" });
     await stopServer(server.child);
-    server = await startServer(directory);
+    server = await startServer(directory, seed.torrentPort);
     expect((await server.client.jobs.list()).items).toEqual([]);
   } finally {
     if (server) await stopServer(server.child, true);
@@ -369,11 +378,9 @@ it("preserves extracted archive paths when adding siblings and restoring offline
     const torrent = await new Promise<Torrent>((resolve) =>
       seed.seed(bundle, { announce: [], private: true }, resolve),
     );
-    server = await startServer(directory);
+    server = await startServer(directory, seed.torrentPort);
     const { items } = await server.client.jobs.enqueue({
-      items: [
-        { url: `${torrent.magnetURI}&x.pe=127.0.0.1:${seed.torrentPort}` },
-      ],
+      items: [{ url: torrent.magnetURI }],
     });
     const client = server.client;
     await expect
@@ -426,7 +433,7 @@ it("preserves extracted archive paths when adding siblings and restoring offline
     ).toBe("archive owns this folder");
     await stopServer(server.child);
     await new Promise<void>((resolve) => seed.destroy(() => resolve()));
-    server = await startServer(directory);
+    server = await startServer(directory, seed.torrentPort);
     expect((await server.client.jobs.list()).items[0]).toMatchObject({
       id: job.id,
       status: "ready",

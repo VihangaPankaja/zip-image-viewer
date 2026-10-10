@@ -73,3 +73,28 @@ export function createRetainedTorrentStore(directory: string) {
 export type RetainedTorrentStore = ReturnType<
   typeof createRetainedTorrentStore
 >;
+
+export function saveRetainedTorrent(
+  store: RetainedTorrentStore | undefined,
+  job: SessionJob,
+) {
+  try {
+    store?.save(job);
+  } catch (error) {
+    const failure = new Error(
+      `Could not save retained torrent state: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    failure.name = "RetainedTorrentStorageError";
+    Object.assign(job, {
+      status: "error",
+      phase: "error",
+      error: failure.message,
+      message: failure.message,
+      canPause: false,
+      canResume: false,
+      downloadSpeedBytesPerSec: 0,
+    });
+    job.abortController?.abort(failure);
+    return failure;
+  }
+}

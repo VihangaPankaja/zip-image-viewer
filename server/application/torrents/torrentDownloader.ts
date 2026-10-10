@@ -234,6 +234,12 @@ type ActiveTorrent = {
   ranges: [number, number][];
 };
 
+function abortReason(signal: AbortSignal): Error {
+  return signal.reason instanceof Error
+    ? signal.reason
+    : Object.assign(new Error("Aborted"), { name: "AbortError" });
+}
+
 function downloadTorrent(
   client: InstanceType<typeof WebTorrent>,
   active: Map<string, ActiveTorrent>,
@@ -290,8 +296,7 @@ function downloadTorrent(
           complete,
         );
     };
-    const abort = () =>
-      finish(Object.assign(new Error("Aborted"), { name: "AbortError" }));
+    const abort = () => finish(abortReason(input.signal));
     const emitProgress = () => {
       if (settled || !selectedIds.size) return;
       const progress = selectedProgress(torrent, selectedIds, priorities);

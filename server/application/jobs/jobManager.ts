@@ -2,6 +2,7 @@ import { rm } from "node:fs/promises";
 import crypto from "node:crypto";
 import path from "node:path";
 import type { RetainedTorrentStore } from "../../repositories/retainedTorrents.js";
+import { saveRetainedTorrent } from "../../repositories/retainedTorrents.js";
 import {
   DEFAULT_DOWNLOAD_OPTIONS,
   DEFAULT_DOWNLOAD_SETTINGS,
@@ -31,6 +32,15 @@ class JobManager {
     private readonly logEvent: LogEvent,
     private readonly retained?: RetainedTorrentStore,
   ) {}
+
+  private saveJob(job: SessionJob) {
+    const error = saveRetainedTorrent(this.retained, job);
+    if (error)
+      this.logEvent("error", "torrent.persistence.failed", {
+        jobId: job.id,
+        error: error.message,
+      });
+  }
 
   createJob = (
     url: string,
@@ -92,7 +102,7 @@ class JobManager {
     this.jobStore.set(job.id, job);
     if (job.sourceKind === "torrent" && this.retained) {
       job.workspaceDir = path.join(this.retained.directory, job.id);
-      this.retained.save(job);
+      this.saveJob(job);
     }
     return job;
   };
@@ -151,7 +161,7 @@ class JobManager {
       updatedAt: Date.now(),
       cleanupAt: Date.now() + JOB_TTL_MS,
     });
-    this.retained?.save(job);
+    this.saveJob(job);
   };
 
   emitJob = (
@@ -167,7 +177,7 @@ class JobManager {
         !progress ||
         Date.now() - (this.progressSavedAt.get(job) ?? 0) >= 1_000
       ) {
-        this.retained.save(job);
+        this.saveJob(job);
         if (progress) this.progressSavedAt.set(job, Date.now());
       }
     }
@@ -196,7 +206,7 @@ class JobManager {
     job.subscribers.clear();
     job.socketSubscribers.clear();
     if (job.sourceKind === "torrent" && reason === "shutdown") {
-      this.retained?.save(job);
+      this.saveJob(job);
       return;
     }
     if (job.workspaceDir && !job.sessionId) {

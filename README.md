@@ -124,3 +124,5 @@ map.
 - `WS /ws/jobs?jobId=...` - realtime job progress
 
 Only public HTTP(S) URLs and safe relative paths pass contract validation.
+Submitted magnets cannot contain direct peer hints (`x.pe`). Tracker and DHT
+discovery still work; this restriction does not isolate BitTorrent network traffic.

@@ -1,4 +1,5 @@
 import { CONFIRM_SIZE_BYTES } from "../../config/runtimeConstants.js";
+import { withoutDirectPeerHints } from "./torrentSource.js";
 import type { SessionJob } from "../../domain/models.js";
 import type { DownloadSettings } from "../downloads/downloadOptions.js";
 import {
@@ -167,10 +168,11 @@ export async function downloadTorrentSource(
     phase: "resolving",
     message: "Resolving torrent metadata...",
   });
+  signal.throwIfAborted();
   const source =
     job.torrentMetadata ??
     (job.url.startsWith("magnet:")
-      ? job.url
+      ? withoutDirectPeerHints(job.url)
       : await fetchTorrentMetadata(job.url, signal));
   for (
     let attempt = 0;
@@ -188,9 +190,6 @@ export async function downloadTorrentSource(
           ]),
         ),
         source,
-        peerHints: job.url.startsWith("magnet:")
-          ? new URL(job.url).searchParams.getAll("x.pe")
-          : [],
         downloadDir: input.downloadDir,
         signal,
         retainStoreOnAbort: () => true,
@@ -211,12 +210,14 @@ export async function downloadTorrentSource(
         canPause: false,
         message: "Torrent complete. Indexing files...",
       });
+      signal.throwIfAborted();
       return "complete";
     } catch (error) {
       if (waitForUser(job, error, deps.emitJob)) return "paused";
       if (
         error instanceof Error &&
         (error.name === "AbortError" ||
+          error.name === "RetainedTorrentStorageError" ||
           (settings.maxRetries !== -1 && attempt >= settings.maxRetries))
       ) {
         throw error;
