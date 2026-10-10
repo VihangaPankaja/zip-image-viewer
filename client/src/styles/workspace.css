@@ -535,6 +535,7 @@
 }
 
 .download-dialog {
+  margin-block: 16px auto;
   width: min(760px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
   padding: 0;

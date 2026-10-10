@@ -1,4 +1,5 @@
 import { CustomDropdown } from "../../../components/Common/CustomDropdown";
+import { useModalDialog } from "../../../hooks/useModalDialog";
 import {
   TreeExplorer,
   type ExplorerNode,
@@ -71,10 +72,6 @@ type ExplorerOverlayProps = Pick<
   | "sortedTree"
 >;
 
-function showModalDialog(dialog: HTMLDialogElement | null): void {
-  if (dialog && !dialog.open) dialog.showModal();
-}
-
 export function WorkspaceOverlays(props: WorkspaceOverlaysProps) {
   const { explorerModalOpen, slideshowOpen, sortedTree } = props;
   return (
@@ -88,12 +85,13 @@ export function WorkspaceOverlays(props: WorkspaceOverlaysProps) {
 }
 
 function SlideshowOverlay(props: SlideshowOverlayProps) {
+  const dialogRef = useModalDialog();
   const node = props.selectedNode;
   if (!node) return null;
   const lastPath = props.currentFolderImages.at(-1) || "";
   return (
     <dialog
-      ref={showModalDialog}
+      ref={dialogRef}
       className={`slideshow-overlay ${props.slideshowChromeHidden ? "chrome-hidden" : ""}`}
       aria-label={`Slideshow for ${node.name}`}
       onClose={props.onCloseSlideshow}
@@ -251,10 +249,11 @@ function SlideshowTools({
 }
 
 function ExplorerOverlay(props: ExplorerOverlayProps) {
+  const dialogRef = useModalDialog();
   if (!props.sortedTree) return null;
   return (
     <dialog
-      ref={showModalDialog}
+      ref={dialogRef}
       className="settings-dialog"
       aria-labelledby="explorer-dialog-title"
       onClose={props.onCloseExplorer}

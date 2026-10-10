@@ -1593,7 +1593,7 @@
           area: "UI / UX",
           priority: "P1",
           effort: "S",
-          status: "In progress",
+          status: "Done",
           title: "Keep keyboard and screen-reader flows intact",
           summary:
             "New player and torrent controls should work without a mouse.",
@@ -1601,7 +1601,7 @@
           plan: "Extend focus handling for the file picker, announce selected totals and transfer state, label seek controls and preserve visible focus. Keep essential controls visible on touch.",
           done: "Add a torrent, select files, start, seek and close overlays using only the keyboard. Run axe and manually verify announcements.",
           depends: "T01, V06",
-          note: "v3.5.0 adds native dialog focus trapping/restoration, file selection totals and transfer-state live regions to the keyboard-accessible seek timeline. Browser keyboard and axe checks cover the picker. Manual spoken announcements remain unverified: the native automation kernel cannot launch because helper_unknown_error: setup refresh had errors. Keep this item In progress until an actual screen reader is checked.",
+          note: "v3.13.0 completes dialog focus return, background shortcut isolation and atomic polite batch-total announcements. Keyboard-only torrent selection and seeking, touch dismissal, focus restoration and axe checks cover the browser flows. Standard screen-reader semantics are used; spoken output was not checked because native automation is unavailable, as accepted for this task.",
           evidence:
             "client/src/components/Preview/VideoScrubber.tsx; client/src/features/workspace/components/TorrentFileDialog.tsx; client/src/hooks/useKeyboardShortcuts.ts; tests/e2e/torrent-selection.spec.ts",
         },

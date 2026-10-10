@@ -86,6 +86,7 @@ function handleKeyboardShortcut(
 ): void {
   if (
     event.defaultPrevented ||
+    (document.querySelector("dialog[open]") && !context.slideshowOpen) ||
     isInteractiveTarget(
       event.target instanceof Element ? event.target : null,
     ) ||
