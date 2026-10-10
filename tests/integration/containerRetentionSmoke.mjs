@@ -2,9 +2,17 @@ import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { pathToFileURL } from "node:url";
 const { fetch } = globalThis;
-import { createRetainedTorrentStore } from "../../build/server/repositories/retainedTorrents.js";
-import { createJobManager } from "../../build/server/application/jobs/jobManager.js";
+// The production build exists only after the CI dead-code check.
+const builtModule = (name) =>
+  pathToFileURL(path.join(process.cwd(), "build/server", name)).href;
+const { createRetainedTorrentStore } = await import(
+  builtModule("repositories/retainedTorrents.js")
+);
+const { createJobManager } = await import(
+  builtModule("application/jobs/jobManager.js")
+);
 
 assert.notEqual(process.getuid(), 0, "The container must run as the app user");
 const directory = path.resolve("sessions");

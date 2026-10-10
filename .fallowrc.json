@@ -6,7 +6,8 @@
     "server/runtimeComposition.ts",
     "client/src/main.tsx",
     "tests/integration/containerHlsSmoke.mjs",
-    "tests/integration/containerBrowserFixture.mjs"
+    "tests/integration/containerBrowserFixture.mjs",
+    "tests/integration/containerRetentionSmoke.mjs"
   ],
   "ignorePatterns": ["build/**", "dist/**", "coverage/**", "node_modules/**"],
   "ignoreDependencies": ["7zip-bin", "ffmpeg-static"],
