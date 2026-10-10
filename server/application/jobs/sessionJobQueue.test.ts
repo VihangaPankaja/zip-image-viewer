@@ -519,6 +519,35 @@ describe("createSessionJobQueue", () => {
     await vi.waitFor(() => expect(active).toBe(0));
   });
 
+  it("waits for a pausing worker to settle before resuming with a spare slot", async () => {
+    let release: (() => void) | undefined;
+    const dependencies = queueDependencies(2);
+    dependencies.processSessionJob.mockImplementation(
+      () => new Promise<void>((resolve) => (release = resolve)),
+    );
+    const queue = createSessionJobQueue({
+      ...dependencies,
+      pauseJob: (job) => {
+        job.status = "paused";
+        return Promise.resolve();
+      },
+    });
+    const job = createJob("one");
+    queue.enqueueSessionJob(job, false);
+    await queue.pauseSessionJob(job.id);
+    queue.resumeSessionJob(job.id);
+    expect(dependencies.processSessionJob).toHaveBeenCalledTimes(1);
+    release?.();
+    await vi.waitFor(() =>
+      expect(dependencies.processSessionJob).toHaveBeenCalledTimes(2),
+    );
+    expect(dependencies.getActiveSessionJobCount()).toBe(1);
+    release?.();
+    await vi.waitFor(() =>
+      expect(dependencies.getActiveSessionJobCount()).toBe(0),
+    );
+  });
+
   it("cancels waiting work before it can start and removes terminal history", async () => {
     let release: (() => void) | undefined;
     const dependencies = queueDependencies(1);

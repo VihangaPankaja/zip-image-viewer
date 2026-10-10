@@ -185,7 +185,8 @@ function resumeSessionJob(state: QueueState, jobId: string): SessionJob {
     message: "Waiting to resume",
     canPause: false,
   });
-  if (!state.pendingSessionJobs.some(({ job }) => job.id === jobId)) {
+  if (state.activeItems.has(jobId)) state.requeueAfterActive.add(jobId);
+  else if (!state.pendingSessionJobs.some(({ job }) => job.id === jobId)) {
     state.pendingSessionJobs.push(item);
     sortPending(state);
   }
