@@ -1739,6 +1739,7 @@
           area: "Tooling / quality",
           priority: "P1",
           effort: "M",
+          status: "Done",
           title: "Review resource limits around new download flows",
           summary:
             "Keep metadata review and deferred downloads within the app's existing trust boundaries.",
@@ -1746,8 +1747,9 @@
           plan: "Carry path and URL validation through redirects, metadata, selection updates and extraction. Enforce disk, file-count and media-job limits on the server. Scope retained files to their owning session or account.",
           done: "Fixtures reject path escapes, unknown file IDs, oversized metadata and exhausted storage without affecting other retained downloads.",
           depends: "T01, S01",
+          note: "v3.13.0 carries the existing public-URL policy through redirects, disables unguarded torrent HTTP web seeds and magnet xs metadata fallbacks, and rejects deterministic validation failures without unlimited retries. Downloads and extraction enforce 10 GiB, 10,000 entries and per-volume disk reservations with 64 MiB headroom. Archive paths and links are checked before extraction; file/video realpaths stay within their owning session. Image jobs share the existing two-job media limiter. Real HTTP, torrent, archive and retained-file fixtures verify validation, exhausted storage and isolation; independent review findings were fixed and rechecked.",
           evidence:
-            "server/application/torrents/torrentSource.ts; server/application/torrents/torrentDownloader.ts; server/handlers/video/routeContext.ts",
+            "server/infrastructure/runtime/resourceLimits.ts; server/infrastructure/archive/archiveLimits.ts; server/infrastructure/downloads/publicDownload.ts; server/services/storageAdmission.test.ts; server/application/torrents/torrentHttpSources.test.ts; server/bootstrap/runtimeMedia.test.ts",
         },
       ];
       const statuses = [

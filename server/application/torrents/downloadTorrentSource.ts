@@ -1,4 +1,5 @@
 import { CONFIRM_SIZE_BYTES } from "../../config/runtimeConstants.js";
+import { resourceLimitError } from "../../infrastructure/runtime/resourceLimits.js";
 import { withoutDirectPeerHints } from "./torrentSource.js";
 import type { SessionJob } from "../../domain/models.js";
 import type { DownloadSettings } from "../downloads/downloadOptions.js";
@@ -58,7 +59,7 @@ function handleMetadata(
         ),
     )
   ) {
-    throw new Error(
+    throw resourceLimitError(
       "Torrent metadata changed. Add the torrent again to review its files.",
     );
   }
@@ -218,6 +219,7 @@ export async function downloadTorrentSource(
         error instanceof Error &&
         (error.name === "AbortError" ||
           error.name === "RetainedTorrentStorageError" ||
+          errorCode(error) === "DOWNLOAD_FATAL" ||
           (settings.maxRetries !== -1 && attempt >= settings.maxRetries))
       ) {
         throw error;

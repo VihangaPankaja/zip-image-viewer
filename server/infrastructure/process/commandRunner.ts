@@ -2,6 +2,8 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { constants } from "node:fs";
 import { access, chmod } from "node:fs/promises";
 import path from "node:path";
+import { validateArchiveEntries } from "../archive/archiveLimits.js";
+import { reserveStorage } from "../runtime/resourceLimits.js";
 
 function chunkText(chunk: unknown): string {
   if (typeof chunk === "string") return chunk;
@@ -78,17 +80,57 @@ export async function runCommandCapture(
   return { stdout, stderr };
 }
 
-export function extractWith7zip(
+export async function extractWith7zip(
   executable: string,
   archivePath: string,
   extractDirectory: string,
 ): Promise<void> {
-  return runCommand(executable, [
-    "x",
-    "-y",
-    `-o${extractDirectory}`,
+  const { stdout } = await runCommandCapture(executable, [
+    "l",
+    "-slt",
     archivePath,
   ]);
+  const listing = stdout.split(/^----------\r?$/m).at(-1) ?? "";
+  const entries = listing
+    .trim()
+    .split(/\r?\n\r?\n/)
+    .filter(Boolean)
+    .map((record) => {
+      const values: Record<string, string | undefined> = Object.fromEntries(
+        record.split(/\r?\n/).map((line) => {
+          const separator = line.indexOf(" = ");
+          return [line.slice(0, separator), line.slice(separator + 3)];
+        }),
+      );
+      return {
+        path: values.Path ?? "",
+        size: Number(values.Size ?? 0),
+        isLink:
+          Boolean(values["Symbolic Link"] || values["Hard Link"]) ||
+          /^l/.test(values.Attributes ?? ""),
+      };
+    });
+  const bytes = validateArchiveEntries(entries);
+  const storage = reserveStorage(extractDirectory, bytes);
+  const controller = new AbortController();
+  const timer = setInterval(() => {
+    try {
+      storage.check();
+    } catch (error) {
+      controller.abort(error);
+    }
+  }, 100);
+  try {
+    await runCommand(
+      executable,
+      ["x", "-y", `-o${extractDirectory}`, archivePath],
+      { signal: controller.signal },
+    );
+    controller.signal.throwIfAborted();
+  } finally {
+    clearInterval(timer);
+    storage.release();
+  }
 }
 
 export async function detectArchiveEncryption(

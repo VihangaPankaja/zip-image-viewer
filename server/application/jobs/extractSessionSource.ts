@@ -2,6 +2,7 @@ import { createWriteStream } from "node:fs";
 import { mkdir, rename, stat } from "node:fs/promises";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
+import { Transform } from "node:stream";
 import { fileTypeFromFile } from "file-type";
 import unzipper from "unzipper";
 import { PROGRESS_EMIT_INTERVAL_MS } from "../../config/runtimeConstants.js";
@@ -12,6 +13,11 @@ import {
   isArchiveByName,
 } from "../../infrastructure/runtime/mediaClassification.js";
 import { sanitizeEntryPath } from "../../infrastructure/runtime/runtimePrimitives.js";
+import { validateArchiveEntries } from "../../infrastructure/archive/archiveLimits.js";
+import {
+  reserveStorage,
+  resourceLimitError,
+} from "../../infrastructure/runtime/resourceLimits.js";
 
 type ExtractDependencies = {
   emitJob: (_job: SessionJob, _patch: Partial<SessionJob>) => void;
@@ -48,32 +54,66 @@ async function extractZip(
 ): Promise<void> {
   const root = path.resolve(extractDir);
   const directory = await unzipper.Open.file(archivePath);
-  for (const entry of directory.files) {
-    const relativePath = sanitizeEntryPath(entry.path);
-    const destination = path.join(extractDir, relativePath);
-    const resolved = path.resolve(destination);
-    if (!resolved.startsWith(`${root}${path.sep}`) && resolved !== root) {
-      throw new Error("Archive contains invalid file paths.");
+  const bytes = validateArchiveEntries(
+    directory.files.map((entry) => ({
+      path: entry.path,
+      size: entry.uncompressedSize,
+      isLink: ((entry.externalFileAttributes >>> 16) & 0xf000) === 0xa000,
+    })),
+  );
+  const storage = reserveStorage(extractDir, bytes);
+  try {
+    for (const entry of directory.files) {
+      const relativePath = sanitizeEntryPath(entry.path);
+      const destination = path.join(extractDir, relativePath);
+      const resolved = path.resolve(destination);
+      if (!resolved.startsWith(`${root}${path.sep}`) && resolved !== root) {
+        throw new Error("Archive contains invalid file paths.");
+      }
+      if (entry.type === "Directory") {
+        await mkdir(destination, { recursive: true });
+        entries.push({
+          relativePath,
+          type: "directory",
+          size: 0,
+          modifiedAt: entry.lastModifiedDateTime.getTime(),
+        });
+      } else {
+        await mkdir(path.dirname(destination), { recursive: true });
+        let written = 0;
+        const budget = new Transform({
+          transform(chunk: Buffer, _encoding, callback) {
+            try {
+              written += chunk.length;
+              if (written > entry.uncompressedSize)
+                throw resourceLimitError(
+                  "Archive entry exceeds its declared size.",
+                );
+              storage.check();
+              callback(null, chunk);
+            } catch (error) {
+              callback(
+                error instanceof Error ? error : new Error(String(error)),
+              );
+            }
+          },
+        });
+        await pipeline(
+          entry.stream(),
+          budget,
+          createWriteStream(destination, { flags: "wx" }),
+        );
+        entries.push({
+          relativePath,
+          type: "file",
+          size: entry.uncompressedSize,
+          modifiedAt: entry.lastModifiedDateTime.getTime(),
+        });
+      }
+      progress();
     }
-    if (entry.type === "Directory") {
-      await mkdir(destination, { recursive: true });
-      entries.push({
-        relativePath,
-        type: "directory",
-        size: 0,
-        modifiedAt: entry.lastModifiedDateTime.getTime(),
-      });
-    } else {
-      await mkdir(path.dirname(destination), { recursive: true });
-      await pipeline(entry.stream(), createWriteStream(destination));
-      entries.push({
-        relativePath,
-        type: "file",
-        size: entry.uncompressedSize,
-        modifiedAt: entry.lastModifiedDateTime.getTime(),
-      });
-    }
-    progress();
+  } finally {
+    storage.release();
   }
 }
 

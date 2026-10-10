@@ -1,5 +1,5 @@
 import express from "express";
-import { mkdtemp, rm, writeFile, readFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, readFile, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import request from "supertest";
@@ -73,6 +73,24 @@ it("does not expose files from an expired session", async () => {
     .get("/api/sessions/expired/file")
     .query({ path: "caption.txt" })
     .expect(404);
+});
+
+it("rejects a retained path linked into another session", async () => {
+  const { app, deps, endpoint } = await setup();
+  const other = await mkdtemp(path.join(tmpdir(), "other-session-"));
+  workspaces.push(other);
+  await writeFile(path.join(other, "private.txt"), "other session contents");
+  const owner = deps.touchSession("session");
+  if (!owner) throw new Error("Missing owner session");
+  await symlink(other, path.join(owner.extractDir, "linked"), "junction");
+  const response = await request(app)
+    .get(endpoint)
+    .query({ path: "linked/private.txt" });
+  expect(response.status).toBe(400);
+  expect(response.text).not.toContain("other session contents");
+  expect(await readFile(path.join(other, "private.txt"), "utf8")).toBe(
+    "other session contents",
+  );
 });
 
 it("serves complete files, previews and bounded byte ranges", async () => {

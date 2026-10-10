@@ -7,6 +7,12 @@ import { applyByteRange } from "./httpUtils.js";
 
 type RangeValue = { start: number; end: number };
 
+function findJob(id: string, deps: SessionJobRouteDependencies, res: Response) {
+  const job = deps.getJob(id);
+  if (!job) res.status(404).json({ error: "Job not found." });
+  return job;
+}
+
 export type SessionJobRouteDependencies = {
   getJob: (_jobId: string) => SessionJob | undefined;
   sanitizeJob: (_job: SessionJob) => unknown;
@@ -30,14 +36,14 @@ function registerStateRoutes(
   deps: SessionJobRouteDependencies,
 ): void {
   app.get("/api/session-jobs/:id", (req, res) => {
-    const job = deps.getJob(req.params.id);
-    if (!job) return res.status(404).json({ error: "Job not found." });
+    const job = findJob(req.params.id, deps, res);
+    if (!job) return;
     return res.json(deps.sanitizeJob(job));
   });
 
   app.get("/api/session-jobs/:id/events", (req, res) => {
-    const job = deps.getJob(req.params.id);
-    if (!job) return res.status(404).json({ error: "Job not found." });
+    const job = findJob(req.params.id, deps, res);
+    if (!job) return;
     res.setHeader("content-type", "text/event-stream");
     res.setHeader("cache-control", "no-cache, no-transform");
     res.setHeader("connection", "keep-alive");
@@ -53,8 +59,8 @@ function registerStateRoutes(
   });
 
   app.post("/api/session-jobs/:id/confirm", (req, res) => {
-    const job = deps.getJob(req.params.id);
-    if (!job) return res.status(404).json({ error: "Job not found." });
+    const job = findJob(req.params.id, deps, res);
+    if (!job) return;
     if (job.status !== "awaiting_confirmation") {
       return res
         .status(400)
@@ -74,8 +80,8 @@ function registerStreamRoute(
   deps: SessionJobRouteDependencies,
 ): void {
   app.get("/api/session-jobs/:id/stream", async (req, res) => {
-    const job = deps.getJob(req.params.id);
-    if (!job) return res.status(404).json({ error: "Job not found." });
+    const job = findJob(req.params.id, deps, res);
+    if (!job) return;
     if (!job.zipPath) {
       return res
         .status(409)
@@ -110,8 +116,8 @@ function registerCancelRoute(
   deps: SessionJobRouteDependencies,
 ): void {
   app.delete("/api/session-jobs/:id", async (req, res) => {
-    const job = deps.getJob(req.params.id);
-    if (!job) return res.status(404).json({ error: "Job not found." });
+    const job = findJob(req.params.id, deps, res);
+    if (!job) return;
     if (job.sourceKind === "torrent") {
       if (req.query.release === "true") return res.status(204).end();
       if (deps.removeJob) return deleteTorrentJob(job.id, deps.removeJob, res);

@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { gzipSync } from "node:zlib";
 import {
   mkdir,
   mkdtemp,
@@ -14,6 +15,46 @@ import unzipper from "unzipper";
 import { describe, expect, it } from "vitest";
 import { runCommand } from "../infrastructure/process/commandRunner.js";
 import { downloadWithSegmentedManager } from "./segmentedDownloader.js";
+
+it("downloads encoded responses using a decoded byte cap instead of the wire content length", async () => {
+  const workspace = await mkdtemp(join(tmpdir(), "encoded-download-"));
+  const payload = Buffer.alloc(10_000, 7);
+  const compressed = gzipSync(payload);
+  const server = createServer((_request, response) =>
+    response
+      .writeHead(200, {
+        "content-encoding": "gzip",
+        "content-length": compressed.length,
+      })
+      .end(compressed),
+  );
+  try {
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("No TCP port");
+    const targetPath = join(workspace, "download.bin");
+    await downloadWithSegmentedManager({
+      url: `http://127.0.0.1:${String(address.port)}/file`,
+      targetPath,
+      signal: new AbortController().signal,
+      state: { downloadedBytes: 0 },
+      metadata: { size: compressed.length, acceptRanges: false },
+      settings: {
+        enableResume: false,
+        enableMultithread: false,
+        threadCount: 1,
+        maxRetries: 0,
+      },
+    });
+    expect(await readFile(targetPath)).toEqual(payload);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
 
 describe("downloadWithSegmentedManager", () => {
   it("downloads a real ZIP over HTTP, opens it, and removes segment files", async () => {

@@ -1,12 +1,15 @@
 import path from "node:path";
+import { existsSync, realpathSync } from "node:fs";
+import { resourceLimitError } from "../../infrastructure/runtime/resourceLimits.js";
 
 export type SourceKind = "http" | "torrent";
 export type SourcePreference = "auto" | SourceKind;
+export const MAX_TORRENT_METADATA_BYTES = 10 * 1024 * 1024;
 
 const INFO_HASH = /^[a-f\d]{40}$|^[a-z2-7]{32}$/i;
 
 export function withoutDirectPeerHints(value: string): string {
-  // Persisted magnets may predate the submission restriction.
+  // Persisted magnets may predate submission and HTTP metadata restrictions.
   // Preserve literal BTIH colons required by WebTorrent's magnet parser.
   const queryStart = value.indexOf("?") + 1;
   return (
@@ -14,7 +17,10 @@ export function withoutDirectPeerHints(value: string): string {
     value
       .slice(queryStart)
       .split("&")
-      .filter((parameter) => !new URLSearchParams(parameter).has("x.pe"))
+      .filter((parameter) => {
+        const params = new URLSearchParams(parameter);
+        return !params.has("x.pe") && !params.has("xs");
+      })
       .join("&")
   );
 }
@@ -58,11 +64,24 @@ export function validateTorrentFilePath(
   const resolvedRoot = path.resolve(root);
   if (
     !normalized ||
+    normalized.split("/").some((part) => part === "." || part === "..") ||
+    normalized.includes(":") ||
+    /\p{Cc}/u.test(normalized) ||
     path.isAbsolute(normalized) ||
-    (target !== resolvedRoot &&
-      !target.startsWith(`${resolvedRoot}${path.sep}`))
+    !target.startsWith(`${resolvedRoot}${path.sep}`)
   ) {
-    throw new Error("Torrent contains an unsafe file path.");
+    throw resourceLimitError("Torrent contains an unsafe file path.");
+  }
+  if (existsSync(resolvedRoot)) {
+    let existing = target;
+    while (!existsSync(existing)) existing = path.dirname(existing);
+    const realRoot = realpathSync(resolvedRoot);
+    const realExisting = realpathSync(existing);
+    if (
+      realExisting !== realRoot &&
+      !realExisting.startsWith(`${realRoot}${path.sep}`)
+    )
+      throw resourceLimitError("Torrent contains an unsafe file path.");
   }
   return target;
 }

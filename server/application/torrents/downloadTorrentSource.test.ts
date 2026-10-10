@@ -30,9 +30,36 @@ function setup() {
 }
 
 describe("downloadTorrentSource", () => {
+  it("stops deterministic metadata failures even when transfer retries are unlimited", async () => {
+    const { emitJob, job, settings } = setup();
+    settings.maxRetries = -1;
+    let attempts = 0;
+    const download = vi.fn<TorrentAdapter["download"]>(({ onMetadata }) => {
+      if (attempts++ > 0)
+        throw Object.assign(new Error("Retried validation failure"), {
+          name: "AbortError",
+        });
+      onMetadata({
+        files: [file("changed.jpg")],
+        length: 100,
+        name: "changed",
+      });
+      return Promise.resolve({ files: [] });
+    });
+    await expect(
+      downloadTorrentSource(
+        job,
+        settings,
+        { confirmOversize: true, downloadDir: "torrent" },
+        { adapter: { download, close: vi.fn() }, emitJob },
+      ),
+    ).rejects.toThrow("metadata changed");
+    expect(download).toHaveBeenCalledOnce();
+  });
   it("removes direct hints from persisted magnets before native parsing and forwarding", async () => {
     const { emitJob, job, settings } = setup();
-    job.url += "&x.pe=127.0.0.1%3A80&x.pe=%5B%3A%3A1%5D%3A80";
+    job.url +=
+      "&x.pe=127.0.0.1%3A80&x.pe=%5B%3A%3A1%5D%3A80&xs=http%3A%2F%2F127.0.0.1%2Fprivate";
     const download = vi
       .fn<TorrentAdapter["download"]>()
       .mockResolvedValue({ files: [] });
@@ -44,6 +71,7 @@ describe("downloadTorrentSource", () => {
     );
     const input = download.mock.calls[0][0];
     expect(new URL(String(input.source)).searchParams.has("x.pe")).toBe(false);
+    expect(new URL(String(input.source)).searchParams.has("xs")).toBe(false);
     expect(input.peerHints).toBeUndefined();
   });
   it("does not retry retained-storage failures even with unlimited transfer retries", async () => {

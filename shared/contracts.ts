@@ -22,7 +22,7 @@ function isPrivateIpv4(hostname: string): boolean {
   );
 }
 
-const publicHttpUrlSchema = z
+export const publicHttpUrlSchema = z
   .url()
   .max(2_048)
   .superRefine((value, context) => {

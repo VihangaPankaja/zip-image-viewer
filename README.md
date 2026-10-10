@@ -96,6 +96,18 @@ For torrents containing archives, the first selected archive stays extracted at 
 same paths when more files are added. Added siblings appear under `Torrent files`
 (with a suffix if the archive already uses that name). Original payloads stay retained.
 
+Downloads and extracted archives are limited to 10 GiB and 10,000 entries. The
+server checks free disk space before work starts, reserves space across active
+downloads on the same volume, and keeps 64 MiB of headroom. Unknown-length HTTP
+responses are checked while streaming. Segmented downloads also reserve space
+for merging their parts. Archive expansion is checked before extraction; unsafe
+paths and links are rejected. Resource-limit failures stop the affected job and
+leave other retained downloads available.
+
+Torrent HTTP web seeds and magnet `xs` metadata fallbacks are disabled because
+they bypass the guarded HTTP downloader. Direct `.torrent` URLs still use the
+bounded metadata request; torrent transfers continue through peers and DHT.
+
 ## Architecture
 
 The React application is organized by workspace and player features. TanStack

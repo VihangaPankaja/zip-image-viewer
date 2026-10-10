@@ -8,6 +8,7 @@ import {
   applyByteRange,
   errorMessage,
   isWithinRoot,
+  isRealPathWithinRoot,
   queryText,
 } from "../httpUtils.js";
 
@@ -107,6 +108,10 @@ async function resolveFileContext(
       requestedPath: normalizedPath,
     });
     res.status(404).json({ error: "File not found." });
+    return null;
+  }
+  if (!(await isRealPathWithinRoot(targetPath, rootPath))) {
+    res.status(400).json({ error: "Invalid file path." });
     return null;
   }
   return {

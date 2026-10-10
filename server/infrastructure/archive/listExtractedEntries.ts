@@ -1,6 +1,11 @@
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import type { ExtractedEntry } from "../../domain/explorerTree.js";
+import {
+  assertResourceEntryCount,
+  assertResourceSize,
+  resourceLimitError,
+} from "../runtime/resourceLimits.js";
 
 export async function listExtractedEntries(
   rootDir: string,
@@ -8,6 +13,9 @@ export async function listExtractedEntries(
   entries: ExtractedEntry[] = [],
 ): Promise<ExtractedEntry[]> {
   for (const entry of await readdir(currentDir, { withFileTypes: true })) {
+    assertResourceEntryCount(entries.length + 1);
+    if (entry.isSymbolicLink())
+      throw resourceLimitError("Filesystem links are not supported.");
     const fullPath = path.join(currentDir, entry.name);
     const relativePath = path
       .relative(rootDir, fullPath)
@@ -31,5 +39,7 @@ export async function listExtractedEntries(
       });
     }
   }
+  if (currentDir === rootDir)
+    assertResourceSize(entries.reduce((total, entry) => total + entry.size, 0));
   return entries;
 }

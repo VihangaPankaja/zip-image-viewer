@@ -6,7 +6,12 @@ import {
   type Session,
   type VideoQualityOption,
 } from "../../domain/models.js";
-import { errorMessage, isWithinRoot, queryText } from "../httpUtils.js";
+import {
+  errorMessage,
+  isWithinRoot,
+  isRealPathWithinRoot,
+  queryText,
+} from "../httpUtils.js";
 import type { VideoRouteDependencies } from "./types.js";
 
 export type VideoContext = {
@@ -76,6 +81,9 @@ export async function resolveVideoFile(
   });
   if (!fileStats?.isFile()) {
     throw new ApplicationError("NOT_FOUND", "File not found.", 404);
+  }
+  if (!(await isRealPathWithinRoot(targetPath, rootPath))) {
+    throw new ApplicationError("INVALID_INPUT", "Invalid file path.", 400);
   }
   return { session, normalizedPath, targetPath, fileStats };
 }

@@ -1,9 +1,18 @@
 import { createReadStream, createWriteStream } from "node:fs";
 import { stat, rm } from "node:fs/promises";
 import type { IncomingMessage } from "node:http";
+import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import got from "got";
 import { sleepWithSignal } from "../infrastructure/runtime/mediaClassification.js";
+import { assertPublicDownloadUrl } from "../infrastructure/downloads/publicDownload.js";
+import {
+  assertResourceSize,
+  MAX_RESOURCE_BYTES,
+  reserveStorage,
+  resourceLimitError,
+  createDownloadBudget,
+} from "../infrastructure/runtime/resourceLimits.js";
 
 const UNLIMITED_RETRIES = -1;
 const RETRY_BASE_DELAY_MS = 1200;
@@ -27,19 +36,14 @@ type RangeRequest = {
   strictRange: boolean;
   append: boolean;
   responseHeader?: (_statusCode: number) => void;
+  checkStorage: () => void;
+  maxBytes: number;
 };
 
 function getErrorProperty(error: unknown, property: "name" | "code"): string {
   if (error instanceof Error && property === "name") return error.name;
   if (typeof error !== "object" || error === null) return "";
-  const value =
-    property === "name"
-      ? "name" in error
-        ? error.name
-        : undefined
-      : "code" in error
-        ? error.code
-        : undefined;
+  const value: unknown = Reflect.get(error, property);
   return typeof value === "string" ? value : "";
 }
 
@@ -73,8 +77,10 @@ async function streamSingleRange({
   strictRange,
   append,
   responseHeader,
+  checkStorage,
+  maxBytes,
 }: RangeRequest): Promise<void> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { "accept-encoding": "identity" };
   if (Number.isFinite(requestedStart) && Number.isFinite(requestedEnd)) {
     headers.Range = `bytes=${String(requestedStart)}-${String(requestedEnd)}`;
   }
@@ -84,12 +90,38 @@ async function streamSingleRange({
     retry: { limit: 0 },
     throwHttpErrors: false,
     signal,
+    hooks: {
+      beforeRedirect: [
+        (options) => {
+          if (options.url) assertPublicDownloadUrl(options.url);
+        },
+      ],
+    },
   });
 
   const responseState = { checked: false };
+  let allowedBytes = maxBytes;
   request.once("response", (response: IncomingMessage) => {
     responseState.checked = true;
     const statusCode = response.statusCode ?? 0;
+    // Got removes content-encoding after decoding; raw headers retain it.
+    const encoded = response.rawHeaders.some(
+      (header, index) =>
+        index % 2 === 0 &&
+        header.toLowerCase() === "content-encoding" &&
+        response.rawHeaders[index + 1] !== "identity",
+    );
+    if (encoded) {
+      if (headers.Range) {
+        request.destroy(
+          resourceLimitError(
+            "Encoded responses do not support ranged downloads.",
+          ),
+        );
+        return;
+      }
+      allowedBytes = MAX_RESOURCE_BYTES;
+    }
 
     if (statusCode >= 400) {
       const err = new Error(`Download failed with HTTP ${String(statusCode)}`);
@@ -108,25 +140,21 @@ async function streamSingleRange({
       return;
     }
 
-    if (responseHeader) {
-      responseHeader(statusCode);
-    }
+    responseHeader?.(statusCode);
   });
 
-  request.on("data", (chunk: Buffer) => {
-    state.downloadedBytes += chunk.length;
-  });
+  const budget = createDownloadBudget(() => allowedBytes, state, checkStorage);
 
   await pipeline(
     request,
+    budget,
     createWriteStream(targetPath, {
       flags: append ? "a" : "w",
     }),
   );
 
-  if (!responseState.checked) {
+  if (!responseState.checked)
     throw new Error("Download failed before response was received.");
-  }
 }
 
 async function downloadSingleWithResume({
@@ -136,6 +164,7 @@ async function downloadSingleWithResume({
   metadata,
   settings,
   signal,
+  checkStorage,
 }: {
   url: string;
   targetPath: string;
@@ -143,6 +172,7 @@ async function downloadSingleWithResume({
   metadata: RemoteMetadata;
   settings: DownloadSettings;
   signal: AbortSignal;
+  checkStorage: () => void;
 }): Promise<void> {
   let existingBytes = 0;
   if (settings.enableResume) {
@@ -155,6 +185,7 @@ async function downloadSingleWithResume({
   const shouldRangeResume =
     settings.enableResume && existingBytes > 0 && canRangeResume;
   const start = shouldRangeResume ? existingBytes : 0;
+  if (shouldRangeResume && existingBytes === metadata.size) return;
   const end = metadata.size > 0 ? metadata.size - 1 : Number.NaN;
 
   await streamSingleRange({
@@ -166,6 +197,8 @@ async function downloadSingleWithResume({
     signal,
     strictRange: shouldRangeResume,
     append: shouldRangeResume,
+    checkStorage,
+    maxBytes: (metadata.size || MAX_RESOURCE_BYTES) - start,
     responseHeader: (statusCode) => {
       if (shouldRangeResume && statusCode !== 206) {
         void rm(targetPath, { force: true }).catch(() => undefined);
@@ -195,6 +228,7 @@ async function downloadSegmentWithRetry({
   settings,
   state,
   signal,
+  checkStorage,
 }: {
   url: string;
   segment: Segment;
@@ -202,6 +236,7 @@ async function downloadSegmentWithRetry({
   settings: DownloadSettings;
   state: DownloadState;
   signal: AbortSignal;
+  checkStorage: () => void;
 }): Promise<string> {
   const partPath = `${targetPath}.part.${String(segment.index)}`;
 
@@ -233,6 +268,8 @@ async function downloadSegmentWithRetry({
         signal,
         strictRange: true,
         append: existingBytes > 0,
+        checkStorage,
+        maxBytes: segment.end - start + 1,
       });
 
       return partPath;
@@ -240,6 +277,7 @@ async function downloadSegmentWithRetry({
       if (
         getErrorProperty(error, "name") === "AbortError" ||
         getErrorProperty(error, "code") === "RANGE_UNSUPPORTED" ||
+        getErrorProperty(error, "code") === "DOWNLOAD_FATAL" ||
         (settings.maxRetries !== UNLIMITED_RETRIES &&
           attempt >= settings.maxRetries)
       ) {
@@ -270,50 +308,75 @@ export async function downloadWithSegmentedManager({
   state: DownloadState;
   metadata: RemoteMetadata;
 }): Promise<void> {
+  assertResourceSize(metadata.size);
   const canUseSegments =
     settings.enableMultithread &&
     settings.threadCount > 1 &&
     metadata.acceptRanges &&
     metadata.size > 0;
 
-  if (!canUseSegments) {
-    await downloadSingleWithResume({
-      url,
-      targetPath,
-      state,
-      metadata,
-      settings,
-      signal,
-    });
-    return;
-  }
-
-  const segments = buildSegments(metadata.size, settings.threadCount);
-  const partPaths = await Promise.all(
-    segments.map((segment) =>
-      downloadSegmentWithRetry({
+  const existingBytes =
+    settings.enableResume && !canUseSegments
+      ? (await stat(targetPath).catch(() => null))?.size || 0
+      : 0;
+  const storage = reserveStorage(
+    path.dirname(targetPath),
+    Math.max(0, metadata.size * (canUseSegments ? 2 : 1) - existingBytes),
+  );
+  const controller = new AbortController();
+  signal = AbortSignal.any([signal, controller.signal]);
+  try {
+    if (!canUseSegments) {
+      await downloadSingleWithResume({
         url,
-        segment,
         targetPath,
-        settings,
         state,
+        metadata,
+        settings,
         signal,
-      }),
-    ),
-  );
+        checkStorage: storage.check,
+      });
+      return;
+    }
 
-  await mergeSegmentParts(partPaths, targetPath);
+    const segments = buildSegments(metadata.size, settings.threadCount);
+    const results = await Promise.allSettled(
+      segments.map((segment) =>
+        downloadSegmentWithRetry({
+          url,
+          segment,
+          targetPath,
+          settings,
+          state,
+          signal,
+          checkStorage: storage.check,
+        }).catch((error: unknown) => {
+          controller.abort(error);
+          throw error;
+        }),
+      ),
+    );
+    const partPaths = results.map((result) => {
+      if (result.status === "rejected") throw result.reason;
+      return result.value;
+    });
 
-  await Promise.all(
-    partPaths.map((partPath) =>
-      rm(partPath, { force: true }).catch(() => undefined),
-    ),
-  );
+    storage.check();
 
-  const finishedStat = await stat(targetPath).catch(() => null);
-  if (!finishedStat?.isFile()) {
-    throw new Error("Download did not produce a file.");
+    await mergeSegmentParts(partPaths, targetPath);
+
+    await Promise.all(
+      partPaths.map((partPath) =>
+        rm(partPath, { force: true }).catch(() => undefined),
+      ),
+    );
+
+    const finishedStat = await stat(targetPath).catch(() => null);
+    if (!finishedStat?.isFile())
+      throw new Error("Download did not produce a file.");
+
+    state.downloadedBytes = finishedStat.size;
+  } finally {
+    storage.release();
   }
-
-  state.downloadedBytes = finishedStat.size;
 }
