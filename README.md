@@ -101,7 +101,9 @@ server checks free disk space before work starts, reserves space across active
 downloads on the same volume, and keeps 64 MiB of headroom. Unknown-length and
 encoded HTTP responses reserve the unclaimed capacity up to 10 GiB until the
 transfer finishes; streaming checks enforce that admitted disk budget. Segmented downloads also reserve space
-for merging their parts. Archive expansion is checked before extraction; unsafe
+for merging their parts. Gzip extraction also reserves unclaimed capacity because
+its size hint can omit earlier members. Non-ZIP output is checked during extraction
+and after the child exits; it can grow between the 100 ms checks. Archive expansion is checked before extraction; unsafe
 paths and links are rejected. Resource-limit failures stop the affected job and
 leave other retained downloads available.
 

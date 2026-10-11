@@ -3,6 +3,7 @@ import { constants } from "node:fs";
 import { access, chmod } from "node:fs/promises";
 import path from "node:path";
 import { validateArchiveEntries } from "../archive/archiveLimits.js";
+import { listExtractedEntries } from "../archive/listExtractedEntries.js";
 import { reserveStorage } from "../runtime/resourceLimits.js";
 
 function chunkText(chunk: unknown): string {
@@ -113,25 +114,41 @@ export async function extractWith7zip(
   const bytes = validateArchiveEntries(entries);
   const storage = reserveStorage(extractDirectory, bytes);
   const controller = new AbortController();
+  let checking: Promise<void> | undefined;
+  const check = () =>
+    (checking ??= (async () => {
+      try {
+        storage.check();
+        const output = await listExtractedEntries(extractDirectory);
+        storage.check(output.reduce((total, entry) => total + entry.size, 0));
+      } catch (error) {
+        controller.abort(error);
+      }
+    })().finally(() => {
+      checking = undefined;
+    }));
+  // shortcut: output can grow between scans; use an OS quota for a strict write ceiling.
   const timer = setInterval(() => {
-    try {
-      storage.check();
-    } catch (error) {
-      controller.abort(error);
-    }
+    void check();
   }, 100);
   try {
+    // Gzip listings can report only one member's modulo-32-bit output size.
+    if (/^Type = gzip\r?$/m.test(stdout)) storage.reserveAvailable();
     await runCommand(
       executable,
       ["x", "-y", `-o${extractDirectory}`, archivePath],
       { signal: controller.signal },
     );
+    await checking;
+    await check();
     controller.signal.throwIfAborted();
   } catch (error) {
+    await checking;
     controller.signal.throwIfAborted();
     throw error;
   } finally {
     clearInterval(timer);
+    await checking;
     storage.release();
   }
 }
