@@ -277,6 +277,7 @@
   width: 46px;
   min-height: 56px;
   padding: 0;
+  background: var(--bg-panel-strong);
   pointer-events: auto;
   font-family: var(--font-display);
   font-size: 1.3rem;

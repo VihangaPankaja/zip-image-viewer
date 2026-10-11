@@ -146,6 +146,10 @@
   color: var(--accent-strong);
 }
 
+.tree-item:focus-visible {
+  outline-offset: -2px;
+}
+
 .tree-item-label {
   overflow: hidden;
   text-overflow: ellipsis;
