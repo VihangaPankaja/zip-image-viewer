@@ -1,4 +1,5 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+import { type SpawnOptions } from "node:child_process";
 import { mkdtemp, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -8,6 +9,60 @@ import {
   runCommand,
   runCommandCapture,
 } from "./commandRunner.js";
+
+const disk = vi.hoisted(() => ({
+  free: 64 * 1024 ** 2 + 512,
+  size: 1,
+  fail: true,
+}));
+vi.mock("node:fs", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("node:fs")>()),
+  statfsSync: () => ({ bavail: disk.free, bsize: 1 }),
+}));
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:child_process")>();
+  return {
+    ...actual,
+    spawn: (command: string, args: string[], options: SpawnOptions) => {
+      if (command !== "storage-extractor")
+        return actual.spawn(command, args, options);
+      const script =
+        args[0] === "l"
+          ? `process.stdout.write('----------\\nPath = child.bin\\nSize = ${disk.size}\\n\\n')`
+          : disk.fail
+            ? "setInterval(() => {}, 1000)"
+            : "";
+      const child = actual.spawn(process.execPath, ["-e", script], options);
+      if (args[0] === "x" && disk.fail)
+        child.once("spawn", () => {
+          disk.free = 0;
+        });
+      return child;
+    },
+  };
+});
+
+test("reports extraction storage exhaustion instead of subprocess cancellation", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "extraction-storage-"));
+  try {
+    await expect(
+      extractWith7zip("storage-extractor", "fixture.tar", directory),
+    ).rejects.toMatchObject({
+      name: "Error",
+      code: "DOWNLOAD_FATAL",
+      message: "Insufficient storage for this download or extraction.",
+    });
+    disk.free = 64 * 1024 ** 2 + 512;
+    disk.size = 512;
+    disk.fail = false;
+    await extractWith7zip("storage-extractor", "fixture.tar", directory);
+  } finally {
+    disk.free = 64 * 1024 ** 2 + 512;
+    disk.size = 1;
+    disk.fail = true;
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 describe("commandRunner", () => {
   test("captures output and preserves command failure details", async () => {

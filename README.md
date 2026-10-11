@@ -98,8 +98,9 @@ same paths when more files are added. Added siblings appear under `Torrent files
 
 Downloads and extracted archives are limited to 10 GiB and 10,000 entries. The
 server checks free disk space before work starts, reserves space across active
-downloads on the same volume, and keeps 64 MiB of headroom. Unknown-length HTTP
-responses are checked while streaming. Segmented downloads also reserve space
+downloads on the same volume, and keeps 64 MiB of headroom. Unknown-length and
+encoded HTTP responses reserve the unclaimed capacity up to 10 GiB until the
+transfer finishes; streaming checks enforce that admitted disk budget. Segmented downloads also reserve space
 for merging their parts. Archive expansion is checked before extraction; unsafe
 paths and links are rejected. Resource-limit failures stop the affected job and
 leave other retained downloads available.

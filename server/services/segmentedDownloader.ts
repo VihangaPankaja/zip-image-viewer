@@ -5,12 +5,14 @@ import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import got from "got";
 import { sleepWithSignal } from "../infrastructure/runtime/mediaClassification.js";
-import { assertPublicDownloadUrl } from "../infrastructure/downloads/publicDownload.js";
+import {
+  assertPublicDownloadUrl,
+  validateDownloadResponse,
+} from "../infrastructure/downloads/publicDownload.js";
 import {
   assertResourceSize,
   MAX_RESOURCE_BYTES,
   reserveStorage,
-  resourceLimitError,
   createDownloadBudget,
 } from "../infrastructure/runtime/resourceLimits.js";
 
@@ -35,8 +37,8 @@ type RangeRequest = {
   signal: AbortSignal;
   strictRange: boolean;
   append: boolean;
-  responseHeader?: (_statusCode: number) => void;
-  checkStorage: () => void;
+  responseHeader?: (_statusCode: number, _encoded: boolean) => void;
+  checkStorage: (_receivedBytes: number) => void;
   maxBytes: number;
 };
 
@@ -103,44 +105,19 @@ async function streamSingleRange({
   let allowedBytes = maxBytes;
   request.once("response", (response: IncomingMessage) => {
     responseState.checked = true;
-    const statusCode = response.statusCode ?? 0;
-    // Got removes content-encoding after decoding; raw headers retain it.
-    const encoded = response.rawHeaders.some(
-      (header, index) =>
-        index % 2 === 0 &&
-        header.toLowerCase() === "content-encoding" &&
-        response.rawHeaders[index + 1] !== "identity",
-    );
-    if (encoded) {
-      if (headers.Range) {
-        request.destroy(
-          resourceLimitError(
-            "Encoded responses do not support ranged downloads.",
-          ),
-        );
-        return;
-      }
-      allowedBytes = MAX_RESOURCE_BYTES;
-    }
-
-    if (statusCode >= 400) {
-      const err = new Error(`Download failed with HTTP ${String(statusCode)}`);
-      request.destroy(err);
-      return;
-    }
-
-    if (strictRange && headers.Range && statusCode !== 206) {
-      const err = Object.assign(
-        new Error(
-          "Server does not support range requests for segmented download.",
-        ),
-        { code: "RANGE_UNSUPPORTED" },
+    try {
+      const { statusCode, encoded } = validateDownloadResponse(
+        response,
+        Boolean(headers.Range),
+        strictRange,
       );
-      request.destroy(err);
-      return;
+      if (encoded) allowedBytes = MAX_RESOURCE_BYTES;
+      responseHeader?.(statusCode, encoded);
+    } catch (error) {
+      request.destroy(
+        error instanceof Error ? error : new Error(String(error)),
+      );
     }
-
-    responseHeader?.(statusCode);
   });
 
   const budget = createDownloadBudget(() => allowedBytes, state, checkStorage);
@@ -157,6 +134,26 @@ async function streamSingleRange({
     throw new Error("Download failed before response was received.");
 }
 
+async function reserveDownloadStorage(
+  targetPath: string,
+  metadata: RemoteMetadata,
+  settings: DownloadSettings,
+  segmented: boolean,
+) {
+  const canResume =
+    settings.enableResume &&
+    !segmented &&
+    metadata.acceptRanges &&
+    metadata.size > 0;
+  const existingBytes = canResume
+    ? (await stat(targetPath).catch(() => null))?.size || 0
+    : 0;
+  return reserveStorage(
+    path.dirname(targetPath),
+    Math.max(0, metadata.size * (segmented ? 2 : 1) - existingBytes),
+  );
+}
+
 async function downloadSingleWithResume({
   url,
   targetPath,
@@ -164,7 +161,7 @@ async function downloadSingleWithResume({
   metadata,
   settings,
   signal,
-  checkStorage,
+  storage,
 }: {
   url: string;
   targetPath: string;
@@ -172,7 +169,7 @@ async function downloadSingleWithResume({
   metadata: RemoteMetadata;
   settings: DownloadSettings;
   signal: AbortSignal;
-  checkStorage: () => void;
+  storage: ReturnType<typeof reserveStorage>;
 }): Promise<void> {
   let existingBytes = 0;
   if (settings.enableResume) {
@@ -197,9 +194,10 @@ async function downloadSingleWithResume({
     signal,
     strictRange: shouldRangeResume,
     append: shouldRangeResume,
-    checkStorage,
+    checkStorage: storage.check,
     maxBytes: (metadata.size || MAX_RESOURCE_BYTES) - start,
-    responseHeader: (statusCode) => {
+    responseHeader: (statusCode, encoded) => {
+      if (encoded) storage.reserveAvailable();
       if (shouldRangeResume && statusCode !== 206) {
         void rm(targetPath, { force: true }).catch(() => undefined);
       }
@@ -236,7 +234,7 @@ async function downloadSegmentWithRetry({
   settings: DownloadSettings;
   state: DownloadState;
   signal: AbortSignal;
-  checkStorage: () => void;
+  checkStorage: (_receivedBytes: number) => void;
 }): Promise<string> {
   const partPath = `${targetPath}.part.${String(segment.index)}`;
 
@@ -315,17 +313,16 @@ export async function downloadWithSegmentedManager({
     metadata.acceptRanges &&
     metadata.size > 0;
 
-  const existingBytes =
-    settings.enableResume && !canUseSegments
-      ? (await stat(targetPath).catch(() => null))?.size || 0
-      : 0;
-  const storage = reserveStorage(
-    path.dirname(targetPath),
-    Math.max(0, metadata.size * (canUseSegments ? 2 : 1) - existingBytes),
+  const storage = await reserveDownloadStorage(
+    targetPath,
+    metadata,
+    settings,
+    canUseSegments,
   );
   const controller = new AbortController();
   signal = AbortSignal.any([signal, controller.signal]);
   try {
+    if (!metadata.size) storage.reserveAvailable();
     if (!canUseSegments) {
       await downloadSingleWithResume({
         url,
@@ -334,7 +331,7 @@ export async function downloadWithSegmentedManager({
         metadata,
         settings,
         signal,
-        checkStorage: storage.check,
+        storage,
       });
       return;
     }
@@ -356,6 +353,7 @@ export async function downloadWithSegmentedManager({
         }),
       ),
     );
+    controller.signal.throwIfAborted();
     const partPaths = results.map((result) => {
       if (result.status === "rejected") throw result.reason;
       return result.value;

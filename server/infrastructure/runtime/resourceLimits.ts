@@ -46,8 +46,26 @@ export function reserveStorage(directory: string, bytes: number) {
   entries.set(key, bytes);
   reservations.set(device, entries);
   return {
-    check: () => {
-      if (available() < STORAGE_HEADROOM_BYTES)
+    reserveAvailable: () => {
+      const otherBytes = [...entries.entries()].reduce(
+        (total, [entryKey, value]) => total + (entryKey === key ? 0 : value),
+        0,
+      );
+      const capacity = Math.min(
+        MAX_RESOURCE_BYTES,
+        available() - otherBytes - STORAGE_HEADROOM_BYTES,
+      );
+      if (capacity < 0)
+        throw resourceLimitError(
+          "Insufficient storage for this download or extraction.",
+        );
+      entries.set(key, capacity);
+    },
+    check: (receivedBytes = 0) => {
+      if (
+        receivedBytes > (entries.get(key) ?? 0) ||
+        available() < STORAGE_HEADROOM_BYTES
+      )
         throw resourceLimitError(
           "Insufficient storage for this download or extraction.",
         );
@@ -62,7 +80,7 @@ export function reserveStorage(directory: string, bytes: number) {
 export function createDownloadBudget(
   maxBytes: () => number,
   state: { downloadedBytes: number },
-  checkStorage: () => void,
+  checkStorage: (_receivedBytes: number) => void,
 ): Transform {
   let received = 0;
   return new Transform({
@@ -73,7 +91,7 @@ export function createDownloadBudget(
           throw resourceLimitError(
             "Response exceeds the allowed download size.",
           );
-        checkStorage();
+        checkStorage(received);
         state.downloadedBytes += chunk.length;
         callback(null, chunk);
       } catch (error) {

@@ -127,6 +127,9 @@ export async function extractWith7zip(
       { signal: controller.signal },
     );
     controller.signal.throwIfAborted();
+  } catch (error) {
+    controller.signal.throwIfAborted();
+    throw error;
   } finally {
     clearInterval(timer);
     storage.release();

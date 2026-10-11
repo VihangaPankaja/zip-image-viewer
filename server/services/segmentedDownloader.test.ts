@@ -16,6 +16,49 @@ import { describe, expect, it } from "vitest";
 import { runCommand } from "../infrastructure/process/commandRunner.js";
 import { downloadWithSegmentedManager } from "./segmentedDownloader.js";
 
+it("preserves a later segment's HTTP failure after cancelling an earlier segment", async () => {
+  const workspace = await mkdtemp(join(tmpdir(), "segment-failure-"));
+  let started!: () => void;
+  const firstStarted = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const server = createServer((request, response) => {
+    if (request.headers.range === "bytes=0-3") {
+      response.writeHead(206, { "content-range": "bytes 0-3/8" });
+      response.write("a");
+      started();
+    } else {
+      void firstStarted.then(() => response.writeHead(503).end());
+    }
+  });
+  try {
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("No TCP port");
+    await expect(
+      downloadWithSegmentedManager({
+        url: `http://127.0.0.1:${String(address.port)}/file`,
+        targetPath: join(workspace, "download.bin"),
+        signal: new AbortController().signal,
+        state: { downloadedBytes: 0 },
+        metadata: { size: 8, acceptRanges: true },
+        settings: {
+          enableResume: false,
+          enableMultithread: true,
+          threadCount: 2,
+          maxRetries: 0,
+        },
+      }),
+    ).rejects.toThrow("HTTP 503");
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
 it("downloads encoded responses using a decoded byte cap instead of the wire content length", async () => {
   const workspace = await mkdtemp(join(tmpdir(), "encoded-download-"));
   const payload = Buffer.alloc(10_000, 7);

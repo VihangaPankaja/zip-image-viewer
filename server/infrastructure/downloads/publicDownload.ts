@@ -1,4 +1,35 @@
 import { publicHttpUrlSchema } from "../../../shared/contracts.js";
+import type { IncomingMessage } from "node:http";
+import { resourceLimitError } from "../runtime/resourceLimits.js";
+
+export function validateDownloadResponse(
+  response: IncomingMessage,
+  hasRange: boolean,
+  strictRange: boolean,
+) {
+  const statusCode = response.statusCode ?? 0;
+  // Got removes content-encoding after decoding; raw headers retain it.
+  const encoded = response.rawHeaders.some(
+    (header, index) =>
+      index % 2 === 0 &&
+      header.toLowerCase() === "content-encoding" &&
+      response.rawHeaders[index + 1] !== "identity",
+  );
+  if (encoded && hasRange)
+    throw resourceLimitError(
+      "Encoded responses do not support ranged downloads.",
+    );
+  if (statusCode >= 400)
+    throw new Error(`Download failed with HTTP ${String(statusCode)}`);
+  if (strictRange && hasRange && statusCode !== 206)
+    throw Object.assign(
+      new Error(
+        "Server does not support range requests for segmented download.",
+      ),
+      { code: "RANGE_UNSUPPORTED" },
+    );
+  return { statusCode, encoded };
+}
 
 export function assertPublicDownloadUrl(url: string | URL): void {
   if (!publicHttpUrlSchema.safeParse(String(url)).success)

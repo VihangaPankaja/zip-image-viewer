@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { gzipSync } from "node:zlib";
 import { once } from "node:events";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -7,6 +8,25 @@ import { afterEach, expect, it, vi } from "vitest";
 import WebTorrent, { type Torrent } from "webtorrent";
 import { downloadWithSegmentedManager } from "./segmentedDownloader.js";
 import { createWebTorrentAdapter } from "../application/torrents/torrentDownloader.js";
+
+vi.mock("webtorrent", async (importOriginal) => {
+  const { default: WebTorrent } =
+    await importOriginal<typeof import("webtorrent")>();
+  return {
+    default: class extends WebTorrent {
+      constructor(options: ConstructorParameters<typeof WebTorrent>[0]) {
+        super({
+          ...options,
+          dht: false,
+          tracker: false,
+          lsd: false,
+          natUpnp: false,
+          natPmp: false,
+        });
+      }
+    },
+  };
+});
 
 const disk = vi.hoisted(() => ({ free: 64 * 1024 ** 2 + 120 }));
 vi.mock("node:fs", async (importOriginal) => ({
@@ -29,7 +49,12 @@ async function workspace() {
   return directory;
 }
 
-function transfer(url: string, targetPath: string, size = 80) {
+function transfer(
+  url: string,
+  targetPath: string,
+  size = 80,
+  enableResume = false,
+) {
   return downloadWithSegmentedManager({
     url,
     targetPath,
@@ -37,13 +62,84 @@ function transfer(url: string, targetPath: string, size = 80) {
     state: { downloadedBytes: 0 },
     metadata: { size, acceptRanges: false },
     settings: {
-      enableResume: false,
+      enableResume,
       enableMultithread: false,
       threadCount: 1,
       maxRetries: 0,
     },
   });
 }
+
+it.each([false, true])(
+  "keeps unknown or encoded streams within unreserved capacity (encoded=%s)",
+  async (encoded) => {
+    const directory = await workspace();
+    await writeFile(path.join(directory, "retained.bin"), "retained bytes");
+    const payload = Buffer.alloc(80, 7);
+    const body = encoded ? gzipSync(payload) : payload;
+    let finish = () => {};
+    let started!: () => void;
+    const ready = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const server = createServer((request, response) => {
+      if (request.url === "/known") {
+        finish = () => response.end(payload);
+        started();
+      } else {
+        if (encoded)
+          response.writeHead(200, {
+            "content-encoding": "gzip",
+            "content-length": body.length,
+          });
+        response.end(body);
+      }
+    });
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("No TCP port");
+    const url = `http://127.0.0.1:${String(address.port)}`;
+    const knownPath = path.join(directory, "known.bin");
+    await writeFile(knownPath, Buffer.alloc(100, 1));
+    const known = transfer(`${url}/known`, knownPath, 80, true);
+    try {
+      await ready;
+      await expect(
+        transfer(
+          `${url}/unknown`,
+          path.join(directory, "rejected.bin"),
+          encoded ? body.length : 0,
+        ),
+      ).rejects.toMatchObject({
+        code: "DOWNLOAD_FATAL",
+        message: "Insufficient storage for this download or extraction.",
+      });
+      finish();
+      await known;
+      await transfer(
+        `${url}/unknown`,
+        path.join(directory, "unknown.bin"),
+        encoded ? body.length : 0,
+      );
+      expect(await readFile(path.join(directory, "known.bin"))).toEqual(
+        payload,
+      );
+      expect(await readFile(path.join(directory, "unknown.bin"))).toEqual(
+        payload,
+      );
+      expect(await readFile(path.join(directory, "retained.bin"), "utf8")).toBe(
+        "retained bytes",
+      );
+    } finally {
+      finish();
+      await known.catch(() => undefined);
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  },
+);
 
 it("reserves storage across active HTTP jobs and releases it without changing retained files", async () => {
   const directory = await workspace();

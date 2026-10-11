@@ -3,8 +3,27 @@ import { createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { createWebTorrentAdapter } from "./torrentDownloader.js";
+
+vi.mock("webtorrent", async (importOriginal) => {
+  const { default: WebTorrent } =
+    await importOriginal<typeof import("webtorrent")>();
+  return {
+    default: class extends WebTorrent {
+      constructor(options: ConstructorParameters<typeof WebTorrent>[0]) {
+        super({
+          ...options,
+          dht: false,
+          tracker: false,
+          lsd: false,
+          natUpnp: false,
+          natPmp: false,
+        });
+      }
+    },
+  };
+});
 
 it("ignores torrent HTTP web seeds rather than bypassing guarded download requests", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "torrent-http-source-"));
