@@ -1087,6 +1087,33 @@ for (const device of devices) {
       await save(page, device, theme, "explorer-dialog");
       await page.keyboard.press("Escape");
       await captureLargeExplorer(page, device, theme, mobile);
+      await page.getByRole("tab", { name: "Explore", exact: true }).click();
+      if (mobile)
+        await page.getByRole("button", { name: "Show sessions" }).click();
+      await page
+        .getByRole("button", { name: "Open Coastal collection", exact: true })
+        .click();
+      await page.getByRole("button", { name: "Storage", exact: true }).click();
+      const storageDialog = page.getByRole("dialog", {
+        name: "Session storage",
+      });
+      await page.route("**/rpc/sessions/remove", (route) =>
+        route.fulfill({ json: { json: null } }),
+      );
+      await page.route("**/rpc/sessions/list", (route) =>
+        route.fulfill({ json: { json: { items: [] } } }),
+      );
+      await storageDialog
+        .getByRole("button", { name: "Delete session files…" })
+        .click();
+      await storageDialog
+        .getByRole("button", { name: "Delete permanently" })
+        .click();
+      await expect(storageDialog).toHaveCount(0);
+      await expect(
+        page.getByRole("button", { name: "Storage", exact: true }),
+      ).toHaveCount(0);
+      await save(page, device, theme, "session-storage-deleted");
     });
   }
 }

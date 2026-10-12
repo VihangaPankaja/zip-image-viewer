@@ -26,6 +26,11 @@ if (run("git", ["status", "--porcelain", "--untracked-files=normal"]))
     "Commit implementation changes before publishing screenshots.",
   );
 const requiredScreens = [
+  "session-storage-totals",
+  "session-storage-pinned",
+  "session-storage-cache-cleared",
+  "session-storage-delete-warning",
+  "session-storage-deleted",
   "downloads-empty",
   "http-and-torrent-downloads",
   "settings",

@@ -1610,6 +1610,7 @@
           area: "UI / UX",
           priority: "P1",
           effort: "M",
+          status: "Done",
           title: "Show storage use and make deletion explicit",
           summary:
             "Separate removing an item from deleting its downloaded files.",
@@ -1617,8 +1618,9 @@
           plan: "Show original files, previews and transcodes separately. Add keep/pin controls, cache-only cleanup and clear deletion scope. Warn before removing files used by retained torrents.",
           done: "Clear transcode cache without losing originals. Retained downloads survive expiry; explicit delete removes the intended files and updates the UI.",
           depends: "S01, S02",
+          note: "Completed in v3.14.0: a responsive Storage dialog separates originals, previews/thumbnails and transcodes/remuxes, counting hardlinked payloads once. Cache-only cleanup preserves original bytes, regenerates previews and serializes deletion while protecting media work and recent HLS playback. Temporary sessions can be kept through viewer close and expiry until the server stops; retained torrents already survive restarts. Explicit deletion warns about retained files and removes the owning queue entry, including pinned HTTP sessions whose job record has expired. Real filesystem, lifecycle, contract, component, keyboard, touch and axe regressions plus independent review verify the flows.",
           evidence:
-            "server/application/sessions/sessionManager.ts; server/bootstrap/runtimeLifecycle.ts",
+            "client/src/features/workspace/components/SessionStorageDialog.tsx; server/application/sessions/sessionStorage.ts; server/infrastructure/media/derivedMediaCache.ts; server/bootstrap/runtimeJobActions.test.ts; tests/e2e/session-storage.spec.ts",
         },
         {
           id: "S01",
