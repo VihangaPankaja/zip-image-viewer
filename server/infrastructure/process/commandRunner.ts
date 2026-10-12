@@ -1,10 +1,18 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { constants } from "node:fs";
-import { access, chmod } from "node:fs/promises";
+import { constants, createWriteStream } from "node:fs";
+import { access, chmod, mkdir, utimes } from "node:fs/promises";
+import { pipeline } from "node:stream/promises";
 import path from "node:path";
 import { validateArchiveEntries } from "../archive/archiveLimits.js";
-import { listExtractedEntries } from "../archive/listExtractedEntries.js";
-import { reserveStorage } from "../runtime/resourceLimits.js";
+import {
+  createDownloadBudget,
+  MAX_RESOURCE_BYTES,
+  reserveStorage,
+  resourceLimitError,
+} from "../runtime/resourceLimits.js";
+import { sanitizeEntryPath } from "../runtime/runtimePrimitives.js";
+
+const MAX_COMMAND_OUTPUT_BYTES = 10 * 1024 ** 2;
 
 function chunkText(chunk: unknown): string {
   if (typeof chunk === "string") return chunk;
@@ -62,23 +70,119 @@ export async function runCommandCapture(
 ): Promise<{ stdout: string; stderr: string }> {
   await ensureExecutable(command);
   const { allowNonZeroExit = false, ...spawnOptions } = options;
+  const controller = new AbortController();
   const child = spawn(command, args, {
     stdio: ["ignore", "pipe", "pipe"],
     ...spawnOptions,
+    signal: spawnOptions.signal
+      ? AbortSignal.any([spawnOptions.signal, controller.signal])
+      : controller.signal,
   });
   let stdout = "";
   let stderr = "";
+  let capturedBytes = 0;
+  const capture = (chunk: unknown) => {
+    const text = chunkText(chunk);
+    capturedBytes += Buffer.byteLength(text);
+    if (capturedBytes > MAX_COMMAND_OUTPUT_BYTES) {
+      controller.abort(
+        resourceLimitError("Command metadata exceeds the 10 MiB limit."),
+      );
+      return "";
+    }
+    return text;
+  };
   child.stdout.on("data", (chunk: unknown) => {
-    stdout += chunkText(chunk);
+    stdout += capture(chunk);
   });
   child.stderr.on("data", (chunk: unknown) => {
-    stderr += chunkText(chunk);
+    stderr += capture(chunk);
   });
-  const code = await waitForClose(child);
-  if (code !== 0 && !allowNonZeroExit) {
-    throw new Error(stderr || `Command failed with code ${String(code)}`);
+  try {
+    const code = await waitForClose(child);
+    controller.signal.throwIfAborted();
+    if (code !== 0 && !allowNonZeroExit)
+      throw new Error(stderr || `Command failed with code ${String(code)}`);
+    return { stdout, stderr };
+  } catch (error) {
+    controller.signal.throwIfAborted();
+    throw error;
   }
-  return { stdout, stderr };
+}
+
+async function writeArchiveEntry({
+  executable,
+  archivePath,
+  entry,
+  destination,
+  gzip,
+  storage,
+  state,
+}: {
+  executable: string;
+  archivePath: string;
+  entry: { path: string; size: number };
+  destination: string;
+  gzip: boolean;
+  storage: ReturnType<typeof reserveStorage>;
+  state: { downloadedBytes: number };
+}) {
+  const controller = new AbortController();
+  const child = spawn(
+    executable,
+    ["x", "-so", "-y", "-spd", "-ssc", "--", archivePath, entry.path],
+    { stdio: ["ignore", "pipe", "pipe"], signal: controller.signal },
+  );
+  let stderr = "";
+  let stderrBytes = 0;
+  child.stderr.on("data", (chunk: unknown) => {
+    const text = chunkText(chunk);
+    stderrBytes += Buffer.byteLength(text);
+    if (stderrBytes > MAX_COMMAND_OUTPUT_BYTES)
+      controller.abort(
+        resourceLimitError("Command metadata exceeds the 10 MiB limit."),
+      );
+    else stderr += text;
+  });
+  const closed = waitForClose(child).catch((error: unknown) => {
+    controller.abort(error);
+    return null;
+  });
+  const before = state.downloadedBytes;
+  const budget = createDownloadBudget(
+    () => (gzip ? MAX_RESOURCE_BYTES : entry.size),
+    state,
+    (received) => storage.check(before + received),
+  );
+  const timer = setInterval(() => {
+    try {
+      storage.check(state.downloadedBytes);
+    } catch (error) {
+      controller.abort(error);
+    }
+  }, 100);
+  try {
+    await pipeline(
+      child.stdout,
+      budget,
+      createWriteStream(destination, { flags: "wx" }),
+    );
+    const code = await closed;
+    controller.signal.throwIfAborted();
+    if (code !== 0)
+      throw new Error(stderr || `Command failed with code ${String(code)}`);
+    if (!gzip && state.downloadedBytes - before !== entry.size)
+      throw resourceLimitError(
+        "Archive entry does not match its declared size.",
+      );
+  } catch (error) {
+    controller.abort(error);
+    await closed;
+    controller.signal.throwIfAborted();
+    throw error;
+  } finally {
+    clearInterval(timer);
+  }
 }
 
 export async function extractWith7zip(
@@ -106,6 +210,8 @@ export async function extractWith7zip(
       return {
         path: values.Path ?? "",
         size: Number(values.Size ?? 0),
+        directory: values.Folder === "+" || /^D/.test(values.Attributes ?? ""),
+        modifiedAt: Date.parse(values.Modified ?? ""),
         isLink:
           Boolean(values["Symbolic Link"] || values["Hard Link"]) ||
           /^l/.test(values.Attributes ?? ""),
@@ -113,42 +219,43 @@ export async function extractWith7zip(
     });
   const bytes = validateArchiveEntries(entries);
   const storage = reserveStorage(extractDirectory, bytes);
-  const controller = new AbortController();
-  let checking: Promise<void> | undefined;
-  const check = () =>
-    (checking ??= (async () => {
-      try {
-        storage.check();
-        const output = await listExtractedEntries(extractDirectory);
-        storage.check(output.reduce((total, entry) => total + entry.size, 0));
-      } catch (error) {
-        controller.abort(error);
-      }
-    })().finally(() => {
-      checking = undefined;
-    }));
-  // shortcut: output can grow between scans; use an OS quota for a strict write ceiling.
-  const timer = setInterval(() => {
-    void check();
-  }, 100);
+  const gzip = /^Type = gzip\r?$/m.test(stdout);
+  const state = { downloadedBytes: 0 };
   try {
     // Gzip listings can report only one member's modulo-32-bit output size.
-    if (/^Type = gzip\r?$/m.test(stdout)) storage.reserveAvailable();
-    await runCommand(
-      executable,
-      ["x", "-y", `-o${extractDirectory}`, archivePath],
-      { signal: controller.signal },
-    );
-    await checking;
-    await check();
-    controller.signal.throwIfAborted();
-  } catch (error) {
-    await checking;
-    controller.signal.throwIfAborted();
-    throw error;
+    if (gzip) storage.reserveAvailable();
+    for (const entry of entries) {
+      const destination = path.join(
+        extractDirectory,
+        sanitizeEntryPath(entry.path),
+      );
+      if (entry.directory) await mkdir(destination, { recursive: true });
+      else {
+        await mkdir(path.dirname(destination), { recursive: true });
+        await writeArchiveEntry({
+          executable,
+          archivePath,
+          entry,
+          destination,
+          gzip,
+          storage,
+          state,
+        });
+      }
+    }
+    for (const entry of [...entries].reverse()) {
+      if (!Number.isFinite(entry.modifiedAt)) continue;
+      const destination = path.join(
+        extractDirectory,
+        sanitizeEntryPath(entry.path),
+      );
+      await utimes(
+        destination,
+        new Date(entry.modifiedAt),
+        new Date(entry.modifiedAt),
+      );
+    }
   } finally {
-    clearInterval(timer);
-    await checking;
     storage.release();
   }
 }

@@ -174,11 +174,22 @@ describe("downloadWithSegmentedManager", () => {
 });
 
 it.each([
-  { payload: "abc", staleParts: false, threads: 8 },
-  { payload: "a fresh download", staleParts: true, threads: 3 },
+  { payload: "abc", staleParts: false, threads: 8, encoding: "identity" },
+  {
+    payload: "a fresh download",
+    staleParts: true,
+    threads: 3,
+    encoding: "identity",
+  },
+  {
+    payload: "capitalized identity",
+    staleParts: false,
+    threads: 2,
+    encoding: "Identity",
+  },
 ])(
   "downloads small payloads and overwrites stale parts when resume is disabled (%j)",
-  async ({ payload, staleParts, threads }) => {
+  async ({ payload, staleParts, threads, encoding }) => {
     const workspace = await mkdtemp(join(tmpdir(), "segmented-restart-"));
     const targetPath = join(workspace, "download.bin");
     const body = Buffer.from(payload);
@@ -203,6 +214,7 @@ it.each([
       const part = body.subarray(start, end + 1);
       response
         .writeHead(206, {
+          "content-encoding": encoding,
           "content-length": part.length,
           "content-range": `bytes ${String(start)}-${String(end)}/${String(body.length)}`,
         })

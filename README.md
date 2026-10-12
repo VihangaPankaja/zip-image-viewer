@@ -102,10 +102,13 @@ downloads on the same volume, and keeps 64 MiB of headroom. Unknown-length and
 encoded HTTP responses reserve the unclaimed capacity up to 10 GiB until the
 transfer finishes; streaming checks enforce that admitted disk budget. Segmented downloads also reserve space
 for merging their parts. Gzip extraction also reserves unclaimed capacity because
-its size hint can omit earlier members. Non-ZIP output is checked during extraction
-and after the child exits; it can grow between the 100 ms checks. Archive expansion is checked before extraction; unsafe
+its size hint can omit earlier members. Non-ZIP entries stream through the size
+and storage checks before bytes reach the filesystem. Each entry is extracted
+separately, so solid archives may take longer. Archive expansion is checked before extraction; unsafe
 paths and links are rejected. Resource-limit failures stop the affected job and
 leave other retained downloads available.
+
+Captured archive metadata and extraction diagnostics are limited to 10 MiB.
 
 Torrent HTTP web seeds and magnet `xs` metadata fallbacks are disabled because
 they bypass the guarded HTTP downloader. Direct `.torrent` URLs still use the

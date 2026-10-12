@@ -11,6 +11,7 @@ export function validateArchiveEntries(
 ): number {
   assertResourceEntryCount(entries.length);
   let bytes = 0;
+  const paths = new Set<string>();
   for (const entry of entries) {
     const name = entry.path.replaceAll("\\", "/");
     if (
@@ -20,7 +21,11 @@ export function validateArchiveEntries(
       name.split("/").some((part) => part === "..")
     )
       throw resourceLimitError(`Unsafe entry path: ${entry.path}`);
-    sanitizeEntryPath(name);
+    const parts = sanitizeEntryPath(name).split("/");
+    for (let index = 1; index <= parts.length; index++) {
+      paths.add(parts.slice(0, index).join("/"));
+      assertResourceEntryCount(paths.size);
+    }
     if (entry.isLink)
       throw resourceLimitError("Archive links are not supported.");
     assertResourceSize(entry.size);

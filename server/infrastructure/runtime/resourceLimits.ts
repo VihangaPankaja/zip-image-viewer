@@ -89,7 +89,7 @@ export function createDownloadBudget(
         received += chunk.length;
         if (received > maxBytes())
           throw resourceLimitError(
-            "Response exceeds the allowed download size.",
+            "Download or extraction exceeds its allowed size.",
           );
         checkStorage(received);
         state.downloadedBytes += chunk.length;

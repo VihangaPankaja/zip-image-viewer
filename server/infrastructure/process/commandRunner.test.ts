@@ -6,6 +6,8 @@ import {
   readFile,
   readdir,
   rm,
+  stat,
+  utimes,
   writeFile,
 } from "node:fs/promises";
 import { gzipSync } from "node:zlib";
@@ -37,21 +39,13 @@ vi.mock("node:child_process", async (importOriginal) => {
     spawn: (command: string, args: string[], options: SpawnOptions) => {
       if (command !== "storage-extractor")
         return actual.spawn(command, args, options);
-      const output = path.join(
-        args.find((argument) => argument.startsWith("-o"))?.slice(2) ?? "",
-        "child.bin",
-      );
       const script =
         args[0] === "l"
           ? `process.stdout.write('----------\\nPath = child.bin\\nSize = ${disk.size}\\n\\n')`
           : disk.fail
-            ? "setInterval(() => {}, 1000)"
-            : `require('node:fs').writeFileSync(process.argv[1], Buffer.alloc(${disk.outputBytes}));${disk.hold ? "setTimeout(() => process.exit(0), 300)" : ""}`;
-      const child = actual.spawn(
-        process.execPath,
-        ["-e", script, output],
-        options,
-      );
+            ? "process.stdout.write('a'); setInterval(() => {}, 1000)"
+            : `process.stdout.write(Buffer.alloc(${disk.outputBytes}));${disk.hold ? "setTimeout(() => process.exit(0), 300)" : ""}`;
+      const child = actual.spawn(process.execPath, ["-e", script], options);
       child.once("error", (error) => {
         if (error.name === "AbortError") disk.aborted = true;
       });
@@ -76,8 +70,10 @@ test.each([false, true])(
         extractWith7zip("storage-extractor", "fixture.gz", directory),
       ).rejects.toMatchObject({
         code: "DOWNLOAD_FATAL",
-        message: "Insufficient storage for this download or extraction.",
       });
+      const files = await readdir(directory);
+      for (const file of files)
+        expect(await readFile(path.join(directory, file))).toHaveLength(0);
       if (hold) expect(disk.aborted).toBe(true);
     } finally {
       disk.fail = true;
@@ -102,17 +98,80 @@ test("reports extraction storage exhaustion instead of subprocess cancellation",
     disk.free = 64 * 1024 ** 2 + 512;
     disk.size = 512;
     disk.fail = false;
-    await extractWith7zip("storage-extractor", "fixture.tar", directory);
+    disk.outputBytes = 512;
+    const retry = path.join(directory, "retry");
+    await mkdir(retry);
+    await extractWith7zip("storage-extractor", "fixture.tar", retry);
   } finally {
     disk.free = 64 * 1024 ** 2 + 512;
     disk.size = 1;
     disk.fail = true;
+    disk.outputBytes = 0;
     disk.aborted = false;
     await rm(directory, { recursive: true, force: true });
   }
 });
 
+test("rejects missing output for an ordinary declared archive entry", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "extraction-missing-"));
+  disk.fail = false;
+  try {
+    await expect(
+      extractWith7zip("storage-extractor", "fixture.7z", directory),
+    ).rejects.toThrow("does not match its declared size");
+  } finally {
+    disk.fail = true;
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("streams literal 7-Zip members with their contents and timestamps intact", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "literal-archive-"));
+  const source = path.join(directory, "source");
+  const output = path.join(directory, "output");
+  const archive = path.join(directory, "members.7z");
+  const members = ["Folder/note[1].txt", "@list.txt", "-option.txt"];
+  try {
+    await mkdir(path.join(source, "Folder"), { recursive: true });
+    await mkdir(path.join(source, "empty"));
+    await mkdir(output);
+    for (const [index, name] of members.entries()) {
+      await writeFile(path.join(source, name), `member ${index}`);
+      await utimes(
+        path.join(source, name),
+        new Date("2020-01-02T03:04:05Z"),
+        new Date("2020-01-02T03:04:05Z"),
+      );
+    }
+    await runCommand(path7za, ["a", "-t7z", archive, "."], { cwd: source });
+    await extractWith7zip(path7za, archive, output);
+    for (const [index, name] of members.entries()) {
+      expect(await readFile(path.join(output, name), "utf8")).toBe(
+        `member ${index}`,
+      );
+      expect((await stat(path.join(output, name))).mtimeMs).toBe(
+        Date.parse("2020-01-02T03:04:05Z"),
+      );
+    }
+    expect(await readdir(path.join(output, "empty"))).toEqual([]);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 describe("commandRunner", () => {
+  test("bounds captured archive metadata before accumulating oversized output", async () => {
+    await expect(
+      runCommandCapture(process.execPath, [
+        "-e",
+        "process.stdout.write(Buffer.alloc(11 * 1024 ** 2))",
+      ]),
+    ).rejects.toMatchObject({
+      code: "DOWNLOAD_FATAL",
+      message: "Command metadata exceeds the 10 MiB limit.",
+    });
+  });
+
   test("captures output and preserves command failure details", async () => {
     await expect(
       runCommandCapture(process.execPath, [
@@ -152,6 +211,10 @@ test.each([512, 1024])(
         ).rejects.toMatchObject({
           code: "DOWNLOAD_FATAL",
         });
+        for (const file of await readdir(output))
+          expect(
+            (await readFile(path.join(output, file))).length,
+          ).toBeLessThanOrEqual(capacity);
       } else {
         await extractWith7zip(path7za, archive, output);
         const files = await readdir(output);

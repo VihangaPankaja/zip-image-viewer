@@ -13,7 +13,7 @@ export function validateDownloadResponse(
     (header, index) =>
       index % 2 === 0 &&
       header.toLowerCase() === "content-encoding" &&
-      response.rawHeaders[index + 1] !== "identity",
+      response.rawHeaders[index + 1].trim().toLowerCase() !== "identity",
   );
   if (encoded && hasRange)
     throw resourceLimitError(
