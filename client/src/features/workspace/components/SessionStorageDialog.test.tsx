@@ -134,3 +134,23 @@ it("shows a failed measurement without offering file actions", async () => {
     screen.queryByRole("button", { name: "Delete session files…" }),
   ).not.toBeInTheDocument();
 });
+
+it("reflects the pending pin immediately and restores the saved value on failure", async () => {
+  let reject = (_error: Error) => {};
+  api.pin.mockReturnValue(
+    new Promise<void>((_resolve, fail) => {
+      reject = fail;
+    }),
+  );
+  const { user } = setup();
+  const checkbox = await screen.findByRole("checkbox", {
+    name: "Keep until the server stops",
+  });
+  await user.click(checkbox);
+  expect(checkbox).toBeChecked();
+  expect(checkbox).toBeDisabled();
+  reject(new Error("Could not save pin."));
+  await screen.findByText("Could not save pin.");
+  await waitFor(() => expect(checkbox).not.toBeChecked());
+  expect(checkbox).toBeEnabled();
+});

@@ -17,6 +17,7 @@ function useStorageActions({ id, onClose, onDeleted }: Props) {
   const remove = useMutation(workspaceRpc.sessions.remove.mutationOptions());
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [pendingPin, setPendingPin] = useState<boolean | null>(null);
   async function perform(action: () => Promise<unknown>, success: string) {
     setError("");
     setMessage("");
@@ -31,7 +32,12 @@ function useStorageActions({ id, onClose, onDeleted }: Props) {
     }
   }
   return {
-    busy: clear.isPending || pin.isPending || remove.isPending,
+    busy:
+      pendingPin !== null ||
+      clear.isPending ||
+      pin.isPending ||
+      remove.isPending,
+    pendingPin,
     message,
     error,
     clear: () =>
@@ -39,13 +45,15 @@ function useStorageActions({ id, onClose, onDeleted }: Props) {
         () => clear.mutateAsync({ id }),
         "Cache cleared. Original files kept.",
       ),
-    pin: (pinned: boolean) =>
+    pin: (pinned: boolean) => {
+      setPendingPin(pinned);
       void perform(
         () => pin.mutateAsync({ id, pinned }),
         pinned
           ? "Session kept until the server stops."
           : "Session is temporary again.",
-      ),
+      ).finally(() => setPendingPin(null));
+    },
     remove: () =>
       void perform(async () => {
         await remove.mutateAsync({ id });
@@ -145,7 +153,7 @@ function StorageRetention({
       <label className="storage-pin">
         <input
           type="checkbox"
-          checked={data.pinned}
+          checked={actions.pendingPin ?? data.pinned}
           disabled={actions.busy}
           onChange={(event) => actions.pin(event.target.checked)}
         />
