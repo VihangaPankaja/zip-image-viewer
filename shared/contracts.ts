@@ -316,7 +316,25 @@ const removeSessionContract = oc
   .input(z.object({ id: z.uuid() }))
   .output(z.void());
 
+const sessionStorageSchema = z.object({
+  originalsBytes: z.number().nonnegative(),
+  previewsBytes: z.number().nonnegative(),
+  transcodesBytes: z.number().nonnegative(),
+  retained: z.boolean(),
+  pinned: z.boolean(),
+});
+export type SessionStorage = z.infer<typeof sessionStorageSchema>;
+const storageInputSchema = z.object({ id: z.uuid() });
+const storageContract = {
+  get: oc.input(storageInputSchema).output(sessionStorageSchema),
+  clear: oc.input(storageInputSchema).output(z.void()),
+  pin: oc
+    .input(storageInputSchema.extend({ pinned: z.boolean() }))
+    .output(z.void()),
+};
+
 export const serverContract = {
+  storage: storageContract,
   video: { qualities: videoQualitiesContract },
   sessions: {
     create: createSessionContract,

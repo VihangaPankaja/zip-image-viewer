@@ -10,6 +10,7 @@ const removal = vi.hoisted(
     target: string;
     wait?: Promise<void>;
     started: () => void;
+    waits?: Promise<void>[];
   } => ({
     target: "",
     wait: undefined,
@@ -24,11 +25,62 @@ vi.mock("node:fs/promises", async (importOriginal) => {
     rm: async (...args: Parameters<typeof fs.rm>) => {
       if (args[0] === removal.target) {
         removal.started();
-        await removal.wait;
+        await (removal.waits?.shift() ?? removal.wait);
       }
       return fs.rm(...args);
     },
   };
+});
+
+it("serializes queued cache clears and keeps media waiting until the last removal ends", async () => {
+  const workspaceDir = await mkdtemp(
+    path.join(os.tmpdir(), "cache-clear-race-"),
+  );
+  const finishes: (() => void)[] = [];
+  const session = { id: "clear-race", workspaceDir } as Session;
+  const cache = createDerivedMediaCache(
+    new Map([[session.id, session]]),
+    new Map(),
+    1_000,
+  );
+  let started = 0;
+  removal.target = path.join(workspaceDir, "thumbnails");
+  removal.started = () => {
+    started += 1;
+  };
+  removal.waits = Array.from(
+    { length: 3 },
+    () =>
+      new Promise<void>((resolve) => {
+        finishes.push(resolve);
+      }),
+  );
+  const first = cache.clear(session);
+  await vi.waitFor(() => expect(started).toBe(1));
+  const next = [cache.clear(session), cache.clear(session)];
+  try {
+    finishes[0]();
+    await first;
+    await vi.waitFor(() => expect(started).toBe(2));
+    expect(removal.waits).toHaveLength(1);
+    finishes[1]();
+    await vi.waitFor(() => expect(started).toBe(3));
+    let admitted = false;
+    const waiting = cache.waitForEviction(session.id).then(() => {
+      admitted = true;
+    });
+    await Promise.resolve();
+    expect(admitted).toBe(false);
+    finishes[2]();
+    await Promise.all([...next, waiting]);
+    expect(admitted).toBe(true);
+  } finally {
+    for (const finish of finishes) finish();
+    await Promise.allSettled([first, ...next]);
+    removal.target = "";
+    removal.waits = undefined;
+    await rm(workspaceDir, { recursive: true, force: true });
+  }
 });
 
 it("waits for an ongoing eviction before admitting a newly pinned request", async () => {

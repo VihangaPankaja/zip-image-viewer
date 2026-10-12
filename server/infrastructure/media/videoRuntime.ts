@@ -113,7 +113,11 @@ class VideoRuntime {
     work.controller.abort();
     await Promise.allSettled([...work.pending]);
     work.metadata.clear();
-    work.storyboards.clear();
+    this.clearCachedMedia(session);
+  };
+
+  clearCachedMedia = (session: Session): void => {
+    this.sessionWork(session).storyboards.clear();
   };
 
   ensureVideoStoryboard = (

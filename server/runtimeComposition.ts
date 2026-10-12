@@ -54,6 +54,7 @@ import {
 } from "./infrastructure/runtime/mediaClassification.js";
 import { readPreviewChunk } from "./infrastructure/media/imagePreviews.js";
 import { createRuntimeMedia } from "./bootstrap/runtimeMedia.js";
+import { createSessionStorage } from "./application/sessions/sessionStorage.js";
 import { listExtractedEntries } from "./infrastructure/archive/listExtractedEntries.js";
 import {
   detectRuntimeArchiveEncryption,
@@ -73,6 +74,8 @@ const {
   pinMediaRequest,
   ensureThumbnail,
   ensureImagePreview,
+  storage,
+  clearMediaCache,
 } = createRuntimeMedia(ffmpegPath, sessionStore, videoTranscodeStore, logEvent);
 const {
   ensureVideoTranscodeEntry,
@@ -161,6 +164,7 @@ const {
 );
 
 const app = createRuntimeApp({
+  storage: createSessionStorage(touchSession, { storage, clearMediaCache }),
   videoQualities: (input) =>
     getVideoQualities(input, {
       touchSession,

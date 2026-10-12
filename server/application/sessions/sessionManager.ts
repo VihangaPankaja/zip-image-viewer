@@ -13,10 +13,17 @@ export function createSessionManager(
   logEvent: LogEvent,
   cleanupVideoSession: (_session: Session) => Promise<void>,
 ) {
-  async function removeSession(sessionId: string, reason = "manual"): Promise<void> {
+  async function removeSession(
+    sessionId: string,
+    reason = "manual",
+  ): Promise<void> {
     const session = sessions.get(sessionId);
     if (!session) return;
-    if (session.retained && (reason === "expired" || reason === "viewer")) return;
+    if (
+      (session.retained || session.pinned) &&
+      (reason === "expired" || reason === "viewer")
+    )
+      return;
     if (session.retained && reason === "shutdown") {
       await cleanupVideoSession(session);
       return;

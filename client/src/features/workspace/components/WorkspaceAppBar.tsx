@@ -5,6 +5,7 @@ type WorkspaceAppBarProps = {
   activeView: WorkspaceView;
   onAddDownloads: () => void;
   onOpenSettings: () => void;
+  onOpenStorage?: () => void;
   onSelectView: (view: WorkspaceView) => void;
 };
 
@@ -12,6 +13,7 @@ export function WorkspaceAppBar({
   activeView,
   onAddDownloads,
   onOpenSettings,
+  onOpenStorage,
   onSelectView,
 }: WorkspaceAppBarProps) {
   return (
@@ -48,6 +50,18 @@ export function WorkspaceAppBar({
         </button>
       </nav>
       <div className="workspace-appbar-actions">
+        {onOpenStorage ? (
+          <button
+            className="ghost-button compact-button"
+            type="button"
+            onClick={(event) => {
+              event.currentTarget.focus();
+              onOpenStorage();
+            }}
+          >
+            Storage
+          </button>
+        ) : null}
         <button
           className="primary-button compact-button"
           type="button"

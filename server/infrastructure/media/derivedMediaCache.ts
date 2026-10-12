@@ -5,6 +5,7 @@ import type {
   VideoRendition,
   VideoTranscodeEntry,
 } from "../../domain/models.js";
+import { ApplicationError } from "../../domain/models.js";
 
 const DERIVED_DIRS = [
   "thumbnails",
@@ -27,15 +28,20 @@ type Candidate = {
 
 async function diskUsage(
   filePath: string,
+  seen = new Set<string>(),
 ): Promise<{ size: number; modifiedAt: number }> {
   const entry = await lstat(filePath).catch(() => null);
   if (!entry || entry.isSymbolicLink()) return { size: 0, modifiedAt: 0 };
-  if (!entry.isDirectory())
+  if (!entry.isDirectory()) {
+    const identity = `${entry.dev}:${entry.ino}`;
+    if (seen.has(identity)) return { size: 0, modifiedAt: entry.mtimeMs };
+    seen.add(identity);
     return { size: entry.size, modifiedAt: entry.mtimeMs };
+  }
   let size = 0;
   let modifiedAt = entry.mtimeMs;
   for (const name of await readdir(filePath).catch(() => [])) {
-    const child = await diskUsage(path.join(filePath, name));
+    const child = await diskUsage(path.join(filePath, name), seen);
     size += child.size;
     modifiedAt = Math.max(modifiedAt, child.modifiedAt);
   }
@@ -67,21 +73,23 @@ function findRendition(
   return undefined;
 }
 
-export function createDerivedMediaCache(
-  sessions: Map<string, Session>,
-  transcodes: Map<string, VideoTranscodeEntry>,
-  budgetBytes: number,
-) {
-  if (!Number.isFinite(budgetBytes) || budgetBytes < 0)
-    throw new RangeError("Invalid derived media budget.");
-  const active = new Map<string, number>();
-  const evicting = new Map<string, Promise<void>>();
-  let pending: Promise<void> | undefined;
+class DerivedMediaCache {
+  private readonly active = new Map<string, number>();
+  private readonly evicting = new Map<string, Promise<void>>();
+  private pending: Promise<void> | undefined;
+  constructor(
+    private readonly sessions: Map<string, Session>,
+    private readonly transcodes: Map<string, VideoTranscodeEntry>,
+    private readonly budgetBytes: number,
+  ) {
+    if (!Number.isFinite(budgetBytes) || budgetBytes < 0)
+      throw new RangeError("Invalid derived media budget.");
+  }
 
-  async function sweep(): Promise<void> {
+  private async sweep(): Promise<void> {
     const candidates: Candidate[] = [];
     let total = 0;
-    for (const session of sessions.values()) {
+    for (const session of this.sessions.values()) {
       for (const directory of DERIVED_DIRS) {
         const root = path.join(session.workspaceDir, directory);
         const rootEntry = await lstat(root).catch(() => null);
@@ -103,11 +111,13 @@ export function createDerivedMediaCache(
     }
     candidates.sort((a, b) => a.modifiedAt - b.modifiedAt);
     for (const candidate of candidates) {
-      if (total <= budgetBytes) break;
-      if (sessions.get(candidate.session.id) !== candidate.session) continue;
-      if (active.has(candidate.session.id)) continue;
+      if (total <= this.budgetBytes) break;
+      if (this.sessions.get(candidate.session.id) !== candidate.session)
+        continue;
+      if (this.active.has(candidate.session.id)) continue;
+      if (this.evicting.has(candidate.session.id)) continue;
       const rendition = candidate.isTranscode
-        ? findRendition(transcodes, candidate.path)
+        ? findRendition(this.transcodes, candidate.path)
         : undefined;
       if (rendition?.status === "queued" || rendition?.status === "running")
         continue;
@@ -124,29 +134,97 @@ export function createDerivedMediaCache(
         rendition.status = "idle";
         rendition.availableSegments = 0;
       });
-      evicting.set(candidate.session.id, eviction);
+      this.evicting.set(candidate.session.id, eviction);
       try {
         await eviction;
       } finally {
-        evicting.delete(candidate.session.id);
+        this.evicting.delete(candidate.session.id);
       }
       total -= candidate.size;
     }
     // ponytail: active playback may exceed the budget until its 30-second idle window ends.
   }
 
-  function enforce(): Promise<void> {
-    if (pending) return pending;
-    pending = sweep().finally(() => {
-      pending = undefined;
+  enforce = (): Promise<void> => {
+    if (this.pending) return this.pending;
+    this.pending = this.sweep().finally(() => {
+      this.pending = undefined;
     });
-    return pending;
-  }
-
-  return {
-    enforce,
-    protectSession: (sessionId: string) => protectSession(active, sessionId),
-    waitForEviction: (sessionId: string) =>
-      evicting.get(sessionId) ?? Promise.resolve(),
+    return this.pending;
   };
+
+  storage = async (session: Session) => {
+    const seen = new Set<string>();
+    let originalsBytes = 0;
+    let previewsBytes = 0;
+    let transcodesBytes = 0;
+    for (const name of await readdir(session.workspaceDir)) {
+      const { size } = await diskUsage(
+        path.join(session.workspaceDir, name),
+        seen,
+      );
+      if (name === "video-transcodes" || name === "video-quality")
+        transcodesBytes += size;
+      else if (DERIVED_DIRS.some((directory) => directory === name))
+        previewsBytes += size;
+      else originalsBytes += size;
+    }
+    return { originalsBytes, previewsBytes, transcodesBytes };
+  };
+
+  clear = async (session: Session, onCleared?: () => void): Promise<void> => {
+    await this.pending;
+    while (this.evicting.has(session.id)) await this.evicting.get(session.id);
+    const entries = [...this.transcodes.values()].filter(
+      (entry) => entry.sessionId === session.id,
+    );
+    if (
+      this.active.has(session.id) ||
+      entries.some((entry) =>
+        [...entry.renditions.values()].some(
+          (rendition) =>
+            rendition.status === "queued" ||
+            rendition.status === "running" ||
+            (rendition.lastAccessedAt &&
+              Date.now() - rendition.lastAccessedAt < ACTIVE_PLAYBACK_MS),
+        ),
+      )
+    )
+      throw new ApplicationError(
+        "CONFLICT",
+        "Media is active. Close playback and wait 30 seconds before clearing the cache.",
+        409,
+      );
+    if (this.sessions.get(session.id) !== session)
+      throw new ApplicationError("NOT_FOUND", "Session not found.", 404);
+    const removal = (async () => {
+      for (const directory of DERIVED_DIRS)
+        await rm(path.join(session.workspaceDir, directory), {
+          recursive: true,
+          force: true,
+        });
+      for (const [key, entry] of this.transcodes)
+        if (entry.sessionId === session.id) this.transcodes.delete(key);
+      onCleared?.();
+    })();
+    this.evicting.set(session.id, removal);
+    try {
+      await removal;
+    } finally {
+      this.evicting.delete(session.id);
+    }
+  };
+
+  protectSession = (sessionId: string) =>
+    protectSession(this.active, sessionId);
+  waitForEviction = (sessionId: string) =>
+    this.evicting.get(sessionId) ?? Promise.resolve();
+}
+
+export function createDerivedMediaCache(
+  sessions: Map<string, Session>,
+  transcodes: Map<string, VideoTranscodeEntry>,
+  budgetBytes: number,
+) {
+  return new DerivedMediaCache(sessions, transcodes, budgetBytes);
 }

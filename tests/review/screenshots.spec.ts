@@ -135,6 +135,44 @@ async function installSearchTree(page: Page) {
   });
 }
 
+async function captureStorage(
+  page: Page,
+  device: (typeof devices)[number],
+  theme: string,
+  state: Awaited<ReturnType<typeof installReviewFixtures>>,
+) {
+  await page.getByRole("button", { name: "Storage", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Session storage" });
+  await expect(dialog).toContainText("50 MB");
+  await save(page, device, theme, "session-storage-totals");
+  await dialog
+    .getByRole("checkbox", { name: "Keep until the server stops" })
+    .check();
+  await expect(dialog.getByRole("status")).toHaveText(
+    "Session kept until the server stops.",
+  );
+  await save(page, device, theme, "session-storage-pinned");
+  await dialog
+    .getByRole("button", { name: "Clear preview & transcode cache" })
+    .click();
+  await expect(dialog.getByRole("status")).toHaveText(
+    "Cache cleared. Original files kept.",
+  );
+  await expect(dialog.locator("dd")).toHaveText(["50 MB", "0 B", "0 B"]);
+  await save(page, device, theme, "session-storage-cache-cleared");
+  await page.keyboard.press("Escape");
+  state.storage.retained = true;
+  await page.getByRole("button", { name: "Storage", exact: true }).click();
+  await dialog.getByRole("button", { name: "Delete session files…" }).click();
+  await expect(dialog).toContainText(
+    "files needed to download skipped items later",
+  );
+  await save(page, device, theme, "session-storage-delete-warning");
+  await page.keyboard.press("Escape");
+  state.storage.retained = false;
+  state.storage.pinned = false;
+}
+
 async function resizeExplorer(page: Page, targetX: number) {
   const handle = await page.locator(".workspace-resize-handle").boundingBox();
   if (!handle) throw new Error("Explorer resize handle is missing.");
@@ -796,6 +834,7 @@ for (const device of devices) {
         page.getByRole("treeitem", { name: filenames[0], exact: true }),
       ).toBeVisible();
       await save(page, device, theme, "explorer");
+      await captureStorage(page, device, theme, state);
       await captureExplorerSearch(page, device, theme, mobile);
       const mediaFilter = page.getByRole("combobox", { name: "Media type" });
       await mediaFilter.selectOption("text");

@@ -9,8 +9,10 @@ import type {
   TorrentLimits,
   TorrentPriority,
 } from "../../shared/contracts.js";
+import type { ServerRpcDependencies } from "../rpc/serverRouter.js";
 
 type Dependencies = {
+  storage: ServerRpcDependencies["storage"];
   videoQualities: (_input: VideoQualitiesInput) => Promise<VideoQualities>;
   metrics: { getSessionCount: () => number; getJobCount: () => number };
   distDir: string;
@@ -53,6 +55,11 @@ function summarizeSession(session: Session) {
   };
 }
 
+function getSessionSummary(sessions: Map<string, Session>, id: string) {
+  const session = sessions.get(id);
+  return session ? summarizeSession(session) : undefined;
+}
+
 export function createRuntimeApp(deps: Dependencies) {
   const listJobs = () => deps.listOrderedJobs().map(deps.sanitizeJob);
   const listSessions = () =>
@@ -63,6 +70,7 @@ export function createRuntimeApp(deps: Dependencies) {
     listJobs,
     listSessions,
     rpc: {
+      storage: deps.storage,
       videoQualities: deps.videoQualities,
       listJobs,
       listSessions,
@@ -80,10 +88,7 @@ export function createRuntimeApp(deps: Dependencies) {
           deps.enqueueJob(job, input.confirmOversize);
           return deps.sanitizeJob(job);
         }),
-      getSession: (id) => {
-        const session = deps.sessions.get(id);
-        return session ? summarizeSession(session) : undefined;
-      },
+      getSession: (id) => getSessionSummary(deps.sessions, id),
       removeSession: (id) => deps.removeSession(id, "rpc"),
       cancelJob: (id) => {
         const job = deps.jobs.get(id);

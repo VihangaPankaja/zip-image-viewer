@@ -10,11 +10,17 @@ import {
   type SessionSummary,
   type VideoQualities,
   type VideoQualitiesInput,
+  type SessionStorage,
 } from "../../shared/contracts.js";
 
 import { ApplicationError } from "../domain/models.js";
 
 export type ServerRpcDependencies = {
+  storage: {
+    get: (_id: string) => Promise<SessionStorage>;
+    clear: (_id: string) => Promise<void>;
+    pin: (_id: string, _pinned: boolean) => void;
+  };
   videoQualities: (_input: VideoQualitiesInput) => Promise<VideoQualities>;
   listJobs: () => readonly Job[];
   listSessions: () => readonly SessionSummary[];
@@ -41,28 +47,13 @@ export type ServerRpcDependencies = {
   removeSession: (_id: string) => void | Promise<void>;
 };
 
-async function videoQualities(
-  deps: ServerRpcDependencies,
-  input: VideoQualitiesInput,
-) {
-  try {
-    return await deps.videoQualities(input);
-  } catch (error) {
-    if (error instanceof ApplicationError) {
-      throw new ORPCError(error.code, {
-        status: error.status,
-        message: error.message,
-      });
-    }
-    throw error;
-  }
-}
 export function createServerRpcRouter(deps: ServerRpcDependencies) {
   const contract = implement(serverContract);
   return contract.router({
+    storage: createStorageRouter(deps.storage),
     video: {
       qualities: contract.video.qualities.handler(({ input }) =>
-        videoQualities(deps, input),
+        applicationResult(() => deps.videoQualities(input)),
       ),
     },
     sessions: {
@@ -129,4 +120,34 @@ export function createServerRpcRouter(deps: ServerRpcDependencies) {
       ),
     },
   });
+}
+
+function createStorageRouter(deps: ServerRpcDependencies["storage"]) {
+  const contract = implement(serverContract.storage);
+  return contract.router({
+    get: contract.get.handler(({ input }) =>
+      applicationResult(() => deps.get(input.id)),
+    ),
+    clear: contract.clear.handler(({ input }) =>
+      applicationResult(() => deps.clear(input.id)),
+    ),
+    pin: contract.pin.handler(({ input }) =>
+      applicationResult(() => deps.pin(input.id, input.pinned)),
+    ),
+  });
+}
+
+async function applicationResult<Result>(
+  operation: () => Result | Promise<Result>,
+): Promise<Result> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (error instanceof ApplicationError)
+      throw new ORPCError(error.code, {
+        status: error.status,
+        message: error.message,
+      });
+    throw error;
+  }
 }

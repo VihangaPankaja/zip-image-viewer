@@ -128,7 +128,7 @@ function JobActions({ job, ...actions }: JobActionsProps) {
         {terminal
           ? job.sourceKind === "torrent"
             ? "Delete files"
-            : "Remove"
+            : "Remove from queue"
           : "Cancel"}
       </button>
     </div>

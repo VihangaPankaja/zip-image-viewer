@@ -552,6 +552,55 @@
   backdrop-filter: blur(3px);
 }
 
+.storage-dialog {
+  overflow: auto;
+}
+.storage-dialog-content {
+  padding: 20px;
+  display: grid;
+  gap: 16px;
+}
+.storage-dialog-content header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.storage-dialog-content p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.storage-totals {
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+.storage-totals > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.storage-totals dd {
+  margin: 0;
+  white-space: nowrap;
+}
+.storage-pin {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+.storage-dialog-content button {
+  min-height: 44px;
+}
+.storage-dialog-content section {
+  display: grid;
+  gap: 12px;
+}
+.storage-dialog-content .storage-delete {
+  color: var(--accent-danger);
+}
+
 .download-dialog-sheet {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto auto;
