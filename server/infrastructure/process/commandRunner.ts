@@ -130,7 +130,7 @@ async function writeArchiveEntry({
   const controller = new AbortController();
   const child = spawn(
     executable,
-    ["x", "-so", "-y", "-spd", "-ssc", "--", archivePath, entry.path],
+    ["x", "-so", "-y", "-spd", "-ssc", `-i!${entry.path}`, "--", archivePath],
     { stdio: ["ignore", "pipe", "pipe"], signal: controller.signal },
   );
   let stderr = "";
