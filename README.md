@@ -108,6 +108,9 @@ separately, so solid archives may take longer. Archive expansion is checked befo
 paths and links are rejected. Resource-limit failures stop the affected job and
 leave other retained downloads available.
 
+Retries remove unusable owned partials before admission and credit reusable
+regular files toward the remaining footprint. Unrelated retained files are preserved.
+
 Captured archive metadata and extraction diagnostics are limited to 10 MiB.
 
 Torrent HTTP web seeds and magnet `xs` metadata fallbacks are disabled because

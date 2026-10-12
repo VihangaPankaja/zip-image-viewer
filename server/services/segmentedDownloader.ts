@@ -10,6 +10,10 @@ import {
   validateDownloadResponse,
 } from "../infrastructure/downloads/publicDownload.js";
 import {
+  prepareDownloadFiles,
+  reusableDownloadBytes,
+} from "../infrastructure/downloads/downloadFiles.js";
+import {
   assertResourceSize,
   MAX_RESOURCE_BYTES,
   reserveStorage,
@@ -140,14 +144,13 @@ async function reserveDownloadStorage(
   settings: DownloadSettings,
   segmented: boolean,
 ) {
-  const canResume =
-    settings.enableResume &&
-    !segmented &&
-    metadata.acceptRanges &&
-    metadata.size > 0;
-  const existingBytes = canResume
-    ? (await stat(targetPath).catch(() => null))?.size || 0
-    : 0;
+  const existingBytes = await prepareDownloadFiles(targetPath, {
+    size: metadata.size,
+    resume: settings.enableResume && metadata.acceptRanges && metadata.size > 0,
+    segments: segmented
+      ? buildSegments(metadata.size, settings.threadCount)
+      : undefined,
+  });
   return reserveStorage(
     path.dirname(targetPath),
     Math.max(0, metadata.size * (segmented ? 2 : 1) - existingBytes),
@@ -248,9 +251,11 @@ async function downloadSegmentWithRetry({
     }
 
     try {
-      const existingBytes = settings.enableResume
-        ? (await stat(partPath).catch(() => null))?.size || 0
-        : 0;
+      const existingBytes = await reusableDownloadBytes(
+        partPath,
+        segment.end - segment.start + 1,
+        settings.enableResume,
+      );
 
       const start = segment.start + existingBytes;
       if (start > segment.end) {
