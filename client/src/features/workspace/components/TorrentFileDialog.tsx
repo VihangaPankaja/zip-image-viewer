@@ -1,15 +1,10 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-} from "react";
+import { useMemo, useState, type KeyboardEvent } from "react";
 import type { Job, TorrentPriority } from "../../../../../shared/contracts";
 import { formatTransferBytes } from "../../../lib/formatterUtils";
 import { classifyExtension } from "../../../lib/mimeTypeSystem";
 import { FileTools, fileState } from "./TorrentFileContents";
 import { FileList } from "./TorrentFileList";
+import { useModalDialog } from "../../../hooks/useModalDialog";
 
 type TorrentFile = Job["torrentFiles"][number];
 type Props = {
@@ -22,24 +17,6 @@ type Props = {
     priority: TorrentPriority,
   ) => Promise<void>;
 };
-
-function useTorrentDialog() {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const opener = document.activeElement;
-    const dialog = dialogRef.current;
-    dialog?.showModal();
-    return () => {
-      dialog?.close();
-      requestAnimationFrame(() => {
-        if (dialog?.open) return;
-        if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
-        else document.getElementById("downloads-title")?.focus();
-      });
-    };
-  }, []);
-  return dialogRef;
-}
 
 function filterFiles(
   job: Job,
@@ -90,7 +67,7 @@ function useTorrentSelection({
   const { adding, setAdding, displayJob, selected, setSelected } =
     useTorrentChoices(job);
   const selecting = job.status === "awaiting_selection" || adding;
-  const dialogRef = useTorrentDialog();
+  const dialogRef = useModalDialog();
   const [search, setSearch] = useState("");
   const [mediaType, setMediaType] = useState("all");
   const [status, setStatus] = useState("all");

@@ -1,6 +1,7 @@
 /* eslint-disable max-lines */
 import { useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { DownloadOptions } from "../../../types/download";
+import { useModalDialog } from "../../../hooks/useModalDialog";
 
 type DownloadItem = {
   url: string;
@@ -215,7 +216,7 @@ function DraftList({
   setDrafts: Dispatch<SetStateAction<DownloadDraft[]>>;
 }) {
   return (
-    <div className="download-drafts" aria-live="polite">
+    <div className="download-drafts">
       {drafts.map((draft, index) => (
         <DownloadDraftRow
           key={draft.id}
@@ -249,7 +250,7 @@ function DialogFooter({
 }) {
   return (
     <footer>
-      <span>
+      <span role="status" aria-atomic="true">
         {readyCount} of 50 ready
         {invalidCount ? ` · ${invalidCount} invalid` : ""}
         {duplicateCount ? ` · ${duplicateCount} duplicates` : ""}
@@ -280,6 +281,7 @@ export function DownloadDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const nextDraftId = useRef(0);
+  const dialogRef = useModalDialog(open);
   if (!open) return null;
   const pendingDrafts = parseDrafts(source, defaultOptions, 0).slice(
     0,
@@ -337,9 +339,7 @@ export function DownloadDialog({
   };
   return (
     <dialog
-      ref={(dialog) => {
-        if (dialog && !dialog.open) dialog.showModal();
-      }}
+      ref={dialogRef}
       className="download-dialog"
       aria-labelledby="download-dialog-title"
       onClose={onClose}

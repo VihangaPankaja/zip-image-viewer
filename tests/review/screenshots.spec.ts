@@ -68,6 +68,7 @@ async function save(
     path: path.join(output, file),
     fullPage:
       screen === "http-and-torrent-downloads" ||
+      screen === "download-storage-rejected" ||
       screen === "loaded-video-downloads-visit",
     animations: "disabled",
     caret: "hide",
@@ -578,7 +579,44 @@ async function captureDialogs(
     .click();
   await expect(page.getByLabel("Download URL", { exact: true })).toHaveCount(2);
   await save(page, device, theme, "add-downloads");
+  await page.getByRole("button", { name: "Add to queue", exact: true }).focus();
+  await expect(page.getByRole("dialog").getByRole("status")).toHaveText(
+    "2 of 50 ready",
+  );
+  await save(page, device, theme, "download-keyboard-announcement");
   await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Add downloads", exact: true }),
+  ).toBeFocused();
+  await save(page, device, theme, "download-focus-returned");
+}
+
+async function captureResourceRejection(
+  page: Page,
+  device: (typeof devices)[number],
+  theme: string,
+  state: Awaited<ReturnType<typeof installReviewFixtures>>,
+) {
+  const jobs = state.jobs;
+  const failed = jobs[0];
+  state.jobs = [
+    {
+      ...failed,
+      status: "error",
+      phase: "error",
+      message: "Insufficient storage for this download or extraction.",
+      canPause: false,
+    },
+    ...jobs.slice(1),
+  ];
+  await expect(
+    page.getByText("Insufficient storage for this download or extraction."),
+  ).toBeVisible();
+  await save(page, device, theme, "download-storage-rejected");
+  state.jobs = jobs;
+  await expect(
+    page.getByText("Insufficient storage for this download or extraction."),
+  ).toHaveCount(0);
 }
 
 for (const device of devices) {
@@ -594,6 +632,7 @@ for (const device of devices) {
       state.jobs = reviewJobs();
       await expect(page.locator(".download-row")).toHaveCount(4);
       await save(page, device, theme, "http-and-torrent-downloads");
+      await captureResourceRejection(page, device, theme, state);
       await captureDialogs(page, device, theme, state);
       await captureLargeTorrent(page, device, theme, state);
       await page

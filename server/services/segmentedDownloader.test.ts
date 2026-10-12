@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { gzipSync } from "node:zlib";
 import {
   mkdir,
   mkdtemp,
@@ -14,6 +15,89 @@ import unzipper from "unzipper";
 import { describe, expect, it } from "vitest";
 import { runCommand } from "../infrastructure/process/commandRunner.js";
 import { downloadWithSegmentedManager } from "./segmentedDownloader.js";
+
+it("preserves a later segment's HTTP failure after cancelling an earlier segment", async () => {
+  const workspace = await mkdtemp(join(tmpdir(), "segment-failure-"));
+  let started!: () => void;
+  const firstStarted = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const server = createServer((request, response) => {
+    if (request.headers.range === "bytes=0-3") {
+      response.writeHead(206, { "content-range": "bytes 0-3/8" });
+      response.write("a");
+      started();
+    } else {
+      void firstStarted.then(() => response.writeHead(503).end());
+    }
+  });
+  try {
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("No TCP port");
+    await expect(
+      downloadWithSegmentedManager({
+        url: `http://127.0.0.1:${String(address.port)}/file`,
+        targetPath: join(workspace, "download.bin"),
+        signal: new AbortController().signal,
+        state: { downloadedBytes: 0 },
+        metadata: { size: 8, acceptRanges: true },
+        settings: {
+          enableResume: false,
+          enableMultithread: true,
+          threadCount: 2,
+          maxRetries: 0,
+        },
+      }),
+    ).rejects.toThrow("HTTP 503");
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+it("downloads encoded responses using a decoded byte cap instead of the wire content length", async () => {
+  const workspace = await mkdtemp(join(tmpdir(), "encoded-download-"));
+  const payload = Buffer.alloc(10_000, 7);
+  const compressed = gzipSync(payload);
+  const server = createServer((_request, response) =>
+    response
+      .writeHead(200, {
+        "content-encoding": "gzip",
+        "content-length": compressed.length,
+      })
+      .end(compressed),
+  );
+  try {
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("No TCP port");
+    const targetPath = join(workspace, "download.bin");
+    await downloadWithSegmentedManager({
+      url: `http://127.0.0.1:${String(address.port)}/file`,
+      targetPath,
+      signal: new AbortController().signal,
+      state: { downloadedBytes: 0 },
+      metadata: { size: compressed.length, acceptRanges: false },
+      settings: {
+        enableResume: false,
+        enableMultithread: false,
+        threadCount: 1,
+        maxRetries: 0,
+      },
+    });
+    expect(await readFile(targetPath)).toEqual(payload);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
 
 describe("downloadWithSegmentedManager", () => {
   it("downloads a real ZIP over HTTP, opens it, and removes segment files", async () => {
@@ -90,11 +174,22 @@ describe("downloadWithSegmentedManager", () => {
 });
 
 it.each([
-  { payload: "abc", staleParts: false, threads: 8 },
-  { payload: "a fresh download", staleParts: true, threads: 3 },
+  { payload: "abc", staleParts: false, threads: 8, encoding: "identity" },
+  {
+    payload: "a fresh download",
+    staleParts: true,
+    threads: 3,
+    encoding: "identity",
+  },
+  {
+    payload: "capitalized identity",
+    staleParts: false,
+    threads: 2,
+    encoding: "Identity",
+  },
 ])(
   "downloads small payloads and overwrites stale parts when resume is disabled (%j)",
-  async ({ payload, staleParts, threads }) => {
+  async ({ payload, staleParts, threads, encoding }) => {
     const workspace = await mkdtemp(join(tmpdir(), "segmented-restart-"));
     const targetPath = join(workspace, "download.bin");
     const body = Buffer.from(payload);
@@ -119,6 +214,7 @@ it.each([
       const part = body.subarray(start, end + 1);
       response
         .writeHead(206, {
+          "content-encoding": encoding,
           "content-length": part.length,
           "content-range": `bytes ${String(start)}-${String(end)}/${String(body.length)}`,
         })

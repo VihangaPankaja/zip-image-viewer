@@ -60,8 +60,7 @@ export function createRuntimeMedia(
   ) => {
     if (sessions.get(session.id) !== session)
       throw new Error("Session has been removed.");
-    const result = await videoRuntime.trackVideoTask(
-      session,
+    const result = await videoRuntime.runVideoTask(session, () =>
       ensureRuntimeThumbnail(session, normalizedPath, targetPath, size),
     );
     await enforceMediaBudget();
@@ -75,8 +74,7 @@ export function createRuntimeMedia(
   ) => {
     if (sessions.get(session.id) !== session)
       throw new Error("Session has been removed.");
-    const result = await videoRuntime.trackVideoTask(
-      session,
+    const result = await videoRuntime.runVideoTask(session, () =>
       ensureRuntimeImagePreview(
         session,
         normalizedPath,

@@ -4,9 +4,22 @@ import type {
   TorrentLimits,
   TorrentPriority,
 } from "../../../shared/contracts.js";
-import { validateTorrentFilePath } from "./torrentSource.js";
+import {
+  describeTorrentFiles,
+  selectedProgress,
+  selectFiles,
+  applyFilePriorities,
+  reserveTorrentSelection,
+} from "./torrentFileSelection.js";
+import { mkdirSync } from "node:fs";
+import {
+  reserveStorage,
+  resourceLimitError,
+} from "../../infrastructure/runtime/resourceLimits.js";
+import { fetchWithValidatedRedirects } from "../../infrastructure/downloads/publicDownload.js";
 
-export const MAX_TORRENT_METADATA_BYTES = 10 * 1024 * 1024;
+import { MAX_TORRENT_METADATA_BYTES } from "./torrentSource.js";
+export { MAX_TORRENT_METADATA_BYTES } from "./torrentSource.js";
 
 export type TorrentMetadata = {
   files: TorrentFile[];
@@ -50,14 +63,12 @@ export type TorrentAdapter = {
   close: () => Promise<void>;
 };
 
-const webTorrentPriority = { low: 0, normal: 1, high: 2 } as const;
-
 export async function fetchTorrentMetadata(
   url: string,
   signal: AbortSignal,
   fetcher: typeof fetch = fetch,
 ): Promise<Uint8Array> {
-  const response = await fetcher(url, { redirect: "follow", signal });
+  const response = await fetchWithValidatedRedirects(url, { signal }, fetcher);
   if (!response.ok) {
     throw new Error(
       `Torrent metadata request failed with HTTP ${String(response.status)}.`,
@@ -65,7 +76,7 @@ export async function fetchTorrentMetadata(
   }
   const declared = Number(response.headers.get("content-length")) || 0;
   if (declared > MAX_TORRENT_METADATA_BYTES) {
-    throw new Error("Torrent metadata exceeds the 10 MiB limit.");
+    throw resourceLimitError("Torrent metadata exceeds the 10 MiB limit.");
   }
   const reader = response.body?.getReader();
   if (!reader) throw new Error("Torrent metadata response has no body.");
@@ -77,7 +88,7 @@ export async function fetchTorrentMetadata(
     length += value.length;
     if (length > MAX_TORRENT_METADATA_BYTES) {
       await reader.cancel();
-      throw new Error("Torrent metadata exceeds the 10 MiB limit.");
+      throw resourceLimitError("Torrent metadata exceeds the 10 MiB limit.");
     }
     chunks.push(value);
   }
@@ -88,143 +99,6 @@ export async function fetchTorrentMetadata(
     offset += chunk.length;
   }
   return result;
-}
-
-function describeTorrentFiles(
-  torrent: Torrent,
-  directory: string,
-): TorrentFile[] {
-  return torrent.files.map((file, index) => {
-    validateTorrentFilePath(directory, file.path);
-    return {
-      id: String(index),
-      path: file.path.replaceAll("\\", "/"),
-      size: file.length,
-      selected: false,
-      downloadedBytes: verifiedFileBytes(torrent, file),
-      complete: verifiedFileBytes(torrent, file) === file.length,
-      priority: "normal",
-    };
-  });
-}
-
-function verifiedFileBytes(torrent: Torrent, file: Torrent["files"][number]) {
-  let downloadedBytes = 0;
-  const end = file.offset + file.length;
-  for (
-    let piece = Math.floor(file.offset / torrent.pieceLength);
-    piece * torrent.pieceLength < end;
-    piece += 1
-  ) {
-    if (torrent.pieces[piece] === null)
-      downloadedBytes +=
-        Math.min(end, (piece + 1) * torrent.pieceLength) -
-        Math.max(file.offset, piece * torrent.pieceLength);
-  }
-  return downloadedBytes;
-}
-
-function selectedProgress(
-  torrent: Torrent,
-  selectedIds: Set<string>,
-  priorities: Map<string, TorrentPriority>,
-): TorrentProgress {
-  const files = torrent.files.map((file, index) => {
-    const downloadedBytes = verifiedFileBytes(torrent, file);
-    return {
-      id: String(index),
-      path: file.path.replaceAll("\\", "/"),
-      size: file.length,
-      selected: selectedIds.has(String(index)),
-      downloadedBytes,
-      complete: downloadedBytes === file.length,
-      priority: priorities.get(String(index)) ?? "normal",
-    };
-  });
-  const selected = files.filter((file) => file.selected);
-  const total = selected.reduce((sum, file) => sum + file.size, 0);
-  const downloadedBytes = selected.reduce(
-    (sum, file) => sum + file.downloadedBytes,
-    0,
-  );
-  return {
-    files,
-    downloadedBytes,
-    downloadSpeedBytesPerSec: torrent.downloadSpeed,
-    peerCount: torrent.numPeers,
-    progress: total ? downloadedBytes / total : 1,
-    uploadedBytes: torrent.uploaded,
-    uploadSpeedBytesPerSec: torrent.uploadSpeed,
-  };
-}
-
-function selectFiles(
-  torrent: Torrent,
-  input: TorrentDownloadInput,
-): Set<string> {
-  const files = describeTorrentFiles(torrent, input.downloadDir);
-  const ids = new Set(
-    input.onMetadata({
-      files,
-      length: torrent.length,
-      name: torrent.name,
-      torrentFile: torrent.torrentFile,
-    }),
-  );
-  if (
-    !ids.size ||
-    [...ids].some((id) => !files.some((file) => file.id === id))
-  ) {
-    throw new Error("Choose one or more known torrent files.");
-  }
-  return ids;
-}
-
-function applyFilePriorities(
-  torrent: Torrent,
-  selectedIds: Set<string>,
-  priorities: Map<string, TorrentPriority>,
-  ranges: [number, number][],
-) {
-  // WebTorrent 3 merges adjacent public selections, including their priorities.
-  // Its stream selections preserve separate ranges and normal scheduling.
-  const scheduler = torrent as Torrent & {
-    _select: (
-      start: number,
-      end: number,
-      priority: number,
-      notify: undefined,
-      stream: boolean,
-    ) => void;
-    _deselect: (start: number, end: number, stream: boolean) => void;
-  };
-  for (const [start, end] of ranges) scheduler._deselect(start, end, true);
-  ranges.length = 0;
-  // Shared boundary pieces take the higher priority without merging whole files.
-  const pieces = new Uint8Array(torrent.pieces.length);
-  torrent.files.forEach((file, index) => {
-    if (!selectedIds.has(String(index)) || !file.length) return;
-    const priority =
-      webTorrentPriority[priorities.get(String(index)) ?? "normal"] + 1;
-    const end = Math.ceil((file.offset + file.length) / torrent.pieceLength);
-    for (
-      let piece = Math.floor(file.offset / torrent.pieceLength);
-      piece < end;
-      piece += 1
-    )
-      pieces[piece] = Math.max(pieces[piece], priority);
-  });
-  if (!pieces.length) return;
-  torrent.deselect(0, pieces.length - 1);
-  for (let start = 0; start < pieces.length;) {
-    let end = start + 1;
-    while (end < pieces.length && pieces[end] === pieces[start]) end += 1;
-    if (pieces[start]) {
-      scheduler._select(start, end - 1, pieces[start] - 1, undefined, true);
-      ranges.push([start, end - 1]);
-    }
-    start = end;
-  }
 }
 
 type ActiveTorrent = {
@@ -240,7 +114,37 @@ function abortReason(signal: AbortSignal): Error {
     : Object.assign(new Error("Aborted"), { name: "AbortError" });
 }
 
+function guardTorrentMetadata(
+  torrent: Torrent,
+  directory: string,
+  finish: (_error: Error) => void,
+): void {
+  torrent.once("metadata", () => {
+    try {
+      describeTorrentFiles(torrent, directory);
+    } catch (error) {
+      finish(error instanceof Error ? error : new Error(String(error)));
+    }
+  });
+}
+
 function downloadTorrent(
+  client: InstanceType<typeof WebTorrent>,
+  active: Map<string, ActiveTorrent>,
+  input: TorrentDownloadInput,
+): Promise<{ files: string[] }> {
+  if (
+    typeof input.source !== "string" &&
+    input.source.length > MAX_TORRENT_METADATA_BYTES
+  )
+    return Promise.reject(
+      resourceLimitError("Torrent metadata exceeds the 10 MiB limit."),
+    );
+  mkdirSync(input.downloadDir, { recursive: true });
+  return transferTorrent(client, active, input);
+}
+
+function transferTorrent(
   client: InstanceType<typeof WebTorrent>,
   active: Map<string, ActiveTorrent>,
   input: TorrentDownloadInput,
@@ -248,11 +152,10 @@ function downloadTorrent(
   return new Promise((resolve, reject) => {
     let settled = false;
     let selectedIds = new Set<string>();
-    const priorities = new Map<string, TorrentPriority>(
-      Object.entries(input.priorities ?? {}),
-    );
+    const priorities = new Map(Object.entries(input.priorities ?? {}));
     const ranges: [number, number][] = [];
     let resultFiles: string[] = [];
+    let storage: ReturnType<typeof reserveStorage> | undefined;
     const torrent = client.add(
       input.source,
       { path: input.downloadDir, deselect: true },
@@ -260,18 +163,17 @@ function downloadTorrent(
         if (settled || readyTorrent !== torrent) return;
         try {
           selectedIds = selectFiles(readyTorrent, input);
-          resultFiles = readyTorrent.files
-            .filter((_file, index) => selectedIds.has(String(index)))
-            .map((file) => file.path.replaceAll("\\", "/"));
-          applyFilePriorities(readyTorrent, selectedIds, priorities, ranges);
-          for (const peer of input.peerHints ?? []) readyTorrent.addPeer(peer);
-          if (input.jobId)
-            active.set(input.jobId, {
-              torrent: readyTorrent,
-              selectedIds,
-              priorities,
-              ranges,
-            });
+          storage = reserveTorrentSelection(
+            readyTorrent,
+            selectedIds,
+            input.downloadDir,
+          );
+          resultFiles = activateTorrent(active, input, {
+            torrent: readyTorrent,
+            selectedIds,
+            priorities,
+            ranges,
+          });
           emitProgress();
         } catch (error) {
           finish(error instanceof Error ? error : new Error(String(error)));
@@ -285,6 +187,7 @@ function downloadTorrent(
       input.signal.removeEventListener("abort", abort);
       clearInterval(progressTimer);
       const complete = (cleanupError?: Error) => {
+        storage?.release();
         if (error) reject(error);
         else if (cleanupError) reject(cleanupError);
         else resolve({ files: resultFiles });
@@ -299,16 +202,17 @@ function downloadTorrent(
     const abort = () => finish(abortReason(input.signal));
     const emitProgress = () => {
       if (settled || !selectedIds.size) return;
-      const progress = selectedProgress(torrent, selectedIds, priorities);
-      input.onProgress(progress);
-      if (
-        progress.files
-          ?.filter((file) => file.selected)
-          .every((file) => file.complete)
-      )
+      try {
+        storage?.check();
+      } catch (error) {
+        finish(error instanceof Error ? error : new Error(String(error)));
+        return;
+      }
+      if (emitSelectedProgress(input, torrent, selectedIds, priorities))
         finish();
     };
     const progressTimer = setInterval(emitProgress, 250);
+    guardTorrentMetadata(torrent, input.downloadDir, finish);
     torrent.on("download", emitProgress);
     torrent.on("upload", emitProgress);
     torrent.on("noPeers", input.onNoPeers);
@@ -320,8 +224,41 @@ function downloadTorrent(
   });
 }
 
+function activateTorrent(
+  active: Map<string, ActiveTorrent>,
+  input: TorrentDownloadInput,
+  entry: ActiveTorrent,
+): string[] {
+  applyFilePriorities(
+    entry.torrent,
+    entry.selectedIds,
+    entry.priorities,
+    entry.ranges,
+  );
+  for (const peer of input.peerHints ?? []) entry.torrent.addPeer(peer);
+  if (input.jobId) active.set(input.jobId, entry);
+  return entry.torrent.files
+    .filter((_file, index) => entry.selectedIds.has(String(index)))
+    .map((file) => file.path.replaceAll("\\", "/"));
+}
+
+function emitSelectedProgress(
+  input: TorrentDownloadInput,
+  torrent: Torrent,
+  selectedIds: Set<string>,
+  priorities: Map<string, TorrentPriority>,
+): boolean {
+  const progress = selectedProgress(torrent, selectedIds, priorities);
+  input.onProgress(progress);
+  return (
+    progress.files
+      ?.filter((file) => file.selected)
+      .every((file) => file.complete) ?? false
+  );
+}
+
 export function createWebTorrentAdapter(): TorrentAdapter {
-  const client = new WebTorrent({ utp: false });
+  const client = new WebTorrent({ utp: false, webSeeds: false });
   const active = new Map<string, ActiveTorrent>();
   let limits: TorrentLimits = { downloadBytesPerSec: 0, uploadBytesPerSec: 0 };
   return {

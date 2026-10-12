@@ -81,7 +81,10 @@ function PreviewActions({
       <button
         className="ghost-button"
         type="button"
-        onClick={() => setExplorerModalOpen(true)}
+        onClick={(event) => {
+          event.currentTarget.focus();
+          setExplorerModalOpen(true);
+        }}
       >
         Open explorer
       </button>
@@ -104,7 +107,10 @@ function PreviewActions({
         <button
           className="ghost-button"
           type="button"
-          onClick={() => setSlideshowOpen(true)}
+          onClick={(event) => {
+            event.currentTarget.focus();
+            setSlideshowOpen(true);
+          }}
         >
           Slideshow
         </button>

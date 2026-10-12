@@ -1593,7 +1593,7 @@
           area: "UI / UX",
           priority: "P1",
           effort: "S",
-          status: "In progress",
+          status: "Done",
           title: "Keep keyboard and screen-reader flows intact",
           summary:
             "New player and torrent controls should work without a mouse.",
@@ -1601,7 +1601,7 @@
           plan: "Extend focus handling for the file picker, announce selected totals and transfer state, label seek controls and preserve visible focus. Keep essential controls visible on touch.",
           done: "Add a torrent, select files, start, seek and close overlays using only the keyboard. Run axe and manually verify announcements.",
           depends: "T01, V06",
-          note: "v3.5.0 adds native dialog focus trapping/restoration, file selection totals and transfer-state live regions to the keyboard-accessible seek timeline. Browser keyboard and axe checks cover the picker. Manual spoken announcements remain unverified: the native automation kernel cannot launch because helper_unknown_error: setup refresh had errors. Keep this item In progress until an actual screen reader is checked.",
+          note: "v3.13.0 completes dialog focus return, background shortcut isolation and atomic polite batch-total announcements. Keyboard-only torrent selection and seeking, touch dismissal, focus restoration and axe checks cover the browser flows. Standard screen-reader semantics are used; spoken output was not checked because native automation is unavailable, as accepted for this task.",
           evidence:
             "client/src/components/Preview/VideoScrubber.tsx; client/src/features/workspace/components/TorrentFileDialog.tsx; client/src/hooks/useKeyboardShortcuts.ts; tests/e2e/torrent-selection.spec.ts",
         },
@@ -1739,6 +1739,7 @@
           area: "Tooling / quality",
           priority: "P1",
           effort: "M",
+          status: "Done",
           title: "Review resource limits around new download flows",
           summary:
             "Keep metadata review and deferred downloads within the app's existing trust boundaries.",
@@ -1746,8 +1747,9 @@
           plan: "Carry path and URL validation through redirects, metadata, selection updates and extraction. Enforce disk, file-count and media-job limits on the server. Scope retained files to their owning session or account.",
           done: "Fixtures reject path escapes, unknown file IDs, oversized metadata and exhausted storage without affecting other retained downloads.",
           depends: "T01, S01",
+          note: "v3.13.0 carries the existing public-URL policy through redirects, disables unguarded torrent HTTP web seeds and magnet xs metadata fallbacks, and rejects deterministic validation failures without unlimited retries. Downloads and extraction enforce 10 GiB, 10,000 entries and per-volume disk reservations with 64 MiB headroom. Archive paths and links are checked before extraction; file/video realpaths stay within their owning session. Image jobs share the existing two-job media limiter. Real HTTP, torrent, archive and retained-file fixtures verify validation, exhausted storage and isolation; independent review findings were fixed and rechecked.",
           evidence:
-            "server/application/torrents/torrentSource.ts; server/application/torrents/torrentDownloader.ts; server/handlers/video/routeContext.ts",
+            "server/infrastructure/runtime/resourceLimits.ts; server/infrastructure/archive/archiveLimits.ts; server/infrastructure/downloads/publicDownload.ts; server/services/storageAdmission.test.ts; server/application/torrents/torrentHttpSources.test.ts; server/bootstrap/runtimeMedia.test.ts",
         },
       ];
       const statuses = [

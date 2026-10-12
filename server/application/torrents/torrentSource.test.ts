@@ -1,4 +1,6 @@
 import path from "node:path";
+import { mkdtemp, mkdir, rm, symlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import { detectSourceKind, validateTorrentFilePath } from "./torrentSource.js";
 import {
@@ -8,6 +10,22 @@ import {
 
 const magnet =
   "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=fixture";
+
+it("rejects torrent write paths through a junction owned by another session", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "torrent-path-owner-"));
+  try {
+    const root = path.join(directory, "owner");
+    const other = path.join(directory, "other");
+    await mkdir(root);
+    await mkdir(other);
+    await symlink(other, path.join(root, "linked"), "junction");
+    expect(() => validateTorrentFilePath(root, "linked/private.txt")).toThrow(
+      "unsafe file path",
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 describe("torrent source validation", () => {
   it("detects magnets and .torrent URLs while allowing an explicit override", () => {
@@ -49,5 +67,19 @@ describe("torrent source validation", () => {
         () => Promise.resolve(oversized),
       ),
     ).rejects.toThrow("10 MiB");
+  });
+
+  it.each([
+    ".",
+    "folder/..",
+    "C:/outside.txt",
+    "folder/../../outside.txt",
+    "folder/../inside.txt",
+    "file\u0000.txt",
+    "folder/file:stream",
+  ])("rejects ambiguous torrent paths (%s)", (relativePath) => {
+    expect(() =>
+      validateTorrentFilePath(path.resolve("downloads"), relativePath),
+    ).toThrow("unsafe file path");
   });
 });

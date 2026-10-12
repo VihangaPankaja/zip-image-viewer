@@ -1,3 +1,5 @@
+import { fetchWithValidatedRedirects } from "./publicDownload.js";
+
 export type RemoteMetadata = {
   size: number;
   acceptRanges: boolean;
@@ -17,16 +19,18 @@ export async function fetchRemoteMetadata(
   signal: AbortSignal,
 ): Promise<RemoteMetadata> {
   try {
-    const response = await fetch(url, {
+    const response = await fetchWithValidatedRedirects(url, {
       method: "HEAD",
-      redirect: "follow",
       signal,
-      headers: { "cache-control": "no-cache" },
+      headers: { "cache-control": "no-cache", "accept-encoding": "identity" },
     });
     if (!response.ok) return emptyMetadata;
+    const encoding = response.headers.get("content-encoding");
+    const encoded = Boolean(encoding && encoding.toLowerCase() !== "identity");
     return {
-      size: Number(response.headers.get("content-length")) || 0,
-      acceptRanges: /bytes/i.test(response.headers.get("accept-ranges") ?? ""),
+      size: encoded ? 0 : Number(response.headers.get("content-length")) || 0,
+      acceptRanges:
+        !encoded && /bytes/i.test(response.headers.get("accept-ranges") ?? ""),
       etag: response.headers.get("etag") ?? "",
       lastModified: response.headers.get("last-modified") ?? "",
     };

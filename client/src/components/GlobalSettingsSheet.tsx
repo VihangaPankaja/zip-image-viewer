@@ -1,4 +1,5 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
+import { useModalDialog } from "../hooks/useModalDialog";
 import { AppearanceConfiguration } from "./AppearanceConfiguration";
 import type { ThemePreference } from "../hooks/useLocalStorageSettings";
 import type { DownloadSettings } from "../lib/appConstants";
@@ -330,16 +331,13 @@ function ToggleConfiguration(props: ToggleConfigurationProps) {
   );
 }
 
-function showModalDialog(dialog: HTMLDialogElement | null): void {
-  if (dialog && !dialog.open) dialog.showModal();
-}
-
 export function GlobalSettingsSheet(props: GlobalSettingsSheetProps) {
+  const dialogRef = useModalDialog(props.settingsOpen);
   if (!props.settingsOpen) return null;
 
   return (
     <dialog
-      ref={showModalDialog}
+      ref={dialogRef}
       className="settings-dialog"
       aria-labelledby="global-settings-title"
       onClose={() => props.setSettingsOpen(false)}

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { realpath } from "node:fs/promises";
 import type { Response } from "express";
 
 export type ByteRange = { start: number; end: number };
@@ -35,6 +36,17 @@ export function isWithinRoot(targetPath: string, rootPath: string): boolean {
   return (
     targetPath === rootPath || targetPath.startsWith(`${rootPath}${path.sep}`)
   );
+}
+
+export async function isRealPathWithinRoot(
+  targetPath: string,
+  rootPath: string,
+): Promise<boolean> {
+  const [target, root] = await Promise.all([
+    realpath(targetPath),
+    realpath(rootPath),
+  ]);
+  return isWithinRoot(target, root);
 }
 
 export function queryText(value: unknown, fallback = ""): string {

@@ -90,6 +90,18 @@ describe("useKeyboardShortcuts", () => {
     expect(setSelectedPath).toHaveBeenCalledWith("next.mp4");
   });
 
+  it("does not navigate the background preview while an overlay is open", () => {
+    const { setSelectedPath, video } = renderShortcuts();
+    const dialog = document.createElement("dialog");
+    document.body.append(dialog);
+    dialog.showModal();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp" }));
+    expect(setSelectedPath).not.toHaveBeenCalled();
+    expect(video.volume).toBe(1);
+    dialog.remove();
+  });
+
   it("uses J and L to seek a maximized video", () => {
     const { video } = renderShortcuts();
     video.currentTime = 12;
