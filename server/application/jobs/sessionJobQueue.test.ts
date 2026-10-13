@@ -561,7 +561,7 @@ describe("createSessionJobQueue", () => {
     queue.enqueueSessionJob(second, false);
 
     expect(() => queue.removeSessionJob(second.id)).toThrow(
-      "Only completed jobs can be removed.",
+      "Pause or cancel the download",
     );
     expect(queue.cancelSessionJob(second.id).status).toBe("cancelled");
     release?.();

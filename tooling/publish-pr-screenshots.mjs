@@ -30,6 +30,7 @@ const requiredScreens = [
   "session-storage-pinned",
   "session-storage-cache-cleared",
   "session-storage-delete-warning",
+  "session-storage-delete-blocked",
   "session-storage-deleted",
   "downloads-empty",
   "http-and-torrent-downloads",

@@ -69,7 +69,7 @@ export function createServerRpcRouter(deps: ServerRpcDependencies) {
         items: [...deps.listSessions()],
       })),
       remove: contract.sessions.remove.handler(({ input }) =>
-        deps.removeSession(input.id),
+        applicationResult(() => deps.removeSession(input.id)),
       ),
     },
     jobs: {
@@ -101,7 +101,7 @@ export function createServerRpcRouter(deps: ServerRpcDependencies) {
         deps.resumeJob(input.id),
       ),
       remove: contract.jobs.remove.handler(({ input }) =>
-        deps.removeJob(input.id),
+        applicationResult(() => deps.removeJob(input.id)),
       ),
       reorder: contract.jobs.reorder.handler(({ input }) =>
         deps.reorderJobs(input.jobIds),

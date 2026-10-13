@@ -60,12 +60,35 @@ test("storage supports narrow-screen keyboard cleanup, pinning and deliberate de
     dialog.getByRole("button", { name: "Delete permanently" }),
   ).toHaveCount(0);
   let deleted = false;
+  let blocked = true;
   await page.route("**/rpc/sessions/remove", (route) => {
+    if (blocked)
+      return route.fulfill({
+        status: 409,
+        json: {
+          json: {
+            defined: false,
+            code: "CONFLICT",
+            status: 409,
+            message:
+              "Pause or cancel the download and wait for it to stop before deleting its files.",
+          },
+        },
+      });
     deleted = true;
     return route.fulfill({ json: { json: null } });
   });
   await dialog.getByRole("button", { name: "Delete session files…" }).click();
   expect(deleted).toBe(false);
+  await dialog.getByRole("button", { name: "Delete permanently" }).click();
+  await expect(dialog.getByRole("alert")).toContainText(
+    "Pause or cancel the download",
+  );
+  await expect(
+    dialog.getByRole("button", { name: "Keep files" }),
+  ).toBeEnabled();
+  expect(deleted).toBe(false);
+  blocked = false;
   await dialog.getByRole("button", { name: "Delete permanently" }).click();
   await expect(dialog).toHaveCount(0);
   expect(deleted).toBe(true);

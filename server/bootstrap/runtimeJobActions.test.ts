@@ -73,3 +73,67 @@ it.each([
     }
   },
 );
+
+it.each(["pending", "active"])(
+  "rejects deletion of a %s retained torrent without removing files or state",
+  async (phase) => {
+    const workspaceDir = await mkdtemp(
+      path.join(tmpdir(), "busy-session-delete-"),
+    );
+    const jobs = new Map<string, SessionJob>();
+    const manager = createJobManager(jobs, vi.fn());
+    const job = manager.createJob("https://example.com/media.torrent");
+    Object.assign(job, {
+      workspaceDir,
+      sessionId: "session",
+      sourceKind: "torrent",
+    });
+    const session = {
+      id: job.sessionId,
+      workspaceDir,
+      retained: true,
+    } as Session;
+    const sessions = new Map([[session.id, session]]);
+    let finish = () => {};
+    const running = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const queue = createSessionJobQueue({
+      pendingSessionJobs: [],
+      getActiveSessionJobCount: () => (phase === "pending" ? 2 : 0),
+      incrementActiveSessionJobCount: vi.fn(),
+      decrementActiveSessionJobCount: vi.fn(),
+      maxActiveSessionJobs: 2,
+      processSessionJob: () => running,
+      logEvent: vi.fn(),
+    });
+    queue.enqueueSessionJob(job, false);
+    const cleanup = vi.fn(() => Promise.resolve());
+    const actions = createRuntimeJobActions(
+      jobs,
+      sessions,
+      new Map(),
+      manager,
+      queue,
+      vi.fn(),
+      cleanup,
+    );
+    try {
+      const deletion = actions.removeSession(session.id, "rpc");
+      await expect(deletion).rejects.toMatchObject({
+        code: "CONFLICT",
+        status: 409,
+      });
+      await expect(deletion).rejects.toThrow("Pause or cancel");
+      expect((await stat(workspaceDir)).isDirectory()).toBe(true);
+      expect(sessions.get(session.id)).toBe(session);
+      expect(jobs.get(job.id)).toBe(job);
+      expect(queue.getOrderedJobs()).toEqual([job]);
+      expect(cleanup).not.toHaveBeenCalled();
+    } finally {
+      finish();
+      await queue.stopSessionJobs();
+      await rm(workspaceDir, { recursive: true, force: true });
+    }
+  },
+);

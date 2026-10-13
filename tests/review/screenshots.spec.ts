@@ -168,6 +168,26 @@ async function captureStorage(
     "files needed to download skipped items later",
   );
   await save(page, device, theme, "session-storage-delete-warning");
+  const blockedRemoval: Parameters<Page["route"]>[1] = (route) =>
+    route.fulfill({
+      status: 409,
+      json: {
+        json: {
+          defined: false,
+          code: "CONFLICT",
+          status: 409,
+          message:
+            "Pause or cancel the download and wait for it to stop before deleting its files.",
+        },
+      },
+    });
+  await page.route("**/rpc/sessions/remove", blockedRemoval);
+  await dialog.getByRole("button", { name: "Delete permanently" }).click();
+  await expect(dialog.getByRole("alert")).toContainText(
+    "Pause or cancel the download",
+  );
+  await save(page, device, theme, "session-storage-delete-blocked");
+  await page.unroute("**/rpc/sessions/remove", blockedRemoval);
   await page.keyboard.press("Escape");
   state.storage.retained = false;
   state.storage.pinned = false;
