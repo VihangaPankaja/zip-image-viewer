@@ -1027,7 +1027,20 @@ for (const device of devices) {
           });
           await expect(page.getByRole("alert")).toBeVisible();
           await page.getByRole("alert").scrollIntoViewIfNeeded();
+          await page.evaluate(
+            (offset) => window.scrollBy(0, offset),
+            mobile ? 96 : 32,
+          );
           await expect(page.getByRole("alert")).toBeInViewport({ ratio: 1 });
+          if (mobile) {
+            const alert = await page.getByRole("alert").boundingBox();
+            const navigation = await page
+              .locator(".workspace-mobile-nav")
+              .boundingBox();
+            if (!alert || !navigation)
+              throw new Error("Subtitle layout missing.");
+            expect(alert.y + alert.height).toBeLessThanOrEqual(navigation.y);
+          }
           await save(page, device, theme, "video-subtitles-error");
           await upload.setInputFiles({
             name: "Recovered.vtt",
