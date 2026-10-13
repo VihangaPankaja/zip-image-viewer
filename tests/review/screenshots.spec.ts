@@ -1026,9 +1026,8 @@ for (const device of devices) {
             buffer: Buffer.from("1\nnot a timestamp\nInvalid subtitle"),
           });
           await expect(page.getByRole("alert")).toBeVisible();
-          await page
-            .getByRole("alert")
-            .evaluate((element) => element.scrollIntoView({ block: "center" }));
+          await page.getByRole("alert").scrollIntoViewIfNeeded();
+          await expect(page.getByRole("alert")).toBeInViewport({ ratio: 1 });
           await save(page, device, theme, "video-subtitles-error");
           await upload.setInputFiles({
             name: "Recovered.vtt",
