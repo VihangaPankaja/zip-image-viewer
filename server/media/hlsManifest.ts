@@ -1,3 +1,5 @@
+import type { VideoMediaTrack } from "../../shared/contracts.js";
+
 export type VideoDimensions = {
   width: number;
   height: number;
@@ -71,11 +73,32 @@ export function calculateRenditions(
 export function buildMasterPlaylist(
   renditions: readonly HlsRendition[],
   getUri: (_rendition: HlsRendition) => string,
+  audioTracks: readonly VideoMediaTrack[] = [],
+  getAudioUri?: (_track: VideoMediaTrack) => string,
 ): string {
   const lines = ["#EXTM3U", "#EXT-X-VERSION:7"];
+  const alternateAudio = audioTracks.length > 1 && getAudioUri;
+  if (alternateAudio) {
+    const defaultTrack =
+      audioTracks.find((track) => track.isDefault) ?? audioTracks[0];
+    const attribute = (value: string) => value.replace(/[\p{Cc}"\\]/gu, "");
+    for (const track of audioTracks) {
+      const name =
+        audioTracks.filter(({ label }) => label === track.label).length > 1
+          ? `${track.label} (${String(track.index)})`
+          : track.label;
+      lines.push(
+        `#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="${attribute(name)}",LANGUAGE="${attribute(track.language)}",DEFAULT=${track === defaultTrack ? "YES" : "NO"},AUTOSELECT=YES,URI="${attribute(getAudioUri(track))}"`,
+      );
+    }
+  }
   for (const rendition of renditions) {
+    const codecs =
+      rendition.codecs && alternateAudio && !rendition.codecs.includes("mp4a")
+        ? `${rendition.codecs},mp4a.40.2`
+        : rendition.codecs;
     lines.push(
-      `#EXT-X-STREAM-INF:BANDWIDTH=${String(rendition.bandwidth)},RESOLUTION=${String(rendition.width)}x${String(rendition.height)}${rendition.codecs ? `,CODECS="${rendition.codecs}"` : ""}`,
+      `#EXT-X-STREAM-INF:BANDWIDTH=${String(rendition.bandwidth)},RESOLUTION=${String(rendition.width)}x${String(rendition.height)}${codecs ? `,CODECS="${codecs}"` : ""}${alternateAudio ? ',AUDIO="audio"' : ""}`,
       getUri(rendition),
     );
   }

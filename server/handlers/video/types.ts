@@ -1,4 +1,5 @@
 import type { VideoStoryboard } from "../../../shared/contracts.js";
+import type { VideoMetadata } from "../../media/videoMetadata.js";
 import type {
   Session,
   VideoQualityOption,
@@ -7,12 +8,6 @@ import type {
 } from "../../domain/models.js";
 
 type ByteRange = { start: number; end: number };
-type VideoMetadata = {
-  width: number;
-  height: number;
-  durationSeconds: number;
-  playbackMode?: "direct" | "remux" | "transcode";
-};
 
 export type VideoRouteDependencies = {
   ensureVideoStoryboard: (

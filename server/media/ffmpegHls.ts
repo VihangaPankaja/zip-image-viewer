@@ -5,6 +5,8 @@ export type Fmp4HlsInput = {
   outputDirectory: string;
   height: number;
   segmentDurationSeconds?: number;
+  audioStreamIndex?: number;
+  videoOnly?: boolean;
 };
 
 function mediaPath(directory: string, filename: string): string {
@@ -21,39 +23,46 @@ export function buildFmp4HlsArgs(input: Fmp4HlsInput): string[] {
     "-i",
     input.inputPath,
     "-map",
-    "0:v:0",
-    "-map",
-    "0:a:0?",
+    input.audioStreamIndex === undefined
+      ? "0:v:0"
+      : `0:${String(input.audioStreamIndex)}`,
   ];
-
-  if (input.height > 0) args.push("-vf", `scale=-2:${String(input.height)}`);
+  if (input.audioStreamIndex === undefined) {
+    if (!input.videoOnly) args.push("-map", "0:a:0?");
+    if (input.height > 0) args.push("-vf", `scale=-2:${String(input.height)}`);
+    args.push(
+      "-c:v",
+      "libx264",
+      "-preset",
+      "veryfast",
+      "-profile:v",
+      "main",
+      "-pix_fmt",
+      "yuv420p",
+      "-b:v",
+      bitrate,
+      "-maxrate",
+      bitrate,
+      "-bufsize",
+      bitrate,
+      "-sc_threshold",
+      "0",
+      "-force_key_frames",
+      `expr:gte(t,n_forced*${String(duration)})`,
+    );
+  }
+  if (!input.videoOnly)
+    args.push(
+      "-c:a",
+      "aac",
+      "-b:a",
+      `${String(AUDIO_BITRATE / 1000)}k`,
+      "-ac",
+      "2",
+      "-ar",
+      "48000",
+    );
   args.push(
-    "-c:v",
-    "libx264",
-    "-preset",
-    "veryfast",
-    "-profile:v",
-    "main",
-    "-pix_fmt",
-    "yuv420p",
-    "-b:v",
-    bitrate,
-    "-maxrate",
-    bitrate,
-    "-bufsize",
-    bitrate,
-    "-sc_threshold",
-    "0",
-    "-force_key_frames",
-    `expr:gte(t,n_forced*${String(duration)})`,
-    "-c:a",
-    "aac",
-    "-b:a",
-    `${String(AUDIO_BITRATE / 1000)}k`,
-    "-ac",
-    "2",
-    "-ar",
-    "48000",
     "-f",
     "hls",
     "-hls_time",
@@ -71,4 +80,27 @@ export function buildFmp4HlsArgs(input: Fmp4HlsInput): string[] {
     mediaPath(input.outputDirectory, "index.m3u8"),
   );
   return args;
+}
+
+export function buildFmp4AudioGroupArgs(
+  inputPath: string,
+  outputs: readonly { index: number; directory: string }[],
+  segmentDurationSeconds: number,
+): string[] {
+  return [
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-i",
+    inputPath,
+    ...outputs.flatMap(({ index, directory }) =>
+      buildFmp4HlsArgs({
+        inputPath,
+        outputDirectory: directory,
+        height: 0,
+        audioStreamIndex: index,
+        segmentDurationSeconds,
+      }).slice(5),
+    ),
+  ];
 }

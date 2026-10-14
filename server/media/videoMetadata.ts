@@ -1,12 +1,89 @@
 import type { VideoQualityOption } from "../domain/models.js";
+import type { VideoMediaTrack } from "../../shared/contracts.js";
 import { calculateRenditions } from "./hlsManifest.js";
 export type VideoMetadata = {
   width: number;
   height: number;
   durationSeconds: number;
   playbackMode?: VideoPlaybackMode;
+  audioTracks?: VideoMediaTrack[];
+  subtitleTracks?: VideoMediaTrack[];
 };
 export type VideoPlaybackMode = "direct" | "remux" | "transcode";
+
+const TEXT_SUBTITLE_CODECS = new Set([
+  "subrip",
+  "srt",
+  "ass",
+  "ssa",
+  "webvtt",
+  "mov_text",
+  "text",
+]);
+const languageNames = new Intl.DisplayNames(["en"], { type: "language" });
+
+export function mediaTracksFromOutput(output: string): {
+  audioTracks: VideoMediaTrack[];
+  subtitleTracks: VideoMediaTrack[];
+} {
+  const audioTracks: VideoMediaTrack[] = [];
+  const subtitleTracks: VideoMediaTrack[] = [];
+  let current: VideoMediaTrack | undefined;
+  for (const line of output.split(/\r?\n/)) {
+    const stream =
+      /^\s*Stream #0:(\d+)(?:\[[^\]]*\])?(?:\(([^)]+)\))?:\s*(Audio|Subtitle):\s*([\w]+)/.exec(
+        line,
+      );
+    if (stream) {
+      current = undefined;
+      const [, streamIndex, rawLanguage, kind, codec] = stream;
+      if (kind === "Subtitle" && !TEXT_SUBTITLE_CODECS.has(codec)) continue;
+      const tracks = kind === "Audio" ? audioTracks : subtitleTracks;
+      let language =
+        rawLanguage && /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i.test(rawLanguage)
+          ? rawLanguage.toLowerCase()
+          : "und";
+      let name: string | undefined;
+      try {
+        if (language !== "und") name = languageNames.of(language);
+      } catch {
+        language = "und";
+      }
+      current = {
+        id: `${kind === "Audio" ? "audio" : "subtitle"}-${streamIndex}`,
+        index: Number(streamIndex),
+        language,
+        label: name ?? `${kind} ${String(tracks.length + 1)}`,
+        isDefault: line.includes("(default)"),
+      };
+      tracks.push(current);
+    } else if (/^\s*Stream #/.test(line)) {
+      current = undefined;
+    } else if (current) {
+      const title = /^\s*title\s*:\s*(.+)$/i.exec(line)?.[1]?.trim();
+      if (title && !/[\\/]/.test(title)) {
+        const label = title
+          .replace(/[\p{Cc}"<>]/gu, "")
+          .slice(0, 120)
+          .trim();
+        if (label) current.label = label;
+      }
+    }
+  }
+  return { audioTracks, subtitleTracks };
+}
+
+export function videoMetadataFromOutput(
+  output: string,
+  extension: string,
+): VideoMetadata {
+  return {
+    ...dimensionsFromOutput(output),
+    ...mediaTracksFromOutput(output),
+    durationSeconds: durationFromOutput(output),
+    playbackMode: playbackModeFromOutput(output, extension),
+  };
+}
 
 export function playbackModeFromOutput(
   output: string,

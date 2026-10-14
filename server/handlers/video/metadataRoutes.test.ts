@@ -166,3 +166,68 @@ it("prefers the probed playback mode and still offers a transcode fallback", asy
     defaultQuality: "auto",
   });
 });
+
+it("exposes track choices and starts multi-audio media in adaptive playback", async () => {
+  directory = await mkdtemp(path.join(os.tmpdir(), "video-tracks-"));
+  await writeFile(path.join(directory, "clip.mp4"), "fixture");
+  const tracks = [
+    {
+      id: "audio-1",
+      index: 1,
+      language: "eng",
+      label: "English",
+      isDefault: true,
+    },
+    {
+      id: "audio-2",
+      index: 2,
+      language: "jpn",
+      label: "Japanese",
+      isDefault: false,
+    },
+  ];
+  const subtitleTracks = [
+    {
+      id: "subtitle-3",
+      index: 3,
+      language: "eng",
+      label: "English captions",
+      isDefault: false,
+    },
+  ];
+  const source = {
+    width: 640,
+    height: 360,
+    durationSeconds: 8,
+    playbackMode: "direct" as const,
+    audioTracks: tracks,
+    subtitleTracks,
+  };
+  const result = await getVideoQualities(
+    { sessionId: "session", path: "clip.mp4" },
+    {
+      touchSession: () => ({ id: "session", extractDir: directory }) as Session,
+      sanitizeEntryPath,
+      VIDEO_EXTENSIONS: new Set(["mp4"]),
+      getVideoMetadata: () => Promise.resolve(source),
+      buildVideoQualityOptions: () => ({
+        options: [
+          { id: "source", label: "Original", height: 360 },
+          { id: "auto", label: "Auto", height: null },
+        ],
+        defaultQuality: "source",
+      }),
+    },
+  );
+  expect(result).toMatchObject({
+    defaultQuality: "auto",
+    audioTracks: tracks,
+    subtitleTracks,
+  });
+  expect(result.source).toEqual({
+    width: 640,
+    height: 360,
+    durationSeconds: 8,
+    playbackMode: "direct",
+  });
+});

@@ -1,17 +1,15 @@
 import type { VideoStoryboard } from "../../../shared/contracts.js";
-import { access, mkdir, readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import type {
   Session,
   VideoRendition,
   VideoTranscodeEntry,
 } from "../../domain/models.js";
-import { buildFmp4HlsArgs } from "../../media/ffmpegHls.js";
+import { startRenditionJob } from "./videoRenditionJob.js";
 import { publishedSegments } from "../../media/hlsManifest.js";
 import {
-  durationFromOutput,
-  dimensionsFromOutput,
-  playbackModeFromOutput,
+  videoMetadataFromOutput,
   qualityOptions,
   buildVideoQualityOptions,
   type VideoMetadata,
@@ -22,7 +20,6 @@ import {
 } from "../../media/videoStoryboard.js";
 import { ProcessLimiter } from "../../media/processLimiter.js";
 import { getRenditionState } from "../../media/videoRendition.js";
-import { errorFromUnknown } from "../runtime/mediaClassification.js";
 import { runCommand, runCommandCapture } from "../process/commandRunner.js";
 import { getSessionQualityOutputPath, remuxVideo } from "./videoRemux.js";
 
@@ -196,14 +193,8 @@ class VideoRuntime {
         ["-hide_banner", "-i", videoPath],
         { allowNonZeroExit: true, signal },
       );
-      return {
-        ...dimensionsFromOutput(stderr),
-        durationSeconds: durationFromOutput(stderr),
-        playbackMode: playbackModeFromOutput(
-          stderr,
-          path.extname(videoPath).slice(1).toLowerCase(),
-        ),
-      };
+      const extension = path.extname(videoPath).slice(1).toLowerCase();
+      return videoMetadataFromOutput(stderr, extension);
     });
     cached?.set(videoPath, metadata);
     void metadata.catch(() => cached?.delete(videoPath));
@@ -255,72 +246,15 @@ class VideoRuntime {
     entry: VideoTranscodeEntry,
     session: Session,
     rendition: VideoRendition,
-  ): Promise<void> => {
-    const executable = this.ffmpegPath;
-    if (!executable || rendition.status !== "idle") return Promise.resolve();
-    rendition.status = "queued";
-    const queuedAt = Date.now();
-    rendition.queuedAt = queuedAt;
-    let startedAt = queuedAt;
-    this.logEvent("info", "video.transcode.queued", {
-      sessionId: session.id,
-      path: entry.path,
-      quality: rendition.qualityId,
-      cache: "miss",
+  ): Promise<void> =>
+    startRenditionJob(entry, session, rendition, {
+      ffmpegPath: this.ffmpegPath,
+      segmentSeconds: SEGMENT_SECONDS,
+      runVideoTask: this.runVideoTask,
+      refreshRenditionAvailability: this.refreshRenditionAvailability,
+      enforceDerivedMediaBudget: this.enforceDerivedMediaBudget,
+      logEvent: this.logEvent,
     });
-    const encode = async (signal?: AbortSignal) => {
-      await mkdir(rendition.dir, { recursive: true });
-      startedAt = Date.now();
-      rendition.status = "running";
-      rendition.encoderWaitMs = startedAt - queuedAt;
-      this.logEvent("info", "video.transcode.started", {
-        sessionId: session.id,
-        path: entry.path,
-        quality: rendition.qualityId,
-        cache: "miss",
-        queueMs: startedAt - queuedAt,
-      });
-      await runCommand(
-        executable,
-        buildFmp4HlsArgs({
-          inputPath: entry.targetPath,
-          outputDirectory: rendition.dir,
-          height: rendition.selectedHeight,
-          segmentDurationSeconds: SEGMENT_SECONDS,
-        }),
-        { signal },
-      );
-    };
-    void this.runVideoTask(session, encode, undefined, "background")
-      .then(async () => {
-        await this.refreshRenditionAvailability(rendition);
-        rendition.status = "done";
-        void this.enforceDerivedMediaBudget().catch((error: unknown) =>
-          this.logEvent("warn", "media.cache.cleanup.failed", {
-            error: errorFromUnknown(error).message,
-          }),
-        );
-        this.logEvent("info", "video.transcode.completed", {
-          sessionId: session.id,
-          path: entry.path,
-          quality: rendition.qualityId,
-          cache: "miss",
-          queueMs: startedAt - queuedAt,
-          encodeMs: Date.now() - startedAt,
-        });
-      })
-      .catch((error: unknown) => {
-        rendition.status = "error";
-        this.logEvent("warn", "video.transcode.failed", {
-          sessionId: session.id,
-          path: entry.path,
-          quality: rendition.qualityId,
-          error: errorFromUnknown(error).message,
-        });
-      });
-    return Promise.resolve();
-  };
-
   waitForFile = async (
     filePath: string,
     timeoutMs = 12_000,

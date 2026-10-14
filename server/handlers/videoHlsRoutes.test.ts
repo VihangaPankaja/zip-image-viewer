@@ -58,6 +58,41 @@ describe("HLS routes", () => {
       );
       expect(cold.text).not.toContain("CODECS=");
 
+      entry.audioTracks = [
+        {
+          id: "audio-1",
+          index: 1,
+          language: "eng",
+          label: "English",
+          isDefault: true,
+        },
+        {
+          id: "audio-2",
+          index: 2,
+          language: "jpn",
+          label: "Japanese",
+          isDefault: false,
+        },
+      ];
+      const alternate = await request(app)
+        .get(`${resource}/master?path=source.mp4`)
+        .expect(200);
+      expect(alternate.text).toContain('TYPE=AUDIO,GROUP-ID="audio"');
+      expect(alternate.text).toContain('AUDIO="audio"');
+      expect(alternate.text).toContain("quality=audio-2");
+      const encoding = vi.spyOn(deps, "startRenditionTranscode");
+      for (const route of ["playlist", "init", "segment"]) {
+        const invalid = await request(app)
+          .get(`${resource}/${route}?path=source.mp4&quality=audio-999`)
+          .expect(400);
+        expect(invalid.text).not.toContain(workspace);
+      }
+      expect(encoding).not.toHaveBeenCalled();
+      const audio = await request(app)
+        .get(`${resource}/playlist?path=source.mp4&quality=audio-2`)
+        .expect(200);
+      expect(audio.headers["content-type"]).toContain("mpegurl");
+
       await writeFile(
         path.join(dir, "init.mp4"),
         Buffer.from("avcC\x01\x4d\x40\x1fmp4a", "latin1"),

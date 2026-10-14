@@ -8,6 +8,21 @@ import { buildFmp4HlsArgs } from "./ffmpegHls.js";
 import { codecsFromInit } from "./hlsManifest.js";
 
 describe("FFmpeg adaptive HLS arguments", () => {
+  it("maps a selected absolute audio stream separately from video-only variants", () => {
+    const input = {
+      inputPath: "video.mkv",
+      outputDirectory: "hls",
+      height: 360,
+    };
+    const audio = buildFmp4HlsArgs({ ...input, audioStreamIndex: 2 });
+    expect(audio[audio.indexOf("-map") + 1]).toBe("0:2");
+    expect(audio).not.toContain("-c:v");
+    expect(audio).not.toContain("-vf");
+    const video = buildFmp4HlsArgs({ ...input, videoOnly: true });
+    expect(video).toContain("0:v:0");
+    expect(video).not.toContain("0:a:0?");
+    expect(video).not.toContain("-c:a");
+  });
   it("creates aligned four-second fMP4 media", () => {
     const args = buildFmp4HlsArgs({
       inputPath: "input.mp4",

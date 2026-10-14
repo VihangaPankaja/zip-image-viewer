@@ -188,6 +188,15 @@ export const mediaPathQuerySchema = z.object({
 const videoQualitiesInputSchema = mediaPathQuerySchema.extend({
   sessionId: z.uuid(),
 });
+const videoMediaTrackSchema = z.object({
+  id: z.string().min(1),
+  index: z.number().int().nonnegative(),
+  language: z.string(),
+  label: z.string().min(1),
+  isDefault: z.boolean(),
+});
+export type VideoMediaTrack = z.infer<typeof videoMediaTrackSchema>;
+
 const videoQualitiesSchema = z.object({
   path: safeRelativePathSchema,
   source: z.object({
@@ -203,6 +212,8 @@ const videoQualitiesSchema = z.object({
     }),
   ),
   defaultQuality: z.string().min(1),
+  audioTracks: z.array(videoMediaTrackSchema).optional(),
+  subtitleTracks: z.array(videoMediaTrackSchema).optional(),
 });
 export type VideoQualitiesInput = z.infer<typeof videoQualitiesInputSchema>;
 export type VideoQualities = z.infer<typeof videoQualitiesSchema>;

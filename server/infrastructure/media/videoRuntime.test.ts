@@ -1,5 +1,8 @@
 import { afterEach, expect, it, vi } from "vitest";
-import type { Session } from "../../domain/models.js";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import type { Session, VideoTranscodeEntry } from "../../domain/models.js";
 import { createVideoRuntime } from "./videoRuntime.js";
 
 const commands = vi.hoisted(() => ({
@@ -7,6 +10,7 @@ const commands = vi.hoisted(() => ({
   peak: 0,
   releases: [] as (() => void)[],
   started: [] as string[],
+  args: [] as string[][],
 }));
 vi.mock("../process/commandRunner.js", () => {
   const run = (
@@ -18,6 +22,7 @@ vi.mock("../process/commandRunner.js", () => {
       commands.active += 1;
       commands.peak = Math.max(commands.peak, commands.active);
       commands.started.push(args.includes("-i") ? "metadata" : command);
+      commands.args.push(args);
       const finish = () => {
         commands.active -= 1;
         signal?.removeEventListener("abort", cancel);
@@ -40,6 +45,91 @@ afterEach(() => {
   commands.peak = 0;
   commands.releases = [];
   commands.started = [];
+  commands.args = [];
+});
+
+it("starts all audio streams together beside a running background video encoder", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "video-audio-group-"));
+  const runtime = createVideoRuntime({
+    ffmpegPath: "ffmpeg",
+    transcodes: new Map(),
+    logEvent: () => undefined,
+  });
+  const session = { id: "audio-group", workspaceDir: directory } as Session;
+  const entry = {
+    path: "clip.mkv",
+    targetPath: "clip.mkv",
+    renditions: new Map(),
+    audioTracks: [
+      {
+        id: "audio-1",
+        index: 1,
+        language: "eng",
+        label: "English",
+        isDefault: true,
+      },
+      {
+        id: "audio-2",
+        index: 2,
+        language: "spa",
+        label: "Spanish",
+        isDefault: false,
+      },
+    ],
+  } as unknown as VideoTranscodeEntry;
+  const video = runtime.getRenditionState(entry, session, "360p");
+  const first = runtime.getRenditionState(entry, session, "audio-1");
+  const second = runtime.getRenditionState(entry, session, "audio-2");
+  try {
+    await runtime.startRenditionTranscode(entry, session, video);
+    await vi.waitFor(() => expect(commands.active).toBe(1));
+    await runtime.startRenditionTranscode(entry, session, first);
+    await runtime.startRenditionTranscode(entry, session, second);
+    await vi.waitFor(() => expect(commands.active).toBe(2));
+    expect([video.status, first.status, second.status]).toEqual([
+      "running",
+      "running",
+      "running",
+    ]);
+    expect(commands.args[1]).toContain("0:1");
+    expect(commands.args[1]).toContain("0:2");
+    expect(commands.started).toHaveLength(2);
+    commands.releases[1]?.();
+    await vi.waitFor(() =>
+      expect([first.status, second.status]).toEqual(["done", "done"]),
+    );
+    expect(video.status).toBe("running");
+    await runtime.startRenditionTranscode(entry, session, second);
+    expect(commands.started).toHaveLength(2);
+    first.status = "idle";
+    await runtime.startRenditionTranscode(entry, session, first);
+    await vi.waitFor(() => expect(commands.started).toHaveLength(3));
+    expect(commands.args[2]).toContain("0:1");
+    expect(commands.args[2]).not.toContain("0:2");
+  } finally {
+    await runtime.cleanupVideoSession(session);
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+it("rejects unprobed audio IDs before queuing an encoder", async () => {
+  const runtime = createVideoRuntime({
+    ffmpegPath: "ffmpeg",
+    transcodes: new Map(),
+    logEvent: () => undefined,
+  });
+  const session = { id: "invalid-audio", workspaceDir: "workspace" } as Session;
+  const entry = {
+    path: "clip.mkv",
+    renditions: new Map(),
+    audioTracks: [],
+  } as unknown as VideoTranscodeEntry;
+  const rendition = runtime.getRenditionState(entry, session, "audio-99");
+  await expect(
+    runtime.startRenditionTranscode(entry, session, rendition),
+  ).rejects.toThrow("Unknown audio track");
+  expect(rendition.status).toBe("idle");
+  expect(commands.started).toHaveLength(0);
 });
 
 it("shares two permits across runtime instances, coalesces probes and cancels queued/running session work", async () => {
@@ -71,6 +161,8 @@ it("shares two permits across runtime instances, coalesces probes and cancels qu
     height: 360,
     durationSeconds: 8,
     playbackMode: "transcode",
+    audioTracks: [],
+    subtitleTracks: [],
   });
   await runtime.getVideoMetadata("clip", firstSession);
   expect(commands.started.filter((name) => name === "metadata")).toHaveLength(
