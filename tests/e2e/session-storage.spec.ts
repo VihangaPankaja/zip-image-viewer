@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect } from "@playwright/test";
 import { test } from "./media-fixture";
-import { installReviewFixtures } from "../review/fixtures";
+import { installReviewFixtures, reviewJobs } from "../review/fixtures";
 import { tapVisibleTarget } from "./touch";
 
 test("storage supports narrow-screen keyboard cleanup, pinning and deliberate deletion", async ({
@@ -9,6 +9,15 @@ test("storage supports narrow-screen keyboard cleanup, pinning and deliberate de
   appOrigin,
 }) => {
   const state = await installReviewFixtures(page);
+  state.jobs = reviewJobs();
+  const releases: string[] = [];
+  page.on("request", (request) => {
+    if (
+      request.method() === "DELETE" &&
+      request.url().includes("/api/session-jobs/")
+    )
+      releases.push(request.url());
+  });
   await page.setViewportSize({ width: 360, height: 844 });
   await page.goto(appOrigin);
   await page.getByRole("tab", { name: "Explore", exact: true }).click();
@@ -94,6 +103,11 @@ test("storage supports narrow-screen keyboard cleanup, pinning and deliberate de
   expect(deleted).toBe(true);
   await expect(page.locator(".preview-panel")).toContainText("Select a file");
   await expect(storage).toHaveCount(0);
+  await page.getByRole("tab", { name: "Downloads", exact: true }).click();
+  await expect(
+    page.getByText("Downloading collection", { exact: true }),
+  ).toBeVisible();
+  expect(releases).toEqual([]);
 });
 
 test("touch dismissal returns focus and a cleanup conflict keeps storage usable", async ({

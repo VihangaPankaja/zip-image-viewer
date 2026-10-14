@@ -1050,6 +1050,14 @@ for (const device of devices) {
             ),
           });
           await expect(page.getByRole("alert")).toHaveCount(0);
+          await video.evaluate((element: HTMLVideoElement) => {
+            element.currentTime = 4.5;
+          });
+          await expect
+            .poll(() =>
+              video.evaluate((element: HTMLVideoElement) => !element.seeking),
+            )
+            .toBe(true);
           await expect.poll(activeText).toEqual(["Recovered coastal captions"]);
           await save(page, device, theme, "video-subtitles-recovered");
         }
