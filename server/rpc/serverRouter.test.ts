@@ -1,4 +1,7 @@
-import { call } from "@orpc/server";
+import { call, ORPCError } from "@orpc/server";
+import express from "express";
+import request from "supertest";
+import { registerRpc } from "./registerRpc.js";
 import { describe, expect, it, vi } from "vitest";
 import { ApplicationError } from "../domain/models.js";
 import {
@@ -27,6 +30,18 @@ function job(id = "2bf886fc-65bf-4e2f-b973-b607766b3131"): Job {
 
 function dependencies(): ServerRpcDependencies {
   return {
+    storage: {
+      get: () =>
+        Promise.resolve({
+          originalsBytes: 8,
+          previewsBytes: 0,
+          transcodesBytes: 0,
+          retained: false,
+          pinned: false,
+        }),
+      clear: () => Promise.resolve(),
+      pin: () => {},
+    },
     videoQualities: vi.fn(() =>
       Promise.resolve({
         path: "clip.mp4",
@@ -79,6 +94,69 @@ function dependencies(): ServerRpcDependencies {
 }
 
 describe("createServerRpcRouter", () => {
+  it("maps blocked session and job deletions to public RPC conflicts", async () => {
+    const deps = dependencies();
+    const conflict = new ApplicationError(
+      "CONFLICT",
+      "Pause or cancel this download before deleting its files.",
+      409,
+    );
+    vi.mocked(deps.removeSession).mockRejectedValue(conflict);
+    vi.mocked(deps.removeJob).mockRejectedValue(conflict);
+    const router = createServerRpcRouter(deps);
+    for (const procedure of [router.sessions.remove, router.jobs.remove]) {
+      const failure = call(procedure, { id: job().id });
+      await expect(failure).rejects.toBeInstanceOf(ORPCError);
+      await expect(failure).rejects.toMatchObject({
+        code: "CONFLICT",
+        status: 409,
+        message: conflict.message,
+      });
+    }
+    const app = express();
+    app.use(express.json());
+    registerRpc(app, deps);
+    for (const endpoint of ["sessions", "jobs"]) {
+      const response = await request(app)
+        .post(`/rpc/${endpoint}/remove`)
+        .send({ json: { id: job().id } })
+        .expect(409);
+      expect(response.body).toMatchObject({
+        json: { code: "CONFLICT", message: conflict.message },
+      });
+    }
+  });
+  it("validates storage controls and returns recoverable media conflicts", async () => {
+    const deps = dependencies();
+    const pin = vi.spyOn(deps.storage, "pin");
+    const router = createServerRpcRouter(deps);
+    const id = job().id;
+    await expect(call(router.storage.get, { id })).resolves.toMatchObject({
+      originalsBytes: 8,
+      pinned: false,
+    });
+    await call(router.storage.pin, { id, pinned: true });
+    expect(pin).toHaveBeenCalledWith(id, true);
+    await expect(
+      call(router.storage.pin, { id: "invalid", pinned: true }),
+    ).rejects.toThrow();
+    expect(pin).toHaveBeenCalledOnce();
+    vi.spyOn(deps.storage, "clear").mockRejectedValue(
+      new ApplicationError("CONFLICT", "Media is active.", 409),
+    );
+    await expect(call(router.storage.clear, { id })).rejects.toMatchObject({
+      code: "CONFLICT",
+      status: 409,
+      message: "Media is active.",
+    });
+    vi.spyOn(deps.storage, "get").mockRejectedValue(
+      new ApplicationError("NOT_FOUND", "Session not found.", 404),
+    );
+    await expect(call(router.storage.get, { id })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      status: 404,
+    });
+  });
   it("lists jobs through an executable contract procedure", async () => {
     const router = createServerRpcRouter(dependencies());
     await expect(call(router.jobs.list, undefined)).resolves.toEqual({

@@ -135,6 +135,64 @@ async function installSearchTree(page: Page) {
   });
 }
 
+async function captureStorage(
+  page: Page,
+  device: (typeof devices)[number],
+  theme: string,
+  state: Awaited<ReturnType<typeof installReviewFixtures>>,
+) {
+  await page.getByRole("button", { name: "Storage", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Session storage" });
+  await expect(dialog).toContainText("50 MB");
+  await save(page, device, theme, "session-storage-totals");
+  await dialog
+    .getByRole("checkbox", { name: "Keep until the server stops" })
+    .check();
+  await expect(dialog.getByRole("status")).toHaveText(
+    "Session kept until the server stops.",
+  );
+  await save(page, device, theme, "session-storage-pinned");
+  await dialog
+    .getByRole("button", { name: "Clear preview & transcode cache" })
+    .click();
+  await expect(dialog.getByRole("status")).toHaveText(
+    "Cache cleared. Original files kept.",
+  );
+  await expect(dialog.locator("dd")).toHaveText(["50 MB", "0 B", "0 B"]);
+  await save(page, device, theme, "session-storage-cache-cleared");
+  await page.keyboard.press("Escape");
+  state.storage.retained = true;
+  await page.getByRole("button", { name: "Storage", exact: true }).click();
+  await dialog.getByRole("button", { name: "Delete session files…" }).click();
+  await expect(dialog).toContainText(
+    "files needed to download skipped items later",
+  );
+  await save(page, device, theme, "session-storage-delete-warning");
+  const blockedRemoval: Parameters<Page["route"]>[1] = (route) =>
+    route.fulfill({
+      status: 409,
+      json: {
+        json: {
+          defined: false,
+          code: "CONFLICT",
+          status: 409,
+          message:
+            "Pause or cancel the download and wait for it to stop before deleting its files.",
+        },
+      },
+    });
+  await page.route("**/rpc/sessions/remove", blockedRemoval);
+  await dialog.getByRole("button", { name: "Delete permanently" }).click();
+  await expect(dialog.getByRole("alert")).toContainText(
+    "Pause or cancel the download",
+  );
+  await save(page, device, theme, "session-storage-delete-blocked");
+  await page.unroute("**/rpc/sessions/remove", blockedRemoval);
+  await page.keyboard.press("Escape");
+  state.storage.retained = false;
+  state.storage.pinned = false;
+}
+
 async function resizeExplorer(page: Page, targetX: number) {
   const handle = await page.locator(".workspace-resize-handle").boundingBox();
   if (!handle) throw new Error("Explorer resize handle is missing.");
@@ -796,6 +854,7 @@ for (const device of devices) {
         page.getByRole("treeitem", { name: filenames[0], exact: true }),
       ).toBeVisible();
       await save(page, device, theme, "explorer");
+      await captureStorage(page, device, theme, state);
       await captureExplorerSearch(page, device, theme, mobile);
       const mediaFilter = page.getByRole("combobox", { name: "Media type" });
       await mediaFilter.selectOption("text");
@@ -967,9 +1026,21 @@ for (const device of devices) {
             buffer: Buffer.from("1\nnot a timestamp\nInvalid subtitle"),
           });
           await expect(page.getByRole("alert")).toBeVisible();
-          await page
-            .getByRole("alert")
-            .evaluate((element) => element.scrollIntoView({ block: "center" }));
+          await page.getByRole("alert").scrollIntoViewIfNeeded();
+          await page.evaluate(
+            (offset) => window.scrollBy(0, offset),
+            mobile ? 96 : 32,
+          );
+          await expect(page.getByRole("alert")).toBeInViewport({ ratio: 1 });
+          if (mobile) {
+            const alert = await page.getByRole("alert").boundingBox();
+            const navigation = await page
+              .locator(".workspace-mobile-nav")
+              .boundingBox();
+            if (!alert || !navigation)
+              throw new Error("Subtitle layout missing.");
+            expect(alert.y + alert.height).toBeLessThanOrEqual(navigation.y);
+          }
           await save(page, device, theme, "video-subtitles-error");
           await upload.setInputFiles({
             name: "Recovered.vtt",
@@ -979,6 +1050,27 @@ for (const device of devices) {
             ),
           });
           await expect(page.getByRole("alert")).toHaveCount(0);
+          await video.evaluate((element: HTMLVideoElement) => {
+            element.currentTime = 4.5;
+          });
+          await expect
+            .poll(() =>
+              video.evaluate((element: HTMLVideoElement) => !element.seeking),
+            )
+            .toBe(true);
+          await expect.poll(activeText).toEqual(["Recovered coastal captions"]);
+          await video.evaluate(async (element: HTMLVideoElement) => {
+            element.muted = true;
+            await element.play();
+          });
+          await expect
+            .poll(() =>
+              video.evaluate(
+                (element: HTMLVideoElement) => element.currentTime,
+              ),
+            )
+            .toBeGreaterThan(4.8);
+          await video.evaluate((element: HTMLVideoElement) => element.pause());
           await expect.poll(activeText).toEqual(["Recovered coastal captions"]);
           await save(page, device, theme, "video-subtitles-recovered");
         }
@@ -1048,6 +1140,33 @@ for (const device of devices) {
       await save(page, device, theme, "explorer-dialog");
       await page.keyboard.press("Escape");
       await captureLargeExplorer(page, device, theme, mobile);
+      await page.getByRole("tab", { name: "Explore", exact: true }).click();
+      if (mobile)
+        await page.getByRole("button", { name: "Show sessions" }).click();
+      await page
+        .getByRole("button", { name: "Open Coastal collection", exact: true })
+        .click();
+      await page.getByRole("button", { name: "Storage", exact: true }).click();
+      const storageDialog = page.getByRole("dialog", {
+        name: "Session storage",
+      });
+      await page.route("**/rpc/sessions/remove", (route) =>
+        route.fulfill({ json: { json: null } }),
+      );
+      await page.route("**/rpc/sessions/list", (route) =>
+        route.fulfill({ json: { json: { items: [] } } }),
+      );
+      await storageDialog
+        .getByRole("button", { name: "Delete session files…" })
+        .click();
+      await storageDialog
+        .getByRole("button", { name: "Delete permanently" })
+        .click();
+      await expect(storageDialog).toHaveCount(0);
+      await expect(
+        page.getByRole("button", { name: "Storage", exact: true }),
+      ).toHaveCount(0);
+      await save(page, device, theme, "session-storage-deleted");
     });
   }
 }

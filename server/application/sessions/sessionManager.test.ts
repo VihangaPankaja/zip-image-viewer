@@ -6,12 +6,24 @@ import type { Session } from "../../domain/models.js";
 import { createSessionManager } from "./sessionManager.js";
 
 it("keeps retained originals through viewer close, expiry and shutdown until explicit removal", async () => {
-  const workspaceDir = await mkdtemp(path.join(os.tmpdir(), "retained-cleanup-"));
+  const workspaceDir = await mkdtemp(
+    path.join(os.tmpdir(), "retained-cleanup-"),
+  );
   const session: Session = {
-    id: "retained", retained: true, workspaceDir, extractDir: workspaceDir,
+    id: "retained",
+    retained: true,
+    workspaceDir,
+    extractDir: workspaceDir,
     tree: { name: "root", path: ".", type: "directory", modifiedAt: 0 },
-    firstFilePath: "", stats: { fileCount: 0 }, selectedVideoQuality: "original",
-    transcodeStatus: { quality: "original", done: true, completed: 0, total: 0 },
+    firstFilePath: "",
+    stats: { fileCount: 0 },
+    selectedVideoQuality: "original",
+    transcodeStatus: {
+      quality: "original",
+      done: true,
+      completed: 0,
+      total: 0,
+    },
     lastAccessedAt: 0,
   };
   const sessions = new Map([[session.id, session]]);
@@ -36,15 +48,26 @@ it("keeps retained originals through viewer close, expiry and shutdown until exp
 it("rejects new session access and drains media work before deleting its files", async () => {
   const workspaceDir = await mkdtemp(path.join(os.tmpdir(), "media-cleanup-"));
   const session: Session = {
-    id: "session", workspaceDir, extractDir: workspaceDir,
+    id: "session",
+    workspaceDir,
+    extractDir: workspaceDir,
     tree: { name: "root", path: ".", type: "directory", modifiedAt: 0 },
-    firstFilePath: "", stats: { fileCount: 0 }, selectedVideoQuality: "original",
-    transcodeStatus: { quality: "original", done: true, completed: 0, total: 0 },
+    firstFilePath: "",
+    stats: { fileCount: 0 },
+    selectedVideoQuality: "original",
+    transcodeStatus: {
+      quality: "original",
+      done: true,
+      completed: 0,
+      total: 0,
+    },
     lastAccessedAt: 0,
   };
   const sessions = new Map([[session.id, session]]);
   let finish = () => {};
-  const drained = new Promise<void>((resolve) => { finish = resolve; });
+  const drained = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
   const cleanup = vi.fn(async () => {
     expect(sessions.has(session.id)).toBe(false);
     expect((await stat(workspaceDir)).isDirectory()).toBe(true);
@@ -64,3 +87,33 @@ it("rejects new session access and drains media work before deleting its files",
     await rm(workspaceDir, { recursive: true, force: true });
   }
 });
+
+it.each(["manual", "shutdown"])(
+  "keeps a pinned temporary session on viewer close and expiry but deletes it on %s",
+  async (reason) => {
+    const workspaceDir = await mkdtemp(
+      path.join(os.tmpdir(), "pinned-session-"),
+    );
+    const session = { id: "pinned", pinned: true, workspaceDir } as Session;
+    const sessions = new Map([[session.id, session]]);
+    const manager = createSessionManager(
+      sessions,
+      new Map(),
+      vi.fn(),
+      async () => {},
+    );
+    try {
+      await manager.removeSession(session.id, "viewer");
+      await manager.removeSession(session.id, "expired");
+      expect(sessions.get(session.id)).toBe(session);
+      expect((await stat(workspaceDir)).isDirectory()).toBe(true);
+      await manager.removeSession(session.id, reason);
+      expect(sessions.size).toBe(0);
+      await expect(stat(workspaceDir)).rejects.toMatchObject({
+        code: "ENOENT",
+      });
+    } finally {
+      await rm(workspaceDir, { recursive: true, force: true });
+    }
+  },
+);

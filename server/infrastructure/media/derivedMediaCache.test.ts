@@ -6,6 +6,7 @@ import {
   rm,
   utimes,
   writeFile,
+  link,
 } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -45,6 +46,77 @@ async function cachedFile(
   await utimes(filePath, modifiedAt, modifiedAt);
   await utimes(path.dirname(filePath), modifiedAt, modifiedAt);
 }
+
+it("reports separate storage totals and clears derived files without deleting originals", async () => {
+  const item = await session("storage");
+  await cachedFile(
+    path.join(item.workspaceDir, "previews", "image.jpg"),
+    "preview",
+    0,
+  );
+  await cachedFile(
+    path.join(item.workspaceDir, "video-quality", "clip.mp4"),
+    "remux",
+    0,
+  );
+  const transcodes = new Map<string, VideoTranscodeEntry>();
+  const cache = createDerivedMediaCache(
+    new Map([[item.id, item]]),
+    transcodes,
+    1_000,
+  );
+  expect(await cache.storage(item)).toEqual({
+    originalsBytes: 8,
+    previewsBytes: 7,
+    transcodesBytes: 5,
+  });
+  await cache.clear(item);
+  expect(await cache.storage(item)).toEqual({
+    originalsBytes: 8,
+    previewsBytes: 0,
+    transcodesBytes: 0,
+  });
+  expect(
+    await readFile(path.join(item.extractDir, "original.mp4"), "utf8"),
+  ).toBe("original");
+});
+
+it("counts retained torrent hardlinks once in storage totals", async () => {
+  const item = await session("hardlinks");
+  await link(
+    path.join(item.extractDir, "original.mp4"),
+    path.join(item.workspaceDir, "original-link.mp4"),
+  );
+  const cache = createDerivedMediaCache(
+    new Map([[item.id, item]]),
+    new Map(),
+    1_000,
+  );
+  expect((await cache.storage(item)).originalsBytes).toBe(8);
+});
+
+it("refuses cache cleanup during media work or recent HLS playback", async () => {
+  const item = await session("active");
+  const rendition = {
+    status: "done",
+    lastAccessedAt: Date.now(),
+  } as VideoRendition;
+  const entry = {
+    sessionId: item.id,
+    renditions: new Map([["360p", rendition]]),
+  } as VideoTranscodeEntry;
+  const cache = createDerivedMediaCache(
+    new Map([[item.id, item]]),
+    new Map([["clip", entry]]),
+    1_000,
+  );
+  const release = cache.protectSession(item.id);
+  await expect(cache.clear(item)).rejects.toThrow("Media is active");
+  release();
+  await expect(cache.clear(item)).rejects.toThrow("Media is active");
+  rendition.lastAccessedAt = Date.now() - 31_000;
+  await cache.clear(item);
+});
 
 it("evicts the oldest completed rendition across sessions without removing originals or stale rendition state", async () => {
   const first = await session("first");

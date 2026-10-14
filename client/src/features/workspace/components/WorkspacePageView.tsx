@@ -1,4 +1,5 @@
-import type { ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
+import { SessionStorageDialog } from "./SessionStorageDialog";
 import { GlobalSettingsSheet } from "../../../components/GlobalSettingsSheet";
 import { PreviewContent } from "../../../components/Preview/PreviewContent";
 import { TreeExplorer } from "../../../components/TreeExplorer";
@@ -29,6 +30,7 @@ type ViewProps = { controller: WorkspacePageController };
 
 export function WorkspacePageView({ controller }: ViewProps) {
   const { queue, settings, state } = controller;
+  const [storageOpen, setStorageOpen] = useState(false);
   return (
     <div className="app-shell">
       <main className="workspace">
@@ -36,7 +38,10 @@ export function WorkspacePageView({ controller }: ViewProps) {
           className={`unified-workspace ${state.activeView === "downloads" ? "downloads-workspace" : ""}`}
         >
           <header className="unified-workspace-header">
-            <WorkspaceHeader controller={controller} />
+            <WorkspaceHeader
+              controller={controller}
+              onOpenStorage={() => setStorageOpen(true)}
+            />
           </header>
           {state.activeView === "downloads" ? (
             <WorkspaceDownloads controller={controller} />
@@ -70,6 +75,13 @@ export function WorkspacePageView({ controller }: ViewProps) {
       {state.activeView === "explore" ? (
         <WorkspacePageOverlays controller={controller} />
       ) : null}
+      {storageOpen && state.session?.id ? (
+        <SessionStorageDialog
+          id={state.session.id}
+          onClose={() => setStorageOpen(false)}
+          onDeleted={() => controller.lifecycle.clearArchive(false)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -100,7 +112,10 @@ function WorkspaceDownloads({ controller }: ViewProps) {
   );
 }
 
-function WorkspaceHeader({ controller }: ViewProps) {
+function WorkspaceHeader({
+  controller,
+  onOpenStorage,
+}: ViewProps & { onOpenStorage: () => void }) {
   const { state } = controller;
   return (
     <WorkspaceAppBar
@@ -108,6 +123,7 @@ function WorkspaceHeader({ controller }: ViewProps) {
       onAddDownloads={() => state.setDownloadDialogOpen(true)}
       onOpenSettings={() => state.setSettingsOpen(true)}
       onSelectView={state.setActiveView}
+      onOpenStorage={state.session ? onOpenStorage : undefined}
     />
   );
 }
@@ -218,9 +234,16 @@ function WorkspaceMetadata({ controller }: ViewProps) {
         <button
           className="ghost-button"
           type="button"
-          onClick={() => void lifecycle.clearArchive(true)}
+          onClick={() => {
+            if (
+              window.confirm(
+                "Close this session? Temporary files are deleted unless Keep until the server stops is enabled. Retained torrent files are kept.",
+              )
+            )
+              void lifecycle.clearArchive(true);
+          }}
         >
-          Close session
+          Close session…
         </button>
       ) : null}
     </section>

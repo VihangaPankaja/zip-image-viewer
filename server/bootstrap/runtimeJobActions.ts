@@ -48,15 +48,15 @@ export function createRuntimeJobActions(
     return job;
   };
   async function removeSession(id: string, reason: string) {
-    const retainedJob = [...jobs.values()].find(
-      (job) => job.sourceKind === "torrent" && job.sessionId === id,
+    const owningJob = [...jobs.values(), ...queue.getOrderedJobs()].find(
+      (job) => job.sessionId === id,
     );
-    if (retainedJob && !["expired", "shutdown", "viewer"].includes(reason)) {
+    if (owningJob && !["expired", "shutdown", "viewer"].includes(reason)) {
       // Reject deletion while a worker is still using the files.
-      queue.removeSessionJob(retainedJob.id);
+      queue.removeSessionJob(owningJob.id);
       await sessionManager.removeSession(id, reason);
-      retainedJob.sessionId = "";
-      await manager.cleanupJob(retainedJob.id, reason);
+      owningJob.sessionId = "";
+      await manager.cleanupJob(owningJob.id, reason);
       return;
     }
     await sessionManager.removeSession(id, reason);

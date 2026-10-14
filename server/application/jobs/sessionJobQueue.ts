@@ -1,6 +1,8 @@
 import { ApplicationError, type SessionJob } from "../../domain/models.js";
 
 type QueueItem = { job: SessionJob; confirmOversize: boolean };
+const deletionConflict =
+  "Pause or cancel the download and wait for it to stop before deleting its files.";
 
 type SessionJobQueueDeps = {
   pendingSessionJobs: QueueItem[];
@@ -305,9 +307,8 @@ function removeSessionJob(state: QueueState, jobId: string): SessionJob {
   if (
     state.activeItems.has(jobId) ||
     state.pendingSessionJobs.some(({ job }) => job.id === jobId)
-  ) {
-    throw new Error("Only completed jobs can be removed.");
-  }
+  )
+    throw new ApplicationError("CONFLICT", deletionConflict, 409);
   state.jobs.delete(jobId);
   const orderIndex = state.jobOrder.indexOf(jobId);
   if (orderIndex >= 0) state.jobOrder.splice(orderIndex, 1);
@@ -317,17 +318,15 @@ function removeSessionJob(state: QueueState, jobId: string): SessionJob {
 
 export function createSessionJobQueue(deps: SessionJobQueueDeps) {
   validateConcurrency(deps.maxActiveSessionJobs);
+  const initialJobs = deps.initialJobs ?? [];
   const state: QueueState = {
     ...deps,
     maxConcurrent: deps.maxActiveSessionJobs,
     activeItems: new Map(),
     jobs: new Map(
-      (deps.initialJobs ?? []).map((job) => [
-        job.id,
-        { job, confirmOversize: false },
-      ]),
+      initialJobs.map((job) => [job.id, { job, confirmOversize: false }]),
     ),
-    jobOrder: (deps.initialJobs ?? []).map(({ id }) => id),
+    jobOrder: initialJobs.map(({ id }) => id),
     pausing: new Set(),
     requeueAfterActive: new Set(),
     stopping: false,

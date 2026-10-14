@@ -40,6 +40,7 @@ describe("createRuntimeApp", () => {
       }),
     );
     const app = createRuntimeApp({
+      storage: { get: vi.fn(), clear: vi.fn(), pin: vi.fn() },
       videoQualities,
       metrics: { getSessionCount: () => 0, getJobCount: () => jobs.size },
       distDir: path.resolve("dist"),

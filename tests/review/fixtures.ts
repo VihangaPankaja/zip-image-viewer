@@ -284,10 +284,31 @@ export async function installReviewFixtures(page: Page) {
     jobs: [] as (ReturnType<typeof reviewJobs>[number] | Job)[],
     selectedFileIds: [] as string[],
     torrentLimits: { downloadBytesPerSec: 0, uploadBytesPerSec: 0 },
+    storage: {
+      originalsBytes: 52428800,
+      previewsBytes: 2097152,
+      transcodesBytes: 12582912,
+      retained: false,
+      pinned: false,
+    },
   };
   await page.clock.setFixedTime(new Date(timestamp));
   await page.route("**/rpc/**", (route) => {
     const endpoint = new URL(route.request().url()).pathname;
+    if (endpoint.endsWith("storage/get"))
+      return route.fulfill({ json: { json: state.storage } });
+    if (endpoint.endsWith("storage/pin")) {
+      const payload = route.request().postDataJSON() as {
+        json: { pinned: boolean };
+      };
+      state.storage.pinned = payload.json.pinned;
+      return route.fulfill({ json: { json: null } });
+    }
+    if (endpoint.endsWith("storage/clear")) {
+      state.storage.previewsBytes = 0;
+      state.storage.transcodesBytes = 0;
+      return route.fulfill({ json: { json: null } });
+    }
     if (
       endpoint.endsWith("torrentLimits/get") ||
       endpoint.endsWith("torrentLimits/update")

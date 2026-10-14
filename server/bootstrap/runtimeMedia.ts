@@ -14,6 +14,22 @@ type LogEvent = (
   _details?: Record<string, unknown>,
 ) => void;
 
+function pinMediaRequests(
+  cache: ReturnType<typeof createDerivedMediaCache>,
+): RequestHandler {
+  return async (req, res, next) => {
+    const release = cache.protectSession(req.params.id as string);
+    res.once("finish", release);
+    res.once("close", release);
+    try {
+      await cache.waitForEviction(req.params.id as string);
+      if (!res.destroyed) next();
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
 export function createRuntimeMedia(
   ffmpegPath: string | null,
   sessions: Map<string, Session>,
@@ -41,17 +57,6 @@ export function createRuntimeMedia(
     protectSession: cache.protectSession,
     enforceDerivedMediaBudget: enforceMediaBudget,
   });
-  const pinMediaRequest: RequestHandler = async (req, res, next) => {
-    const release = cache.protectSession(req.params.id as string);
-    res.once("finish", release);
-    res.once("close", release);
-    try {
-      await cache.waitForEviction(req.params.id as string);
-      if (!res.destroyed) next();
-    } catch (error) {
-      next(error);
-    }
-  };
   const ensureThumbnail: typeof ensureRuntimeThumbnail = async (
     session,
     normalizedPath,
@@ -86,9 +91,12 @@ export function createRuntimeMedia(
     return result;
   };
   return {
+    storage: cache.storage,
+    clearMediaCache: (session: Session) =>
+      cache.clear(session, () => videoRuntime.clearCachedMedia(session)),
     videoRuntime,
     enforceMediaBudget,
-    pinMediaRequest,
+    pinMediaRequest: pinMediaRequests(cache),
     ensureThumbnail,
     ensureImagePreview,
   };

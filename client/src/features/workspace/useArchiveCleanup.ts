@@ -36,7 +36,7 @@ export function useArchiveCleanup({
           () => {},
         );
       }
-      if (jobId)
+      if (removeRemoteSession && jobId)
         await fetch(`/api/session-jobs/${jobId}?release=true`, {
           method: "DELETE",
         }).catch(() => {});

@@ -281,6 +281,7 @@ describe("real download flows", () => {
       logEvent: vi.fn(),
     });
     const app = createRuntimeApp({
+      storage: { get: vi.fn(), clear: vi.fn(), pin: vi.fn() },
       videoQualities: vi.fn(),
       metrics: {
         getSessionCount: () => sessions.size,

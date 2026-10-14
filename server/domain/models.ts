@@ -40,6 +40,7 @@ export type ExplorerNode = {
 
 export type Session = {
   retained?: boolean;
+  pinned?: boolean;
   availablePaths?: Set<string>;
   id: string;
   workspaceDir: string;

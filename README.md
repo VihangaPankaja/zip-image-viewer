@@ -92,6 +92,16 @@ skipped files to add selections. Close session releases the viewer; Delete files
 permanently removes the torrent and its payloads after confirmation. HTTP downloads
 continue to use temporary sessions and the existing expiry policy.
 
+Open a session and choose **Storage** to see original files, previews/thumbnails,
+and transcodes/remuxes separately. Totals count hardlinked files once and exclude
+symbolic links. **Clear preview & transcode cache** keeps originals and regenerates
+derived media when needed. Cleanup refuses active media work and HLS playback used
+within the last 30 seconds. HTTP sessions can use **Keep until the server stops** to
+survive viewer close and expiry; these pins do not survive server shutdown. Retained
+torrents survive restarts until explicitly deleted. **Delete session files** explains
+the deletion scope before removing files and their queue entry. Removing a completed
+HTTP item from the queue leaves its session files subject to that retention policy.
+
 For torrents containing archives, the first selected archive stays extracted at the
 same paths when more files are added. Added siblings appear under `Torrent files`
 (with a suffix if the archive already uses that name). Original payloads stay retained.
