@@ -1059,6 +1059,19 @@ for (const device of devices) {
             )
             .toBe(true);
           await expect.poll(activeText).toEqual(["Recovered coastal captions"]);
+          await video.evaluate(async (element: HTMLVideoElement) => {
+            element.muted = true;
+            await element.play();
+          });
+          await expect
+            .poll(() =>
+              video.evaluate(
+                (element: HTMLVideoElement) => element.currentTime,
+              ),
+            )
+            .toBeGreaterThan(4.8);
+          await video.evaluate((element: HTMLVideoElement) => element.pause());
+          await expect.poll(activeText).toEqual(["Recovered coastal captions"]);
           await save(page, device, theme, "video-subtitles-recovered");
         }
       }
