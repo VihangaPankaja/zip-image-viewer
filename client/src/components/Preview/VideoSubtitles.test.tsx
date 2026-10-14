@@ -53,6 +53,68 @@ it("ignores late file reads after changing videos", async () => {
   expect(video.querySelector("track")).toBeNull();
 });
 
+it("loads embedded captions by language, recovers from failure, and cancels a pending selection", async () => {
+  const fetchSubtitles = vi
+    .fn<(url: RequestInfo | URL, init?: RequestInit) => Promise<unknown>>()
+    .mockResolvedValueOnce({ ok: false })
+    .mockImplementationOnce(
+      (_url: RequestInfo | URL, init: RequestInit | undefined) =>
+        new Promise((_resolve, reject) =>
+          init?.signal?.addEventListener("abort", () =>
+            reject(new DOMException("Aborted", "AbortError")),
+          ),
+        ),
+    );
+  vi.stubGlobal("fetch", fetchSubtitles);
+  try {
+    const video = document.createElement("video");
+    const { unmount } = render(
+      <VideoSubtitles
+        videoRef={{ current: video }}
+        sessionId="session/one"
+        path="folder/clip.mkv"
+        embeddedTracks={[
+          {
+            id: "subtitle-3",
+            index: 3,
+            language: "eng",
+            label: "English",
+            isDefault: true,
+          },
+          {
+            id: "subtitle-4",
+            index: 4,
+            language: "spa",
+            label: "Spanish",
+            isDefault: false,
+          },
+        ]}
+      />,
+    );
+    const picker = screen.getByLabelText("Embedded subtitles");
+    fireEvent.change(picker, { target: { value: "subtitle-3" } });
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Embedded subtitles could not be loaded",
+      ),
+    );
+    expect(fetchSubtitles.mock.calls[0][0]).toBe(
+      "/api/sessions/session%2Fone/video/subtitles?path=folder%2Fclip.mkv&track=subtitle-3",
+    );
+    fireEvent.change(picker, { target: { value: "subtitle-4" } });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading subtitles");
+    const signal = fetchSubtitles.mock.calls[1]?.[1]?.signal;
+    fireEvent.change(picker, { target: { value: "" } });
+    expect(signal?.aborted).toBe(true);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(video.querySelector("track")).toBeNull();
+    unmount();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 it("updates native cue times without drift and cleans up track resources", async () => {
   const cues = [{ startTime: 1, endTime: 3 }];
   const nativeTrack = {
@@ -80,9 +142,26 @@ it("updates native cue times without drift and cleans up track resources", async
       revokeObjectURL: revoke,
     }),
   );
+  const fetchSubtitles = vi
+    .fn()
+    .mockResolvedValue({ ok: true, text: () => Promise.resolve(vtt) });
+  vi.stubGlobal("fetch", fetchSubtitles);
   try {
     const { unmount } = render(
-      <VideoSubtitles videoRef={{ current: video }} />,
+      <VideoSubtitles
+        videoRef={{ current: video }}
+        sessionId="session"
+        path="clip.mkv"
+        embeddedTracks={[
+          {
+            id: "subtitle-3",
+            index: 3,
+            language: "eng",
+            label: "English",
+            isDefault: true,
+          },
+        ]}
+      />,
     );
     upload("captions.srt", "1\n00:00:01,000 --> 00:00:03,000\nHello");
     await waitFor(() => expect(video.querySelector("track")).not.toBeNull());
@@ -127,6 +206,19 @@ it("updates native cue times without drift and cleans up track resources", async
     fireEvent.error(failedTrack);
     expect(screen.getByRole("alert")).toHaveTextContent("could not be loaded");
     expect(screen.queryByText(/Loading subtitles/)).not.toBeInTheDocument();
+    expect(video.querySelector("track")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Embedded subtitles"), {
+      target: { value: "subtitle-3" },
+    });
+    await waitFor(() => expect(video.querySelector("track")).not.toBeNull());
+    const embedded = video.querySelector("track");
+    if (!embedded) throw new Error("Embedded track missing.");
+    fireEvent.load(embedded);
+    expect(embedded.label).toBe("English");
+    expect(screen.getByRole("status")).toHaveTextContent("English");
+    fireEvent.change(screen.getByLabelText("Embedded subtitles"), {
+      target: { value: "" },
+    });
     expect(video.querySelector("track")).toBeNull();
     unmount();
     expect(video.dataset.captionSize).toBeUndefined();

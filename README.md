@@ -16,6 +16,20 @@ contents, and previewing files while work continues in the background.
 - Strict TypeScript, type-aware ESLint, Fallow, Lefthook, Vitest, Playwright,
   Axe, and coverage reporting are part of the normal quality workflow.
 
+## Audio languages and captions
+
+Videos with multiple audio tracks open in adaptive playback. Choose an audio
+language without restarting the video or changing its position and paused state.
+Original and remux playback use browser-native audio selection when supported;
+otherwise choose **Switch to adaptive playback** to select a language.
+
+Choose an embedded text subtitle language or load a local WebVTT/SRT file.
+Captions support on/off, size and a timing offset. Local files stay in the
+browser. Embedded text tracks convert to WebVTT on the server, with a 2 MiB
+output limit and a 30-second conversion timeout. Bitmap subtitle tracks are
+not offered. Failed or malformed captions show an error and can be replaced
+without closing the video.
+
 ## Requirements
 
 - Node.js 26.7.0

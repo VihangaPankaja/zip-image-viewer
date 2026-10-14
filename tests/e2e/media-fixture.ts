@@ -1,11 +1,11 @@
 import express from "express";
 import { once } from "node:events";
-import { request } from "node:http";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { test as base } from "@playwright/test";
 import { prepareMedia } from "../review/fixtures";
+import { proxyApp } from "../fixtures/proxyApp";
 
 export const test = base.extend<{ appOrigin: string; withAudio: boolean }>({
   withAudio: [false, { option: true }],
@@ -41,24 +41,7 @@ export const test = base.extend<{ appOrigin: string; withAudio: boolean }>({
     app.get("/api/sessions/:id/video/play", (_req, res) =>
       res.sendFile(path.join(mediaDirectory, filename)),
     );
-    app.use((req, res) => {
-      const upstream = request(
-        new URL(req.originalUrl, baseURL),
-        {
-          method: req.method,
-          headers: { ...req.headers, host: new URL(baseURL).host },
-        },
-        (response) => {
-          res.writeHead(response.statusCode ?? 502, response.headers);
-          response.pipe(res);
-        },
-      );
-      upstream.on("error", () => {
-        if (!res.headersSent) res.status(502);
-        res.end();
-      });
-      req.pipe(upstream);
-    });
+    app.use(proxyApp(baseURL));
     const server = app.listen(0, "127.0.0.1");
     await once(server, "listening");
     try {

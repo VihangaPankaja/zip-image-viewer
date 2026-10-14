@@ -1,5 +1,6 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { workspaceRpc } from "../../services/orpcClient";
+import type { VideoMediaTrack } from "../../../../shared/contracts";
 import {
   chooseVideoQuality,
   normalizeVideoQualityOptions,
@@ -21,11 +22,15 @@ async function loadVideoQualities(sessionId: string, path: string) {
   return {
     options,
     selected: chooseVideoQuality(options, payload.defaultQuality),
+    audioTracks: payload.audioTracks ?? [],
+    subtitleTracks: payload.subtitleTracks ?? [],
   };
 }
 
 export function useVideoQualities(params: VideoQualitiesParams) {
   const [loadedFile, setLoadedFile] = useState("");
+  const [audioTracks, setAudioTracks] = useState<VideoMediaTrack[]>([]);
+  const [subtitleTracks, setSubtitleTracks] = useState<VideoMediaTrack[]>([]);
   const {
     isFile,
     path,
@@ -36,6 +41,8 @@ export function useVideoQualities(params: VideoQualitiesParams) {
   } = params;
   useEffect(() => {
     setLoadedFile("");
+    setAudioTracks([]);
+    setSubtitleTracks([]);
     if (selectedKind !== "video" || !sessionId || !isFile) {
       setOptions([]);
       setSelectedQuality("source");
@@ -43,10 +50,12 @@ export function useVideoQualities(params: VideoQualitiesParams) {
     }
     let cancelled = false;
     void loadVideoQualities(sessionId, path ?? "").then(
-      ({ options, selected }) => {
+      ({ options, selected, audioTracks, subtitleTracks }) => {
         if (!cancelled) {
           setOptions(options);
           setSelectedQuality(selected);
+          setAudioTracks(audioTracks);
+          setSubtitleTracks(subtitleTracks);
           setLoadedFile(JSON.stringify([sessionId, path]));
         }
       },
@@ -62,5 +71,8 @@ export function useVideoQualities(params: VideoQualitiesParams) {
       cancelled = true;
     };
   }, [isFile, path, selectedKind, sessionId, setOptions, setSelectedQuality]);
-  return loadedFile === JSON.stringify([sessionId, path]);
+  const ready =
+    selectedKind === "video" &&
+    loadedFile === JSON.stringify([sessionId, path]);
+  return { ready, audioTracks, subtitleTracks };
 }

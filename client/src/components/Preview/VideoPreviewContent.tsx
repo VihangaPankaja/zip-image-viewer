@@ -4,6 +4,7 @@ import type { VideoPreviewProps } from "../../features/workspace/types";
 import { useVideoResume } from "../../features/player/useVideoResume";
 import { VideoScrubber } from "./VideoScrubber";
 import { VideoSubtitles } from "./VideoSubtitles";
+import { VideoAudioTracks } from "./VideoAudioTracks";
 
 type VideoPreviewDetailsProps = Omit<
   VideoPreviewProps,
@@ -59,7 +60,10 @@ function VideoPreviewToolbar(props: VideoPreviewDetailsProps) {
             ? "Remux"
             : "Transcode"}
       </span>
-      {transcodeAction(props, "Transcode instead")}
+      {(props.audioTracks?.length ?? 0) > 1 &&
+      (props.videoAudioTracks?.length ?? 0) <= 1
+        ? null
+        : transcodeAction(props, "Transcode instead")}
       <span>{props.formatDate(props.selectedNode.modifiedAt ?? 0)}</span>
     </div>
   );
@@ -249,7 +253,11 @@ export function VideoPreviewContent({
       <VideoSubtitles
         key={JSON.stringify([props.sessionId, props.selectedNode.path])}
         videoRef={videoRef}
+        embeddedTracks={props.subtitleTracks}
+        path={props.selectedNode.path}
+        sessionId={props.sessionId}
       />
+      <VideoAudioTracks {...props} />
       <PlaybackResume {...resume} />
       <PlaybackStatus {...props} />
       <PlaybackDiagnostics
