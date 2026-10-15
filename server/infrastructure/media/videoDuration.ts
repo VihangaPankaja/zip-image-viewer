@@ -20,7 +20,7 @@ export async function videoDuration(
       "-an",
       "-sn",
       "-vf",
-      "select=eq(n\\,0),showinfo",
+      "showinfo",
       "-frames:v",
       "1",
       "-fps_mode",
@@ -31,35 +31,39 @@ export async function videoDuration(
     ],
     { signal },
   );
-  const { stderr } = await runCommandCapture(
-    executable,
-    [
-      "-hide_banner",
-      "-sseof",
-      "-4",
-      "-copyts",
-      "-start_at_zero",
-      "-i",
-      input,
-      "-map",
-      "0:v:0",
-      "-an",
-      "-sn",
-      "-vf",
-      "showinfo",
-      "-fps_mode",
-      "passthrough",
-      "-f",
-      "null",
-      "-",
-    ],
-    { signal },
-  );
-  const frames = [
-    ...stderr.matchAll(
-      /pts_time:([\d.]+)\s+duration:\s*\d+\s+duration_time:([\d.]+)/g,
-    ),
-  ];
+  let frames: RegExpMatchArray[];
+  for (let tail = 4; ; tail = Math.min(containerDuration, tail * 2)) {
+    const { stderr } = await runCommandCapture(
+      executable,
+      [
+        "-hide_banner",
+        "-sseof",
+        String(-Math.min(tail, containerDuration)),
+        "-copyts",
+        "-start_at_zero",
+        "-i",
+        input,
+        "-map",
+        "0:v:0",
+        "-an",
+        "-sn",
+        "-vf",
+        "showinfo",
+        "-fps_mode",
+        "passthrough",
+        "-f",
+        "null",
+        "-",
+      ],
+      { signal },
+    );
+    frames = [
+      ...stderr.matchAll(
+        /pts_time:([\d.]+)\s+duration:\s*\d+\s+duration_time:([\d.]+)/g,
+      ),
+    ];
+    if (frames.length || tail >= containerDuration) break;
+  }
   const last = frames.at(-1);
   const firstTime = first.stderr.match(/pts_time:([-\d.]+)/)?.[1];
   const end =

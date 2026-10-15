@@ -14,11 +14,11 @@
 
 ## Step 2: Real playback, release and review
 
-- [ ] Generate a real 60-minute deterministic source and prove cold seeking, repeated prepared seeks, A/V decode, window crossing, alternate audio, two viewers and cancellation.
-- [ ] Add desktop/mobile browser flows and feature interaction/result screenshots to the complete existing gallery.
-- [ ] Update the roadmap and version. Run all required checks, coverage and all browser projects. Commit after required checks and immediate formatting.
-- [ ] Capture and inspect every gallery image, publish immutable assets, open and link the PR.
-- [ ] Review the complete change, address valid scope-related bot comments, and monitor all checks on the final commit until successful.
+- [x] Generate a real 60-minute deterministic source and prove cold seeking, repeated prepared seeks, A/V decode, window crossing, alternate audio, two viewers and cancellation.
+- [x] Add desktop/mobile browser flows and feature interaction/result screenshots to the complete existing gallery.
+- [x] Update the roadmap and version. Run all required checks, coverage and all browser projects. Commit after required checks and immediate formatting.
+
+Release gates: capture and inspect every gallery image, publish immutable assets, open and link the PR, address valid scope-related bot comments, and monitor all checks on the final commit until successful. The PR gallery, review threads and check results record these gates after the implementation commits.
 
 ## Review focus
 

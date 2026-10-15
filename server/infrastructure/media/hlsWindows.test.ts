@@ -53,35 +53,42 @@ it("promotes queued preparation without rejecting its background consumer", asyn
   expect(priorities).toEqual(["background", "interactive"]);
 });
 
-it("prepares retained low video and default audio through the final window", async () => {
-  const fixture = await startMultilingualFixture(
-    "http://127.0.0.1:5173",
-    0,
-    128,
-  );
-  try {
-    fixture.session.retained = true;
-    const entry = await fixture.runtime.ensureVideoTranscodeEntry(
-      fixture.session,
-      "multilingual.mkv",
-      path.join(fixture.directory, "multilingual.mkv"),
+it.each([20, 128])(
+  "prepares retained low video and default audio through the final window at %s seconds",
+  async (duration) => {
+    const fixture = await startMultilingualFixture(
+      "http://127.0.0.1:5173",
+      0,
+      duration,
     );
-    await vi.waitFor(
-      () => {
-        expect(entry.renditions.get("360p")?.availableSegments).toBe(
-          entry.expectedSegments,
-        );
-        expect(entry.renditions.get("audio-1")?.availableSegments).toBe(
-          entry.expectedSegments,
-        );
-      },
-      { timeout: 90_000 },
-    );
-    expect(entry.renditions.get("audio-2")).toBeUndefined();
-  } finally {
-    await fixture.close();
-  }
-}, 120_000);
+    try {
+      fixture.session.retained = true;
+      const entry = await fixture.runtime.ensureVideoTranscodeEntry(
+        fixture.session,
+        "multilingual.mkv",
+        path.join(fixture.directory, "multilingual.mkv"),
+      );
+      expect(entry.renditions.has("360p")).toBe(true);
+      await vi.waitFor(
+        () => {
+          for (const id of ["360p", "audio-1"]) {
+            const rendition = entry.renditions.get(id);
+            expect(rendition?.status).toBe("done");
+            expect(rendition?.availableSegments).toBeGreaterThan(0);
+            if (duration > 120)
+              expect(rendition?.availableSegments).toBe(entry.expectedSegments);
+          }
+        },
+        { timeout: 90_000 },
+      );
+      if (duration > 120)
+        expect(entry.renditions.get("audio-2")).toBeUndefined();
+    } finally {
+      await fixture.close();
+    }
+  },
+  120_000,
+);
 
 it.each([128, 130.25])(
   "uses the real video end and decodes the final window at %s seconds",

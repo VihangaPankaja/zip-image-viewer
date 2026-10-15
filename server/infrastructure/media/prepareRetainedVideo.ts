@@ -1,13 +1,22 @@
-import type { Session, VideoTranscodeEntry } from "../../domain/models.js";
+import type {
+  Session,
+  VideoRendition,
+  VideoTranscodeEntry,
+} from "../../domain/models.js";
 import { calculateRenditions } from "../../media/hlsManifest.js";
 import { getRenditionState } from "../../media/videoRendition.js";
-import { HlsWindows, WINDOW_SEGMENTS } from "./hlsWindows.js";
+import {
+  HlsWindows,
+  WINDOW_SEGMENTS,
+  WINDOWED_AFTER_SECONDS,
+} from "./hlsWindows.js";
 
 export async function prepareRetainedVideo(
   entry: VideoTranscodeEntry,
   session: Session,
   windows: HlsWindows,
   signal: AbortSignal,
+  startSequential: (_rendition: VideoRendition) => Promise<void>,
 ): Promise<void> {
   const lowest = calculateRenditions(entry).at(0);
   if (!lowest) return;
@@ -17,6 +26,13 @@ export async function prepareRetainedVideo(
       ? (entry.audioTracks?.find(({ isDefault }) => isDefault) ??
         entry.audioTracks?.at(0))
       : undefined;
+  if (entry.durationSeconds <= WINDOWED_AFTER_SECONDS) {
+    signal.throwIfAborted();
+    await startSequential(rendition);
+    if (audio)
+      await startSequential(getRenditionState(entry, session, audio.id));
+    return;
+  }
   for (
     let index = 0;
     index < entry.expectedSegments;

@@ -255,5 +255,13 @@ describe("createProcessSessionJob", () => {
     expect(sessionStore.get(job.sessionId)?.firstFilePath).toBe(
       "album/image.jpg",
     );
+    const originalSession = sessionStore.get(job.sessionId);
+    if (!originalSession) throw new Error("Retained session was not indexed.");
+    originalSession.pinned = true;
+    await processJob(job);
+    expect(job.status).toBe("ready");
+    expect(sessionStore.get(job.sessionId)).toBe(originalSession);
+    expect(sessionStore.get(job.sessionId)?.pinned).toBe(true);
+    expect(prepareRetainedSession).toHaveBeenCalledTimes(2);
   });
 });

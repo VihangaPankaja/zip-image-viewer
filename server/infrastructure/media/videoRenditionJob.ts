@@ -61,6 +61,7 @@ export function startRenditionJob(
   session: Session,
   requested: VideoRendition,
   deps: Dependencies,
+  priority?: "interactive" | "background",
 ): Promise<void> {
   const executable = deps.ffmpegPath;
   if (!executable || requested.status !== "idle") return Promise.resolve();
@@ -112,7 +113,7 @@ export function startRenditionJob(
       session,
       encode,
       undefined,
-      audioTrack ? "interactive" : "background",
+      priority ?? (audioTrack ? "interactive" : "background"),
     )
     .then(async () => {
       await finishRenditions(renditions, deps);

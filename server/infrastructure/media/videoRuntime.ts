@@ -252,12 +252,14 @@ class VideoRuntime {
       renditions: new Map(),
     };
     this.transcodes.set(key, entry);
-    if (session.retained && entry.durationSeconds > WINDOWED_AFTER_SECONDS) {
+    if (session.retained) {
       const prepare = prepareRetainedVideo(
         entry,
         session,
         this.windows,
         this.sessionWork(session).controller.signal,
+        (rendition) =>
+          this.startRenditionTranscode(entry, session, rendition, "background"),
       ).then(this.enforceDerivedMediaBudget);
       void this.trackVideoTask(session, prepare).catch((error: unknown) => {
         if (!this.sessionWork(session).controller.signal.aborted)
@@ -289,15 +291,22 @@ class VideoRuntime {
     entry: VideoTranscodeEntry,
     session: Session,
     rendition: VideoRendition,
+    priority?: "interactive" | "background",
   ): Promise<void> =>
-    startRenditionJob(entry, session, rendition, {
-      ffmpegPath: this.ffmpegPath,
-      segmentSeconds: SEGMENT_SECONDS,
-      runVideoTask: this.runVideoTask,
-      refreshRenditionAvailability: this.refreshRenditionAvailability,
-      enforceDerivedMediaBudget: this.enforceDerivedMediaBudget,
-      logEvent: this.logEvent,
-    });
+    startRenditionJob(
+      entry,
+      session,
+      rendition,
+      {
+        ffmpegPath: this.ffmpegPath,
+        segmentSeconds: SEGMENT_SECONDS,
+        runVideoTask: this.runVideoTask,
+        refreshRenditionAvailability: this.refreshRenditionAvailability,
+        enforceDerivedMediaBudget: this.enforceDerivedMediaBudget,
+        logEvent: this.logEvent,
+      },
+      priority,
+    );
   waitForFile = async (
     filePath: string,
     timeoutMs = 12_000,

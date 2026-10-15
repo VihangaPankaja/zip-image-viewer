@@ -5,7 +5,6 @@ import {
   readFile,
   rename,
   rm,
-  writeFile,
   link,
   unlink,
   readdir,
@@ -185,7 +184,7 @@ async function publishWindow(
     rendition.dir,
     `init-${createHash("sha256").update(init).digest("hex")}.mp4`,
   );
-  await writeFile(sharedInit, init, { flag: "wx" }).catch((error: unknown) => {
+  await link(initPath, sharedInit).catch((error: unknown) => {
     if (
       !(error instanceof Error) ||
       !("code" in error) ||

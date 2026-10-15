@@ -59,7 +59,8 @@ export function buildFmp4HlsArgs(input: Fmp4HlsInput): string[] {
     );
     if (input.window) args.push("-r", "30", "-fps_mode", "cfr");
   }
-  if (!input.videoOnly)
+  if (!input.videoOnly) {
+    if (input.window) args.push("-af", "apad");
     args.push(
       "-c:a",
       "aac",
@@ -70,6 +71,7 @@ export function buildFmp4HlsArgs(input: Fmp4HlsInput): string[] {
       "-ar",
       "48000",
     );
+  }
   args.push(
     ...(input.window ? ["-start_number", String(input.window.startIndex)] : []),
     "-f",
