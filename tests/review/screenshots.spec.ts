@@ -1244,6 +1244,28 @@ for (const device of devices) {
         buffer: Buffer.from("not a subtitle"),
       });
       await page.getByRole("alert").scrollIntoViewIfNeeded();
+      if (device.name === "Mobile") {
+        await audio.evaluate((element) => {
+          const navigation = document.querySelector(".workspace-mobile-nav");
+          if (!navigation) throw new Error("Mobile navigation is missing.");
+          window.scrollBy(
+            0,
+            Math.max(
+              0,
+              element.getBoundingClientRect().bottom -
+                navigation.getBoundingClientRect().top +
+                16,
+            ),
+          );
+        });
+        const bounds = await audio.boundingBox();
+        const navigation = await page
+          .locator(".workspace-mobile-nav")
+          .boundingBox();
+        if (!bounds || !navigation)
+          throw new Error("Mobile audio controls are missing.");
+        expect(bounds.y + bounds.height).toBeLessThanOrEqual(navigation.y);
+      }
       await save(page, device, theme, "video-embedded-subtitles-error");
       await subtitles.selectOption({ label: "English captions" });
       await expect(page.getByRole("alert")).toHaveCount(0);
