@@ -1,4 +1,4 @@
-import type { TorrentFile } from "../../shared/contracts.js";
+import type { TorrentFile, VideoMediaTrack } from "../../shared/contracts.js";
 import type { Response } from "express";
 import type { WebSocket } from "ws";
 import type { ChildProcess } from "node:child_process";
@@ -148,6 +148,8 @@ export type VideoRendition = {
 };
 
 export type VideoTranscodeEntry = {
+  audioTracks?: VideoMediaTrack[];
+  subtitleTracks?: VideoMediaTrack[];
   sessionId: string;
   targetPath: string;
   path: string;

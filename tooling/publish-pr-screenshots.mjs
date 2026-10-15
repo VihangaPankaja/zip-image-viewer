@@ -26,6 +26,10 @@ if (run("git", ["status", "--porcelain", "--untracked-files=normal"]))
     "Commit implementation changes before publishing screenshots.",
   );
 const requiredScreens = [
+  "video-audio-language-choice",
+  "video-audio-spanish-captions",
+  "video-embedded-subtitles-error",
+  "video-embedded-subtitles-recovered",
   "session-storage-totals",
   "session-storage-pinned",
   "session-storage-cache-cleared",

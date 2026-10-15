@@ -47,3 +47,59 @@ it("loads typed qualities and falls back to Original when metadata fails", async
   expect(params.setOptions).toHaveBeenLastCalledWith([]);
   expect(load).toHaveBeenCalledTimes(2);
 });
+
+it("exposes audio and subtitle metadata from the same qualities request and resets it on file changes", async () => {
+  const load = vi.mocked(workspaceRpc.video.qualities.call);
+  load.mockClear();
+  const audioTracks = [
+    {
+      id: "audio-1",
+      index: 1,
+      language: "eng",
+      label: "English",
+      isDefault: true,
+    },
+  ];
+  const subtitleTracks = [
+    {
+      id: "subtitle-3",
+      index: 3,
+      language: "spa",
+      label: "Spanish",
+      isDefault: false,
+    },
+  ];
+  load.mockResolvedValueOnce({
+    path: "languages.mkv",
+    source: { width: 320, height: 180, durationSeconds: 10 },
+    options: [{ id: "auto", label: "Auto", height: null }],
+    defaultQuality: "auto",
+    audioTracks,
+    subtitleTracks,
+  });
+  const params = {
+    sessionId: "session",
+    path: "languages.mkv",
+    selectedKind: "video",
+    isFile: true,
+    setOptions: vi.fn(),
+    setSelectedQuality: vi.fn(),
+  };
+  const { result, rerender } = renderHook(useVideoQualities, {
+    initialProps: params,
+  });
+  await waitFor(() =>
+    expect(result.current).toMatchObject({
+      ready: true,
+      audioTracks,
+      subtitleTracks,
+    }),
+  );
+  expect(load).toHaveBeenCalledTimes(1);
+  rerender({ ...params, selectedKind: "image" });
+  expect(result.current).toMatchObject({
+    ready: false,
+    audioTracks: [],
+    subtitleTracks: [],
+  });
+});

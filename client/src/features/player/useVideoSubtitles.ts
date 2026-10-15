@@ -6,6 +6,7 @@ import {
   type RefObject,
 } from "react";
 import { MAX_SUBTITLE_BYTES, normalizeSubtitles } from "./subtitles";
+import type { VideoMediaTrack } from "../../../../shared/contracts";
 
 function shiftCue(
   cue: TextTrackCue,
@@ -22,27 +23,65 @@ function shiftCue(
 
 type SubtitleFile = { name: string; text: string };
 
-function useSubtitleFile() {
+function readSubtitleFile(selected: File) {
+  const extension = selected.name.split(".").pop()?.toLowerCase();
+  if (extension !== "vtt" && extension !== "srt")
+    throw new Error("Choose a .vtt or .srt subtitle file.");
+  if (selected.size > MAX_SUBTITLE_BYTES)
+    throw new Error("Subtitle files must be 2 MB or smaller.");
+  return selected.text().then((text) => normalizeSubtitles(text, extension));
+}
+
+async function readEmbeddedSubtitles(
+  track: VideoMediaTrack,
+  sessionId: string,
+  path: string,
+  signal: AbortSignal,
+) {
+  const query = new URLSearchParams({ path, track: track.id });
+  const response = await fetch(
+    `/api/sessions/${encodeURIComponent(sessionId)}/video/subtitles?${query}`,
+    { signal },
+  );
+  if (!response.ok) throw new Error("Subtitle request failed.");
+  const text = await response.text();
+  if (new TextEncoder().encode(text).length > MAX_SUBTITLE_BYTES)
+    throw new Error("Subtitle response too large.");
+  return normalizeSubtitles(text, "vtt");
+}
+
+function useSubtitleRequest() {
   const request = useRef(0);
-  const [file, setFile] = useState<SubtitleFile | null>(null);
-  const [error, setError] = useState("");
+  const controllerRef = useRef<AbortController | null>(null);
+  const beginRequest = useCallback(() => {
+    controllerRef.current?.abort();
+    return ++request.current;
+  }, []);
   useEffect(
     () => () => {
-      request.current += 1;
+      beginRequest();
     },
-    [],
+    [beginRequest],
   );
+  return { request, controllerRef, beginRequest };
+}
+
+function useSubtitleFile() {
+  const { request, controllerRef, beginRequest } = useSubtitleRequest();
+  const [file, setFile] = useState<SubtitleFile | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [embeddedTrackId, setEmbeddedTrackId] = useState("");
   async function load(selected: File) {
-    const current = ++request.current;
+    const current = beginRequest();
     setError("");
+    setLoading(false);
     try {
-      const extension = selected.name.split(".").pop()?.toLowerCase();
-      if (extension !== "vtt" && extension !== "srt")
-        throw new Error("Choose a .vtt or .srt subtitle file.");
-      if (selected.size > MAX_SUBTITLE_BYTES)
-        throw new Error("Subtitle files must be 2 MB or smaller.");
-      const text = normalizeSubtitles(await selected.text(), extension);
-      if (current === request.current) setFile({ name: selected.name, text });
+      const text = await readSubtitleFile(selected);
+      if (current === request.current) {
+        setFile({ name: selected.name, text });
+        setEmbeddedTrackId("");
+      }
     } catch (cause) {
       if (current === request.current)
         setError(
@@ -52,16 +91,60 @@ function useSubtitleFile() {
         );
     }
   }
-  function remove() {
-    request.current += 1;
+  async function loadEmbedded(
+    track: VideoMediaTrack,
+    sessionId: string,
+    path: string,
+  ) {
+    const current = beginRequest();
+    const pending = new AbortController();
+    controllerRef.current = pending;
     setFile(null);
     setError("");
+    setLoading(true);
+    setEmbeddedTrackId(track.id);
+    try {
+      const normalized = await readEmbeddedSubtitles(
+        track,
+        sessionId,
+        path,
+        pending.signal,
+      );
+      if (current === request.current)
+        setFile({ name: track.label, text: normalized });
+    } catch {
+      if (current === request.current) {
+        setEmbeddedTrackId("");
+        setError(
+          "Embedded subtitles could not be loaded. Try another track or a local file.",
+        );
+      }
+    } finally {
+      if (current === request.current) setLoading(false);
+    }
+  }
+  function remove() {
+    beginRequest();
+    setFile(null);
+    setError("");
+    setLoading(false);
+    setEmbeddedTrackId("");
   }
   const fail = useCallback((message: string) => {
     setFile(null);
     setError(message);
+    setEmbeddedTrackId("");
   }, []);
-  return { file, error, fail, load, remove };
+  return {
+    file,
+    error,
+    loading,
+    embeddedTrackId,
+    fail,
+    load,
+    loadEmbedded,
+    remove,
+  };
 }
 
 function useNativeSubtitleTrack(

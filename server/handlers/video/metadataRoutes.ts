@@ -50,20 +50,29 @@ export async function getVideoQualities(
   if (source.playbackMode === "direct")
     options[0] = { ...options[0], label: "Direct play" };
   const preferredQuality =
-    source.playbackMode === "direct"
-      ? "source"
-      : source.playbackMode === "remux"
-        ? "remux"
-        : source.playbackMode === "transcode"
-          ? "auto"
-          : context.session.selectedVideoQuality ||
-            qualityConfig.defaultQuality;
+    (source.audioTracks?.length ?? 0) > 1
+      ? "auto"
+      : source.playbackMode === "direct"
+        ? "source"
+        : source.playbackMode === "remux"
+          ? "remux"
+          : source.playbackMode === "transcode"
+            ? "auto"
+            : context.session.selectedVideoQuality ||
+              qualityConfig.defaultQuality;
   const defaultQuality =
     options.find(({ id }) => id === preferredQuality)?.id ||
     qualityConfig.defaultQuality;
   return {
     path: context.normalizedPath,
-    source,
+    source: {
+      width: source.width,
+      height: source.height,
+      durationSeconds: source.durationSeconds,
+      ...(source.playbackMode ? { playbackMode: source.playbackMode } : {}),
+    },
+    audioTracks: source.audioTracks ?? [],
+    subtitleTracks: source.subtitleTracks ?? [],
     options,
     defaultQuality,
   };

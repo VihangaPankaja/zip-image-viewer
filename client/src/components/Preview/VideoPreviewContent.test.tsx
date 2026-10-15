@@ -187,6 +187,82 @@ describe("VideoPreviewContent", () => {
     );
     expect(setQuality).toHaveBeenCalledWith("auto");
   });
+
+  it("offers adaptive audio selection for multi-audio originals and shows actual HLS language choices", () => {
+    const changeQuality = vi.fn();
+    const changeAudio = vi.fn();
+    const props: VideoPreviewProps = {
+      activeJob: null,
+      onOpenDownloads: vi.fn(),
+      hlsRef: createRef(),
+      sessionId: "session",
+      videoHlsStatus: null,
+      videoPlaybackStatus: "ready",
+      retryVideoPlayback: vi.fn(),
+      formatBytes: String,
+      formatDate: String,
+      keyboardSettings: { jumpSeconds: 5, rateStep: 0.25 },
+      selectedNode: { name: "clip.mkv", path: "clip.mkv", type: "file" },
+      selectedVideoQuality: "source",
+      setSelectedVideoQuality: changeQuality,
+      videoPlaybackError: "",
+      videoHeight: 180,
+      videoQualityOptions: [
+        { id: "source", label: "Original" },
+        { id: "auto", label: "Auto" },
+      ],
+      videoRef: createRef(),
+      videoShellRef: createRef(),
+      audioTracks: [
+        {
+          id: "audio-1",
+          index: 1,
+          language: "eng",
+          label: "English",
+          isDefault: true,
+        },
+        {
+          id: "audio-2",
+          index: 2,
+          language: "spa",
+          label: "Spanish",
+          isDefault: false,
+        },
+      ],
+      videoAudioTracks: [],
+      videoAudioMode: "unavailable",
+      selectedVideoAudioTrack: "",
+      setSelectedVideoAudioTrack: changeAudio,
+    };
+    const { rerender } = render(<VideoPreviewContent {...props} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Switch to adaptive playback" }),
+    );
+    expect(changeQuality).toHaveBeenCalledWith("auto");
+    rerender(
+      <VideoPreviewContent
+        {...props}
+        selectedVideoQuality="auto"
+        videoAudioMode="hls"
+        videoAudioTracks={[
+          { id: "0", label: "English" },
+          { id: "1", label: "Spanish" },
+        ]}
+        selectedVideoAudioTrack="0"
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("Audio language"), {
+      target: { value: "1" },
+    });
+    expect(changeAudio).toHaveBeenCalledWith("1");
+    expect(
+      screen.queryByRole("button", { name: "Switch to adaptive playback" }),
+    ).not.toBeInTheDocument();
+    rerender(<VideoPreviewContent {...props} selectedVideoQuality="auto" />);
+    expect(
+      screen.getByText(/browser's native audio controls/),
+    ).toBeInTheDocument();
+  });
 });
 
 describe("video scrub preview requests", () => {

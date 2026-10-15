@@ -1,5 +1,10 @@
 import type { RefObject } from "react";
 import type Hls from "hls.js";
+import type { VideoMediaTrack } from "../../../../shared/contracts";
+import type {
+  VideoAudioMode,
+  VideoAudioOption,
+} from "../player/useVideoAudioTracks";
 
 export type PreviewNode = {
   extension?: string;
@@ -58,6 +63,12 @@ export type ImagePreviewProps = {
 };
 
 export type VideoPreviewProps = {
+  audioTracks?: VideoMediaTrack[];
+  subtitleTracks?: VideoMediaTrack[];
+  videoAudioTracks?: VideoAudioOption[];
+  selectedVideoAudioTrack?: string;
+  videoAudioMode?: VideoAudioMode;
+  setSelectedVideoAudioTrack?: (id: string) => void;
   activeJob: VideoJob | null;
   onOpenDownloads: () => void;
   formatBytes: (value: number) => string;

@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import { startMultilingualFixture } from "../fixtures/multilingual";
 import {
   filenames,
   installReviewFixtures,
@@ -28,12 +29,15 @@ type Capture = {
   file: string;
 };
 const captures: Capture[] = [];
+let multilingual: Awaited<ReturnType<typeof startMultilingualFixture>>;
 
 test.beforeAll(async () => {
   await mkdir(output, { recursive: true });
   await prepareMedia();
+  multilingual = await startMultilingualFixture("http://127.0.0.1:5174");
 });
 test.afterAll(async () => {
+  await multilingual.close();
   const sourceCommit = execFileSync("git", ["rev-parse", "HEAD"], {
     encoding: "utf8",
   }).trim();
@@ -1167,6 +1171,119 @@ for (const device of devices) {
         page.getByRole("button", { name: "Storage", exact: true }),
       ).toHaveCount(0);
       await save(page, device, theme, "session-storage-deleted");
+    });
+  }
+}
+
+for (const device of devices) {
+  for (const theme of ["light", "dark"] as const) {
+    test(`${device.name} ${theme} multilingual playback`, async ({ page }) => {
+      await page.setViewportSize({
+        width: device.width,
+        height: device.height,
+      });
+      await page.emulateMedia({ colorScheme: theme });
+      await page.goto(multilingual.origin);
+      await page.evaluate(
+        (value) => localStorage.setItem("zip-image-viewer-theme", value),
+        theme,
+      );
+      await page.reload();
+      await page.getByRole("tab", { name: "Explore" }).click();
+      if (device.name === "Mobile")
+        await page.getByRole("button", { name: "Show sessions" }).click();
+      await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
+      if (device.name === "Mobile") {
+        await page.getByRole("button", { name: "Hide sessions" }).click();
+        await page
+          .getByRole("radio", { name: "Preview", exact: true })
+          .check({ force: true });
+      }
+      const video = page.getByLabel("Video preview");
+      await expect
+        .poll(
+          () =>
+            video.evaluate((element: HTMLVideoElement) => element.readyState),
+          { timeout: 30_000 },
+        )
+        .toBeGreaterThanOrEqual(2);
+      await video.evaluate(async (element: HTMLVideoElement) => {
+        element.muted = true;
+        await element.play();
+        element.pause();
+        element.currentTime = 5;
+      });
+      const audio = page.getByRole("combobox", { name: "Audio language" });
+      await audio.scrollIntoViewIfNeeded();
+      await audio.focus();
+      await save(page, device, theme, "video-audio-language-choice");
+      await audio.selectOption({ label: "Spanish" });
+      await expect(audio).toHaveValue("1");
+      const subtitles = page.getByRole("combobox", {
+        name: "Embedded subtitles",
+      });
+      await subtitles.selectOption({ label: "Spanish captions" });
+      await expect
+        .poll(() =>
+          video.evaluate((element: HTMLVideoElement) =>
+            Array.from(element.textTracks)
+              .filter((track) => track.mode === "showing")
+              .flatMap((track) =>
+                Array.from(track.activeCues ?? []).map(
+                  (cue) => (cue as VTTCue).text,
+                ),
+              ),
+          ),
+        )
+        .toEqual(["Subtítulos de la costa"]);
+      await video.scrollIntoViewIfNeeded();
+      await save(page, device, theme, "video-audio-spanish-captions");
+      await page.getByLabel("Subtitle file", { exact: true }).setInputFiles({
+        name: "broken.srt",
+        mimeType: "text/plain",
+        buffer: Buffer.from("not a subtitle"),
+      });
+      await page.getByRole("alert").scrollIntoViewIfNeeded();
+      if (device.name === "Mobile") {
+        await audio.evaluate((element) => {
+          const navigation = document.querySelector(".workspace-mobile-nav");
+          if (!navigation) throw new Error("Mobile navigation is missing.");
+          window.scrollBy(
+            0,
+            Math.max(
+              0,
+              element.getBoundingClientRect().bottom -
+                navigation.getBoundingClientRect().top +
+                16,
+            ),
+          );
+        });
+        const bounds = await audio.boundingBox();
+        const navigation = await page
+          .locator(".workspace-mobile-nav")
+          .boundingBox();
+        if (!bounds || !navigation)
+          throw new Error("Mobile audio controls are missing.");
+        expect(bounds.y + bounds.height).toBeLessThanOrEqual(navigation.y);
+      }
+      await save(page, device, theme, "video-embedded-subtitles-error");
+      await subtitles.selectOption({ label: "English captions" });
+      await expect(page.getByRole("alert")).toHaveCount(0);
+      await expect
+        .poll(() =>
+          video.evaluate((element: HTMLVideoElement) =>
+            Array.from(element.textTracks)
+              .filter((track) => track.mode === "showing")
+              .flatMap((track) =>
+                Array.from(track.activeCues ?? []).map(
+                  (cue) => (cue as VTTCue).text,
+                ),
+              ),
+          ),
+        )
+        .toEqual(["English coastal captions"]);
+      await video.scrollIntoViewIfNeeded();
+      await save(page, device, theme, "video-embedded-subtitles-recovered");
     });
   }
 }

@@ -1,5 +1,6 @@
 import { useRef, type RefObject } from "react";
 import { useVideoSubtitles } from "../../features/player/useVideoSubtitles";
+import type { VideoMediaTrack } from "../../../../shared/contracts";
 
 function CaptionSettings(subtitles: ReturnType<typeof useVideoSubtitles>) {
   return (
@@ -47,16 +48,70 @@ function CaptionSettings(subtitles: ReturnType<typeof useVideoSubtitles>) {
   );
 }
 
+function SubtitleNotice(subtitles: ReturnType<typeof useVideoSubtitles>) {
+  return (
+    <>
+      {subtitles.loading ? (
+        <p className="video-subtitle-note" role="status">
+          Loading subtitles…
+        </p>
+      ) : subtitles.file ? (
+        <p className="video-subtitle-note" role="status">
+          {subtitles.ready ? subtitles.file.name : "Loading subtitles…"} ·
+          Positive offset delays captions.
+        </p>
+      ) : (
+        <p className="video-subtitle-note">
+          Local WebVTT or SRT · Up to 2 MB · Files stay in your browser.
+        </p>
+      )}
+      {subtitles.error && (
+        <p className="video-subtitle-error" role="alert">
+          {subtitles.error}
+        </p>
+      )}
+    </>
+  );
+}
+
 export function VideoSubtitles({
   videoRef,
+  embeddedTracks,
+  sessionId,
+  path,
 }: {
   videoRef: RefObject<HTMLVideoElement | null>;
+  embeddedTracks?: VideoMediaTrack[];
+  sessionId?: string;
+  path?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const subtitles = useVideoSubtitles(videoRef);
   return (
     <section className="video-subtitles" aria-label="Subtitles">
       <div className="video-subtitle-controls">
+        {embeddedTracks?.length && sessionId && path ? (
+          <label>
+            Embedded subtitles
+            <select
+              value={subtitles.embeddedTrackId}
+              onChange={(event) => {
+                const track = embeddedTracks.find(
+                  ({ id }) => id === event.target.value,
+                );
+                if (track) void subtitles.loadEmbedded(track, sessionId, path);
+                else subtitles.remove();
+              }}
+            >
+              <option value="">Off</option>
+              {embeddedTracks.map((track) => (
+                <option key={track.id} value={track.id}>
+                  {track.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <input
           ref={inputRef}
           type="file"
@@ -78,21 +133,7 @@ export function VideoSubtitles({
         </button>
         {subtitles.file && <CaptionSettings {...subtitles} />}
       </div>
-      {subtitles.file ? (
-        <p className="video-subtitle-note" role="status">
-          {subtitles.ready ? subtitles.file.name : "Loading subtitles…"} ·
-          Positive offset delays captions.
-        </p>
-      ) : (
-        <p className="video-subtitle-note">
-          Local WebVTT or SRT · Up to 2 MB · Files stay in your browser.
-        </p>
-      )}
-      {subtitles.error && (
-        <p className="video-subtitle-error" role="alert">
-          {subtitles.error}
-        </p>
-      )}
+      <SubtitleNotice {...subtitles} />
     </section>
   );
 }

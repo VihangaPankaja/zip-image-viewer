@@ -8,6 +8,80 @@ import {
 } from "./hlsManifest.js";
 
 describe("adaptive HLS manifests", () => {
+  it("groups alternate audio with one default and escapes metadata attributes", () => {
+    const tracks = [
+      {
+        id: "audio-1",
+        index: 1,
+        language: "eng",
+        label: 'English"\n#EXT-X-ENDLIST',
+        isDefault: false,
+      },
+      {
+        id: "audio-2",
+        index: 2,
+        language: "jpn",
+        label: "Japanese",
+        isDefault: true,
+      },
+    ];
+    const playlist = buildMasterPlaylist(
+      calculateRenditions({ width: 640, height: 360 }),
+      () => "/video",
+      tracks,
+      (track) => `/audio/${track.id}`,
+    );
+    expect(playlist).toContain('TYPE=AUDIO,GROUP-ID="audio"');
+    expect(playlist).toContain('NAME="Japanese",LANGUAGE="jpn",DEFAULT=YES');
+    expect(playlist.match(/DEFAULT=YES/g)).toHaveLength(1);
+    expect(playlist).toContain('AUDIO="audio"');
+    expect(playlist).toContain('URI="/audio/audio-2"');
+    expect(playlist).not.toContain("\n#EXT-X-ENDLIST");
+    const sameLanguage = tracks.map((track) => ({
+      ...track,
+      language: "eng",
+      label: "English",
+    }));
+    const duplicateNames = buildMasterPlaylist(
+      [],
+      () => "/video",
+      sameLanguage,
+      () => "/audio",
+    );
+    expect(duplicateNames).toContain('NAME="English (1)"');
+    expect(duplicateNames).toContain('NAME="English (2)"');
+    expect(
+      buildMasterPlaylist(
+        [],
+        () => "/video",
+        tracks.slice(0, 1),
+        () => "/audio",
+      ),
+    ).not.toContain("EXT-X-MEDIA");
+    expect(buildMasterPlaylist([], () => "/video", tracks)).not.toContain(
+      "EXT-X-MEDIA",
+    );
+    const rendition = {
+      ...calculateRenditions({ width: 640, height: 360 })[0],
+      codecs: "avc1.4d401f",
+    };
+    expect(
+      buildMasterPlaylist(
+        [rendition],
+        () => "/video",
+        tracks.map((track) => ({ ...track, isDefault: false })),
+        () => "/audio",
+      ),
+    ).toContain('CODECS="avc1.4d401f,mp4a.40.2"');
+    expect(
+      buildMasterPlaylist(
+        [{ ...rendition, codecs: "avc1.4d401f,mp4a.40.2" }],
+        () => "/video",
+        tracks,
+        () => "/audio",
+      ),
+    ).toContain('CODECS="avc1.4d401f,mp4a.40.2"');
+  });
   it("builds a source-bounded ladder ordered by bandwidth", () => {
     expect(calculateRenditions({ width: 1920, height: 1080 })).toEqual([
       { id: "360p", width: 640, height: 360, bandwidth: 1_020_800 },

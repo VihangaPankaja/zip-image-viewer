@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, ErrorRequestHandler } from "express";
 import {
   ApplicationError,
   type VideoRendition,
@@ -66,6 +66,21 @@ async function startRendition(
   entry: VideoTranscodeEntry,
   quality: string,
 ): Promise<VideoRendition> {
+  if (
+    !entry.qualities.some(
+      ({ id }) => id === quality && id !== "auto" && id !== "remux",
+    ) &&
+    !(
+      (entry.audioTracks?.length ?? 0) > 1 &&
+      entry.audioTracks?.some((track) => track.id === quality)
+    )
+  ) {
+    throw new ApplicationError(
+      "INVALID_INPUT",
+      "Unknown video or audio rendition.",
+      400,
+    );
+  }
   const rendition = deps.getRenditionState(entry, context.session, quality);
   rendition.lastAccessedAt = Date.now();
   await deps.startRenditionTranscode(entry, context.session, rendition);
@@ -124,8 +139,11 @@ function registerMasterRoute(app: Express, deps: VideoRouteDependencies): void {
         };
       }),
     );
-    const playlist = buildMasterPlaylist(renditions, ({ id }) =>
-      renditionUri(request, context, id, "playlist"),
+    const playlist = buildMasterPlaylist(
+      renditions,
+      ({ id }) => renditionUri(request, context, id, "playlist"),
+      entry.audioTracks,
+      (track) => renditionUri(request, context, track.id, "playlist"),
     );
     response.set("Cache-Control", "private, no-store");
     response.type("application/vnd.apple.mpegurl").send(playlist);
@@ -142,9 +160,7 @@ function registerVariantRoute(
       request.query.quality,
       entry.defaultQuality,
     ).toLowerCase();
-    const quality = entry.qualities.some(({ id }) => id === requested)
-      ? requested
-      : entry.defaultQuality;
+    const quality = requested;
     const rendition = await startRendition(deps, context, entry, quality);
     const source = await readRenditionPlaylist(rendition);
     const playlist = source
@@ -211,4 +227,15 @@ export function registerVideoHlsRoutes(
   registerVariantRoute(app, deps);
   registerInitRoute(app, deps);
   registerSegmentRoute(app, deps);
+  const handleError: ErrorRequestHandler = (
+    error: unknown,
+    _request,
+    response,
+    next,
+  ) => {
+    if (error instanceof ApplicationError)
+      response.status(error.status).json({ error: error.message });
+    else next(error);
+  };
+  app.use("/api/sessions/:id/video/hls", handleError);
 }

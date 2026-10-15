@@ -7,6 +7,7 @@ import {
   type SetStateAction,
 } from "react";
 import { getVideoMimeType } from "../../lib/mimeTypeSystem";
+import { useVideoAudioTracks } from "./useVideoAudioTracks";
 import {
   createAdaptiveHlsConfig,
   loadHlsModule,
@@ -28,10 +29,19 @@ type VideoSourceParams = {
   videoRef: RefObject<HTMLVideoElement | null>;
 };
 
+type AudioBindings = Pick<
+  ReturnType<typeof useVideoAudioTracks>,
+  | "resetAudioTracks"
+  | "updateHlsAudioTracks"
+  | "updateSelectedAudioTrack"
+  | "bindNativeAudioTracks"
+>;
+
 type AdaptiveSourceParams = Pick<
   VideoSourceParams,
   "hlsRef" | "hlsUrl" | "setPlaybackError" | "setVideoHeight"
->;
+> &
+  Pick<AudioBindings, "updateHlsAudioTracks" | "updateSelectedAudioTrack">;
 
 function destroyHls(hlsRef: RefObject<Hls | null>) {
   hlsRef.current?.destroy();
@@ -116,6 +126,12 @@ async function attachAdaptiveSource(
   player.querySelectorAll("source").forEach((source) => source.remove());
   const hls = new HlsConstructor(createAdaptiveHlsConfig());
   params.hlsRef.current = hls;
+  hls.on(HlsConstructor.Events.AUDIO_TRACKS_UPDATED, () =>
+    params.updateHlsAudioTracks(hls),
+  );
+  hls.on(HlsConstructor.Events.AUDIO_TRACK_SWITCHED, (_event, data) =>
+    params.updateSelectedAudioTrack(data.id),
+  );
   hls.on(HlsConstructor.Events.ERROR, (_event, data) => {
     if (data.fatal) {
       const missingSegment =
@@ -133,6 +149,7 @@ async function attachAdaptiveSource(
     }
   });
   hls.on(HlsConstructor.Events.MANIFEST_PARSED, () => {
+    params.updateHlsAudioTracks(hls);
     hls.loadLevel = resolveManualLevel(
       quality(),
       hls.levels.map((level) => level.height),
@@ -146,9 +163,66 @@ async function attachAdaptiveSource(
   hls.attachMedia(player);
 }
 
+function attachVideoSource(
+  params: VideoSourceParams & AudioBindings,
+  qualityRef: RefObject<string>,
+  sourceRef: RefObject<string>,
+) {
+  params.resetAudioTracks();
+  const player = params.videoRef.current;
+  if (!player || params.selectedKind !== "video" || !params.originalUrl) {
+    destroyHls(params.hlsRef);
+    if (player) resetVideoSource(player);
+    return;
+  }
+  const sameFile = sourceRef.current === params.originalUrl;
+  const resumeTime = sameFile ? player.currentTime : 0;
+  const wasPlaying = sameFile && !player.paused;
+  sourceRef.current = params.originalUrl;
+  params.setPlaybackError("");
+  params.setPlaybackStatus("loading");
+  params.setVideoHeight(null);
+  destroyHls(params.hlsRef);
+  const removeNativeAudioListeners = params.bindNativeAudioTracks(player);
+  const onResize = () => params.setVideoHeight(player.videoHeight || null);
+  const onLoadedMetadata = () =>
+    restorePlayback(player, resumeTime, wasPlaying);
+  player.addEventListener("resize", onResize);
+  player.addEventListener("loadedmetadata", onLoadedMetadata, { once: true });
+  let cancelled = false;
+  if (["source", "remux"].includes(params.selectedQuality))
+    attachFileSource(
+      player,
+      params.originalUrl,
+      params.selectedQuality,
+      params.extension,
+    );
+  else {
+    resetVideoSource(player);
+    void attachAdaptiveSource(
+      params,
+      player,
+      resumeTime,
+      wasPlaying,
+      () => qualityRef.current,
+      () => cancelled,
+    ).catch((error: unknown) => {
+      if (!cancelled) reportAttachmentError(error, params.setPlaybackError);
+    });
+  }
+  return () => {
+    cancelled = true;
+    player.removeEventListener("resize", onResize);
+    player.removeEventListener("loadedmetadata", onLoadedMetadata);
+    removeNativeAudioListeners();
+    destroyHls(params.hlsRef);
+  };
+}
+
 function useAttachedVideoSource(
   params: VideoSourceParams,
   qualityRef: RefObject<string>,
+  audio: AudioBindings,
 ) {
   const {
     extension,
@@ -162,72 +236,59 @@ function useAttachedVideoSource(
     videoRef,
   } = params;
   const sourceRef = useRef("");
+  const {
+    resetAudioTracks,
+    updateHlsAudioTracks,
+    updateSelectedAudioTrack,
+    bindNativeAudioTracks,
+  } = audio;
   const fileQuality = ["source", "remux"].includes(params.selectedQuality)
     ? params.selectedQuality
     : "";
-  useEffect(() => {
-    const player = videoRef.current;
-    if (!player || selectedKind !== "video" || !originalUrl) {
-      destroyHls(hlsRef);
-      if (player) resetVideoSource(player);
-      return;
-    }
-    const sameFile = sourceRef.current === originalUrl;
-    const resumeTime = sameFile ? player.currentTime : 0;
-    const wasPlaying = sameFile && !player.paused;
-    sourceRef.current = originalUrl;
-    setPlaybackError("");
-    setPlaybackStatus("loading");
-    setVideoHeight(null);
-    destroyHls(hlsRef);
-    const onResize = () => setVideoHeight(player.videoHeight || null);
-    const onLoadedMetadata = () =>
-      restorePlayback(player, resumeTime, wasPlaying);
-    player.addEventListener("resize", onResize);
-    player.addEventListener("loadedmetadata", onLoadedMetadata, { once: true });
-    let cancelled = false;
-    if (fileQuality)
-      attachFileSource(player, originalUrl, fileQuality, extension);
-    else {
-      resetVideoSource(player);
-      void attachAdaptiveSource(
+  useEffect(
+    () =>
+      attachVideoSource(
         {
+          extension,
           hlsRef,
           hlsUrl,
+          originalUrl,
+          selectedKind,
+          selectedQuality: fileQuality,
           setPlaybackError,
+          setPlaybackStatus,
           setVideoHeight,
+          videoRef,
+          resetAudioTracks,
+          updateHlsAudioTracks,
+          updateSelectedAudioTrack,
+          bindNativeAudioTracks,
         },
-        player,
-        resumeTime,
-        wasPlaying,
-        () => qualityRef.current,
-        () => cancelled,
-      ).catch((error: unknown) => {
-        if (!cancelled) reportAttachmentError(error, setPlaybackError);
-      });
-    }
-    return () => {
-      cancelled = true;
-      player.removeEventListener("resize", onResize);
-      player.removeEventListener("loadedmetadata", onLoadedMetadata);
-      destroyHls(hlsRef);
-    };
-  }, [
-    extension,
-    hlsRef,
-    hlsUrl,
-    originalUrl,
-    selectedKind,
-    fileQuality,
-    setPlaybackError,
-    setPlaybackStatus,
-    setVideoHeight,
-    videoRef,
-    qualityRef,
-  ]);
+        qualityRef,
+        sourceRef,
+      ),
+    [
+      extension,
+      hlsRef,
+      hlsUrl,
+      originalUrl,
+      selectedKind,
+      fileQuality,
+      setPlaybackError,
+      setPlaybackStatus,
+      setVideoHeight,
+      videoRef,
+      qualityRef,
+      resetAudioTracks,
+      updateHlsAudioTracks,
+      updateSelectedAudioTrack,
+      bindNativeAudioTracks,
+    ],
+  );
 }
 
 export function useVideoSource(params: VideoSourceParams) {
+  const audio = useVideoAudioTracks(params.hlsRef, params.videoRef);
   const qualityRef = useRef(params.selectedQuality);
   const { hlsRef, selectedQuality } = params;
   useEffect(() => {
@@ -244,5 +305,17 @@ export function useVideoSource(params: VideoSourceParams) {
       );
     }
   }, [hlsRef, selectedQuality]);
-  useAttachedVideoSource(params, qualityRef);
+  useAttachedVideoSource(params, qualityRef, audio);
+  const {
+    videoAudioTracks,
+    selectedVideoAudioTrack,
+    videoAudioMode,
+    setSelectedVideoAudioTrack,
+  } = audio;
+  return {
+    videoAudioTracks,
+    selectedVideoAudioTrack,
+    videoAudioMode,
+    setSelectedVideoAudioTrack,
+  };
 }

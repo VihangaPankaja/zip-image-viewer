@@ -1426,7 +1426,7 @@
           area: "Video",
           priority: "P1",
           effort: "M",
-          status: "In progress",
+          status: "Done",
           title: "Add subtitle and audio-track choices",
           summary:
             "Let viewers select a language and load an external subtitle file.",
@@ -1434,7 +1434,7 @@
           plan: "Start with WebVTT and safely converted SRT via native text tracks. Probe embedded languages; add alternate audio HLS groups only when needed. Include subtitle size and timing offset controls.",
           done: "A multilingual fixture switches audio in sync and displays captions on desktop and mobile. Malformed captions show a recoverable error.",
           depends: "V02, V04",
-          note: "v3.7.0 adds browser-local WebVTT/SRT subtitles with native captions, off/on, size and timing offset controls, recoverable validation errors and per-video cleanup. Embedded language probing and alternate audio groups remain planned.",
+          note: "Completed in v3.15.0: embedded audio and text subtitle languages are probed and labelled. Multilingual videos use alternate AAC HLS audio with language switching on the active player, preserving playback and captions; native audio selection and explicit adaptive fallback remain usable. Embedded text captions convert to bounded WebVTT alongside local WebVTT/SRT, off/on, size and timing offset controls. Real multilingual FFmpeg and Chromium desktop/mobile fixtures verify distinct decoded audio, aligned timestamps, keyboard/touch switching and recoverable subtitle errors.",
           evidence:
             "server/media/ffmpegHls.ts; client/src/components/Preview/VideoPreviewContent.tsx",
         },

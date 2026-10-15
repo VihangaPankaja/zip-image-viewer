@@ -78,7 +78,7 @@ export function useVideoPlaybackController({
 }: UseVideoPlaybackControllerParams) {
   const state = useVideoPlaybackState();
   const playback = state.publicState;
-  const qualitiesReady = useVideoQualities({
+  const qualities = useVideoQualities({
     path: selectedNode?.path,
     selectedKind,
     sessionId: session?.id,
@@ -103,12 +103,12 @@ export function useVideoPlaybackController({
     setPlaybackError: state.setters.setVideoPlaybackError,
     setPlaybackStatus: state.setters.setVideoPlaybackStatus,
   });
-  useVideoSource({
+  const audio = useVideoSource({
     extension: selectedNode?.extension,
     hlsRef: state.hlsRef,
     hlsUrl: urls.hlsUrl,
     originalUrl: urls.originalUrl,
-    selectedKind: qualitiesReady ? selectedKind : "",
+    selectedKind: qualities.ready ? selectedKind : "",
     selectedQuality: playback.selectedVideoQuality,
     setVideoHeight: state.setters.setVideoHeight,
     setPlaybackError: state.setters.setVideoPlaybackError,
@@ -139,6 +139,9 @@ export function useVideoPlaybackController({
   };
   return {
     ...playback,
+    ...audio,
+    audioTracks: qualities.audioTracks,
+    subtitleTracks: qualities.subtitleTracks,
     hlsRef: state.hlsRef,
     videoHlsStatus,
     retryVideoPlayback,
