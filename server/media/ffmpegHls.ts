@@ -57,7 +57,7 @@ export function buildFmp4HlsArgs(input: Fmp4HlsInput): string[] {
       "-force_key_frames",
       `expr:gte(t,n_forced*${String(duration)})`,
     );
-    if (input.window) args.push("-r", "30", "-fps_mode", "cfr");
+    if (input.window) args.push("-r", "30", "-fps_mode", "cfr", "-bf", "0");
   }
   if (!input.videoOnly) {
     if (input.window) args.push("-af", "apad");

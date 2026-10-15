@@ -108,22 +108,29 @@ test("long video supports two viewers, pointer seeking and narrow touch/keyboard
       [page, pointerTarget],
       [other, 40],
     ] as const) {
+      await viewer.bringToFront();
       await expect
         .poll(
           () =>
-            viewer
-              .locator("video")
-              .evaluate(
-                (v: HTMLVideoElement, time) =>
-                  !v.seeking &&
-                  v.readyState >= 2 &&
-                  Math.abs(v.currentTime - time) < 2,
-                target,
-              ),
+            viewer.locator("video").evaluate(
+              (v: HTMLVideoElement, time) => ({
+                target: time,
+                currentTime: v.currentTime,
+                seeking: v.seeking,
+                ready: v.readyState >= 2,
+                nearTarget: Math.abs(v.currentTime - time) < 2,
+                buffered: Array.from({ length: v.buffered.length }, (_, i) => [
+                  v.buffered.start(i),
+                  v.buffered.end(i),
+                ]),
+              }),
+              target,
+            ),
           { timeout: 30_000 },
         )
-        .toBe(true);
+        .toMatchObject({ seeking: false, ready: true, nearTarget: true });
     }
+    await page.bringToFront();
     await page.setViewportSize({ width: 360, height: 844 });
     await page
       .getByRole("radio", { name: "Preview", exact: true })

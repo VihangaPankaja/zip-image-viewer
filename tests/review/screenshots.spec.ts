@@ -63,7 +63,7 @@ for (const device of devices) {
         .poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState), {
           timeout: 30_000,
         })
-        .toBeGreaterThanOrEqual(2);
+        .toBe(4);
       await video.evaluate((v: HTMLVideoElement) => v.pause());
       const seek = page.getByRole("slider", { name: "Seek video" });
       await seek.scrollIntoViewIfNeeded();
@@ -93,7 +93,7 @@ for (const device of devices) {
             video.evaluate(
               (v: HTMLVideoElement, time) =>
                 !v.seeking &&
-                v.readyState >= 2 &&
+                v.readyState === 4 &&
                 Math.abs(v.currentTime - time) < 0.5,
               target,
             ),

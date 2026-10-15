@@ -1,5 +1,5 @@
-import { expect, test, type Locator } from "@playwright/test";
-import { writeFile } from "node:fs/promises";
+import { expect, test, type Locator, type Page } from "@playwright/test";
+import { rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import { startMultilingualFixture } from "../fixtures/multilingual";
 
@@ -36,6 +36,22 @@ function percentiles(samples: number[]) {
   };
 }
 
+async function resetPlayer(page: Page) {
+  await page.reload();
+  await page.getByRole("tab", { name: "Explore" }).click();
+  await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
+  await page
+    .getByRole("combobox", { name: "Audio language" })
+    .selectOption({ label: "Spanish" });
+  const video = page.getByLabel("Video preview");
+  await expect
+    .poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState), {
+      timeout: 30_000,
+    })
+    .toBe(4);
+  await video.evaluate((v: HTMLVideoElement) => v.pause());
+}
+
 test("cold hour seeks, crosses windows and preserves alternate audio on desktop and touch", async ({
   page,
   browserName,
@@ -45,6 +61,7 @@ test("cold hour seeks, crosses windows and preserves alternate audio on desktop 
     "The real H.264/AAC decode fixture uses Chromium's bundled codecs.",
   );
   test.setTimeout(240_000);
+  await rm("test-results/priority-seek-metrics.json", { force: true });
   const fixture = await startMultilingualFixture(
     "http://127.0.0.1:5173",
     0,
@@ -118,6 +135,7 @@ test("cold hour seeks, crosses windows and preserves alternate audio on desktop 
           ),
         ),
       );
+    await resetPlayer(page);
     const prepared: number[] = [];
     for (const target of targets) {
       expect(
@@ -135,16 +153,7 @@ test("cold hour seeks, crosses windows and preserves alternate audio on desktop 
     expect(percentiles(prepared).p95).toBeLessThan(500);
     // Start with a fresh media buffer; earlier seeks may remain buffered even
     // after a distant seek, which would bypass the network measurement.
-    await page.reload();
-    await page.getByRole("tab", { name: "Explore" }).click();
-    await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
-    await audio.selectOption({ label: "Spanish" });
-    await expect
-      .poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState), {
-        timeout: 30_000,
-      })
-      .toBeGreaterThanOrEqual(2);
-    await video.evaluate((v: HTMLVideoElement) => v.pause());
+    await resetPlayer(page);
     const cdp = await page.context().newCDPSession(page);
     await cdp.send("Network.enable");
     await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
