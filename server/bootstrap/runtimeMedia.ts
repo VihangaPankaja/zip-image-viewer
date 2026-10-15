@@ -7,6 +7,7 @@ import {
 } from "../runtimeAdapters.js";
 import { createDerivedMediaCache } from "../infrastructure/media/derivedMediaCache.js";
 import { createVideoRuntime } from "../infrastructure/media/videoRuntime.js";
+import { prepareRetainedSession } from "../infrastructure/media/prepareRetainedSession.js";
 
 type LogEvent = (
   _level: "info" | "warn" | "error",
@@ -91,6 +92,12 @@ export function createRuntimeMedia(
     return result;
   };
   return {
+    prepareRetainedSession: retainedPreparation(
+      videoRuntime,
+      sessions,
+      ffmpegPath,
+      logEvent,
+    ),
     storage: cache.storage,
     clearMediaCache: (session: Session) =>
       cache.clear(session, () => videoRuntime.clearCachedMedia(session)),
@@ -99,5 +106,38 @@ export function createRuntimeMedia(
     pinMediaRequest: pinMediaRequests(cache),
     ensureThumbnail,
     ensureImagePreview,
+  };
+}
+
+function retainedPreparation(
+  videoRuntime: ReturnType<typeof createVideoRuntime>,
+  sessions: ReadonlyMap<string, Session>,
+  ffmpegPath: string | null,
+  logEvent: LogEvent,
+) {
+  return (session: Session) => {
+    if (!ffmpegPath || !session.retained) return;
+    const report = (error: unknown) =>
+      logEvent("warn", "video.prepare.failed", {
+        sessionId: session.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    void videoRuntime
+      .trackVideoTask(
+        session,
+        prepareRetainedSession(
+          session,
+          sessions,
+          (item, file, target) =>
+            videoRuntime.ensureVideoTranscodeEntry(
+              item,
+              file,
+              target,
+              "background",
+            ),
+          report,
+        ),
+      )
+      .catch(report);
   };
 }

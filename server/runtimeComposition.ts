@@ -76,6 +76,7 @@ const {
   ensureImagePreview,
   storage,
   clearMediaCache,
+  prepareRetainedSession,
 } = createRuntimeMedia(ffmpegPath, sessionStore, videoTranscodeStore, logEvent);
 const {
   ensureVideoTranscodeEntry,
@@ -96,6 +97,7 @@ const { torrentAdapter, ...torrentControls } = createTorrentControls(
   emitJob,
 );
 const processorDependencies = {
+  prepareRetainedSession,
   sessionStore,
   emitJob,
   closeJob,

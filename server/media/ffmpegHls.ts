@@ -7,6 +7,11 @@ export type Fmp4HlsInput = {
   segmentDurationSeconds?: number;
   audioStreamIndex?: number;
   videoOnly?: boolean;
+  window?: {
+    startSeconds: number;
+    durationSeconds: number;
+    startIndex: number;
+  };
 };
 
 function mediaPath(directory: string, filename: string): string {
@@ -20,8 +25,10 @@ export function buildFmp4HlsArgs(input: Fmp4HlsInput): string[] {
     "-hide_banner",
     "-loglevel",
     "error",
+    ...(input.window ? ["-ss", String(input.window.startSeconds)] : []),
     "-i",
     input.inputPath,
+    ...(input.window ? ["-t", String(input.window.durationSeconds)] : []),
     "-map",
     input.audioStreamIndex === undefined
       ? "0:v:0"
@@ -50,6 +57,7 @@ export function buildFmp4HlsArgs(input: Fmp4HlsInput): string[] {
       "-force_key_frames",
       `expr:gte(t,n_forced*${String(duration)})`,
     );
+    if (input.window) args.push("-r", "30", "-fps_mode", "cfr");
   }
   if (!input.videoOnly)
     args.push(
@@ -63,6 +71,7 @@ export function buildFmp4HlsArgs(input: Fmp4HlsInput): string[] {
       "48000",
     );
   args.push(
+    ...(input.window ? ["-start_number", String(input.window.startIndex)] : []),
     "-f",
     "hls",
     "-hls_time",

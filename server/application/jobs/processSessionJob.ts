@@ -22,6 +22,7 @@ import type { TorrentAdapter } from "../torrents/torrentDownloader.js";
 import { prepareTorrentEntries } from "../torrents/prepareTorrentEntries.js";
 
 type ProcessorDependencies = DownloadSourceDependencies & {
+  prepareRetainedSession?: (_session: Session) => void;
   torrentAdapter: TorrentAdapter;
   sessionStore: Map<string, Session>;
   detectEncryption: (_archivePath: string) => Promise<boolean>;
@@ -209,6 +210,7 @@ export async function restoreTorrentSession(
   );
   session.retained = true;
   deps.sessionStore.set(session.id, session);
+  deps.prepareRetainedSession?.(session);
   return session;
 }
 

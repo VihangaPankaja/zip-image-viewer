@@ -72,6 +72,7 @@ export type VideoRouteDependencies = {
     _session: Session,
     _rendition: VideoRendition,
     _index: number,
+    _signal?: AbortSignal,
   ) => Promise<void>;
   refreshRenditionAvailability: (_rendition: VideoRendition) => Promise<number>;
   DEFAULT_VIDEO_SEGMENT_SECONDS: number;

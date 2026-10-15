@@ -16,6 +16,11 @@ import {
 } from "../media/hlsManifest.js";
 import type { VideoRouteDependencies } from "./videoRoutes.js";
 import { resolveVideoFile, type VideoContext } from "./video/routeContext.js";
+import {
+  buildWindowPlaylist,
+  WINDOWED_AFTER_SECONDS,
+  windowDirectory,
+} from "../infrastructure/media/hlsWindows.js";
 
 function renditionUri(
   request: Request,
@@ -83,7 +88,8 @@ async function startRendition(
   }
   const rendition = deps.getRenditionState(entry, context.session, quality);
   rendition.lastAccessedAt = Date.now();
-  await deps.startRenditionTranscode(entry, context.session, rendition);
+  if (entry.durationSeconds <= WINDOWED_AFTER_SECONDS || !entry.durationSeconds)
+    await deps.startRenditionTranscode(entry, context.session, rendition);
   return rendition;
 }
 
@@ -130,9 +136,14 @@ function registerMasterRoute(app: Express, deps: VideoRouteDependencies): void {
           context.session,
           rendition.id,
         );
-        const init = await readFile(path.join(state.dir, "init.mp4")).catch(
-          () => null,
-        );
+        const init = await readFile(
+          path.join(
+            entry.durationSeconds > WINDOWED_AFTER_SECONDS
+              ? windowDirectory(state, 0)
+              : state.dir,
+            "init.mp4",
+          ),
+        ).catch(() => null);
         return {
           ...rendition,
           codecs: init ? codecsFromInit(init) : undefined,
@@ -162,6 +173,17 @@ function registerVariantRoute(
     ).toLowerCase();
     const quality = requested;
     const rendition = await startRendition(deps, context, entry, quality);
+    if (entry.durationSeconds > WINDOWED_AFTER_SECONDS) {
+      response.set("Cache-Control", "private, no-store");
+      response.type("application/vnd.apple.mpegurl").send(
+        buildWindowPlaylist(
+          entry.durationSeconds,
+          (index) => renditionUri(request, context, quality, "init", index),
+          (index) => renditionUri(request, context, quality, "segment", index),
+        ),
+      );
+      return;
+    }
     const source = await readRenditionPlaylist(rendition);
     const playlist = source
       ? buildVariantPlaylist(
@@ -183,6 +205,19 @@ function registerInitRoute(app: Express, deps: VideoRouteDependencies): void {
       entry.defaultQuality,
     ).toLowerCase();
     const rendition = await startRendition(deps, context, entry, quality);
+    if (entry.durationSeconds > WINDOWED_AFTER_SECONDS) {
+      await sendWindowResource(
+        request,
+        response,
+        deps,
+        context,
+        entry,
+        rendition,
+        "init.mp4",
+        "video/mp4",
+      );
+      return;
+    }
     const initPath = path.join(rendition.dir, "init.mp4");
     if (!(await waitForPublishedSegment(rendition, 0))) {
       return response
@@ -208,6 +243,19 @@ function registerSegmentRoute(
       Number.parseInt(queryText(request.query.index, "0"), 10) || 0,
     );
     const rendition = await startRendition(deps, context, entry, quality);
+    if (entry.durationSeconds > WINDOWED_AFTER_SECONDS) {
+      await sendWindowResource(
+        request,
+        response,
+        deps,
+        context,
+        entry,
+        rendition,
+        undefined,
+        "video/iso.segment",
+      );
+      return;
+    }
     const segmentPath = path.join(
       rendition.dir,
       `segment_${String(index).padStart(6, "0")}.m4s`,
@@ -217,6 +265,63 @@ function registerSegmentRoute(
     }
     sendCompletedFile(response, segmentPath, "video/iso.segment");
   });
+}
+
+async function sendWindowResource(
+  request: Request,
+  response: Response,
+  deps: VideoRouteDependencies,
+  context: VideoContext,
+  entry: VideoTranscodeEntry,
+  rendition: VideoRendition,
+  filename: string | undefined,
+  contentType: string,
+): Promise<void> {
+  const raw = queryText(request.query.index, "0");
+  const index = Number(raw);
+  if (
+    !/^\d+$/.test(raw) ||
+    !Number.isSafeInteger(index) ||
+    index >= entry.expectedSegments
+  )
+    throw new ApplicationError(
+      "INVALID_INPUT",
+      "Segment index is outside the video.",
+      400,
+    );
+  const controller = new AbortController();
+  const close = () => controller.abort();
+  response.once("close", close);
+  try {
+    await deps.startPrioritySegmentWindow(
+      entry,
+      context.session,
+      rendition,
+      index,
+      controller.signal,
+    );
+    if (response.destroyed) return;
+    sendCompletedFile(
+      response,
+      path.join(
+        windowDirectory(rendition, index),
+        filename ?? `segment_${String(index).padStart(6, "0")}.m4s`,
+      ),
+      contentType,
+    );
+  } catch (error) {
+    if (controller.signal.aborted) return;
+    deps.logEvent("warn", "video.window.failed", {
+      sessionId: context.session.id,
+      index,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    response
+      .status(503)
+      .json({ error: "Seek window could not be prepared. Try again." });
+  } finally {
+    response.removeListener("close", close);
+  }
 }
 
 export function registerVideoHlsRoutes(
