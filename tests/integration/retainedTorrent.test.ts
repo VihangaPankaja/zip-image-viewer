@@ -315,9 +315,10 @@ it("retains and reverifies selective downloads across graceful and forced restar
         timeout: 20_000,
       })
       .toBe("ready");
-    expect(await readFile(path.join(downloadDir, "2.bin"))).toEqual(
-      contents[2],
-    );
+    // A deep matcher blocks idle HTTP socket cleanup under coverage.
+    expect(
+      (await readFile(path.join(downloadDir, "2.bin"))).equals(contents[2]),
+    ).toBe(true);
     expect(
       await fetch(`${server.origin}/api/session-jobs/${id}`, {
         method: "DELETE",
