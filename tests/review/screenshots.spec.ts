@@ -64,6 +64,13 @@ for (const device of devices) {
           timeout: 30_000,
         })
         .toBe(4);
+      await video.evaluate(async (v: HTMLVideoElement) => {
+        v.muted = true;
+        await v.play();
+      });
+      await expect
+        .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
+        .toBeGreaterThan(0.5);
       await video.evaluate((v: HTMLVideoElement) => v.pause());
       const seek = page.getByRole("slider", { name: "Seek video" });
       await seek.scrollIntoViewIfNeeded();
