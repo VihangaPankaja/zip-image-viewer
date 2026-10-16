@@ -30,14 +30,97 @@ type Capture = {
 };
 const captures: Capture[] = [];
 let multilingual: Awaited<ReturnType<typeof startMultilingualFixture>>;
+let longVideo: Awaited<ReturnType<typeof startMultilingualFixture>>;
+
+for (const device of devices) {
+  for (const theme of ["light", "dark"] as const) {
+    test(`${device.name} ${theme} full-duration priority seeking`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({
+        width: device.width,
+        height: device.height,
+      });
+      await page.emulateMedia({ colorScheme: theme });
+      await page.goto(longVideo.origin);
+      await page.evaluate(
+        (value) => localStorage.setItem("zip-image-viewer-theme", value),
+        theme,
+      );
+      await page.reload();
+      await page.getByRole("tab", { name: "Explore" }).click();
+      if (device.name === "Mobile")
+        await page.getByRole("button", { name: "Show sessions" }).click();
+      await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
+      if (device.name === "Mobile") {
+        await page.getByRole("button", { name: "Hide sessions" }).click();
+        await page
+          .getByRole("radio", { name: "Preview", exact: true })
+          .check({ force: true });
+      }
+      const video = page.getByLabel("Video preview");
+      await expect
+        .poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState), {
+          timeout: 30_000,
+        })
+        .toBe(4);
+      await video.evaluate(async (v: HTMLVideoElement) => {
+        v.muted = true;
+        await v.play();
+      });
+      await expect
+        .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
+        .toBeGreaterThan(0.5);
+      await video.evaluate((v: HTMLVideoElement) => v.pause());
+      const seek = page.getByRole("slider", { name: "Seek video" });
+      await seek.scrollIntoViewIfNeeded();
+      await save(page, device, theme, "video-full-seek-timeline");
+      const bounds = await seek.boundingBox();
+      if (!bounds) throw new Error("Long-video seek control is missing.");
+      await page.mouse.move(
+        bounds.x + bounds.width * 0.8,
+        bounds.y + bounds.height / 2,
+      );
+      await page.mouse.down();
+      const thumbnail = page.locator(".video-scrubber-preview img");
+      await expect(thumbnail).toBeVisible();
+      await expect
+        .poll(
+          () => thumbnail.evaluate((img: HTMLImageElement) => img.naturalWidth),
+          { timeout: 30_000 },
+        )
+        .toBeGreaterThan(0);
+      await save(page, device, theme, "video-long-seek-preview");
+      const target = Number(await seek.inputValue());
+      expect(target).toBeGreaterThan(2700);
+      await page.mouse.up();
+      await expect
+        .poll(
+          () =>
+            video.evaluate(
+              (v: HTMLVideoElement, time) =>
+                !v.seeking &&
+                v.readyState === 4 &&
+                Math.abs(v.currentTime - time) < 0.5,
+              target,
+            ),
+          { timeout: 30_000 },
+        )
+        .toBe(true);
+      await save(page, device, theme, "video-priority-seek-committed");
+    });
+  }
+}
 
 test.beforeAll(async () => {
   await mkdir(output, { recursive: true });
   await prepareMedia();
   multilingual = await startMultilingualFixture("http://127.0.0.1:5174");
+  longVideo = await startMultilingualFixture("http://127.0.0.1:5174", 0, 3600);
 });
 test.afterAll(async () => {
   await multilingual.close();
+  await longVideo.close();
   const sourceCommit = execFileSync("git", ["rev-parse", "HEAD"], {
     encoding: "utf8",
   }).trim();

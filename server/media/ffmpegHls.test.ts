@@ -8,6 +8,19 @@ import { buildFmp4HlsArgs } from "./ffmpegHls.js";
 import { codecsFromInit } from "./hlsManifest.js";
 
 describe("FFmpeg adaptive HLS arguments", () => {
+  it("seeks before decoding and encodes only the requested window", () => {
+    const args = buildFmp4HlsArgs({
+      inputPath: "long.mkv",
+      outputDirectory: "window",
+      height: 360,
+      window: { startSeconds: 2880, durationSeconds: 16, startIndex: 720 },
+    });
+    expect(args.indexOf("-ss")).toBeLessThan(args.indexOf("-i"));
+    expect(args[args.indexOf("-ss") + 1]).toBe("2880");
+    expect(args[args.indexOf("-t") + 1]).toBe("16");
+    expect(args[args.indexOf("-start_number") + 1]).toBe("720");
+    expect(args[args.indexOf("-r") + 1]).toBe("30");
+  });
   it("maps a selected absolute audio stream separately from video-only variants", () => {
     const input = {
       inputPath: "video.mkv",

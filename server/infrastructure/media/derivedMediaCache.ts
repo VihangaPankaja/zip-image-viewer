@@ -75,6 +75,7 @@ function findRendition(
 
 class DerivedMediaCache {
   private readonly active = new Map<string, number>();
+  private readonly preparing = new Map<string, number>();
   private readonly evicting = new Map<string, Promise<void>>();
   private pending: Promise<void> | undefined;
   constructor(
@@ -180,6 +181,7 @@ class DerivedMediaCache {
     );
     if (
       this.active.has(session.id) ||
+      this.preparing.has(session.id) ||
       entries.some((entry) =>
         [...entry.renditions.values()].some(
           (rendition) =>
@@ -215,8 +217,8 @@ class DerivedMediaCache {
     }
   };
 
-  protectSession = (sessionId: string) =>
-    protectSession(this.active, sessionId);
+  protectSession = (sessionId: string, allowEviction = false) =>
+    protectSession(allowEviction ? this.preparing : this.active, sessionId);
   waitForEviction = (sessionId: string) =>
     this.evicting.get(sessionId) ?? Promise.resolve();
 }

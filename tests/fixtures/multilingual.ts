@@ -15,6 +15,7 @@ import {
 import { registerVideoPlaybackRoutes } from "../../server/handlers/video/playbackRoutes.js";
 import { registerVideoSubtitleRoute } from "../../server/handlers/video/subtitleRoute.js";
 import { registerVideoHlsRoutes } from "../../server/handlers/videoHlsRoutes.js";
+import { registerVideoThumbnailRoute } from "../../server/handlers/video/thumbnailRoute.js";
 import type { VideoRouteDependencies } from "../../server/handlers/video/types.js";
 import { createVideoRuntime } from "../../server/infrastructure/media/videoRuntime.js";
 import { runCommand } from "../../server/infrastructure/process/commandRunner.js";
@@ -45,6 +46,8 @@ export async function startMultilingualFixture(
     logEvent: () => undefined,
   });
   try {
+    const looped = durationSeconds > 120;
+    const fixtureDuration = looped ? 16 : durationSeconds;
     for (const [language, text] of [
       ["eng", "English coastal captions"],
       ["spa", "Subtítulos de la costa"],
@@ -62,15 +65,15 @@ export async function startMultilingualFixture(
       "-f",
       "lavfi",
       "-i",
-      `testsrc2=size=640x360:rate=24:duration=${durationSeconds}`,
+      `testsrc2=size=640x360:rate=24:duration=${fixtureDuration}`,
       "-f",
       "lavfi",
       "-i",
-      `sine=frequency=440:sample_rate=48000:duration=${durationSeconds}`,
+      `sine=frequency=440:sample_rate=48000:duration=${fixtureDuration}`,
       "-f",
       "lavfi",
       "-i",
-      `sine=frequency=880:sample_rate=48000:duration=${durationSeconds}`,
+      `sine=frequency=880:sample_rate=48000:duration=${fixtureDuration}`,
       "-i",
       path.join(directory, "eng.srt"),
       "-i",
@@ -95,6 +98,7 @@ export async function startMultilingualFixture(
       "aac",
       "-c:s",
       "srt",
+      ...(looped ? ["-t", String(fixtureDuration)] : []),
       "-metadata:s:a:0",
       "language=eng",
       "-metadata:s:a:0",
@@ -115,8 +119,27 @@ export async function startMultilingualFixture(
       "language=spa",
       "-metadata:s:s:1",
       "title=Spanish captions",
-      path.join(directory, filename),
+      path.join(directory, looped ? "seed.mkv" : filename),
     ]);
+    if (looped)
+      await runCommand(ffmpegPath, [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-stream_loop",
+        "-1",
+        "-i",
+        path.join(directory, "seed.mkv"),
+        "-t",
+        String(durationSeconds),
+        "-map",
+        "0:v",
+        "-map",
+        "0:a",
+        "-c",
+        "copy",
+        path.join(directory, filename),
+      ]);
   } catch (error) {
     await rm(directory, { recursive: true, force: true });
     throw error;
@@ -169,6 +192,12 @@ export async function startMultilingualFixture(
     }),
   );
   app.post("/rpc/jobs/list", (_req, res) => res.json({ json: { items: [] } }));
+  app.post("/rpc/scheduler/get", (_req, res) =>
+    res.json({ json: { activeCount: 0, maxConcurrent: 2 } }),
+  );
+  app.post("/rpc/torrentLimits/get", (_req, res) =>
+    res.json({ json: { downloadBytesPerSec: 0, uploadBytesPerSec: 0 } }),
+  );
   app.post("/rpc/video/qualities", async (_req, res) =>
     res.json({
       json: await getVideoQualities(
@@ -194,6 +223,7 @@ export async function startMultilingualFixture(
   registerVideoMetadataRoutes(app, deps);
   registerVideoSubtitleRoute(app, deps);
   registerVideoHlsRoutes(app, deps);
+  registerVideoThumbnailRoute(app, deps);
   app.use(proxyApp(baseURL));
   const server = app.listen(port, "127.0.0.1");
   await once(server, "listening");

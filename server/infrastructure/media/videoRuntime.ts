@@ -22,9 +22,18 @@ import { ProcessLimiter } from "../../media/processLimiter.js";
 import { getRenditionState } from "../../media/videoRendition.js";
 import { runCommand, runCommandCapture } from "../process/commandRunner.js";
 import { getSessionQualityOutputPath, remuxVideo } from "./videoRemux.js";
+import {
+  HlsWindows,
+  windowAvailability,
+  WINDOWED_AFTER_SECONDS,
+} from "./hlsWindows.js";
+import { videoDuration } from "./videoDuration.js";
+import { RetainedVideoPreparation } from "./prepareRetainedVideo.js";
 
 const SEGMENT_SECONDS = 4;
 const processLimiter = new ProcessLimiter(2);
+type WaitForEviction = (_sessionId: string) => Promise<void>;
+type ProtectSession = (_id: string, _allowEviction?: boolean) => () => void;
 type SessionWork = {
   controller: AbortController;
   pending: Set<Promise<unknown>>;
@@ -40,6 +49,8 @@ type LogEvent = (
 class VideoRuntime {
   readonly segmentSeconds = SEGMENT_SECONDS;
   private readonly sessions = new WeakMap<Session, SessionWork>();
+  private readonly preparation: RetainedVideoPreparation;
+  private readonly windows: HlsWindows;
 
   private sessionWork(session: Session): SessionWork {
     let work = this.sessions.get(session);
@@ -58,10 +69,11 @@ class VideoRuntime {
   trackVideoTask = <Result>(
     session: Session | undefined,
     task: Promise<Result>,
+    protectCache = true,
   ): Promise<Result> => {
     if (!session) return task;
     const work = this.sessionWork(session);
-    const release = this.protectSession(session.id);
+    const release = this.protectSession(session.id, !protectCache);
     work.pending.add(task);
     void task
       .finally(() => {
@@ -84,7 +96,9 @@ class VideoRuntime {
       sessionSignal && requestSignal
         ? AbortSignal.any([sessionSignal, requestSignal])
         : (sessionSignal ?? requestSignal);
-    const start = () => {
+    const start = async () => {
+      if (session) await this.waitForEviction(session.id);
+      signal?.throwIfAborted();
       this.logEvent("info", "video.process.started", {
         sessionId: session?.id,
       });
@@ -153,12 +167,26 @@ class VideoRuntime {
     private readonly ffmpegPath: string | null,
     private readonly transcodes: Map<string, VideoTranscodeEntry>,
     private readonly logEvent: LogEvent,
-    private readonly protectSession: (_sessionId: string) => () => void = () =>
-      () =>
-        undefined,
+    private readonly protectSession: ProtectSession = () => () => undefined,
     private readonly enforceDerivedMediaBudget: () => Promise<void> = () =>
       Promise.resolve(),
-  ) {}
+    private readonly waitForEviction: WaitForEviction = () => Promise.resolve(),
+  ) {
+    this.windows = new HlsWindows(ffmpegPath, this.runVideoTask);
+    this.preparation = new RetainedVideoPreparation({
+      windows: this.windows,
+      signalFor: (session) => this.sessionWork(session).controller.signal,
+      startSequential: (entry, session, rendition) =>
+        this.startRenditionTranscode(entry, session, rendition, "background"),
+      track: (session, task) => this.trackVideoTask(session, task, false),
+      enforceBudget: this.enforceDerivedMediaBudget,
+      onError: (session, error) =>
+        this.logEvent("warn", "video.prepare.failed", {
+          sessionId: session.id,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+    });
+  }
 
   getVideoTranscodeKey = (sessionId: string, normalizedPath: string): string =>
     `${sessionId}:${normalizedPath}`;
@@ -180,6 +208,7 @@ class VideoRuntime {
   getVideoMetadata = (
     videoPath: string,
     session?: Session,
+    priority: "interactive" | "background" = "interactive",
   ): Promise<VideoMetadata> => {
     const executable = this.ffmpegPath;
     if (!executable)
@@ -187,15 +216,28 @@ class VideoRuntime {
     const cached = session && this.sessionWork(session).metadata;
     const existing = cached && cached.get(videoPath);
     if (existing) return existing;
-    const metadata = this.runVideoTask(session, async (signal) => {
-      const { stderr } = await runCommandCapture(
-        executable,
-        ["-hide_banner", "-i", videoPath],
-        { allowNonZeroExit: true, signal },
-      );
-      const extension = path.extname(videoPath).slice(1).toLowerCase();
-      return videoMetadataFromOutput(stderr, extension);
-    });
+    const metadata = this.runVideoTask(
+      session,
+      async (signal) => {
+        const { stderr } = await runCommandCapture(
+          executable,
+          ["-hide_banner", "-i", videoPath],
+          { allowNonZeroExit: true, signal },
+        );
+        const extension = path.extname(videoPath).slice(1).toLowerCase();
+        const result = videoMetadataFromOutput(stderr, extension);
+        if (result.durationSeconds > WINDOWED_AFTER_SECONDS)
+          result.durationSeconds = await videoDuration(
+            executable,
+            videoPath,
+            result.durationSeconds,
+            signal,
+          );
+        return result;
+      },
+      undefined,
+      priority,
+    );
     cached?.set(videoPath, metadata);
     void metadata.catch(() => cached?.delete(videoPath));
     return metadata;
@@ -205,13 +247,15 @@ class VideoRuntime {
     session: Session,
     normalizedPath: string,
     targetPath: string,
+    priority: "interactive" | "background" = "interactive",
   ): Promise<VideoTranscodeEntry> => {
     const key = this.getVideoTranscodeKey(session.id, normalizedPath);
     const existing = this.transcodes.get(key);
-    if (existing) return existing;
-    const metadata = await this.getVideoMetadata(targetPath, session);
+    if (existing) return this.preparation.ensure(existing, session, priority);
+    const metadata = await this.getVideoMetadata(targetPath, session, priority);
     const racedEntry = this.transcodes.get(key);
-    if (racedEntry) return racedEntry;
+    if (racedEntry)
+      return this.preparation.ensure(racedEntry, session, priority);
     const qualities = qualityOptions(metadata);
     const entry: VideoTranscodeEntry = {
       sessionId: session.id,
@@ -227,7 +271,7 @@ class VideoRuntime {
       renditions: new Map(),
     };
     this.transcodes.set(key, entry);
-    return entry;
+    return this.preparation.ensure(entry, session, priority);
   };
 
   getRenditionState = getRenditionState;
@@ -235,6 +279,9 @@ class VideoRuntime {
   refreshRenditionAvailability = async (
     rendition: VideoRendition,
   ): Promise<number> => {
+    if (rendition.durationSeconds > WINDOWED_AFTER_SECONDS) {
+      return windowAvailability(rendition);
+    }
     const playlist = await readFile(rendition.playlistPath, "utf8").catch(
       () => "",
     );
@@ -246,15 +293,22 @@ class VideoRuntime {
     entry: VideoTranscodeEntry,
     session: Session,
     rendition: VideoRendition,
+    priority?: "interactive" | "background",
   ): Promise<void> =>
-    startRenditionJob(entry, session, rendition, {
-      ffmpegPath: this.ffmpegPath,
-      segmentSeconds: SEGMENT_SECONDS,
-      runVideoTask: this.runVideoTask,
-      refreshRenditionAvailability: this.refreshRenditionAvailability,
-      enforceDerivedMediaBudget: this.enforceDerivedMediaBudget,
-      logEvent: this.logEvent,
-    });
+    startRenditionJob(
+      entry,
+      session,
+      rendition,
+      {
+        ffmpegPath: this.ffmpegPath,
+        segmentSeconds: SEGMENT_SECONDS,
+        runVideoTask: this.runVideoTask,
+        refreshRenditionAvailability: this.refreshRenditionAvailability,
+        enforceDerivedMediaBudget: this.enforceDerivedMediaBudget,
+        logEvent: this.logEvent,
+      },
+      priority,
+    );
   waitForFile = async (
     filePath: string,
     timeoutMs = 12_000,
@@ -279,7 +333,14 @@ class VideoRuntime {
 
   buildVideoQualityOptions = buildVideoQualityOptions;
 
-  startPrioritySegmentWindow = this.startRenditionTranscode;
+  startPrioritySegmentWindow = (
+    entry: VideoTranscodeEntry,
+    session: Session,
+    rendition: VideoRendition,
+    index: number,
+    signal?: AbortSignal,
+  ): Promise<void> =>
+    this.windows.ensure(entry, session, rendition, index, signal);
 
   getSessionQualityOutputPath = getSessionQualityOutputPath;
 }
@@ -290,12 +351,14 @@ export function createVideoRuntime({
   logEvent,
   protectSession,
   enforceDerivedMediaBudget,
+  waitForEviction,
 }: {
   ffmpegPath: string | null;
   transcodes: Map<string, VideoTranscodeEntry>;
   logEvent: LogEvent;
-  protectSession?: (_sessionId: string) => () => void;
+  protectSession?: ProtectSession;
   enforceDerivedMediaBudget?: () => Promise<void>;
+  waitForEviction?: WaitForEviction;
 }) {
   return new VideoRuntime(
     ffmpegPath,
@@ -303,5 +366,6 @@ export function createVideoRuntime({
     logEvent,
     protectSession,
     enforceDerivedMediaBudget,
+    waitForEviction,
   );
 }

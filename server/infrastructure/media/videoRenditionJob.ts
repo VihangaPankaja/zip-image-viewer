@@ -61,6 +61,7 @@ export function startRenditionJob(
   session: Session,
   requested: VideoRendition,
   deps: Dependencies,
+  priority?: "interactive" | "background",
 ): Promise<void> {
   const executable = deps.ffmpegPath;
   if (!executable || requested.status !== "idle") return Promise.resolve();
@@ -107,12 +108,12 @@ export function startRenditionJob(
     );
     await runCommand(executable, args, { signal });
   };
-  void deps
+  const completion = deps
     .runVideoTask(
       session,
       encode,
       undefined,
-      audioTrack ? "interactive" : "background",
+      priority ?? (audioTrack ? "interactive" : "background"),
     )
     .then(async () => {
       await finishRenditions(renditions, deps);
@@ -129,6 +130,7 @@ export function startRenditionJob(
         "warn",
       );
     });
+  for (const rendition of renditions) rendition.completion = completion;
   return Promise.resolve();
 }
 

@@ -8,6 +8,7 @@
     "tests/**/*.ts",
     "playwright.config.ts",
     "playwright.review.config.ts",
+    "playwright.seek.config.ts",
     "vitest.config.ts",
     "vite.config.ts"
   ]

@@ -1,6 +1,8 @@
-import path from "node:path";
-import { realpath } from "node:fs/promises";
 import type { Response } from "express";
+export {
+  isWithinRoot,
+  isRealPathWithinRoot,
+} from "../infrastructure/runtime/filePaths.js";
 
 export type ByteRange = { start: number; end: number };
 
@@ -30,23 +32,6 @@ export function applyByteRange(
 
 export function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
-}
-
-export function isWithinRoot(targetPath: string, rootPath: string): boolean {
-  return (
-    targetPath === rootPath || targetPath.startsWith(`${rootPath}${path.sep}`)
-  );
-}
-
-export async function isRealPathWithinRoot(
-  targetPath: string,
-  rootPath: string,
-): Promise<boolean> {
-  const [target, root] = await Promise.all([
-    realpath(targetPath),
-    realpath(rootPath),
-  ]);
-  return isWithinRoot(target, root);
 }
 
 export function queryText(value: unknown, fallback = ""): string {

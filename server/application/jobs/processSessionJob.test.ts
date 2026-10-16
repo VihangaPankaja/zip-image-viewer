@@ -205,7 +205,9 @@ describe("createProcessSessionJob", () => {
         return Promise.resolve({ files: ["album/image.jpg"] });
       },
     );
+    const prepareRetainedSession = vi.fn();
     const processJob = createProcessSessionJob({
+      prepareRetainedSession,
       sessionStore,
       emitJob: manager.emitJob,
       closeJob: manager.closeJob,
@@ -236,6 +238,7 @@ describe("createProcessSessionJob", () => {
 
     expect(job.status).toBe("awaiting_selection");
     expect(sessionStore.size).toBe(0);
+    expect(prepareRetainedSession).not.toHaveBeenCalled();
     job.torrentFiles = torrentFiles.map((file) => ({
       ...file,
       selected: true,
@@ -245,9 +248,20 @@ describe("createProcessSessionJob", () => {
     expect(download).toHaveBeenCalledTimes(2);
     expect(job.status).toBe("ready");
     expect(sessionStore.size).toBe(1);
+    expect(prepareRetainedSession).toHaveBeenCalledExactlyOnceWith(
+      sessionStore.get(job.sessionId),
+    );
     expect(sessionStore.get(job.sessionId)?.stats.fileCount).toBe(1);
     expect(sessionStore.get(job.sessionId)?.firstFilePath).toBe(
       "album/image.jpg",
     );
+    const originalSession = sessionStore.get(job.sessionId);
+    if (!originalSession) throw new Error("Retained session was not indexed.");
+    originalSession.pinned = true;
+    await processJob(job);
+    expect(job.status).toBe("ready");
+    expect(sessionStore.get(job.sessionId)).toBe(originalSession);
+    expect(sessionStore.get(job.sessionId)?.pinned).toBe(true);
+    expect(prepareRetainedSession).toHaveBeenCalledTimes(2);
   });
 });

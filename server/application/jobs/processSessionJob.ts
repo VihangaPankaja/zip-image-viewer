@@ -22,6 +22,7 @@ import type { TorrentAdapter } from "../torrents/torrentDownloader.js";
 import { prepareTorrentEntries } from "../torrents/prepareTorrentEntries.js";
 
 type ProcessorDependencies = DownloadSourceDependencies & {
+  prepareRetainedSession?: (_session: Session) => void;
   torrentAdapter: TorrentAdapter;
   sessionStore: Map<string, Session>;
   detectEncryption: (_archivePath: string) => Promise<boolean>;
@@ -208,8 +209,12 @@ export async function restoreTorrentSession(
       .map((entry) => entry.relativePath),
   );
   session.retained = true;
-  deps.sessionStore.set(session.id, session);
-  return session;
+  const existing = deps.sessionStore.get(session.id);
+  // Keep the session object that owns active viewers and cancellable media work.
+  const retainedSession = existing ? Object.assign(existing, session) : session;
+  deps.sessionStore.set(session.id, retainedSession);
+  deps.prepareRetainedSession?.(retainedSession);
+  return retainedSession;
 }
 
 async function processHttpJob(

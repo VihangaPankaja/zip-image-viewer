@@ -111,6 +111,19 @@ jobs:
         run: rm -f "$RUNNER_TEMP/video-latency.md"
       - name: Verify storyboard latency and sustained dragging under media load
         run: pnpm run benchmark:storyboard -- --output "$RUNNER_TEMP/storyboard-performance.json"
+      - name: Verify cold and prepared long-video seeking without competing browser tests
+        run: pnpm run benchmark:seek
+      - name: Publish long-video seek benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: priority-seek-benchmark
+          retention-days: 14
+          path: |
+            test-results/priority-seek-metrics.json
+            test-results/priority-seek-run/
+            playwright-report/
+          if-no-files-found: warn
 
   e2e:
     runs-on: ubuntu-latest

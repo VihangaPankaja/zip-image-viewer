@@ -16,6 +16,17 @@ contents, and previewing files while work continues in the background.
 - Strict TypeScript, type-aware ESLint, Fallow, Lefthook, Vitest, Playwright,
   Axe, and coverage reporting are part of the normal quality workflow.
 
+## Long-video seeking
+
+Videos longer than two minutes have a full-duration adaptive seek timeline.
+Seeking prepares the requested eight-second window without waiting for earlier
+minutes to encode. Retained videos prepare their lowest rendition and default
+audio in the background after indexing and restart recovery. The existing
+original, remux and short-video playback paths remain available.
+
+See [long-video seeking and verification](docs/priority-seeking.md) and run
+`pnpm run benchmark:seek` for the isolated cold/prepared seek benchmark.
+
 ## Audio languages and captions
 
 Videos with multiple audio tracks open in adaptive playback. Choose an audio
