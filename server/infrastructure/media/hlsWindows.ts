@@ -35,9 +35,7 @@ export function windowDirectory(
   return path.join(rendition.dir, `window-${String(windowStart(index))}`);
 }
 
-export async function windowAvailability(
-  rendition: VideoRendition,
-): Promise<number> {
+async function windowAvailability(rendition: VideoRendition): Promise<number> {
   const directories = await readdir(rendition.dir).catch(() => []);
   const counts = await Promise.all(
     directories
