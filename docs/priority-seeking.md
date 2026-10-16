@@ -2,7 +2,7 @@
 
 V03 adds a complete HLS seek timeline for videos longer than two minutes. The server encodes only the requested eight-second window, instead of encoding every earlier minute first. Short clips retain their existing sequential HLS path.
 
-Windows publish only after FFmpeg exits and the playlist contains the expected complete, positive-duration segments. Each window has an initialization map and an explicit discontinuity boundary. The encoder normalizes window video to 30 fps with B-frames disabled, keeping presentation and decode timestamps equal so HLS.js does not accumulate a composition offset at each boundary. Audio uses the same window boundaries. Compatible initialization files share a hard link. First-frame and tail probes exclude container-only AAC padding from the video timeline. When audio outlasts the picture, the tail probe searches progressively earlier until it finds the final video frame. Short audio tracks are padded with silence within each bounded window.
+Windows publish only after FFmpeg exits and the playlist contains the expected complete, positive-duration segments. Each window has an initialization map and an explicit discontinuity boundary. The encoder normalizes window video to 30 fps with B-frames disabled, keeping presentation and decode timestamps equal so HLS.js does not accumulate a composition offset at each boundary. Audio uses the same window boundaries and resamples to a sample clock starting at zero. This prevents millisecond input jitter from selecting a previous audio discontinuity during an exact-boundary seek. Compatible initialization files share a hard link. First-frame and tail probes exclude container-only AAC padding from the video timeline. When audio outlasts the picture, the tail probe searches progressively earlier until it finds the final video frame. Short audio tracks are padded with silence within each bounded window.
 
 Requests for the same window share one job. Cancelling a request releases its consumer; the encoder stops only when the last consumer leaves. A foreground viewer promotes a queued background job without rejecting its other consumers. All probes and encoders use the existing shared two-process limit. Session cleanup drains media work, and derived output remains subject to the existing cache budget.
 
@@ -16,13 +16,13 @@ Run `pnpm run benchmark:seek` for the isolated Chromium benchmark. It creates an
 
 The enforced targets are under three seconds for the cold seek, prepared p95 under 500 ms on loopback, and p95 under 1.5 seconds at 10 Mbps. CI runs this benchmark separately from other browser tests so competing encoders do not invalidate the measurement.
 
-Measured on Windows 10.0.26300 with an Intel Core i7-8565U, using the full-length 640×360 fixture on 2026-10-15:
+Measured on Windows 10.0.26300 with an Intel Core i7-8565U, using the full-length 640×360 fixture on 2026-10-16:
 
 | Scenario                            | Samples | Displayed-frame latency |
 | ----------------------------------- | ------: | ----------------------: |
-| Cold seek to 48:00                  |       1 |                 2144 ms |
-| Prepared, loopback                  |      30 |  p50 370 ms, p95 495 ms |
-| Prepared, 10 Mbps and 10 ms latency |      30 |  p50 611 ms, p95 724 ms |
+| Cold seek to 48:00                  |       1 |                 1500 ms |
+| Prepared, loopback                  |      30 |  p50 346 ms, p95 403 ms |
+| Prepared, 10 Mbps and 10 ms latency |      30 |  p50 573 ms, p95 628 ms |
 
 The ordinary E2E suite separately exercises two viewers at different playheads, pointer seeking, 360 px touch seeking and keyboard commits. Runtime tests cover exact and fractional video endings, AAC padding, window coalescing, promotion, cancellation, cached replay and retained preparation through the final window. The PR gallery includes the loaded hour-long timeline, a seek thumbnail and time preview, and decoded playback after committing the seek, in both themes at all four review sizes.
 

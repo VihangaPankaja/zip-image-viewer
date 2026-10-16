@@ -1,4 +1,5 @@
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { Buffer } from "node:buffer";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import ffmpegPath from "ffmpeg-static";
@@ -89,6 +90,73 @@ it.each([20, 128])(
   },
   120_000,
 );
+
+it("keeps alternate audio windows on a sample clock for exact-boundary seeks", async () => {
+  if (!ffmpegPath) throw new Error("FFmpeg is required.");
+  const fixture = await startMultilingualFixture(
+    "http://127.0.0.1:5173",
+    0,
+    130.25,
+  );
+  try {
+    const entry = await fixture.runtime.ensureVideoTranscodeEntry(
+      fixture.session,
+      "multilingual.mkv",
+      path.join(fixture.directory, "multilingual.mkv"),
+    );
+    const audio = fixture.runtime.getRenditionState(
+      entry,
+      fixture.session,
+      "audio-1",
+    );
+    for (const index of [0, 1, 8, 9, 10, 11]) {
+      await fixture.runtime.startPrioritySegmentWindow(
+        entry,
+        fixture.session,
+        audio,
+        index,
+      );
+      const directory = windowDirectory(audio, index);
+      const media = path.join(fixture.directory, "audio-window.mp4");
+      await writeFile(
+        media,
+        Buffer.concat(
+          await Promise.all(
+            ["init.mp4", `segment_${String(index).padStart(6, "0")}.m4s`].map(
+              (name) => readFile(path.join(directory, name)),
+            ),
+          ),
+        ),
+      );
+      const { stderr } = await runCommandCapture(ffmpegPath, [
+        "-hide_banner",
+        "-copyts",
+        "-debug_ts",
+        "-i",
+        media,
+        "-map",
+        "0:a:0",
+        "-frames:a",
+        "2",
+        "-f",
+        "null",
+        "-",
+      ]);
+      const packets = [
+        ...stderr.matchAll(
+          /demuxer -> .*?type:audio.*?pkt_dts_time:([-\d.]+)/g,
+        ),
+      ].map((match) => Number(match[1]));
+      expect(packets.length).toBeGreaterThanOrEqual(2);
+      const start =
+        index % 2 ? (Math.ceil((4 * 48000) / 1024) * 1024) / 48000 : 0;
+      expect(packets[0]).toBeCloseTo(start, 5);
+      expect(packets[1]).toBeCloseTo(start + 1024 / 48000, 5);
+    }
+  } finally {
+    await fixture.close();
+  }
+}, 45_000);
 
 it.each([128, 130.25])(
   "uses the real video end and decodes the final window at %s seconds",

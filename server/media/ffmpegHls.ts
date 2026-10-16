@@ -60,7 +60,7 @@ export function buildFmp4HlsArgs(input: Fmp4HlsInput): string[] {
     if (input.window) args.push("-r", "30", "-fps_mode", "cfr", "-bf", "0");
   }
   if (!input.videoOnly) {
-    if (input.window) args.push("-af", "apad");
+    if (input.window) args.push("-af", "aresample=async=1:first_pts=0,apad");
     args.push(
       "-c:a",
       "aac",
