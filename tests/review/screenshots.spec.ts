@@ -50,6 +50,14 @@ for (const device of devices) {
       );
       await page.reload();
       await page.getByRole("tab", { name: "Explore" }).click();
+      const network = await page.context().newCDPSession(page);
+      await network.send("Network.enable");
+      await network.send("Network.emulateNetworkConditions", {
+        offline: false,
+        latency: 0,
+        downloadThroughput: 250_000,
+        uploadThroughput: -1,
+      });
       if (device.name === "Mobile")
         await page.getByRole("button", { name: "Show sessions" }).click();
       await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
@@ -92,23 +100,36 @@ for (const device of devices) {
       await quality.click();
       await save(page, device, theme, "video-warm-quality-choice");
       await page.getByRole("option", { name: "360p", exact: true }).click();
+      await expect(quality).toContainText("360p");
+      const seek = page.getByRole("slider", { name: "Seek video" });
+      await seek.scrollIntoViewIfNeeded();
+      const bounds = await seek.boundingBox();
+      if (!bounds) throw new Error("Fallback seek control is missing.");
+      await seek.click({
+        position: { x: bounds.width * 0.8, y: bounds.height / 2 },
+      });
       await video.evaluate(async (v: HTMLVideoElement) => {
-        v.currentTime = 104;
         await v.play();
       });
       await expect
         .poll(
           () =>
-            video.evaluate(
-              (v: HTMLVideoElement) =>
-                !v.seeking && v.videoHeight === 360 && v.currentTime > 104.25,
-            ),
+            video.evaluate((v: HTMLVideoElement) => ({
+              height: v.videoHeight,
+              atTarget: !v.seeking && v.currentTime > 104.25,
+              time: v.currentTime,
+              buffered: Array.from({ length: v.buffered.length }, (_, i) => [
+                v.buffered.start(i),
+                v.buffered.end(i),
+              ]),
+            })),
           { timeout: 30_000 },
         )
-        .toBe(true);
+        .toMatchObject({ height: 360, atTarget: true });
       await video.evaluate((v: HTMLVideoElement) => v.pause());
       await video.scrollIntoViewIfNeeded();
       await save(page, device, theme, "video-warm-fallback-playback");
+      await network.detach();
     });
     test(`${device.name} ${theme} full-duration priority seeking`, async ({
       page,
