@@ -132,6 +132,7 @@ export type VideoQualityOption = {
 };
 
 export type VideoRendition = {
+  completion?: Promise<void>;
   qualityId: string;
   selectedHeight: number;
   dir: string;

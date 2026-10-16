@@ -57,6 +57,7 @@ export function createRuntimeMedia(
     logEvent,
     protectSession: cache.protectSession,
     enforceDerivedMediaBudget: enforceMediaBudget,
+    waitForEviction: cache.waitForEviction,
   });
   const ensureThumbnail: typeof ensureRuntimeThumbnail = async (
     session,
@@ -137,6 +138,7 @@ function retainedPreparation(
             ),
           report,
         ),
+        false,
       )
       .catch(report);
   };

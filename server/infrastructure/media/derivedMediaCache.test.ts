@@ -47,6 +47,26 @@ async function cachedFile(
   await utimes(path.dirname(filePath), modifiedAt, modifiedAt);
 }
 
+it("evicts completed preparation output while preventing a manual clear of pending work", async () => {
+  const item = await session("preparing");
+  const file = path.join(item.workspaceDir, "video-quality", "completed.mp4");
+  await cachedFile(file, "completed output", 0);
+  const cache = createDerivedMediaCache(
+    new Map([[item.id, item]]),
+    new Map(),
+    0,
+  );
+  const release = cache.protectSession(item.id, true);
+  await cache.enforce();
+  await expect(readFile(file)).rejects.toMatchObject({ code: "ENOENT" });
+  await expect(cache.clear(item)).rejects.toMatchObject({ status: 409 });
+  release();
+  await expect(cache.clear(item)).resolves.toBeUndefined();
+  expect(
+    await readFile(path.join(item.extractDir, "original.mp4"), "utf8"),
+  ).toBe("original");
+});
+
 it("reports separate storage totals and clears derived files without deleting originals", async () => {
   const item = await session("storage");
   await cachedFile(

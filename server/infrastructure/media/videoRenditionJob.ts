@@ -108,7 +108,7 @@ export function startRenditionJob(
     );
     await runCommand(executable, args, { signal });
   };
-  void deps
+  const completion = deps
     .runVideoTask(
       session,
       encode,
@@ -130,6 +130,7 @@ export function startRenditionJob(
         "warn",
       );
     });
+  for (const rendition of renditions) rendition.completion = completion;
   return Promise.resolve();
 }
 

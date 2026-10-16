@@ -28,10 +28,12 @@ import {
   WINDOWED_AFTER_SECONDS,
 } from "./hlsWindows.js";
 import { videoDuration } from "./videoDuration.js";
-import { prepareRetainedVideo } from "./prepareRetainedVideo.js";
+import { RetainedVideoPreparation } from "./prepareRetainedVideo.js";
 
 const SEGMENT_SECONDS = 4;
 const processLimiter = new ProcessLimiter(2);
+type WaitForEviction = (_sessionId: string) => Promise<void>;
+type ProtectSession = (_id: string, _allowEviction?: boolean) => () => void;
 type SessionWork = {
   controller: AbortController;
   pending: Set<Promise<unknown>>;
@@ -47,6 +49,7 @@ type LogEvent = (
 class VideoRuntime {
   readonly segmentSeconds = SEGMENT_SECONDS;
   private readonly sessions = new WeakMap<Session, SessionWork>();
+  private readonly preparation: RetainedVideoPreparation;
   private readonly windows: HlsWindows;
 
   private sessionWork(session: Session): SessionWork {
@@ -66,10 +69,11 @@ class VideoRuntime {
   trackVideoTask = <Result>(
     session: Session | undefined,
     task: Promise<Result>,
+    protectCache = true,
   ): Promise<Result> => {
     if (!session) return task;
     const work = this.sessionWork(session);
-    const release = this.protectSession(session.id);
+    const release = this.protectSession(session.id, !protectCache);
     work.pending.add(task);
     void task
       .finally(() => {
@@ -92,7 +96,9 @@ class VideoRuntime {
       sessionSignal && requestSignal
         ? AbortSignal.any([sessionSignal, requestSignal])
         : (sessionSignal ?? requestSignal);
-    const start = () => {
+    const start = async () => {
+      if (session) await this.waitForEviction(session.id);
+      signal?.throwIfAborted();
       this.logEvent("info", "video.process.started", {
         sessionId: session?.id,
       });
@@ -161,13 +167,25 @@ class VideoRuntime {
     private readonly ffmpegPath: string | null,
     private readonly transcodes: Map<string, VideoTranscodeEntry>,
     private readonly logEvent: LogEvent,
-    private readonly protectSession: (_sessionId: string) => () => void = () =>
-      () =>
-        undefined,
+    private readonly protectSession: ProtectSession = () => () => undefined,
     private readonly enforceDerivedMediaBudget: () => Promise<void> = () =>
       Promise.resolve(),
+    private readonly waitForEviction: WaitForEviction = () => Promise.resolve(),
   ) {
     this.windows = new HlsWindows(ffmpegPath, this.runVideoTask);
+    this.preparation = new RetainedVideoPreparation({
+      windows: this.windows,
+      signalFor: (session) => this.sessionWork(session).controller.signal,
+      startSequential: (entry, session, rendition) =>
+        this.startRenditionTranscode(entry, session, rendition, "background"),
+      track: (session, task) => this.trackVideoTask(session, task, false),
+      enforceBudget: this.enforceDerivedMediaBudget,
+      onError: (session, error) =>
+        this.logEvent("warn", "video.prepare.failed", {
+          sessionId: session.id,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+    });
   }
 
   getVideoTranscodeKey = (sessionId: string, normalizedPath: string): string =>
@@ -233,10 +251,11 @@ class VideoRuntime {
   ): Promise<VideoTranscodeEntry> => {
     const key = this.getVideoTranscodeKey(session.id, normalizedPath);
     const existing = this.transcodes.get(key);
-    if (existing) return existing;
+    if (existing) return this.preparation.ensure(existing, session, priority);
     const metadata = await this.getVideoMetadata(targetPath, session, priority);
     const racedEntry = this.transcodes.get(key);
-    if (racedEntry) return racedEntry;
+    if (racedEntry)
+      return this.preparation.ensure(racedEntry, session, priority);
     const qualities = qualityOptions(metadata);
     const entry: VideoTranscodeEntry = {
       sessionId: session.id,
@@ -252,24 +271,7 @@ class VideoRuntime {
       renditions: new Map(),
     };
     this.transcodes.set(key, entry);
-    if (session.retained) {
-      const prepare = prepareRetainedVideo(
-        entry,
-        session,
-        this.windows,
-        this.sessionWork(session).controller.signal,
-        (rendition) =>
-          this.startRenditionTranscode(entry, session, rendition, "background"),
-      ).then(this.enforceDerivedMediaBudget);
-      void this.trackVideoTask(session, prepare).catch((error: unknown) => {
-        if (!this.sessionWork(session).controller.signal.aborted)
-          this.logEvent("warn", "video.prepare.failed", {
-            sessionId: session.id,
-            error: error instanceof Error ? error.message : String(error),
-          });
-      });
-    }
-    return entry;
+    return this.preparation.ensure(entry, session, priority);
   };
 
   getRenditionState = getRenditionState;
@@ -349,12 +351,14 @@ export function createVideoRuntime({
   logEvent,
   protectSession,
   enforceDerivedMediaBudget,
+  waitForEviction,
 }: {
   ffmpegPath: string | null;
   transcodes: Map<string, VideoTranscodeEntry>;
   logEvent: LogEvent;
-  protectSession?: (_sessionId: string) => () => void;
+  protectSession?: ProtectSession;
   enforceDerivedMediaBudget?: () => Promise<void>;
+  waitForEviction?: WaitForEviction;
 }) {
   return new VideoRuntime(
     ffmpegPath,
@@ -362,5 +366,6 @@ export function createVideoRuntime({
     logEvent,
     protectSession,
     enforceDerivedMediaBudget,
+    waitForEviction,
   );
 }

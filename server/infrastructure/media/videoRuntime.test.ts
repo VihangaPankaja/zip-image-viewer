@@ -48,6 +48,63 @@ afterEach(() => {
   commands.args = [];
 });
 
+it("drains a preparation coordinator without protecting completed cache output", async () => {
+  const protectSession = vi.fn(() => () => undefined);
+  const runtime = createVideoRuntime({
+    ffmpegPath: "ffmpeg",
+    transcodes: new Map(),
+    logEvent: () => undefined,
+    protectSession,
+  });
+  const session = { id: "coordinator" } as Session;
+  let finish: () => void = () => undefined;
+  const preparation = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  void runtime.trackVideoTask(session, preparation, false);
+  let drained = false;
+  const cleanup = runtime.cleanupVideoSession(session).then(() => {
+    drained = true;
+  });
+  await Promise.resolve();
+  expect(drained).toBe(false);
+  expect(protectSession).toHaveBeenCalledWith(session.id, true);
+  finish();
+  await cleanup;
+  expect(drained).toBe(true);
+});
+
+it("pins media work and waits for an ongoing eviction before starting it", async () => {
+  let finishEviction: () => void = () => undefined;
+  const eviction = new Promise<void>((resolve) => {
+    finishEviction = resolve;
+  });
+  const waitForEviction = vi.fn(() => eviction);
+  const release = vi.fn();
+  const protectSession = vi.fn(() => release);
+  const runtime = createVideoRuntime({
+    ffmpegPath: "ffmpeg",
+    transcodes: new Map(),
+    logEvent: () => undefined,
+    protectSession,
+    waitForEviction,
+  });
+  const session = { id: "eviction" } as Session;
+  const result = Promise.allSettled([
+    runtime.runCommand("window", [], session),
+  ]);
+  await vi.waitFor(() =>
+    expect(waitForEviction).toHaveBeenCalledWith(session.id),
+  );
+  expect(protectSession).toHaveBeenCalledWith(session.id, false);
+  expect(commands.started).toEqual([]);
+  finishEviction();
+  await vi.waitFor(() => expect(commands.started).toEqual(["window"]));
+  await runtime.cleanupVideoSession(session);
+  expect((await result)[0].status).toBe("rejected");
+  expect(release).toHaveBeenCalledOnce();
+});
+
 it("starts all audio streams together beside a running background video encoder", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "video-audio-group-"));
   const runtime = createVideoRuntime({

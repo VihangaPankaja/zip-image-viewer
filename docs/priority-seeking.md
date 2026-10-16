@@ -8,6 +8,8 @@ Requests for the same window share one job. Cancelling a request releases its co
 
 Retained torrents begin preparing their lowest video rendition and default audio after indexing and restart restoration. Long videos prepare one background window at a time; short clips use the existing sequential encoder. Both leave capacity for interactive work. Other audio languages in long videos remain available on demand. Temporary long videos generate windows on demand.
 
+Retained preparation is serialized within each session. Its coordinators remain tracked for cancellation and cleanup, while eviction protection covers individual media jobs. The cache budget is enforced between completed windows and videos, so completed output can be evicted while the rest of a collection prepares. Pending preparation still blocks manual cache clearing. New jobs wait for an eviction already in progress before writing.
+
 ## Verification
 
 Run `pnpm run benchmark:seek` for the isolated Chromium benchmark. It creates an actual 60-minute 640×360 H.264 source with two AAC languages, then checks a cold seek to 48:00, switching audio across a window boundary, and 30 prepared seeks outside the browser buffer on each network profile. Each profile starts with a fresh player buffer; the controlled 10 Mbps pass also disables the HTTP cache. Measurements use `requestVideoFrameCallback`, from seek assignment to a displayed target frame. The JSON report is written to `test-results/priority-seek-metrics.json` and attached to the Playwright result.
