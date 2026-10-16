@@ -1,5 +1,5 @@
 import type { VideoStoryboard } from "../../../shared/contracts.js";
-import { access, readFile } from "node:fs/promises";
+import { access } from "node:fs/promises";
 import path from "node:path";
 import type {
   Session,
@@ -7,7 +7,6 @@ import type {
   VideoTranscodeEntry,
 } from "../../domain/models.js";
 import { startRenditionJob } from "./videoRenditionJob.js";
-import { publishedSegments } from "../../media/hlsManifest.js";
 import {
   videoMetadataFromOutput,
   qualityOptions,
@@ -24,10 +23,11 @@ import { runCommand, runCommandCapture } from "../process/commandRunner.js";
 import { getSessionQualityOutputPath, remuxVideo } from "./videoRemux.js";
 import {
   HlsWindows,
-  windowAvailability,
+  refreshRenditionAvailability,
   WINDOWED_AFTER_SECONDS,
 } from "./hlsWindows.js";
 import { videoDuration } from "./videoDuration.js";
+import { HlsPlaybackPreparation } from "./hlsPlaybackPreparation.js";
 import { RetainedVideoPreparation } from "./prepareRetainedVideo.js";
 
 const SEGMENT_SECONDS = 4;
@@ -50,7 +50,7 @@ class VideoRuntime {
   readonly segmentSeconds = SEGMENT_SECONDS;
   private readonly sessions = new WeakMap<Session, SessionWork>();
   private readonly preparation: RetainedVideoPreparation;
-  private readonly windows: HlsWindows;
+  private readonly playback: HlsPlaybackPreparation;
 
   private sessionWork(session: Session): SessionWork {
     let work = this.sessions.get(session);
@@ -172,19 +172,28 @@ class VideoRuntime {
       Promise.resolve(),
     private readonly waitForEviction: WaitForEviction = () => Promise.resolve(),
   ) {
-    this.windows = new HlsWindows(ffmpegPath, this.runVideoTask);
-    this.preparation = new RetainedVideoPreparation({
-      windows: this.windows,
-      signalFor: (session) => this.sessionWork(session).controller.signal,
-      startSequential: (entry, session, rendition) =>
-        this.startRenditionTranscode(entry, session, rendition, "background"),
-      track: (session, task) => this.trackVideoTask(session, task, false),
+    const windows = new HlsWindows(ffmpegPath, this.runVideoTask);
+    const preparationDependencies = {
+      signalFor: (session: Session) =>
+        this.sessionWork(session).controller.signal,
+      track: (session: Session, task: Promise<void>) =>
+        this.trackVideoTask(session, task, false),
       enforceBudget: this.enforceDerivedMediaBudget,
-      onError: (session, error) =>
+      onError: (session: Session, error: unknown) =>
         this.logEvent("warn", "video.prepare.failed", {
           sessionId: session.id,
           error: error instanceof Error ? error.message : String(error),
         }),
+    };
+    this.playback = new HlsPlaybackPreparation(
+      windows,
+      preparationDependencies,
+    );
+    this.preparation = new RetainedVideoPreparation({
+      ...preparationDependencies,
+      windows,
+      startSequential: (entry, session, rendition) =>
+        this.startRenditionTranscode(entry, session, rendition, "background"),
     });
   }
 
@@ -276,18 +285,7 @@ class VideoRuntime {
 
   getRenditionState = getRenditionState;
 
-  refreshRenditionAvailability = async (
-    rendition: VideoRendition,
-  ): Promise<number> => {
-    if (rendition.durationSeconds > WINDOWED_AFTER_SECONDS) {
-      return windowAvailability(rendition);
-    }
-    const playlist = await readFile(rendition.playlistPath, "utf8").catch(
-      () => "",
-    );
-    rendition.availableSegments = publishedSegments(playlist).length;
-    return rendition.availableSegments;
-  };
+  refreshRenditionAvailability = refreshRenditionAvailability;
 
   startRenditionTranscode = (
     entry: VideoTranscodeEntry,
@@ -340,7 +338,7 @@ class VideoRuntime {
     index: number,
     signal?: AbortSignal,
   ): Promise<void> =>
-    this.windows.ensure(entry, session, rendition, index, signal);
+    this.playback.ensure(entry, session, rendition, index, signal);
 
   getSessionQualityOutputPath = getSessionQualityOutputPath;
 }

@@ -103,6 +103,24 @@ describe("HLS routes", () => {
       expect(warm.text).toContain('CODECS="avc1.4d401f,mp4a.40.2"');
       expect(warm.text).toContain("quality=360p");
 
+      entry.width = 1280;
+      entry.height = 720;
+      const states = vi
+        .spyOn(deps, "getRenditionState")
+        .mockImplementation((_entry, _session, quality) =>
+          quality === "360p"
+            ? rendition
+            : { ...rendition, dir: path.join(workspace, quality) },
+        );
+      const partial = await request(app)
+        .get(`${resource}/master?path=source.mp4`)
+        .expect(200);
+      expect(partial.text).toContain("quality=720p");
+      expect(partial.text).not.toContain("CODECS=");
+      states.mockRestore();
+      entry.width = 640;
+      entry.height = 360;
+
       await request(app).get(`${resource}/segment${query}&index=0`).expect(425);
       await writeFile(
         playlistPath,

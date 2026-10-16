@@ -59,6 +59,19 @@ export async function windowAvailability(
   return rendition.availableSegments;
 }
 
+export async function refreshRenditionAvailability(
+  rendition: VideoRendition,
+): Promise<number> {
+  if (rendition.durationSeconds > WINDOWED_AFTER_SECONDS) {
+    return windowAvailability(rendition);
+  }
+  const playlist = await readFile(rendition.playlistPath, "utf8").catch(
+    () => "",
+  );
+  rendition.availableSegments = publishedSegments(playlist).length;
+  return rendition.availableSegments;
+}
+
 export function buildWindowPlaylist(
   duration: number,
   initUri: (_index: number) => string,

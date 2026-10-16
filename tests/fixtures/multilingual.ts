@@ -24,11 +24,14 @@ import {
   sanitizeEntryPath,
 } from "../../server/infrastructure/runtime/runtimePrimitives.js";
 import { proxyApp } from "./proxyApp.js";
+import { createDerivedMediaCache } from "../../server/infrastructure/media/derivedMediaCache.js";
 
 export async function startMultilingualFixture(
   baseURL: string,
   port = 0,
   durationSeconds = 20,
+  height = 360,
+  cacheBudgetBytes?: number,
 ) {
   if (!ffmpegPath)
     throw new Error("FFmpeg is required for multilingual playback.");
@@ -40,10 +43,21 @@ export async function startMultilingualFixture(
     workspaceDir: directory,
   } as Session;
   const transcodes = new Map<string, VideoTranscodeEntry>();
+  const cache =
+    cacheBudgetBytes === undefined
+      ? undefined
+      : createDerivedMediaCache(
+          new Map([[session.id, session]]),
+          transcodes,
+          cacheBudgetBytes,
+        );
   const runtime = createVideoRuntime({
     ffmpegPath,
     transcodes,
     logEvent: () => undefined,
+    protectSession: cache?.protectSession,
+    enforceDerivedMediaBudget: cache?.enforce,
+    waitForEviction: cache?.waitForEviction,
   });
   try {
     const looped = durationSeconds > 120;
@@ -65,7 +79,7 @@ export async function startMultilingualFixture(
       "-f",
       "lavfi",
       "-i",
-      `testsrc2=size=640x360:rate=24:duration=${fixtureDuration}`,
+      `testsrc2=size=${Math.round((height * 16) / 9 / 2) * 2}x${height}:rate=24:duration=${fixtureDuration}`,
       "-f",
       "lavfi",
       "-i",
@@ -237,6 +251,7 @@ export async function startMultilingualFixture(
     session,
     deps,
     directory,
+    cache,
     async close() {
       server.closeAllConnections();
       await new Promise<void>((resolve, reject) =>

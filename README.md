@@ -24,6 +24,13 @@ minutes to encode. Retained videos prepare their lowest rendition and default
 audio in the background after indexing and restart recovery. The existing
 original, remux and short-video playback paths remain available.
 
+Adaptive playback prepares the lowest quality at startup. Before serving a
+higher-quality window, it prepares every lower quality at that same position,
+so an Auto downshift can use cached media. It also warms the next eight-second
+window through the current quality on the bounded background encoder lane.
+Viewers at different positions share completed windows and keep independent
+foreground requests; `hls.js` still makes bandwidth and buffer decisions.
+
 See [long-video seeking and verification](docs/priority-seeking.md) and run
 `pnpm run benchmark:seek` for the isolated cold/prepared seek benchmark.
 

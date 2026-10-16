@@ -26,6 +26,9 @@ if (run("git", ["status", "--porcelain", "--untracked-files=normal"]))
     "Commit implementation changes before publishing screenshots.",
   );
 const requiredScreens = [
+  "video-warm-high-playback",
+  "video-warm-quality-choice",
+  "video-warm-fallback-playback",
   "video-full-seek-timeline",
   "video-long-seek-preview",
   "video-priority-seek-committed",

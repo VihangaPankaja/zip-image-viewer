@@ -6,6 +6,7 @@ import {
   type VideoRendition,
   type VideoTranscodeEntry,
 } from "../domain/models.js";
+import { prepareHlsMaster } from "./video/hlsPreparation.js";
 import { queryText } from "./httpUtils.js";
 import {
   buildMasterPlaylist,
@@ -88,8 +89,20 @@ async function startRendition(
   }
   const rendition = deps.getRenditionState(entry, context.session, quality);
   rendition.lastAccessedAt = Date.now();
-  if (entry.durationSeconds <= WINDOWED_AFTER_SECONDS || !entry.durationSeconds)
+  if (
+    entry.durationSeconds <= WINDOWED_AFTER_SECONDS ||
+    !entry.durationSeconds
+  ) {
+    const levels = calculateRenditions(entry);
+    const level = levels.findIndex(({ id }) => id === quality);
+    // The background lane is FIFO and runs one sequential video encoder at a time.
+    for (const fallback of levels.slice(0, Math.max(0, level))) {
+      const state = deps.getRenditionState(entry, context.session, fallback.id);
+      state.lastAccessedAt = Date.now();
+      await deps.startRenditionTranscode(entry, context.session, state);
+    }
     await deps.startRenditionTranscode(entry, context.session, rendition);
+  }
   return rendition;
 }
 
@@ -129,6 +142,7 @@ function sendCompletedFile(
 function registerMasterRoute(app: Express, deps: VideoRouteDependencies): void {
   app.get("/api/sessions/:id/video/hls/master", async (request, response) => {
     const { context, entry } = await resolveHlsEntry(request, deps);
+    if (!(await prepareHlsMaster(response, deps, context, entry))) return;
     const renditions = await Promise.all(
       calculateRenditions(entry).map(async (rendition) => {
         const state = deps.getRenditionState(
@@ -150,6 +164,9 @@ function registerMasterRoute(app: Express, deps: VideoRouteDependencies): void {
         };
       }),
     );
+    // A partial CODECS ladder makes hls.js treat cold levels as incompatible.
+    if (renditions.some(({ codecs }) => !codecs))
+      for (const rendition of renditions) rendition.codecs = undefined;
     const playlist = buildMasterPlaylist(
       renditions,
       ({ id }) => renditionUri(request, context, id, "playlist"),
