@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { tapVisibleTarget } from "./touch";
 import {
   startTorrentPlaybackFixture,
   waitForPlayback,
@@ -60,29 +61,41 @@ test("plays and seeks a real incomplete torrent, reconnects a missing seek, and 
     );
     if (codec) {
       await expect(video).toBeVisible();
-      await video.evaluate((element: HTMLVideoElement) => {
+      await video.evaluate(async (element: HTMLVideoElement) => {
         element.muted = true;
-        void element.play().catch(() => undefined);
+        await element.play();
       });
       await expect
         .poll(
           () =>
             video.evaluate((element: HTMLVideoElement) => ({
               ready: element.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA,
-              width: element.videoWidth,
-              frames: element.getVideoPlaybackQuality().totalVideoFrames,
+              aspect: Math.round(
+                (element.videoWidth / element.videoHeight) * 1000,
+              ),
             })),
           { timeout: 20_000 },
         )
-        .toMatchObject({ ready: true, width: 640, frames: expect.any(Number) });
+        .toMatchObject({ ready: true, aspect: 1778 });
       await expect
         .poll(() =>
-          video.evaluate(
-            (element: HTMLVideoElement) =>
-              element.getVideoPlaybackQuality().totalVideoFrames,
-          ),
+          video.evaluate((element: HTMLVideoElement) => {
+            const canvas = document.createElement("canvas");
+            canvas.width = 64;
+            canvas.height = 36;
+            const context = canvas.getContext("2d");
+            if (!context) throw new Error("Cannot inspect the decoded frame");
+            context.drawImage(element, 0, 0, 64, 36);
+            // WebKit on Windows reports zero totalVideoFrames even while playing.
+            return (
+              element.currentTime > 0 &&
+              context
+                .getImageData(0, 0, 64, 36)
+                .data.some((value, index) => index % 4 !== 3 && value > 32)
+            );
+          }),
         )
-        .toBeGreaterThan(0);
+        .toBe(true);
       const firstFrame = (await fixture.client.jobs.list()).items.find(
         (job) => job.id === id,
       );
@@ -140,23 +153,25 @@ test("plays and seeks a real incomplete torrent, reconnects a missing seek, and 
       ).toBeVisible();
     }
     // Both are real remuxed media files; their metadata is not replaced by route fixtures.
-    await dialog
-      .getByRole("button", { name: "Download first", exact: true })
-      .tap();
+    await tapVisibleTarget(
+      dialog.getByRole("button", { name: "Download first", exact: true }),
+    );
     for (const index of [1, 2]) {
-      await play.nth(index).tap();
+      await tapVisibleTarget(play.nth(index));
       await expect(
         dialog.getByText(/^Download first\. Early playback requires/),
       ).toBeVisible();
       await expect(video).toHaveCount(0);
       if (index === 1)
-        await dialog
-          .getByRole("button", { name: "Back to files", exact: true })
-          .tap();
+        await tapVisibleTarget(
+          dialog.getByRole("button", { name: "Back to files", exact: true }),
+        );
     }
     expect(
       await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
+        () =>
+          document.documentElement.scrollWidth <=
+          document.documentElement.clientWidth,
       ),
     ).toBe(true);
     await page.keyboard.press("Escape");
