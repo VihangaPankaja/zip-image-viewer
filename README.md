@@ -16,6 +16,19 @@ contents, and previewing files while work continues in the background.
 - Strict TypeScript, type-aware ESLint, Fallow, Lefthook, Vitest, Playwright,
   Axe, and coverage reporting are part of the normal quality workflow.
 
+## Torrent playback while downloading
+
+In Downloads, choose **View files**, then **Play now** for a selected video.
+Early playback supports fast-start MP4/M4V files with a leading movie index and
+browser-compatible codecs. Other containers and MP4 files with a tail index offer
+**Download first**, which returns to the file list and keeps the download running.
+
+Playback reads only hash-verified pieces. Seeking may wait for peers to supply
+missing pieces and resumes when they return. An idle read expires after two minutes;
+use **Retry playback** or finish downloading if peers remain unavailable. Closing the
+preview keeps the transfer running; pausing or cancelling it stops playback. Playback
+keeps its position through indexing and download completion.
+
 ## Long-video seeking
 
 Videos longer than two minutes have a full-duration adaptive seek timeline.
@@ -179,6 +192,8 @@ map.
 
 - `POST /rpc/*` - typed oRPC list, batch enqueue, cancel, and retry procedures
 - `GET /api/session-jobs` - queue snapshots
+- `GET /api/session-jobs/:id/video/info?fileId=...` - selected-video early-playback eligibility
+- `GET /api/session-jobs/:id/video/stream?fileId=...` - verified MP4 byte ranges, waiting for missing pieces
 - `GET /api/sessions` - ready session summaries
 - `POST /api/sessions` - legacy-compatible single enqueue
 - `GET /api/sessions/:id/tree` - extracted file tree

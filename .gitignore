@@ -6,6 +6,7 @@ dist/
 build/
 /sessions/
 .superpowers/
+docs/superpowers/
 
 # logs
 npm-debug.log*

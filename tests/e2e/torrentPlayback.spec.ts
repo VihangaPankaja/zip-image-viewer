@@ -45,6 +45,14 @@ test("plays and seeks a real incomplete torrent, reconnects a missing seek, and 
     await play.nth(0).focus();
     await page.keyboard.press("Enter");
     const video = dialog.getByLabel("Early video preview", { exact: true });
+    const close = dialog.getByRole("button", { name: "Close", exact: true });
+    await close.focus();
+    await page.keyboard.press("Shift+Tab");
+    await expect(
+      dialog.getByRole("button", { name: "Download first", exact: true }),
+    ).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(close).toBeFocused();
     const codec = await page.evaluate(() =>
       document
         .createElement("video")

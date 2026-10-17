@@ -60,6 +60,31 @@ afterEach(() => {
 });
 
 describe("torrent early video", () => {
+  it("wraps keyboard focus through visible player controls", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify({ state: "ready", message: "Ready" })),
+        ),
+    );
+    const user = userEvent.setup();
+    render(<TorrentFileDialog {...props()} />);
+    await user.click(
+      screen.getByRole("button", { name: "Play now: film.mp4" }),
+    );
+    await screen.findByLabelText("Early video preview");
+    const close = screen.getByRole("button", { name: "Close" });
+    close.focus();
+    await user.tab({ shift: true });
+    expect(
+      screen.getByRole("button", { name: "Download first" }),
+    ).toHaveFocus();
+    await user.tab();
+    expect(close).toHaveFocus();
+  });
+
   it("retains the media source after StrictMode replays the stream effect", async () => {
     vi.stubGlobal(
       "fetch",
