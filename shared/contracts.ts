@@ -113,6 +113,12 @@ const torrentFileSchema = z.object({
 export type TorrentFile = z.infer<typeof torrentFileSchema>;
 export type TorrentPriority = NonNullable<TorrentFile["priority"]>;
 
+export const torrentVideoInfoSchema = z.object({
+  state: z.enum(["ready", "download-first"]),
+  message: z.string(),
+});
+export type TorrentVideoInfo = z.infer<typeof torrentVideoInfoSchema>;
+
 export const jobSchema = z.object({
   id: z.uuid(),
   url: downloadSourceSchema,
