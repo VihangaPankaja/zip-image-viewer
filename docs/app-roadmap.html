@@ -1531,6 +1531,7 @@
           area: "Torrents",
           priority: "P2",
           effort: "L",
+          status: "Done",
           title: "Play a torrent video before it finishes",
           summary:
             "Begin with supported video formats and prioritize pieces around playback.",
@@ -1538,8 +1539,9 @@
           plan: "After selective downloads are reliable, prioritize metadata and playhead pieces. Gate reads on verified availability and support pending range requests. Offer Download first for containers that need unavailable indexes.",
           done: "A controlled peer fixture starts playback before completion, seeks into missing pieces and recovers from peer loss without serving corrupt bytes.",
           depends: "T03, V03",
+          note: "v3.18.0 plays selected fast-start MP4 files before completion from verified torrent pieces. Bounded metadata reads and moving playback windows take priority without changing saved file priorities. Missing-piece ranges wait for peers and recover after reconnect; closing, pausing or cancelling releases readers. Completed downloads continue playback through validated retained files. Tail-index MP4 and other containers offer Download first. Private local-seed integration tests compare exact bytes and hashes, and browser tests decode video and seek before completion.",
           evidence:
-            "server/application/torrents/downloadTorrentSource.ts; server/handlers/video/playbackRoutes.ts",
+            "server/application/torrents/verifiedTorrentStream.ts; server/application/torrents/torrentVideo.ts; server/handlers/torrentVideoRoutes.ts; client/src/features/workspace/components/TorrentEarlyVideo.tsx; tests/integration/torrentPlayback.test.ts; tests/e2e/torrentPlayback.spec.ts",
         },
         {
           id: "U01",

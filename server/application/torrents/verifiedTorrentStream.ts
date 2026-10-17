@@ -65,7 +65,10 @@ export function verifiedTorrentStream(
           Math.floor((file.offset + range.end) / torrent.pieceLength),
         );
         scheduler._select(piece, endPiece, priority, notify, true);
+        const waitingSince = Date.now();
         while (!scheduler.bitfield.get(piece)) {
+          if (Date.now() - waitingSince >= 120_000)
+            throw new Error("Waiting for verified torrent pieces timed out.");
           await delay(50, undefined, { signal: combined });
           assertTorrentOpen(scheduler);
         }

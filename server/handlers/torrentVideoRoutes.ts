@@ -52,10 +52,7 @@ export function registerTorrentVideoRoutes(
         res.end();
         return;
       }
-      const signal = AbortSignal.any([
-        controller.signal,
-        AbortSignal.timeout(120_000),
-      ]);
+      const signal = controller.signal;
       await pipeline(
         file.stream(selectedRange ?? { start: 0, end: file.size - 1 }, signal),
         res,

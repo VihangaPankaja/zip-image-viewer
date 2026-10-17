@@ -326,6 +326,74 @@ async function installSearchTree(page: Page) {
   });
 }
 
+async function captureEarlyTorrentVideo(
+  page: Page,
+  device: (typeof devices)[number],
+  theme: string,
+  state: Awaited<ReturnType<typeof installReviewFixtures>>,
+) {
+  const trigger = page.getByRole("button", { name: /^Play now:/ }).first();
+  await trigger.click();
+  const video = page.getByLabel("Early video preview");
+  await expect
+    .poll(() =>
+      video.evaluate((element: HTMLVideoElement) => element.readyState),
+    )
+    .toBeGreaterThanOrEqual(2);
+  await video.evaluate(async (element: HTMLVideoElement) => {
+    element.muted = true;
+    await element.play();
+  });
+  await expect
+    .poll(() =>
+      video.evaluate((element: HTMLVideoElement) => element.currentTime),
+    )
+    .toBeGreaterThan(0.25);
+  await video.evaluate((element: HTMLVideoElement) => element.pause());
+  await save(page, device, theme, "torrent-early-playback");
+  await video.evaluate((element: HTMLVideoElement) => {
+    element.currentTime = 5;
+  });
+  await expect
+    .poll(() =>
+      video.evaluate(
+        (element: HTMLVideoElement) =>
+          !element.seeking &&
+          element.currentTime >= 5 &&
+          element.readyState >= 2,
+      ),
+    )
+    .toBe(true);
+  await save(page, device, theme, "torrent-early-seek-committed");
+  await page.getByRole("button", { name: "Back to files" }).click();
+  await expect(trigger).toBeFocused();
+  state.earlyVideo = "download-first";
+  await trigger.click();
+  await expect(
+    page.getByText(
+      "This video needs a complete download before playback. Continue downloading, then open it in the session player.",
+    ),
+  ).toBeVisible();
+  await expect(video).toHaveCount(0);
+  await save(page, device, theme, "torrent-download-first");
+  await page
+    .getByRole("button", { name: "Download first", exact: true })
+    .click();
+  state.earlyVideo = "error";
+  await trigger.click();
+  await expect(page.getByRole("alert")).toContainText("No peers");
+  await save(page, device, theme, "torrent-playback-retry");
+  state.earlyVideo = "ready";
+  await page.getByRole("button", { name: "Retry playback" }).click();
+  await expect
+    .poll(() =>
+      video.evaluate((element: HTMLVideoElement) => element.readyState),
+    )
+    .toBeGreaterThanOrEqual(2);
+  await page.getByRole("button", { name: "Back to files" }).click();
+  await expect(trigger).toBeFocused();
+}
+
 async function captureStorage(
   page: Page,
   device: (typeof devices)[number],
@@ -945,6 +1013,7 @@ for (const device of devices) {
         page.locator(".torrent-file-state").filter({ hasText: "Downloaded" }),
       ).toHaveCount(1);
       await save(page, device, theme, "torrent-file-states");
+      await captureEarlyTorrentVideo(page, device, theme, state);
       const priority = page.getByRole("combobox", {
         name: "Priority for Coastal collection/subtitles/English.srt",
       });
