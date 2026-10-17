@@ -12,6 +12,10 @@ import {
   reserveTorrentSelection,
 } from "./torrentFileSelection.js";
 import { mkdirSync } from "node:fs";
+import type { Readable } from "node:stream";
+import type { TorrentByteRange } from "./verifiedTorrentStream.js";
+import { openTorrentVideoFile } from "./torrentVideoFiles.js";
+import type { TorrentVideoSource } from "./torrentVideo.js";
 import {
   reserveStorage,
   resourceLimitError,
@@ -60,6 +64,13 @@ export type TorrentAdapter = {
   ) => void;
   getLimits?: () => TorrentLimits;
   setLimits?: (_limits: TorrentLimits) => TorrentLimits;
+  openVideoFile?: (
+    _jobId: string,
+    _fileId: string,
+  ) => TorrentVideoSource & {
+    stream: (_range: TorrentByteRange, _signal: AbortSignal) => Readable;
+    release: () => void;
+  };
   close: () => Promise<void>;
 };
 
@@ -101,11 +112,14 @@ export async function fetchTorrentMetadata(
   return result;
 }
 
-type ActiveTorrent = {
+export type ActiveTorrent = {
   torrent: Torrent;
   selectedIds: Set<string>;
   priorities: Map<string, TorrentPriority>;
   ranges: [number, number][];
+  readers: Set<AbortController>;
+  completed: boolean;
+  readPriority: number;
 };
 
 function abortReason(signal: AbortSignal): Error {
@@ -128,7 +142,7 @@ function guardTorrentMetadata(
   });
 }
 
-function downloadTorrent(
+async function downloadTorrent(
   client: InstanceType<typeof WebTorrent>,
   active: Map<string, ActiveTorrent>,
   input: TorrentDownloadInput,
@@ -141,6 +155,15 @@ function downloadTorrent(
       resourceLimitError("Torrent metadata exceeds the 10 MiB limit."),
     );
   mkdirSync(input.downloadDir, { recursive: true });
+  const previous = input.jobId ? active.get(input.jobId) : undefined;
+  if (previous?.completed) {
+    previous.completed = false;
+    for (const reader of previous.readers) reader.abort();
+    if (input.jobId) active.delete(input.jobId);
+    await new Promise<void>((resolve) =>
+      previous.torrent.destroy({ destroyStore: false }, () => resolve()),
+    );
+  }
   return transferTorrent(client, active, input);
 }
 
@@ -151,9 +174,8 @@ function transferTorrent(
 ): Promise<{ files: string[] }> {
   return new Promise((resolve, reject) => {
     let settled = false;
-    let selectedIds = new Set<string>();
-    const priorities = new Map(Object.entries(input.priorities ?? {}));
-    const ranges: [number, number][] = [];
+    const readers = new Set<AbortController>();
+    let entry: ActiveTorrent | undefined;
     let resultFiles: string[] = [];
     let storage: ReturnType<typeof reserveStorage> | undefined;
     const torrent = client.add(
@@ -162,18 +184,13 @@ function transferTorrent(
       (readyTorrent) => {
         if (settled || readyTorrent !== torrent) return;
         try {
-          selectedIds = selectFiles(readyTorrent, input);
+          entry = createActiveTorrent(readyTorrent, input, readers);
           storage = reserveTorrentSelection(
             readyTorrent,
-            selectedIds,
+            entry.selectedIds,
             input.downloadDir,
           );
-          resultFiles = activateTorrent(active, input, {
-            torrent: readyTorrent,
-            selectedIds,
-            priorities,
-            ranges,
-          });
+          resultFiles = activateTorrent(active, input, entry);
           emitProgress();
         } catch (error) {
           finish(error instanceof Error ? error : new Error(String(error)));
@@ -183,16 +200,19 @@ function transferTorrent(
     const finish = (error?: Error, destroy = true) => {
       if (settled) return;
       settled = true;
-      if (input.jobId) active.delete(input.jobId);
+      if (input.jobId && (error || !readers.size)) active.delete(input.jobId);
       input.signal.removeEventListener("abort", abort);
       clearInterval(progressTimer);
+      torrent.removeListener("noPeers", input.onNoPeers);
+      if (entry) entry.completed = !error;
+      if (error) for (const reader of readers) reader.abort();
       const complete = (cleanupError?: Error) => {
         storage?.release();
         if (error) reject(error);
         else if (cleanupError) reject(cleanupError);
         else resolve({ files: resultFiles });
       };
-      if (!destroy) complete();
+      if (!destroy || (!error && readers.size)) complete();
       else
         torrent.destroy(
           { destroyStore: Boolean(error) && !input.retainStoreOnAbort() },
@@ -201,27 +221,44 @@ function transferTorrent(
     };
     const abort = () => finish(abortReason(input.signal));
     const emitProgress = () => {
-      if (settled || !selectedIds.size) return;
+      if (settled || !entry) return;
       try {
         storage?.check();
       } catch (error) {
         finish(error instanceof Error ? error : new Error(String(error)));
         return;
       }
-      if (emitSelectedProgress(input, torrent, selectedIds, priorities))
+      if (
+        emitSelectedProgress(
+          input,
+          torrent,
+          entry.selectedIds,
+          entry.priorities,
+        )
+      )
         finish();
     };
     const progressTimer = setInterval(emitProgress, 250);
-    guardTorrentMetadata(torrent, input.downloadDir, finish);
-    torrent.on("download", emitProgress);
-    torrent.on("upload", emitProgress);
-    torrent.on("noPeers", input.onNoPeers);
-    torrent.once("error", (error) =>
-      finish(error instanceof Error ? error : new Error(error), false),
-    );
+    monitorTorrent(torrent, input, finish, emitProgress);
     input.signal.addEventListener("abort", abort, { once: true });
     if (input.signal.aborted) abort();
   });
+}
+
+function createActiveTorrent(
+  torrent: Torrent,
+  input: TorrentDownloadInput,
+  readers: Set<AbortController>,
+): ActiveTorrent {
+  return {
+    torrent,
+    selectedIds: selectFiles(torrent, input),
+    priorities: new Map(Object.entries(input.priorities ?? {})),
+    ranges: [],
+    readers,
+    completed: false,
+    readPriority: 10,
+  };
 }
 
 function activateTorrent(
@@ -282,9 +319,26 @@ export function createWebTorrentAdapter(): TorrentAdapter {
       limits = { ...next };
       return { ...limits };
     },
+    openVideoFile: (jobId, fileId) =>
+      openTorrentVideoFile(active, jobId, fileId),
     close: () =>
       new Promise((resolve, reject) => {
         client.destroy((error) => (error ? reject(error) : resolve()));
       }),
   };
+}
+
+function monitorTorrent(
+  torrent: Torrent,
+  input: TorrentDownloadInput,
+  finish: (_error?: Error, _destroy?: boolean) => void,
+  emitProgress: () => void,
+) {
+  guardTorrentMetadata(torrent, input.downloadDir, finish);
+  torrent.on("download", emitProgress);
+  torrent.on("upload", emitProgress);
+  torrent.on("noPeers", input.onNoPeers);
+  torrent.once("error", (error) =>
+    finish(error instanceof Error ? error : new Error(error), false),
+  );
 }

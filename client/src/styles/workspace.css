@@ -1142,6 +1142,45 @@
 .torrent-file-sheet {
   grid-template-rows: auto auto minmax(80px, 1fr) auto auto;
 }
+.torrent-file-browser {
+  display: contents;
+}
+.torrent-file-browser[hidden] {
+  display: none;
+}
+.torrent-file-sheet:has(.torrent-early-video) {
+  grid-template-rows: auto minmax(80px, 1fr) auto auto;
+}
+.torrent-early-video {
+  min-height: 0;
+  padding: 12px var(--space-6);
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+.torrent-early-video h3 {
+  margin-block: 12px;
+  font-size: 1rem;
+}
+.torrent-early-video p {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+.torrent-early-video video {
+  display: block;
+  width: 100%;
+  max-height: 40dvh;
+  background: #000;
+  border-radius: var(--radius-sm);
+}
+.torrent-early-video-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.torrent-play-now {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
 .torrent-file-tools,
 .torrent-file-feedback {
   padding: 12px var(--space-6);

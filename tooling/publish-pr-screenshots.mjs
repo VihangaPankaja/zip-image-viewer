@@ -5,6 +5,11 @@ import { createHash } from "node:crypto";
 import { cp, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import {
+  groupScreenshotGalleries,
+  prepareScreenshotGalleries,
+  renderScreenshotSection,
+} from "./pr-screenshot-gallery.mjs";
 
 const run = (command, args, cwd = process.cwd()) =>
   execFileSync(command, args, {
@@ -26,6 +31,10 @@ if (run("git", ["status", "--porcelain", "--untracked-files=normal"]))
     "Commit implementation changes before publishing screenshots.",
   );
 const requiredScreens = [
+  "torrent-early-playback",
+  "torrent-early-seek-committed",
+  "torrent-download-first",
+  "torrent-playback-retry",
   "video-warm-high-playback",
   "video-warm-quality-choice",
   "video-warm-fallback-playback",
@@ -104,9 +113,6 @@ if (
   throw new Error(
     "PR_SCREENSHOT_FEATURED must list unique gallery screen names.",
   );
-const featuredRank = new Map(
-  featuredScreens.map((screen, index) => [screen, index]),
-);
 for (const device of ["Mobile", "Tablet", "Desktop", "Ultrawide"]) {
   for (const theme of ["light", "dark"]) {
     for (const screen of requiredScreens) {
@@ -143,7 +149,24 @@ const hash = createHash("sha256");
 for (const capture of manifest.captures) {
   if (!/^[a-z0-9-]+\.png$/.test(capture.file))
     throw new Error("Invalid screenshot filename.");
-  hash.update(await readFile(path.join(directory, capture.file)));
+}
+const groups = groupScreenshotGalleries(manifest.captures, featuredScreens);
+const sectionOptions = {
+  groups,
+  repository,
+  sourceCommit: head,
+  fixtures: manifest.fixtures,
+};
+renderScreenshotSection({ ...sectionOptions, assetCommit: "0".repeat(40) });
+const generatedAssets = await prepareScreenshotGalleries(directory, groups);
+const assetFiles = [
+  "manifest.json",
+  ...manifest.captures.map((capture) => capture.file),
+  ...generatedAssets,
+];
+for (const file of assetFiles) {
+  hash.update(file);
+  hash.update(await readFile(path.join(directory, file)));
 }
 const branch = `pr-assets/${head.slice(0, 12)}-${hash.digest("hex").slice(0, 12)}`;
 const remote = run("git", ["remote", "get-url", "origin"]);
@@ -151,10 +174,7 @@ if (!run("git", ["ls-remote", "--heads", remote, `refs/heads/${branch}`])) {
   const temporary = await mkdtemp(
     path.join(os.tmpdir(), "zip-viewer-pr-assets-"),
   );
-  for (const file of [
-    "manifest.json",
-    ...manifest.captures.map((capture) => capture.file),
-  ]) {
+  for (const file of assetFiles) {
     await cp(path.join(directory, file), path.join(temporary, file));
   }
   run("git", ["init", "--quiet"], temporary);
@@ -183,39 +203,10 @@ const assetCommit = run("git", [
   remote,
   `refs/heads/${branch}`,
 ]).split(/\s/)[0];
-const lines = [
-  "## Screenshots",
-  "",
-  `Captured from \`${head}\`. ${manifest.fixtures}`,
-  "",
-];
-for (const device of ["Mobile", "Tablet", "Desktop", "Ultrawide"]) {
-  const entries = manifest.captures.filter(
-    (capture) => capture.device === device,
-  );
-  lines.push(`### ${device} · ${entries[0].width} × ${entries[0].height}`, "");
-  for (const theme of ["light", "dark"]) {
-    lines.push(
-      `<details><summary>${theme === "light" ? "Light" : "Dark"} theme</summary>`,
-      "",
-    );
-    const themeEntries = entries.filter((entry) => entry.theme === theme);
-    themeEntries.sort(
-      (a, b) =>
-        (featuredRank.get(a.screen) ?? Infinity) -
-        (featuredRank.get(b.screen) ?? Infinity),
-    );
-    for (const capture of themeEntries) {
-      const label = capture.screen.replaceAll("-", " ");
-      lines.push(
-        `![${label}](https://raw.githubusercontent.com/${repository}/${assetCommit}/${capture.file})`,
-        "",
-      );
-    }
-    lines.push("</details>", "");
-  }
-}
-await writeFile(path.join(directory, "pr-section.md"), lines.join("\n"));
+await writeFile(
+  path.join(directory, "pr-section.md"),
+  renderScreenshotSection({ ...sectionOptions, assetCommit }),
+);
 console.log(
   `Published ${manifest.captures.length} screenshots. Append ${path.join(directory, "pr-section.md")} to the PR body.`,
 );

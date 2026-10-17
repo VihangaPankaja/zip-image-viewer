@@ -6,6 +6,7 @@ import type {
 import type { Selection } from "./TorrentFileDialog";
 import { formatTransferBytes } from "../../../lib/formatterUtils";
 import { fileState, fileStates } from "./TorrentFileContents";
+import { classifyExtension } from "../../../lib/mimeTypeSystem";
 
 export function FileGroup({
   folder,
@@ -79,6 +80,19 @@ export function FileStatusGroup({
             <span className="torrent-file-state">
               {fileStates[fileState(file, job)]}
             </span>
+            {file.selected &&
+            job.status === "downloading" &&
+            job.phase === "downloading" &&
+            classifyExtension(file.path.split(".").at(-1)) === "video" ? (
+              <button
+                type="button"
+                className="ghost-button torrent-play-now"
+                aria-label={`Play now: ${file.path}`}
+                onClick={(event) => selection.play(file, event.currentTarget)}
+              >
+                Play now
+              </button>
+            ) : null}
             {file.selected &&
             job.status === "downloading" &&
             selection.canChangePriority ? (

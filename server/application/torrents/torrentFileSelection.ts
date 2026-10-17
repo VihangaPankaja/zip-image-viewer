@@ -127,9 +127,21 @@ export function applyFilePriorities(
       notify: undefined,
       stream: boolean,
     ) => void;
-    _deselect: (start: number, end: number, stream: boolean) => void;
+    _selections: Iterable<{
+      from: number;
+      to: number;
+      notify?: () => void;
+      remove: () => void;
+    }>;
+    _updateSelections: () => void;
   };
-  for (const [start, end] of ranges) scheduler._deselect(start, end, true);
+  for (const [start, end] of ranges) {
+    for (const selection of scheduler._selections) {
+      if (selection.from === start && selection.to === end && !selection.notify)
+        selection.remove();
+    }
+  }
+  scheduler._updateSelections();
   ranges.length = 0;
   // Shared boundary pieces take the higher priority without merging whole files.
   const pieces = new Uint8Array(torrent.pieces.length);

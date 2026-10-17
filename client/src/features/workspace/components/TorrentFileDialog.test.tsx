@@ -207,7 +207,14 @@ it("shows live file states without changing selection and combines status, media
   const list = within(dialog).getByRole("region", { name: "Torrent files" });
   list.focus();
   await user.tab();
+  const play = within(dialog).getByRole("button", {
+    name: "Play now: film/movie.mp4",
+  });
+  expect(play).toHaveFocus();
+  await user.tab();
   expect(within(dialog).getByRole("button", { name: "Close" })).toHaveFocus();
+  await user.tab({ shift: true });
+  expect(play).toHaveFocus();
   await user.tab({ shift: true });
   expect(list).toHaveFocus();
   expect(within(dialog).queryByRole("checkbox")).not.toBeInTheDocument();

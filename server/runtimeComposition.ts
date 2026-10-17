@@ -286,6 +286,7 @@ registerRuntimeLifecycle({
 });
 
 registerBaseRoutes(app, {
+  playback: { jobs: jobStore, adapter: torrentAdapter },
   removeJob: removeSessionJob,
   getSessionCount: container.metrics.getSessionCount,
   getJobCount: container.metrics.getJobCount,

@@ -2,9 +2,9 @@ import { useMemo, useState, type KeyboardEvent } from "react";
 import type { Job, TorrentPriority } from "../../../../../shared/contracts";
 import { formatTransferBytes } from "../../../lib/formatterUtils";
 import { classifyExtension } from "../../../lib/mimeTypeSystem";
-import { FileTools, fileState } from "./TorrentFileContents";
-import { FileList } from "./TorrentFileList";
+import { fileState } from "./TorrentFileContents";
 import { useModalDialog } from "../../../hooks/useModalDialog";
+import { TorrentFileArea, useTorrentPlayback } from "./TorrentEarlyVideo";
 
 type TorrentFile = Job["torrentFiles"][number];
 type Props = {
@@ -73,6 +73,7 @@ function useTorrentSelection({
   const [status, setStatus] = useState("all");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const playback = useTorrentPlayback(dialogRef);
   const chosen = useMemo(
     () =>
       displayJob.torrentFiles.filter((file) =>
@@ -107,13 +108,11 @@ function useTorrentSelection({
   const changePriority = filePriorityAction(job, onPriorityChange, setError);
   return {
     adding,
+    ...playback,
     displayJob,
     startAdding: () => {
-      setSelected(
-        new Set(
-          job.torrentFiles.filter((file) => !file.selected).map(({ id }) => id),
-        ),
-      );
+      const skipped = job.torrentFiles.filter((file) => !file.selected);
+      setSelected(new Set(skipped.map(({ id }) => id)));
       setSearch("");
       setMediaType("all");
       setAdding(true);
@@ -155,7 +154,8 @@ export function TorrentFileDialog(props: Props) {
       onKeyDown={trapDialogTab}
       onCancel={(event) => {
         event.preventDefault();
-        if (!submitting) onClose();
+        if (selection.playingFile) selection.stopPlaying();
+        else if (!submitting) onClose();
       }}
     >
       <form
@@ -185,8 +185,7 @@ export function TorrentFileDialog(props: Props) {
             Close
           </button>
         </header>
-        <FileTools job={selection.displayJob} selection={selection} />
-        <FileList job={selection.displayJob} selection={selection} />
+        <TorrentFileArea job={job} selection={selection} />
         <div className="torrent-file-feedback">
           <p role="status" aria-atomic="true">
             {submitting
@@ -241,9 +240,11 @@ export function TorrentReviewAction({
 
 function trapDialogTab(event: KeyboardEvent<HTMLDialogElement>) {
   if (event.key !== "Tab") return;
-  const controls = event.currentTarget.querySelectorAll<HTMLElement>(
-    'button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]',
-  );
+  const controls = [
+    ...event.currentTarget.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), input:not(:disabled), select:not(:disabled), video[controls], [tabindex="0"]',
+    ),
+  ].filter((control) => !control.closest("[hidden]"));
   const first = controls[0];
   const last = controls[controls.length - 1];
   if (event.shiftKey && document.activeElement === first) {

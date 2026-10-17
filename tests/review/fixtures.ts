@@ -283,6 +283,7 @@ export async function installReviewFixtures(page: Page) {
   const state = {
     jobs: [] as (ReturnType<typeof reviewJobs>[number] | Job)[],
     selectedFileIds: [] as string[],
+    earlyVideo: "ready" as "ready" | "download-first" | "error",
     torrentLimits: { downloadBytesPerSec: 0, uploadBytesPerSec: 0 },
     storage: {
       originalsBytes: 52428800,
@@ -428,6 +429,28 @@ export async function installReviewFixtures(page: Page) {
   });
   await page.route("**/api/**", async (route) => {
     const url = new URL(route.request().url());
+    if (
+      url.pathname.startsWith("/api/session-jobs/") &&
+      url.pathname.endsWith("/video/info")
+    ) {
+      if (state.earlyVideo === "error")
+        return route.fulfill({
+          status: 503,
+          json: {
+            message:
+              "No peers have the requested verified pieces yet. Try again.",
+          },
+        });
+      return route.fulfill({
+        json: {
+          state: state.earlyVideo,
+          message:
+            state.earlyVideo === "download-first"
+              ? "This video needs a complete download before playback. Continue downloading, then open it in the session player."
+              : "Ready to play verified pieces.",
+        },
+      });
+    }
     if (url.pathname.endsWith("/video/hls/master"))
       return route.fulfill({
         contentType: "application/vnd.apple.mpegurl",
@@ -500,7 +523,8 @@ export async function installReviewFixtures(page: Page) {
     }
     if (
       url.pathname.endsWith("/file") ||
-      url.pathname.endsWith("/video/play")
+      url.pathname.endsWith("/video/play") ||
+      url.pathname.endsWith("/video/stream")
     ) {
       const name = url.searchParams.get("path") ?? "";
       if (name.endsWith(".txt"))
