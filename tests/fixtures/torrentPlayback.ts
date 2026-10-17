@@ -281,6 +281,7 @@ export async function startTorrentPlaybackFixture({
       magnetURI,
       files,
       requests,
+      serverOutput: () => output,
       enqueue,
       close,
       setUploadLimit(bytesPerSecond: number) {

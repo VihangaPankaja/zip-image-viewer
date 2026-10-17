@@ -162,6 +162,11 @@ test("plays and seeks a real incomplete torrent, reconnects a missing seek, and 
       "error",
     );
   } finally {
+    if (fixture && testInfo.status !== testInfo.expectedStatus)
+      await testInfo.attach("torrent-server-output", {
+        body: fixture.serverOutput(),
+        contentType: "text/plain",
+      });
     await page.goto("about:blank").catch(() => undefined);
     await fixture?.close();
   }
