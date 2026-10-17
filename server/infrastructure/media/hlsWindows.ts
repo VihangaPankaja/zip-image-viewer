@@ -35,9 +35,7 @@ export function windowDirectory(
   return path.join(rendition.dir, `window-${String(windowStart(index))}`);
 }
 
-export async function windowAvailability(
-  rendition: VideoRendition,
-): Promise<number> {
+async function windowAvailability(rendition: VideoRendition): Promise<number> {
   const directories = await readdir(rendition.dir).catch(() => []);
   const counts = await Promise.all(
     directories
@@ -56,6 +54,19 @@ export async function windowAvailability(
       }),
   );
   rendition.availableSegments = counts.reduce((sum, count) => sum + count, 0);
+  return rendition.availableSegments;
+}
+
+export async function refreshRenditionAvailability(
+  rendition: VideoRendition,
+): Promise<number> {
+  if (rendition.durationSeconds > WINDOWED_AFTER_SECONDS) {
+    return windowAvailability(rendition);
+  }
+  const playlist = await readFile(rendition.playlistPath, "utf8").catch(
+    () => "",
+  );
+  rendition.availableSegments = publishedSegments(playlist).length;
   return rendition.availableSegments;
 }
 

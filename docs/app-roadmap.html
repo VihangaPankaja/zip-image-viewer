@@ -1364,6 +1364,7 @@
           area: "Video",
           priority: "P0",
           effort: "L",
+          status: "Done",
           title: "Have the next quality ready at the playhead",
           summary:
             "A bandwidth drop should switch to a usable lower rendition, not launch an encode from zero.",
@@ -1371,8 +1372,9 @@
           plan: "Prepare the low rendition first and warm candidate levels near playback. Coordinate advertised levels and scheduling so switching never depends on unrelated earlier work. Let hls.js retain its ABR logic.",
           done: "Throttle bandwidth mid-video and confirm a downshift without a cold-level stall. Run two viewers at different times and check worker fairness.",
           depends: "V03, V04, V07",
+          note: "Implemented in v3.17.0: low-first HLS startup, all lower levels prepared at each requested playhead, and bounded next-window warming on the background lane. Real FFmpeg tests cover two playheads without prefix encoding; Chromium verifies a bandwidth-throttled Auto downshift to cached media. Device/theme galleries show the quality interaction and continued lower-quality playback.",
           evidence:
-            "server/handlers/videoHlsRoutes.ts; server/infrastructure/media/videoRuntime.ts; client/src/features/player/adaptiveQuality.ts",
+            "server/handlers/videoHlsRoutes.ts; server/infrastructure/media/hlsPlaybackPreparation.ts; tests/integration/hlsFallbackPreparation.test.ts; tests/e2e/video-adaptive-fallback.spec.ts",
         },
         {
           id: "V06",

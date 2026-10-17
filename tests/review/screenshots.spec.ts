@@ -31,9 +31,106 @@ type Capture = {
 const captures: Capture[] = [];
 let multilingual: Awaited<ReturnType<typeof startMultilingualFixture>>;
 let longVideo: Awaited<ReturnType<typeof startMultilingualFixture>>;
+let adaptiveVideo: Awaited<ReturnType<typeof startMultilingualFixture>>;
 
 for (const device of devices) {
   for (const theme of ["light", "dark"] as const) {
+    test(`${device.name} ${theme} prepared quality fallback`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({
+        width: device.width,
+        height: device.height,
+      });
+      await page.emulateMedia({ colorScheme: theme });
+      await page.goto(adaptiveVideo.origin);
+      await page.evaluate(
+        (value) => localStorage.setItem("zip-image-viewer-theme", value),
+        theme,
+      );
+      await page.reload();
+      await page.getByRole("tab", { name: "Explore" }).click();
+      const network = await page.context().newCDPSession(page);
+      await network.send("Network.enable");
+      await network.send("Network.emulateNetworkConditions", {
+        offline: false,
+        latency: 0,
+        downloadThroughput: 250_000,
+        uploadThroughput: -1,
+      });
+      if (device.name === "Mobile")
+        await page.getByRole("button", { name: "Show sessions" }).click();
+      await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
+      if (device.name === "Mobile") {
+        await page.getByRole("button", { name: "Hide sessions" }).click();
+        await page
+          .getByRole("radio", { name: "Preview", exact: true })
+          .check({ force: true });
+      }
+      const video = page.getByLabel("Video preview");
+      await expect
+        .poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState), {
+          timeout: 30_000,
+        })
+        .toBeGreaterThanOrEqual(2);
+      const quality = page.getByRole("button", {
+        name: "Quality",
+        exact: true,
+      });
+      await quality.click();
+      await page.getByRole("option", { name: "480p", exact: true }).click();
+      await video.evaluate(async (v: HTMLVideoElement) => {
+        v.muted = true;
+        v.currentTime = 64;
+        await v.play();
+      });
+      await expect
+        .poll(
+          () =>
+            video.evaluate(
+              (v: HTMLVideoElement) =>
+                !v.seeking && v.videoHeight === 480 && v.currentTime > 64.25,
+            ),
+          { timeout: 30_000 },
+        )
+        .toBe(true);
+      await video.evaluate((v: HTMLVideoElement) => v.pause());
+      await video.scrollIntoViewIfNeeded();
+      await save(page, device, theme, "video-warm-high-playback");
+      await quality.click();
+      await save(page, device, theme, "video-warm-quality-choice");
+      await page.getByRole("option", { name: "360p", exact: true }).click();
+      await expect(quality).toContainText("360p");
+      const seek = page.getByRole("slider", { name: "Seek video" });
+      await seek.scrollIntoViewIfNeeded();
+      const bounds = await seek.boundingBox();
+      if (!bounds) throw new Error("Fallback seek control is missing.");
+      await seek.click({
+        position: { x: bounds.width * 0.8, y: bounds.height / 2 },
+      });
+      await video.evaluate(async (v: HTMLVideoElement) => {
+        await v.play();
+      });
+      await expect
+        .poll(
+          () =>
+            video.evaluate((v: HTMLVideoElement) => ({
+              height: v.videoHeight,
+              atTarget: !v.seeking && v.currentTime > 104.25,
+              time: v.currentTime,
+              buffered: Array.from({ length: v.buffered.length }, (_, i) => [
+                v.buffered.start(i),
+                v.buffered.end(i),
+              ]),
+            })),
+          { timeout: 30_000 },
+        )
+        .toMatchObject({ height: 360, atTarget: true });
+      await video.evaluate((v: HTMLVideoElement) => v.pause());
+      await video.scrollIntoViewIfNeeded();
+      await save(page, device, theme, "video-warm-fallback-playback");
+      await network.detach();
+    });
     test(`${device.name} ${theme} full-duration priority seeking`, async ({
       page,
     }) => {
@@ -117,10 +214,17 @@ test.beforeAll(async () => {
   await prepareMedia();
   multilingual = await startMultilingualFixture("http://127.0.0.1:5174");
   longVideo = await startMultilingualFixture("http://127.0.0.1:5174", 0, 3600);
+  adaptiveVideo = await startMultilingualFixture(
+    "http://127.0.0.1:5174",
+    0,
+    130.25,
+    480,
+  );
 });
 test.afterAll(async () => {
   await multilingual.close();
   await longVideo.close();
+  await adaptiveVideo.close();
   const sourceCommit = execFileSync("git", ["rev-parse", "HEAD"], {
     encoding: "utf8",
   }).trim();
