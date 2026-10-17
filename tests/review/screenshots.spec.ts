@@ -96,6 +96,19 @@ for (const device of devices) {
         .toBe(true);
       await video.evaluate((v: HTMLVideoElement) => v.pause());
       await video.scrollIntoViewIfNeeded();
+      if (device.name === "Mobile") {
+        await video.evaluate((element) =>
+          element.scrollIntoView({ block: "center" }),
+        );
+        const bounds = await video.boundingBox();
+        const navigation = await page
+          .locator(".workspace-mobile-nav")
+          .boundingBox();
+        if (!bounds || !navigation)
+          throw new Error("Mobile player is missing.");
+        expect(bounds.y).toBeGreaterThanOrEqual(0);
+        expect(bounds.y + bounds.height).toBeLessThanOrEqual(navigation.y);
+      }
       await save(page, device, theme, "video-warm-high-playback");
       await quality.click();
       await save(page, device, theme, "video-warm-quality-choice");
