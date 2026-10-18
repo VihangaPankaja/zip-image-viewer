@@ -17,6 +17,13 @@ validation instead of silently choosing a different encoder.
 | `h264_qsv`   | Try Intel Quick Sync; fall back to libx264 if unavailable.                                                |
 | `h264_nvenc` | Try NVIDIA NVENC; fall back to libx264 if unavailable.                                                    |
 
+The existing `ffmpeg-static` dependency also honors `FFMPEG_BIN`. Set it to the
+absolute path of an existing system or mounted FFmpeg executable to use a custom
+build. Some supplied binaries, including the tested Linux container binary, do
+not compile Quick Sync or NVENC; a GPU on the host alone will not change that.
+The server probes the executable actually selected by this override. It does
+not download drivers or install another FFmpeg at runtime.
+
 Detection is lazy and has a shared ten-second deadline. Device checks run inside
 the existing two-process media budget. The result is cached for that runtime;
 restart the server after changing device availability. A real hardware encode

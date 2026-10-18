@@ -53,7 +53,8 @@ CPU encoding remains the default. Set `HLS_ENCODER=auto`, `h264_qsv` or
 `h264_nvenc` on the server to opt into an available Intel Quick Sync or NVIDIA
 H.264 encoder. The bundled FFmpeg must support the encoder and have access to
 its device and drivers. Detection runs on the first video encode, within the
-existing media-work limit. Unavailable devices and failed hardware attempts
+existing media-work limit. `FFMPEG_BIN` can select an existing custom FFmpeg build.
+Unavailable devices and failed hardware attempts
 produce a `video.encoder.fallback` log and retry with CPU encoding.
 
 Hardware output is staged until the clip or eight-second seek window completes,
