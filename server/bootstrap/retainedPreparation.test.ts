@@ -17,7 +17,12 @@ vi.mock("../config/runtimeConstants.js", async (original) => ({
   MEDIA_CACHE_BUDGET_BYTES: 512,
 }));
 vi.mock("../infrastructure/media/videoDuration.js", () => ({
-  videoDuration: () => Promise.resolve(encoding.duration),
+  probeVideoMetadata: () =>
+    Promise.resolve({
+      width: 640,
+      height: 360,
+      durationSeconds: encoding.duration,
+    }),
 }));
 vi.mock("../infrastructure/process/commandRunner.js", () => ({
   runCommandCapture: () =>

@@ -6,6 +6,7 @@ describe("parseRuntimeEnvironment", () => {
     expect(parseRuntimeEnvironment({})).toEqual({
       port: 8080,
       mediaCacheBudgetBytes: 1024 ** 3,
+      hlsEncoder: "cpu",
     });
   });
 
@@ -17,6 +18,7 @@ describe("parseRuntimeEnvironment", () => {
     expect(parseRuntimeEnvironment({ PORT: "3000" })).toEqual({
       port: 3000,
       mediaCacheBudgetBytes: 1024 ** 3,
+      hlsEncoder: "cpu",
     });
   });
 
@@ -27,6 +29,16 @@ describe("parseRuntimeEnvironment", () => {
     ).toBe(4096);
     expect(() =>
       parseRuntimeEnvironment({ MEDIA_CACHE_BUDGET_BYTES: "-1" }),
+    ).toThrow();
+  });
+
+  it("accepts only supported opt-in HLS encoder preferences", () => {
+    for (const value of ["cpu", "auto", "h264_qsv", "h264_nvenc"])
+      expect(parseRuntimeEnvironment({ HLS_ENCODER: value }).hlsEncoder).toBe(
+        value,
+      );
+    expect(() =>
+      parseRuntimeEnvironment({ HLS_ENCODER: "arbitrary" }),
     ).toThrow();
   });
 });

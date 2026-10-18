@@ -9,7 +9,9 @@ import ffmpegPath from "ffmpeg-static";
 // The production build exists only after the CI dead-code check.
 const mediaModule = (name) =>
   pathToFileURL(path.join(process.cwd(), "build/server/media", name)).href;
-const { buildFmp4HlsArgs } = await import(mediaModule("ffmpegHls.js"));
+const { HlsEncoder } = await import(
+  mediaModule("../infrastructure/media/hlsEncoder.js")
+);
 const { publishedSegments } = await import(mediaModule("hlsManifest.js"));
 
 assert.ok(ffmpegPath, "Production FFmpeg binary is missing");
@@ -33,15 +35,24 @@ try {
     "yuv420p",
     source,
   ]);
-  execFileSync(
-    ffmpegPath,
-    buildFmp4HlsArgs({
-      inputPath: source,
-      outputDirectory: rendition,
-      height: 360,
-      segmentDurationSeconds: 2,
-    }),
+  const events = [];
+  await new HlsEncoder(ffmpegPath, "auto", (_level, event, details) => {
+    events.push({ event, details });
+  }).encode({
+    inputPath: source,
+    outputDirectory: rendition,
+    height: 360,
+    segmentDurationSeconds: 2,
+  });
+  assert.ok(
+    events.some(
+      ({ event }) =>
+        event === "video.encoder.selected" ||
+        event === "video.encoder.fallback",
+    ),
+    "Hardware selection or CPU fallback must be explicit",
   );
+  process.stdout.write(`${JSON.stringify(events)}\n`);
   const playlist = readFileSync(path.join(rendition, "index.m3u8"), "utf8");
   assert.ok(publishedSegments(playlist).length > 1, "HLS segments are missing");
   assert.match(playlist, /#EXT-X-ENDLIST/);

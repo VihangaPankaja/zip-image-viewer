@@ -42,10 +42,35 @@ test("real multilingual audio switches in sync and embedded captions recover on 
         video.evaluate((element: HTMLVideoElement) => element.currentTime),
       )
       .toBeGreaterThan(1);
+    // A progressive EVENT playlist initially exposes only its first segment.
+    // Wait until the requested seek is available instead of seeking past its end.
+    await expect
+      .poll(
+        () =>
+          video.evaluate(
+            (element: HTMLVideoElement) =>
+              element.seekable.length > 0 &&
+              element.seekable.end(element.seekable.length - 1) > 5,
+          ),
+        { timeout: 30_000 },
+      )
+      .toBe(true);
     await video.evaluate((element: HTMLVideoElement) => {
       element.pause();
       element.currentTime = 5;
     });
+    await expect
+      .poll(
+        () =>
+          video.evaluate(
+            (element: HTMLVideoElement) =>
+              !element.seeking &&
+              element.readyState >= 2 &&
+              Math.abs(element.currentTime - 5) < 0.1,
+          ),
+        { timeout: 30_000 },
+      )
+      .toBe(true);
     const originalSource = await video.evaluate(
       (element: HTMLVideoElement) => element.currentSrc,
     );

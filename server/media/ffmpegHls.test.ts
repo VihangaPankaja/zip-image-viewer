@@ -8,6 +8,32 @@ import { buildFmp4HlsArgs } from "./ffmpegHls.js";
 import { codecsFromInit } from "./hlsManifest.js";
 
 describe("FFmpeg adaptive HLS arguments", () => {
+  it.each(["h264_qsv", "h264_nvenc"] as const)(
+    "keeps the bitrate ladder and IDR boundaries with %s",
+    (encoder) => {
+      const args = buildFmp4HlsArgs({
+        inputPath: "source.mkv",
+        outputDirectory: "hls",
+        height: 720,
+        encoder,
+        window: { startSeconds: 8, durationSeconds: 8, startIndex: 2 },
+      });
+      expect(args[args.indexOf("-c:v") + 1]).toBe(encoder);
+      expect(args[args.indexOf("-b:v") + 1]).toBe("2800k");
+      expect(args[args.indexOf("-preset") + 1]).toBe(
+        encoder === "h264_qsv" ? "veryfast" : "p4",
+      );
+      expect(args[args.indexOf("-pix_fmt") + 1]).toBe(
+        encoder === "h264_qsv" ? "nv12" : "yuv420p",
+      );
+      expect(args).toContain(
+        encoder === "h264_qsv" ? "-forced_idr" : "-forced-idr",
+      );
+      expect(args).toContain("expr:gte(t,n_forced*4)");
+      expect(args[args.indexOf("-bf") + 1]).toBe("0");
+      expect(args).not.toContain("-sc_threshold");
+    },
+  );
   it("seeks before decoding and encodes only the requested window", () => {
     const args = buildFmp4HlsArgs({
       inputPath: "long.mkv",

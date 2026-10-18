@@ -1,6 +1,5 @@
 import type { VideoStoryboard } from "../../../shared/contracts.js";
 import { access } from "node:fs/promises";
-import path from "node:path";
 import type {
   Session,
   VideoRendition,
@@ -8,7 +7,6 @@ import type {
 } from "../../domain/models.js";
 import { startRenditionJob } from "./videoRenditionJob.js";
 import {
-  videoMetadataFromOutput,
   qualityOptions,
   buildVideoQualityOptions,
   type VideoMetadata,
@@ -19,16 +17,14 @@ import {
 } from "../../media/videoStoryboard.js";
 import { ProcessLimiter } from "../../media/processLimiter.js";
 import { getRenditionState } from "../../media/videoRendition.js";
-import { runCommand, runCommandCapture } from "../process/commandRunner.js";
+import { runCommand } from "../process/commandRunner.js";
 import { getSessionQualityOutputPath, remuxVideo } from "./videoRemux.js";
-import {
-  HlsWindows,
-  refreshRenditionAvailability,
-  WINDOWED_AFTER_SECONDS,
-} from "./hlsWindows.js";
-import { videoDuration } from "./videoDuration.js";
+import { HlsWindows, refreshRenditionAvailability } from "./hlsWindows.js";
+import { probeVideoMetadata } from "./videoDuration.js";
 import { HlsPlaybackPreparation } from "./hlsPlaybackPreparation.js";
 import { RetainedVideoPreparation } from "./prepareRetainedVideo.js";
+import { HlsEncoder } from "./hlsEncoder.js";
+import type { HlsEncoderPreference } from "../../config/runtimeConstants.js";
 
 const SEGMENT_SECONDS = 4;
 const processLimiter = new ProcessLimiter(2);
@@ -51,6 +47,7 @@ class VideoRuntime {
   private readonly sessions = new WeakMap<Session, SessionWork>();
   private readonly preparation: RetainedVideoPreparation;
   private readonly playback: HlsPlaybackPreparation;
+  private readonly encoder: HlsEncoder;
 
   private sessionWork(session: Session): SessionWork {
     let work = this.sessions.get(session);
@@ -171,8 +168,14 @@ class VideoRuntime {
     private readonly enforceDerivedMediaBudget: () => Promise<void> = () =>
       Promise.resolve(),
     private readonly waitForEviction: WaitForEviction = () => Promise.resolve(),
+    encoderPreference: HlsEncoderPreference = "cpu",
   ) {
-    const windows = new HlsWindows(ffmpegPath, this.runVideoTask);
+    this.encoder = new HlsEncoder(
+      ffmpegPath ?? "",
+      encoderPreference,
+      logEvent,
+    );
+    const windows = new HlsWindows(ffmpegPath, this.runVideoTask, this.encoder);
     const preparationDependencies = {
       signalFor: (session: Session) =>
         this.sessionWork(session).controller.signal,
@@ -227,23 +230,7 @@ class VideoRuntime {
     if (existing) return existing;
     const metadata = this.runVideoTask(
       session,
-      async (signal) => {
-        const { stderr } = await runCommandCapture(
-          executable,
-          ["-hide_banner", "-i", videoPath],
-          { allowNonZeroExit: true, signal },
-        );
-        const extension = path.extname(videoPath).slice(1).toLowerCase();
-        const result = videoMetadataFromOutput(stderr, extension);
-        if (result.durationSeconds > WINDOWED_AFTER_SECONDS)
-          result.durationSeconds = await videoDuration(
-            executable,
-            videoPath,
-            result.durationSeconds,
-            signal,
-          );
-        return result;
-      },
+      (signal) => probeVideoMetadata(executable, videoPath, signal),
       undefined,
       priority,
     );
@@ -300,6 +287,7 @@ class VideoRuntime {
       {
         ffmpegPath: this.ffmpegPath,
         segmentSeconds: SEGMENT_SECONDS,
+        encoder: this.encoder,
         runVideoTask: this.runVideoTask,
         refreshRenditionAvailability: this.refreshRenditionAvailability,
         enforceDerivedMediaBudget: this.enforceDerivedMediaBudget,
@@ -350,6 +338,7 @@ export function createVideoRuntime({
   protectSession,
   enforceDerivedMediaBudget,
   waitForEviction,
+  encoderPreference,
 }: {
   ffmpegPath: string | null;
   transcodes: Map<string, VideoTranscodeEntry>;
@@ -357,6 +346,7 @@ export function createVideoRuntime({
   protectSession?: ProtectSession;
   enforceDerivedMediaBudget?: () => Promise<void>;
   waitForEviction?: WaitForEviction;
+  encoderPreference?: HlsEncoderPreference;
 }) {
   return new VideoRuntime(
     ffmpegPath,
@@ -365,5 +355,6 @@ export function createVideoRuntime({
     protectSession,
     enforceDerivedMediaBudget,
     waitForEviction,
+    encoderPreference,
   );
 }

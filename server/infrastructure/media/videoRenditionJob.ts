@@ -4,17 +4,16 @@ import type {
   VideoRendition,
   VideoTranscodeEntry,
 } from "../../domain/models.js";
-import {
-  buildFmp4AudioGroupArgs,
-  buildFmp4HlsArgs,
-} from "../../media/ffmpegHls.js";
+import { buildFmp4AudioGroupArgs } from "../../media/ffmpegHls.js";
 import { getRenditionState } from "../../media/videoRendition.js";
 import { runCommand } from "../process/commandRunner.js";
 import { errorFromUnknown } from "../runtime/mediaClassification.js";
+import { HlsEncoder } from "./hlsEncoder.js";
 
 type Dependencies = {
   ffmpegPath: string | null;
   segmentSeconds: number;
+  encoder: HlsEncoder;
   runVideoTask: <Result>(
     _session: Session,
     _task: (_signal?: AbortSignal) => Promise<Result>,
@@ -30,30 +29,46 @@ type Dependencies = {
   ) => void;
 };
 
-function renditionArgs(
+function audioArgs(
+  entry: VideoTranscodeEntry,
+  renditions: VideoRendition[],
+  segmentSeconds: number,
+): string[] {
+  const outputs = (entry.audioTracks ?? []).flatMap((track) => {
+    const rendition = renditions.find(
+      ({ qualityId }) => qualityId === track.id,
+    );
+    return rendition ? [{ index: track.index, directory: rendition.dir }] : [];
+  });
+  return buildFmp4AudioGroupArgs(entry.targetPath, outputs, segmentSeconds);
+}
+
+async function encodeRenditions(
+  executable: string,
   entry: VideoTranscodeEntry,
   renditions: VideoRendition[],
   audio: boolean,
-  segmentSeconds: number,
-): string[] {
+  deps: Dependencies,
+  signal?: AbortSignal,
+): Promise<void> {
   if (audio) {
-    const outputs = (entry.audioTracks ?? []).flatMap((track) => {
-      const rendition = renditions.find(
-        ({ qualityId }) => qualityId === track.id,
-      );
-      return rendition
-        ? [{ index: track.index, directory: rendition.dir }]
-        : [];
-    });
-    return buildFmp4AudioGroupArgs(entry.targetPath, outputs, segmentSeconds);
+    await runCommand(
+      executable,
+      audioArgs(entry, renditions, deps.segmentSeconds),
+      { signal },
+    );
+  } else {
+    await deps.encoder.encode(
+      {
+        inputPath: entry.targetPath,
+        outputDirectory: renditions[0].dir,
+        height: renditions[0].selectedHeight,
+        segmentDurationSeconds: deps.segmentSeconds,
+        videoOnly: (entry.audioTracks?.length ?? 0) > 1,
+      },
+      signal,
+    );
   }
-  return buildFmp4HlsArgs({
-    inputPath: entry.targetPath,
-    outputDirectory: renditions[0].dir,
-    height: renditions[0].selectedHeight,
-    segmentDurationSeconds: segmentSeconds,
-    videoOnly: (entry.audioTracks?.length ?? 0) > 1,
-  });
 }
 
 export function startRenditionJob(
@@ -100,13 +115,14 @@ export function startRenditionJob(
   const encode = async (signal?: AbortSignal) => {
     startedAt = await prepareRenditions(renditions, queuedAt);
     log("video.transcode.started", { queueMs: startedAt - queuedAt });
-    const args = renditionArgs(
+    await encodeRenditions(
+      executable,
       entry,
       renditions,
       Boolean(audioTrack),
-      deps.segmentSeconds,
+      deps,
+      signal,
     );
-    await runCommand(executable, args, { signal });
   };
   const completion = deps
     .runVideoTask(

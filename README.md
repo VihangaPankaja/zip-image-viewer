@@ -47,6 +47,27 @@ foreground requests; `hls.js` still makes bandwidth and buffer decisions.
 See [long-video seeking and verification](docs/priority-seeking.md) and run
 `pnpm run benchmark:seek` for the isolated cold/prepared seek benchmark.
 
+## Optional hardware encoding
+
+CPU encoding remains the default. Set `HLS_ENCODER=auto`, `h264_qsv` or
+`h264_nvenc` on the server to opt into an available Intel Quick Sync or NVIDIA
+H.264 encoder. The bundled FFmpeg must support the encoder and have access to
+its device and drivers. Detection runs on the first video encode, within the
+existing media-work limit. `FFMPEG_BIN` can select an existing custom FFmpeg build.
+Unavailable devices and failed hardware attempts
+produce a `video.encoder.fallback` log and retry with CPU encoding.
+
+Hardware output is staged until the clip or eight-second seek window completes,
+so a failed attempt cannot expose incompatible partial media. This can delay
+startup for short clips, which normally publish progressively on CPU. Original
+playback, remuxing, audio and thumbnails keep their existing behavior.
+
+Run `pnpm run benchmark:encoding -- --output test-results/video-encoding.json`
+to compare the same fixture's encode time, SSIM, output size and decoded seeks.
+It also runs without a GPU and labels CPU fallback explicitly. See
+[hardware encoding verification](docs/hardware-encoding.md) for the measured
+Windows result, deployment requirements and the accepted no-cost test scope.
+
 ## Audio languages and captions
 
 Videos with multiple audio tracks open in adaptive playback. Choose an audio

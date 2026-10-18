@@ -7,13 +7,17 @@ import {
   type VideoTranscodeEntry,
 } from "../domain/models.js";
 import { prepareHlsMaster } from "./video/hlsPreparation.js";
+import {
+  readRenditionPlaylist,
+  sendPreparationStatus,
+  waitForPublishedSegment,
+} from "./video/hlsAvailability.js";
 import { queryText } from "./httpUtils.js";
 import {
   buildMasterPlaylist,
   buildVariantPlaylist,
   calculateRenditions,
   codecsFromInit,
-  publishedSegments,
 } from "../media/hlsManifest.js";
 import type { VideoRouteDependencies } from "./videoRoutes.js";
 import { resolveVideoFile, type VideoContext } from "./video/routeContext.js";
@@ -106,29 +110,6 @@ async function startRendition(
   return rendition;
 }
 
-async function readRenditionPlaylist(
-  rendition: VideoRendition,
-): Promise<string> {
-  return readFile(rendition.playlistPath, "utf8").catch(() => "");
-}
-
-async function waitForPublishedSegment(
-  rendition: VideoRendition,
-  index: number,
-): Promise<boolean> {
-  const deadline = Date.now() + 14_000;
-  do {
-    if (
-      publishedSegments(await readRenditionPlaylist(rendition)).includes(index)
-    )
-      return true;
-    if (rendition.status === "error" || rendition.status === "done")
-      return false;
-    await new Promise<void>((resolve) => setTimeout(resolve, 160));
-  } while (Date.now() < deadline);
-  return false;
-}
-
 function sendCompletedFile(
   response: Response,
   filePath: string,
@@ -201,14 +182,22 @@ function registerVariantRoute(
       );
       return;
     }
-    const source = await readRenditionPlaylist(rendition);
-    const playlist = source
-      ? buildVariantPlaylist(
-          source,
-          renditionUri(request, context, quality, "init"),
-          (index) => renditionUri(request, context, quality, "segment", index),
-        )
-      : "#EXTM3U\n#EXT-X-VERSION:7\n#EXT-X-TARGETDURATION:4\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:EVENT\n";
+    // Native HLS waits for publication; HLS.js explicitly supports preparation retries.
+    const timeout =
+      request.get("X-HLS-Preparation-Retry") === "1" ? 2_000 : Infinity;
+    const availability = await waitForPublishedSegment(
+      rendition,
+      0,
+      response,
+      timeout,
+    );
+    if (availability !== "ready")
+      return sendPreparationStatus(response, availability);
+    const playlist = buildVariantPlaylist(
+      await readRenditionPlaylist(rendition),
+      renditionUri(request, context, quality, "init"),
+      (index) => renditionUri(request, context, quality, "segment", index),
+    );
     response.set("Cache-Control", "private, no-store");
     response.type("application/vnd.apple.mpegurl").send(playlist);
   });
@@ -236,10 +225,9 @@ function registerInitRoute(app: Express, deps: VideoRouteDependencies): void {
       return;
     }
     const initPath = path.join(rendition.dir, "init.mp4");
-    if (!(await waitForPublishedSegment(rendition, 0))) {
-      return response
-        .status(425)
-        .json({ error: "Rendition is being prepared." });
+    const availability = await waitForPublishedSegment(rendition, 0, response);
+    if (availability !== "ready") {
+      return sendPreparationStatus(response, availability);
     }
     sendCompletedFile(response, initPath, "video/mp4");
   });
@@ -277,8 +265,13 @@ function registerSegmentRoute(
       rendition.dir,
       `segment_${String(index).padStart(6, "0")}.m4s`,
     );
-    if (!(await waitForPublishedSegment(rendition, index))) {
-      return response.status(425).json({ error: "Segment is being prepared." });
+    const availability = await waitForPublishedSegment(
+      rendition,
+      index,
+      response,
+    );
+    if (availability !== "ready") {
+      return sendPreparationStatus(response, availability);
     }
     sendCompletedFile(response, segmentPath, "video/iso.segment");
   });

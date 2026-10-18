@@ -11,6 +11,7 @@ import { useVideoSource } from "./useVideoSource";
 
 const instances: FakeHls[] = [];
 class FakeHls {
+  static DefaultConfig = { playlistLoadPolicy: undefined };
   static Events = {
     ERROR: "error",
     MANIFEST_PARSED: "manifestParsed",

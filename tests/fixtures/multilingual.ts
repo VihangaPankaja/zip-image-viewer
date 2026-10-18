@@ -25,6 +25,7 @@ import {
 } from "../../server/infrastructure/runtime/runtimePrimitives.js";
 import { proxyApp } from "./proxyApp.js";
 import { createDerivedMediaCache } from "../../server/infrastructure/media/derivedMediaCache.js";
+import type { HlsEncoderPreference } from "../../server/config/runtimeConstants.js";
 
 export async function startMultilingualFixture(
   baseURL: string,
@@ -32,6 +33,7 @@ export async function startMultilingualFixture(
   durationSeconds = 20,
   height = 360,
   cacheBudgetBytes?: number,
+  encoderPreference: HlsEncoderPreference = "cpu",
 ) {
   if (!ffmpegPath)
     throw new Error("FFmpeg is required for multilingual playback.");
@@ -43,6 +45,8 @@ export async function startMultilingualFixture(
     workspaceDir: directory,
   } as Session;
   const transcodes = new Map<string, VideoTranscodeEntry>();
+  const encoderEvents: { event: string; details?: Record<string, unknown> }[] =
+    [];
   const cache =
     cacheBudgetBytes === undefined
       ? undefined
@@ -53,8 +57,12 @@ export async function startMultilingualFixture(
         );
   const runtime = createVideoRuntime({
     ffmpegPath,
+    encoderPreference,
     transcodes,
-    logEvent: () => undefined,
+    logEvent: (_level, event, details) => {
+      if (event.startsWith("video.encoder."))
+        encoderEvents.push({ event, details });
+    },
     protectSession: cache?.protectSession,
     enforceDerivedMediaBudget: cache?.enforce,
     waitForEviction: cache?.waitForEviction,
@@ -247,6 +255,7 @@ export async function startMultilingualFixture(
   return {
     origin: `http://127.0.0.1:${address.port}`,
     requests,
+    encoderEvents,
     runtime,
     session,
     deps,

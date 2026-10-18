@@ -21,3 +21,5 @@ allowBuilds:
   sharp: true
   utf-8-validate: false
   utp-native: false
+patchedDependencies:
+  hls.js@1.7.2: patches/hls.js@1.7.2.patch

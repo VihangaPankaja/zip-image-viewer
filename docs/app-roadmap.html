@@ -1666,14 +1666,17 @@
           area: "Stack / operations",
           priority: "P2",
           effort: "M",
+          status: "Done",
           title: "Offer hardware encoding when it helps",
           summary:
             "Use available acceleration after correctness and queueing are measured.",
-          now: "The HLS command uses libx264 and veryfast.",
+          now: "CPU encoding is the default; HLS_ENCODER opts into detected Quick Sync or NVENC with device probes and CPU fallback.",
           plan: "Detect encoders in the deployed FFmpeg binary and verify device access. Add an opt-in hardware preset with a CPU fallback. Compare speed, image quality and output size using the same fixtures.",
-          done: "Unsupported machines fall back clearly. A real Docker run on supported hardware shows a measured gain and valid seekable output.",
+          done: "Unsupported machines fall back clearly. Available native hardware has measured speed, quality and size results with decoded seeks; free CI verifies Docker CPU fallback. GPU-enabled Docker benchmarking is outside the user-approved no-cost scope.",
           depends: "V01, V04, S02",
-          evidence: "server/media/ffmpegHls.ts; Dockerfile",
+          evidence:
+            "server/infrastructure/media/hlsEncoder.ts; tests/benchmarks/videoEncoding.ts; tests/integration/containerHlsSmoke.mjs; docs/hardware-encoding.md",
+          note: "v3.19.0 completes S03 under the user's revised no-cost scope. Opt-in Quick Sync/NVENC detection, bounded device probes, staged output and CPU retry apply to sequential HLS and seek windows. Native Windows Quick Sync and unavailable-NVENC fallback were measured with the bundled FFmpeg. Free CI exercises encoder fallback, real output decoding and container playback. GPU Docker gain verification was explicitly excluded because no suitable hardware or paid runner is available; this is not a GPU-container performance claim.",
         },
         {
           id: "S04",

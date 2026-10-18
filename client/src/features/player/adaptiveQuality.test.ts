@@ -17,6 +17,43 @@ describe("adaptive player quality", () => {
     });
   });
 
+  it("keeps retrying a preparing playlist without retrying terminal failures forever", async () => {
+    const { default: Hls } = await loadHlsModule();
+    const original = Hls.DefaultConfig.playlistLoadPolicy;
+    const policy = createAdaptiveHlsConfig(Hls.DefaultConfig.playlistLoadPolicy)
+      .playlistLoadPolicy?.default.errorRetry;
+    expect(policy?.maxNumRetry).toBe(original.default.errorRetry?.maxNumRetry);
+    expect(
+      policy?.shouldRetry?.(null, 0, false, { url: "", code: 425 }, false),
+    ).toBe(false);
+    expect(
+      policy?.shouldRetry?.(policy, 20, false, { url: "", code: 425 }, false),
+    ).toBe(true);
+    expect(20 < (policy?.maxNumRetry ?? 0)).toBe(true);
+    expect(
+      policy?.shouldRetry?.(policy, 20, false, { url: "", code: 503 }, false),
+    ).toBe(false);
+    expect(20 >= (policy?.maxNumRetry ?? 0)).toBe(true);
+    expect(
+      policy?.shouldRetry?.(policy, 20, false, { url: "", code: 503 }, true),
+    ).toBe(false);
+    expect(
+      policy?.shouldRetry?.(policy, 0, false, { url: "", code: 503 }, true),
+    ).toBe(true);
+    expect(
+      policy?.shouldRetry?.(policy, 0, false, { url: "", code: 404 }, false),
+    ).toBe(false);
+    expect(policy?.shouldRetry?.(policy, 20, true, undefined, false)).toBe(
+      false,
+    );
+    expect(original.default.errorRetry?.shouldRetry).toBeUndefined();
+    expect(
+      createAdaptiveHlsConfig({
+        default: { ...original.default, errorRetry: null },
+      }).playlistLoadPolicy?.default.errorRetry,
+    ).toBeNull();
+  });
+
   it("maps Auto to the HLS.js automatic level", () => {
     expect(resolveManualLevel(AUTO_QUALITY, [360, 480, 720])).toBe(-1);
   });
