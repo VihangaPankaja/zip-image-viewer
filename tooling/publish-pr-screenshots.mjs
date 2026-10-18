@@ -31,6 +31,8 @@ if (run("git", ["status", "--porcelain", "--untracked-files=normal"]))
     "Commit implementation changes before publishing screenshots.",
   );
 const requiredScreens = [
+  "video-opt-in-encoding-playback",
+  "video-opt-in-encoding-seek",
   "torrent-early-playback",
   "torrent-early-seek-committed",
   "torrent-download-first",
