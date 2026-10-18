@@ -37,15 +37,31 @@ let optInVideo: Awaited<ReturnType<typeof startMultilingualFixture>>;
 async function showEncodingVideo(page: Page, device: (typeof devices)[number]) {
   const video = page.getByLabel("Video preview");
   await video.scrollIntoViewIfNeeded();
-  if (device.name !== "Mobile") return;
-  await video.evaluate((element) =>
-    element.scrollIntoView({ block: "center" }),
+  if (device.name === "Mobile")
+    await video.evaluate((element) =>
+      element.scrollIntoView({ block: "center" }),
+    );
+  const seek = page.getByRole("slider", { name: "Seek video" });
+  await seek.scrollIntoViewIfNeeded();
+  const navigation =
+    device.name === "Mobile"
+      ? await page.locator(".workspace-mobile-nav").boundingBox()
+      : null;
+  const bottom = navigation?.y ?? device.height;
+  await seek.evaluate(
+    (element, limit) =>
+      window.scrollBy({
+        top: Math.max(0, element.getBoundingClientRect().bottom + 12 - limit),
+        behavior: "instant",
+      }),
+    bottom,
   );
-  const bounds = await video.boundingBox();
-  const navigation = await page.locator(".workspace-mobile-nav").boundingBox();
-  if (!bounds || !navigation) throw new Error("Mobile playback is missing.");
-  expect(bounds.y).toBeGreaterThanOrEqual(0);
-  expect(bounds.y + bounds.height).toBeLessThanOrEqual(navigation.y);
+  for (const control of [video, seek]) {
+    const bounds = await control.boundingBox();
+    if (!bounds) throw new Error("Playback control is missing.");
+    expect(bounds.y).toBeGreaterThanOrEqual(0);
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(bottom - 8);
+  }
 }
 
 for (const device of devices) {
