@@ -34,6 +34,20 @@ let longVideo: Awaited<ReturnType<typeof startMultilingualFixture>>;
 let adaptiveVideo: Awaited<ReturnType<typeof startMultilingualFixture>>;
 let optInVideo: Awaited<ReturnType<typeof startMultilingualFixture>>;
 
+async function showEncodingVideo(page: Page, device: (typeof devices)[number]) {
+  const video = page.getByLabel("Video preview");
+  await video.scrollIntoViewIfNeeded();
+  if (device.name !== "Mobile") return;
+  await video.evaluate((element) =>
+    element.scrollIntoView({ block: "center" }),
+  );
+  const bounds = await video.boundingBox();
+  const navigation = await page.locator(".workspace-mobile-nav").boundingBox();
+  if (!bounds || !navigation) throw new Error("Mobile playback is missing.");
+  expect(bounds.y).toBeGreaterThanOrEqual(0);
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(navigation.y);
+}
+
 for (const device of devices) {
   for (const theme of ["light", "dark"] as const) {
     test(`${device.name} ${theme} opt-in encoding plays and seeks`, async ({
@@ -93,7 +107,7 @@ for (const device of devices) {
         ),
       ).toBe(true);
       await video.evaluate((element: HTMLVideoElement) => element.pause());
-      await video.scrollIntoViewIfNeeded();
+      await showEncodingVideo(page, device);
       await save(page, device, theme, "video-opt-in-encoding-playback");
       const seek = page.getByRole("slider", { name: "Seek video" });
       await seek.focus();
@@ -112,7 +126,7 @@ for (const device of devices) {
           { timeout: 30_000 },
         )
         .toBe(true);
-      await video.scrollIntoViewIfNeeded();
+      await showEncodingVideo(page, device);
       await save(page, device, theme, "video-opt-in-encoding-seek");
     });
     test(`${device.name} ${theme} prepared quality fallback`, async ({
