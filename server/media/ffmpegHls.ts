@@ -1,5 +1,7 @@
 import { AUDIO_BITRATE, videoBitrateForHeight } from "./hlsManifest.js";
 
+export type HlsVideoEncoder = "libx264" | "h264_qsv" | "h264_nvenc";
+
 export type Fmp4HlsInput = {
   inputPath: string;
   outputDirectory: string;
@@ -7,6 +9,7 @@ export type Fmp4HlsInput = {
   segmentDurationSeconds?: number;
   audioStreamIndex?: number;
   videoOnly?: boolean;
+  encoder?: HlsVideoEncoder;
   window?: {
     startSeconds: number;
     durationSeconds: number;
@@ -19,6 +22,7 @@ function mediaPath(directory: string, filename: string): string {
 }
 
 export function buildFmp4HlsArgs(input: Fmp4HlsInput): string[] {
+  const encoder = input.encoder ?? "libx264";
   const duration = Math.max(1, input.segmentDurationSeconds ?? 4);
   const bitrate = `${String(videoBitrateForHeight(input.height) / 1000)}k`;
   const args = [
@@ -39,21 +43,22 @@ export function buildFmp4HlsArgs(input: Fmp4HlsInput): string[] {
     if (input.height > 0) args.push("-vf", `scale=-2:${String(input.height)}`);
     args.push(
       "-c:v",
-      "libx264",
+      encoder,
       "-preset",
-      "veryfast",
+      encoder === "h264_nvenc" ? "p4" : "veryfast",
       "-profile:v",
       "main",
       "-pix_fmt",
-      "yuv420p",
+      encoder === "h264_qsv" ? "nv12" : "yuv420p",
       "-b:v",
       bitrate,
       "-maxrate",
       bitrate,
       "-bufsize",
       bitrate,
-      "-sc_threshold",
-      "0",
+      ...(encoder === "libx264" ? ["-sc_threshold", "0"] : []),
+      ...(encoder === "h264_qsv" ? ["-forced_idr", "1"] : []),
+      ...(encoder === "h264_nvenc" ? ["-forced-idr", "1"] : []),
       "-force_key_frames",
       `expr:gte(t,n_forced*${String(duration)})`,
     );

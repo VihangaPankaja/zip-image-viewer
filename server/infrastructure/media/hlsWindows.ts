@@ -16,9 +16,9 @@ import type {
   VideoRendition,
   VideoTranscodeEntry,
 } from "../../domain/models.js";
-import { buildFmp4HlsArgs } from "../../media/ffmpegHls.js";
+import { type Fmp4HlsInput } from "../../media/ffmpegHls.js";
 import { publishedSegments } from "../../media/hlsManifest.js";
-import { runCommand } from "../process/commandRunner.js";
+import { HlsEncoder } from "./hlsEncoder.js";
 
 export const WINDOW_SEGMENTS = 2;
 const HLS_SEGMENT_SECONDS = 4;
@@ -215,6 +215,11 @@ export class HlsWindows {
   constructor(
     private readonly executable: string | null,
     private readonly runTask: RunTask,
+    private readonly encoder = new HlsEncoder(
+      executable ?? "",
+      "cpu",
+      () => undefined,
+    ),
   ) {}
 
   private async encode(
@@ -234,25 +239,22 @@ export class HlsWindows {
       );
       if (rendition.qualityId.startsWith("audio-") && !audio)
         throw new Error("Unknown audio track.");
-      await runCommand(
-        executable,
-        buildFmp4HlsArgs({
-          inputPath: entry.targetPath,
-          outputDirectory: temporary,
-          height: rendition.selectedHeight,
-          audioStreamIndex: audio?.index,
-          videoOnly: !audio && (entry.audioTracks?.length ?? 0) > 1,
-          window: {
-            startSeconds: start * HLS_SEGMENT_SECONDS,
-            durationSeconds: Math.min(
-              WINDOW_SEGMENTS * HLS_SEGMENT_SECONDS,
-              entry.durationSeconds - start * HLS_SEGMENT_SECONDS,
-            ),
-            startIndex: start,
-          },
-        }),
-        { signal },
-      );
+      const input: Fmp4HlsInput = {
+        inputPath: entry.targetPath,
+        outputDirectory: temporary,
+        height: rendition.selectedHeight,
+        audioStreamIndex: audio?.index,
+        videoOnly: !audio && (entry.audioTracks?.length ?? 0) > 1,
+        window: {
+          startSeconds: start * HLS_SEGMENT_SECONDS,
+          durationSeconds: Math.min(
+            WINDOW_SEGMENTS * HLS_SEGMENT_SECONDS,
+            entry.durationSeconds - start * HLS_SEGMENT_SECONDS,
+          ),
+          startIndex: start,
+        },
+      };
+      await this.encoder.encode(input, signal);
       signal?.throwIfAborted();
       await publishWindow(temporary, rendition, entry, start, Boolean(audio));
     } finally {

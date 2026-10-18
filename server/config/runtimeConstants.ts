@@ -8,17 +8,24 @@ const runtimeEnvironmentSchema = z.object({
     .int()
     .min(0)
     .default(1024 ** 3),
+  HLS_ENCODER: z.enum(["cpu", "auto", "h264_qsv", "h264_nvenc"]).default("cpu"),
 });
 
 export function parseRuntimeEnvironment(
   environment: Readonly<Record<string, string | undefined>>,
-): { port: number; mediaCacheBudgetBytes: number } {
+) {
   const parsed = runtimeEnvironmentSchema.parse(environment);
   return {
     port: parsed.PORT,
     mediaCacheBudgetBytes: parsed.MEDIA_CACHE_BUDGET_BYTES,
+    hlsEncoder: parsed.HLS_ENCODER,
   };
 }
+
+export type HlsEncoderPreference = ReturnType<
+  typeof parseRuntimeEnvironment
+>["hlsEncoder"];
+export const HLS_ENCODER = parseRuntimeEnvironment(process.env).hlsEncoder;
 
 export const PORT = parseRuntimeEnvironment(process.env).port;
 export const MEDIA_CACHE_BUDGET_BYTES = parseRuntimeEnvironment(

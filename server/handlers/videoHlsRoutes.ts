@@ -201,14 +201,15 @@ function registerVariantRoute(
       );
       return;
     }
-    const source = await readRenditionPlaylist(rendition);
-    const playlist = source
-      ? buildVariantPlaylist(
-          source,
-          renditionUri(request, context, quality, "init"),
-          (index) => renditionUri(request, context, quality, "segment", index),
-        )
-      : "#EXTM3U\n#EXT-X-VERSION:7\n#EXT-X-TARGETDURATION:4\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:EVENT\n";
+    if (!(await waitForPublishedSegment(rendition, 0)))
+      return response
+        .status(425)
+        .json({ error: "Rendition is being prepared." });
+    const playlist = buildVariantPlaylist(
+      await readRenditionPlaylist(rendition),
+      renditionUri(request, context, quality, "init"),
+      (index) => renditionUri(request, context, quality, "segment", index),
+    );
     response.set("Cache-Control", "private, no-store");
     response.type("application/vnd.apple.mpegurl").send(playlist);
   });

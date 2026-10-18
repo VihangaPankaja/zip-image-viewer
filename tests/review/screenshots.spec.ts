@@ -32,9 +32,89 @@ const captures: Capture[] = [];
 let multilingual: Awaited<ReturnType<typeof startMultilingualFixture>>;
 let longVideo: Awaited<ReturnType<typeof startMultilingualFixture>>;
 let adaptiveVideo: Awaited<ReturnType<typeof startMultilingualFixture>>;
+let optInVideo: Awaited<ReturnType<typeof startMultilingualFixture>>;
 
 for (const device of devices) {
   for (const theme of ["light", "dark"] as const) {
+    test(`${device.name} ${theme} opt-in encoding plays and seeks`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({
+        width: device.width,
+        height: device.height,
+      });
+      await page.emulateMedia({ colorScheme: theme });
+      await page.goto(optInVideo.origin);
+      await page.evaluate(
+        (value) => localStorage.setItem("zip-image-viewer-theme", value),
+        theme,
+      );
+      await page.reload();
+      await page.getByRole("tab", { name: "Explore" }).click();
+      if (device.name === "Mobile")
+        await page.getByRole("button", { name: "Show sessions" }).click();
+      await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
+      if (device.name === "Mobile") {
+        await page.getByRole("button", { name: "Hide sessions" }).click();
+        await page
+          .getByRole("radio", { name: "Preview", exact: true })
+          .check({ force: true });
+      }
+      const video = page.getByLabel("Video preview");
+      await expect
+        .poll(
+          () =>
+            video.evaluate((element: HTMLVideoElement) => element.readyState),
+          { timeout: 30_000 },
+        )
+        .toBeGreaterThanOrEqual(2);
+      await video.evaluate(async (element: HTMLVideoElement) => {
+        element.muted = true;
+        await element.play();
+      });
+      await expect
+        .poll(
+          () =>
+            video.evaluate((element: HTMLVideoElement) => element.currentTime),
+          { timeout: 30_000 },
+        )
+        .toBeGreaterThan(0.5);
+      await expect
+        .poll(
+          () => video.evaluate((element: HTMLVideoElement) => element.duration),
+          { timeout: 30_000 },
+        )
+        .toBeGreaterThan(19);
+      expect(
+        optInVideo.encoderEvents.some(
+          ({ event }) =>
+            event === "video.encoder.selected" ||
+            event === "video.encoder.fallback",
+        ),
+      ).toBe(true);
+      await video.evaluate((element: HTMLVideoElement) => element.pause());
+      await video.scrollIntoViewIfNeeded();
+      await save(page, device, theme, "video-opt-in-encoding-playback");
+      const seek = page.getByRole("slider", { name: "Seek video" });
+      await seek.focus();
+      for (let step = 0; step < 3; step += 1)
+        await page.keyboard.press("PageUp");
+      await page.keyboard.press("Enter");
+      await expect
+        .poll(
+          () =>
+            video.evaluate(
+              (element: HTMLVideoElement) =>
+                !element.seeking &&
+                element.currentTime > 5 &&
+                element.readyState >= 2,
+            ),
+          { timeout: 30_000 },
+        )
+        .toBe(true);
+      await video.scrollIntoViewIfNeeded();
+      await save(page, device, theme, "video-opt-in-encoding-seek");
+    });
     test(`${device.name} ${theme} prepared quality fallback`, async ({
       page,
     }) => {
@@ -233,11 +313,20 @@ test.beforeAll(async () => {
     130.25,
     480,
   );
+  optInVideo = await startMultilingualFixture(
+    "http://127.0.0.1:5174",
+    0,
+    20,
+    360,
+    undefined,
+    "h264_nvenc",
+  );
 });
 test.afterAll(async () => {
   await multilingual.close();
   await longVideo.close();
   await adaptiveVideo.close();
+  await optInVideo.close();
   const sourceCommit = execFileSync("git", ["rev-parse", "HEAD"], {
     encoding: "utf8",
   }).trim();
@@ -249,6 +338,7 @@ test.afterAll(async () => {
         fixtures:
           "Deterministic local media and simulated HTTP/torrent progress; not a live network benchmark.",
         captures,
+        encoderVerification: optInVideo.encoderEvents,
       },
       null,
       2,

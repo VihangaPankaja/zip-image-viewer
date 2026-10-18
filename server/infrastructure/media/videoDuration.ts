@@ -1,4 +1,31 @@
 import { runCommandCapture } from "../process/commandRunner.js";
+import path from "node:path";
+import { videoMetadataFromOutput } from "../../media/videoMetadata.js";
+import { WINDOWED_AFTER_SECONDS } from "./hlsWindows.js";
+
+export async function probeVideoMetadata(
+  executable: string,
+  input: string,
+  signal?: AbortSignal,
+) {
+  const { stderr } = await runCommandCapture(
+    executable,
+    ["-hide_banner", "-i", input],
+    { allowNonZeroExit: true, signal },
+  );
+  const result = videoMetadataFromOutput(
+    stderr,
+    path.extname(input).slice(1).toLowerCase(),
+  );
+  if (result.durationSeconds > WINDOWED_AFTER_SECONDS)
+    result.durationSeconds = await videoDuration(
+      executable,
+      input,
+      result.durationSeconds,
+      signal,
+    );
+  return result;
+}
 
 // Container duration can include AAC padding after the last video frame.
 export async function videoDuration(

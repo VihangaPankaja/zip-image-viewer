@@ -13,6 +13,61 @@ import type { VideoRouteDependencies } from "./videoRoutes.js";
 import { registerVideoHlsRoutes } from "./videoHlsRoutes.js";
 
 describe("HLS routes", () => {
+  it("waits for staged or fallback output before returning the first variant playlist", async () => {
+    const workspace = await mkdtemp(path.join(tmpdir(), "ziv-hls-startup-"));
+    const source = path.join(workspace, "source.mp4");
+    const dir = path.join(workspace, "rendition");
+    const playlistPath = path.join(dir, "index.m3u8");
+    await mkdir(dir);
+    await writeFile(source, "source");
+    const rendition = {
+      dir,
+      playlistPath,
+      status: "running",
+    } as VideoRendition;
+    const entry = {
+      width: 640,
+      height: 360,
+      durationSeconds: 20,
+      qualities: [{ id: "360p" }],
+      defaultQuality: "360p",
+    } as VideoTranscodeEntry;
+    const start = vi.fn(() => Promise.resolve());
+    const deps = {
+      ffmpegPath: "ffmpeg",
+      touchSession: () => ({ id: "session", extractDir: workspace }),
+      sanitizeEntryPath: (value: string) => value,
+      ensureVideoTranscodeEntry: () => Promise.resolve(entry),
+      getRenditionState: () => rendition,
+      startRenditionTranscode: start,
+    } as unknown as VideoRouteDependencies;
+    const app = express();
+    registerVideoHlsRoutes(app, deps);
+    try {
+      const response = request(app)
+        .get(
+          "/api/sessions/session/video/hls/playlist?path=source.mp4&quality=360p",
+        )
+        .then((value) => value);
+      await vi.waitFor(() => expect(start).toHaveBeenCalled());
+      expect(
+        await Promise.race([
+          response.then(() => "empty"),
+          new Promise((resolve) => setTimeout(() => resolve("waiting"), 50)),
+        ]),
+      ).toBe("waiting");
+      await writeFile(
+        playlistPath,
+        '#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXT-X-MAP:URI="init.mp4"\n#EXTINF:4,\nsegment_000000.m4s\n#EXT-X-ENDLIST\n',
+      );
+      rendition.status = "done";
+      const ready = await response;
+      expect(ready.status).toBe(200);
+      expect(ready.text).toContain("#EXTINF:4,");
+    } finally {
+      await rm(workspace, { recursive: true, force: true });
+    }
+  });
   it("serves only published segments and validates completed media caches", async () => {
     const workspace = await mkdtemp(path.join(tmpdir(), "ziv-hls-route-"));
     const source = path.join(workspace, "source.mp4");
@@ -90,8 +145,8 @@ describe("HLS routes", () => {
       expect(encoding).not.toHaveBeenCalled();
       const audio = await request(app)
         .get(`${resource}/playlist?path=source.mp4&quality=audio-2`)
-        .expect(200);
-      expect(audio.headers["content-type"]).toContain("mpegurl");
+        .expect(425);
+      expect(audio.body).toEqual({ error: "Rendition is being prepared." });
 
       await writeFile(
         path.join(dir, "init.mp4"),

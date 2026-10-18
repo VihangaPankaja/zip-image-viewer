@@ -1,6 +1,9 @@
 import type { RequestHandler } from "express";
 import type { Session, VideoTranscodeEntry } from "../domain/models.js";
-import { MEDIA_CACHE_BUDGET_BYTES } from "../config/runtimeConstants.js";
+import {
+  HLS_ENCODER,
+  MEDIA_CACHE_BUDGET_BYTES,
+} from "../config/runtimeConstants.js";
 import {
   ensureRuntimeImagePreview,
   ensureRuntimeThumbnail,
@@ -53,6 +56,7 @@ export function createRuntimeMedia(
 
   const videoRuntime = createVideoRuntime({
     ffmpegPath,
+    encoderPreference: HLS_ENCODER,
     transcodes,
     logEvent,
     protectSession: cache.protectSession,

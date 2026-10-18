@@ -106,6 +106,16 @@ jobs:
           if-no-files-found: error
       - name: Run real video benchmark smoke test
         run: pnpm run benchmark:video -- --samples 1 --duration 8 --output "$RUNNER_TEMP/video-latency.md"
+      - name: Verify available HLS encoders and CPU fallback without requiring a GPU
+        run: pnpm run benchmark:encoding -- --output "$RUNNER_TEMP/video-encoding.json"
+      - name: Publish encoder benchmark and fallback evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: video-encoding-benchmark
+          path: ${{ runner.temp }}/video-encoding.json
+          retention-days: 14
+          if-no-files-found: error
       - name: Remove benchmark output
         if: always()
         run: rm -f "$RUNNER_TEMP/video-latency.md"
