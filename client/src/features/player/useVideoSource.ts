@@ -124,7 +124,9 @@ async function attachAdaptiveSource(
   }
   player.removeAttribute("src");
   player.querySelectorAll("source").forEach((source) => source.remove());
-  const hls = new HlsConstructor(createAdaptiveHlsConfig());
+  const hls = new HlsConstructor(
+    createAdaptiveHlsConfig(HlsConstructor.DefaultConfig.playlistLoadPolicy),
+  );
   params.hlsRef.current = hls;
   hls.on(HlsConstructor.Events.AUDIO_TRACKS_UPDATED, () =>
     params.updateHlsAudioTracks(hls),

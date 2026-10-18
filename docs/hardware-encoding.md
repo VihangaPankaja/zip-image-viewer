@@ -40,8 +40,13 @@ published, with the playlist last. Failed attempts are removed before CPU retry.
 This preserves the existing window publication rules and prevents mixed hardware
 and CPU initialization files. For clips up to two minutes, hardware mode waits
 for the complete clip before publishing; default CPU mode stays progressive.
-The playlist route waits for the first published segment rather than returning
-an empty playlist while detection or encoding is in progress.
+Native HLS playlist requests wait for published output or job completion and stop
+waiting when the client disconnects. HLS.js advertises preparation-retry support
+through `X-HLS-Preparation-Retry: 1`; those requests wait briefly, then return
+HTTP 425 while encoding is queued or running. The HLS.js player retries that
+preparation status beyond its normal retry budget, so a slow staged encode can
+finish without a fatal startup error. Failed jobs return HTTP 503 and retain
+the player's normal bounded error retries. No empty playlist is published.
 
 Look for `video.encoder.selected`, `video.encoder.unavailable` and
 `video.encoder.fallback` in server logs. Fallback messages distinguish unavailable

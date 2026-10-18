@@ -2,7 +2,10 @@ import type { HlsConfig } from "hls.js";
 
 export const AUTO_QUALITY = "auto" as const;
 
-export function createAdaptiveHlsConfig(): Partial<HlsConfig> {
+export function createAdaptiveHlsConfig(
+  playlistLoadPolicy?: HlsConfig["playlistLoadPolicy"],
+): Partial<HlsConfig> {
+  const errorRetry = playlistLoadPolicy?.default.errorRetry;
   return {
     startLevel: -1,
     capLevelToPlayerSize: true,
@@ -10,6 +13,29 @@ export function createAdaptiveHlsConfig(): Partial<HlsConfig> {
     maxBufferLength: 30,
     backBufferLength: 30,
     enableWorker: true,
+    xhrSetup: (xhr) => xhr.setRequestHeader("X-HLS-Preparation-Retry", "1"),
+    ...(playlistLoadPolicy && {
+      playlistLoadPolicy: {
+        default: {
+          ...playlistLoadPolicy.default,
+          errorRetry: errorRetry
+            ? {
+                ...errorRetry,
+                // Staged hardware output can take longer than the normal retry budget.
+                shouldRetry: (config, count, _timeout, response, retry) => {
+                  if (!config) return false;
+                  const preparing = response?.code === 425;
+                  // HLS.js also checks this cap after calling shouldRetry.
+                  config.maxNumRetry = preparing
+                    ? Math.max(errorRetry.maxNumRetry, count + 1)
+                    : errorRetry.maxNumRetry;
+                  return preparing || (count < errorRetry.maxNumRetry && retry);
+                },
+              }
+            : null,
+        },
+      },
+    }),
   };
 }
 
