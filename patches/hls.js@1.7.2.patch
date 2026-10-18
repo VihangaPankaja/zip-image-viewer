@@ -1,0 +1,39 @@
+diff --git a/dist/hls.js b/dist/hls.js
+index 0a2a6b39b29fd9116ada21929336ac34886b7d2a..5ced09bc6b981c3fff9041a344012929dcad8958 100644
+--- a/dist/hls.js	
++++ b/dist/hls.js	
+@@ -11690,7 +11690,7 @@
+           return _this5._loadInitSegment(initSegment);
+         }) : this._loadInitSegment(initSegment);
+         return initPromise.catch(function (reason) {
+-          if (_this5.state === State.STOPPED || _this5.state === State.ERROR) {
++          if (_this5.state === State.STOPPED || _this5.state === State.ERROR || _this5.fragContextChanged(mediaFrag)) {
+             throw reason;
+           }
+           if ('data' in reason) {
+diff --git a/dist/hls.mjs b/dist/hls.mjs
+index 95bfc42a2e02465e08dd36e9826e5f00e6f7ead7..f81acb678b3870654ebae36c2b4ffbc803474f0a 100644
+--- a/dist/hls.mjs	
++++ b/dist/hls.mjs	
+@@ -10856,7 +10856,7 @@ class BaseStreamController extends TaskLoop {
+       var _initSegment$decryptd;
+       const initPromise = initSegment.encrypted && !((_initSegment$decryptd = initSegment.decryptdata) != null && _initSegment$decryptd.key) ? this.keyLoader.load(initSegment).then(() => this._loadInitSegment(initSegment)) : this._loadInitSegment(initSegment);
+       return initPromise.catch(reason => {
+-        if (this.state === State.STOPPED || this.state === State.ERROR) {
++        if (this.state === State.STOPPED || this.state === State.ERROR || this.fragContextChanged(mediaFrag)) {
+           throw reason;
+         }
+         if ('data' in reason) {
+diff --git a/src/controller/base-stream-controller.ts b/src/controller/base-stream-controller.ts
+index a5dfa6aa9dad351bd6183f8a9b808ac59737490a..b344818532ef16b23138091811dcee892847bdb0 100644
+--- a/src/controller/base-stream-controller.ts	
++++ b/src/controller/base-stream-controller.ts	
+@@ -813,7 +813,7 @@ export default class BaseStreamController
+           : this._loadInitSegment(initSegment);
+ 
+       return initPromise.catch((reason: LoadError | Error) => {
+-        if (this.state === State.STOPPED || this.state === State.ERROR) {
++        if (this.state === State.STOPPED || this.state === State.ERROR || this.fragContextChanged(mediaFrag)) {
+           throw reason;
+         }
+         if ('data' in reason) {

@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  hls.js@1.7.2: 32eb5b4ef746eef7a8c4723768f3ea0373aef39964aacd2788c268396a54103a
+
 importers:
   .:
     dependencies:
@@ -39,7 +42,7 @@ importers:
         version: 16.0.0
       hls.js:
         specifier: ^1.7.2
-        version: 1.7.2
+        version: 1.7.2(patch_hash=32eb5b4ef746eef7a8c4723768f3ea0373aef39964aacd2788c268396a54103a)
       lucide-react:
         specifier: ^1.41.0
         version: 1.41.0(react@19.2.8)
@@ -7983,7 +7986,8 @@ snapshots:
     dependencies:
       hermes-estree: 0.25.1
 
-  hls.js@1.7.2: {}
+  hls.js@1.7.2(patch_hash=32eb5b4ef746eef7a8c4723768f3ea0373aef39964aacd2788c268396a54103a):
+    {}
 
   hookified@1.15.1: {}
 

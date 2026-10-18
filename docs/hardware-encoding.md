@@ -48,6 +48,12 @@ preparation status beyond its normal retry budget, so a slow staged encode can
 finish without a fatal startup error. Failed jobs return HTTP 503 and retain
 the player's normal bounded error retries. No empty playlist is published.
 
+The pinned HLS.js 1.7.2 package also has a small pnpm patch for seek cancellation.
+A cancelled initialization request must not abort the fragment for a newer seek.
+The patch covers the source and both full-player module entry points; Docker
+copies it before installing dependencies. A unit regression exercises both stale
+and current cancellations, alongside the existing real-video seek checks.
+
 Look for `video.encoder.selected`, `video.encoder.unavailable` and
 `video.encoder.fallback` in server logs. Fallback messages distinguish unavailable
 hardware from an encode failure. Hardware acceleration is opt-in because driver

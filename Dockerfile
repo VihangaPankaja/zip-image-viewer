@@ -3,6 +3,7 @@ WORKDIR /app
 RUN npm install --global pnpm@12.1.0
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY tooling/eslint/package.json tooling/eslint/package.json
+COPY patches ./patches
 RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm run build
@@ -18,6 +19,7 @@ RUN apt-get update \
   && useradd --system --gid app --home-dir /app app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY tooling/eslint/package.json tooling/eslint/package.json
+COPY patches ./patches
 RUN pnpm install --prod --frozen-lockfile
 COPY --from=build /app/build ./build
 COPY --from=build /app/dist ./dist
