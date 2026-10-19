@@ -105,6 +105,11 @@ Vite+ selects Node 26.7.0 from `.node-version` and pnpm 12.1.0 from
 `package.json#packageManager`. FFmpeg and 7-Zip come from project dependencies.
 Installation enables staged formatting/lint and pre-push type/test/Fallow checks.
 
+[VS Code integration](https://viteplus.dev/guide/ide-integration) recommends
+the Vite+ extension pack and uses Oxc for formatting and
+fixes on save. Its Scripts panel uses `vp`; the CLI commands below also work
+from a terminal.
+
 A global CLI is optional. With those Node/pnpm versions already available,
 run `pnpm install --frozen-lockfile`, then `pnpm exec vp run dev`.
 Use `pnpm exec vp run <script>` for the commands below (`pnpm.cmd` on Windows).

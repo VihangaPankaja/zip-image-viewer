@@ -112,6 +112,10 @@ The final unified suite includes publishing and one new lint regression:
 
 ## Rollback
 
+Before reverting, run `vp hooks disable` (or `pnpm exec vp hooks disable`)
+while Vite+ is installed. This removes the clone-local dispatcher and clears
+`core.hooksPath`; the restored install can then reinstate the previous hooks.
+
 Revert this PR's commits together and install the restored frozen lockfile with
 the restored Node/package-manager pins. Manifest, lockfile, catalog, config/test
 imports, hooks, Docker and CI must move together; reverting only the manifest
