@@ -2,9 +2,11 @@ import { execFileSync } from "node:child_process";
 import process from "node:process";
 import console from "node:console";
 import { createHash } from "node:crypto";
-import { cp, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { chmod, cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { path7za } from "7zip-bin";
+import { publishScreenshotRelease } from "./pr-screenshot-release.mjs";
 import {
   groupScreenshotGalleries,
   prepareScreenshotGalleries,
@@ -15,6 +17,7 @@ const run = (command, args, cwd = process.cwd()) =>
   execFileSync(command, args, {
     cwd,
     encoding: "utf8",
+    maxBuffer: 16 * 1024 * 1024,
     stdio: ["ignore", "pipe", "pipe"],
   }).trim();
 const directory = path.resolve("test-results/pr-screenshots");
@@ -153,13 +156,6 @@ for (const capture of manifest.captures) {
     throw new Error("Invalid screenshot filename.");
 }
 const groups = groupScreenshotGalleries(manifest.captures, featuredScreens);
-const sectionOptions = {
-  groups,
-  repository,
-  sourceCommit: head,
-  fixtures: manifest.fixtures,
-};
-renderScreenshotSection({ ...sectionOptions, assetCommit: "0".repeat(40) });
 const generatedAssets = await prepareScreenshotGalleries(directory, groups);
 const assetFiles = [
   "manifest.json",
@@ -170,45 +166,54 @@ for (const file of assetFiles) {
   hash.update(file);
   hash.update(await readFile(path.join(directory, file)));
 }
-const branch = `pr-assets/${head.slice(0, 12)}-${hash.digest("hex").slice(0, 12)}`;
-const remote = run("git", ["remote", "get-url", "origin"]);
-if (!run("git", ["ls-remote", "--heads", remote, `refs/heads/${branch}`])) {
-  const temporary = await mkdtemp(
-    path.join(os.tmpdir(), "zip-viewer-pr-assets-"),
-  );
-  for (const file of assetFiles) {
-    await cp(path.join(directory, file), path.join(temporary, file));
-  }
-  run("git", ["init", "--quiet"], temporary);
+const assetPrefix = `${head.slice(0, 12)}-${hash.digest("hex").slice(0, 12)}-`;
+const releaseTag = process.env.PR_SCREENSHOT_RELEASE ?? "pr-review-assets";
+const assetBaseUrl = `https://github.com/${repository}/releases/download/${releaseTag}`;
+const archiveName = `${assetPrefix}originals.zip`;
+const section = renderScreenshotSection({
+  groups,
+  assetBaseUrl,
+  assetPrefix,
+  originalArchiveUrl: `${assetBaseUrl}/${archiveName}`,
+  sourceCommit: head,
+  fixtures: manifest.fixtures,
+});
+const temporary = await mkdtemp(path.join(os.tmpdir(), "zip-viewer-review-"));
+try {
+  const listPath = path.join(temporary, "originals.txt");
+  await writeFile(listPath, assetFiles.join("\n"));
+  if (process.platform !== "win32") await chmod(path7za, 0o755);
   run(
-    "git",
-    ["config", "user.name", run("git", ["config", "user.name"])],
-    temporary,
+    path7za,
+    ["a", "-tzip", "-mx=0", path.join(temporary, archiveName), `@${listPath}`],
+    directory,
   );
-  run(
-    "git",
-    ["config", "user.email", run("git", ["config", "user.email"])],
-    temporary,
+  const publishedFiles = [
+    ...groups.flatMap((group) => [
+      ...group.featured.map((entry) => entry.file),
+      ...group.sheets.map((sheet) => sheet.file),
+    ]),
+  ];
+  for (const file of publishedFiles)
+    await cp(
+      path.join(directory, file),
+      path.join(temporary, `${assetPrefix}${file}`),
+    );
+  const names = [
+    archiveName,
+    ...publishedFiles.map((file) => `${assetPrefix}${file}`),
+  ];
+  await publishScreenshotRelease({
+    run: (args) => run("gh", args),
+    repository,
+    sourceCommit: head,
+    tag: releaseTag,
+    files: names.map((name) => ({ name, path: path.join(temporary, name) })),
+  });
+  await writeFile(path.join(directory, "pr-section.md"), section);
+  console.log(
+    `Published ${manifest.captures.length} screenshots as release assets. Append ${path.join(directory, "pr-section.md")} to the PR description. No asset branch was created.`,
   );
-  run("git", ["add", "--", "."], temporary);
-  run(
-    "git",
-    ["commit", "--quiet", "-m", `Review screenshots for ${head}`],
-    temporary,
-  );
-  run("git", ["push", remote, `HEAD:refs/heads/${branch}`], temporary);
-  console.log(`Asset checkout retained at ${temporary}`);
+} finally {
+  await rm(temporary, { recursive: true, force: true });
 }
-const assetCommit = run("git", [
-  "ls-remote",
-  "--heads",
-  remote,
-  `refs/heads/${branch}`,
-]).split(/\s/)[0];
-await writeFile(
-  path.join(directory, "pr-section.md"),
-  renderScreenshotSection({ ...sectionOptions, assetCommit }),
-);
-console.log(
-  `Published ${manifest.captures.length} screenshots. Append ${path.join(directory, "pr-section.md")} to the PR body.`,
-);
