@@ -25,9 +25,10 @@ describe("workspace session schemas", () => {
       id: "session-1",
       tree: { name: "photos", children: [{ modifiedAt: 1768478400000 }] },
     });
-    expect(
-      jobPayloadSchema.parse({ id: "job-1", threadMode: "segmented" }),
-    ).toMatchObject({ id: "job-1", threadMode: "segmented" });
+    expect(jobPayloadSchema.parse({ id: "job-1", threadMode: "segmented" })).toMatchObject({
+      id: "job-1",
+      threadMode: "segmented",
+    });
   });
 
   it("rejects malformed session and job payloads", () => {
@@ -36,8 +37,6 @@ describe("workspace session schemas", () => {
         tree: { name: "cover.jpg", path: "cover.jpg", type: "unknown" },
       }).success,
     ).toBe(false);
-    expect(jobPayloadSchema.safeParse({ threadMode: "parallel" }).success).toBe(
-      false,
-    );
+    expect(jobPayloadSchema.safeParse({ threadMode: "parallel" }).success).toBe(false);
   });
 });

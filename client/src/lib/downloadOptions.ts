@@ -7,15 +7,11 @@ import {
 import type { DownloadOptions } from "../types/download";
 
 function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object"
-    ? Object.fromEntries(Object.entries(value))
-    : {};
+  return value && typeof value === "object" ? Object.fromEntries(Object.entries(value)) : {};
 }
 
 function asInputText(value: unknown): string {
-  return typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
+  return typeof value === "string" || typeof value === "number" || typeof value === "boolean"
     ? String(value)
     : "";
 }
@@ -33,9 +29,7 @@ function normalizeRequestHeaders(value: unknown): Record<string, string> {
       .filter(
         ([key, entry]) =>
           key.length > 0 &&
-          (typeof entry === "string" ||
-            typeof entry === "number" ||
-            typeof entry === "boolean"),
+          (typeof entry === "string" || typeof entry === "number" || typeof entry === "boolean"),
       )
       .map(([key, entry]) => [key, asInputText(entry)]),
   );
@@ -82,13 +76,9 @@ export function normalizeDownloadSettings(value: unknown): DownloadSettings {
       source.enableResume == null
         ? DEFAULT_DOWNLOAD_SETTINGS.enableResume
         : Boolean(source.enableResume),
-    maxRetries: normalizeRetryCount(
-      source.maxRetries,
-      DEFAULT_DOWNLOAD_SETTINGS.maxRetries,
-    ),
+    maxRetries: normalizeRetryCount(source.maxRetries, DEFAULT_DOWNLOAD_SETTINGS.maxRetries),
     videoQuality: VIDEO_TRANSCODE_QUALITY_OPTIONS.some(
-      (option) =>
-        option.value === asInputText(source.videoQuality).toLowerCase(),
+      (option) => option.value === asInputText(source.videoQuality).toLowerCase(),
     )
       ? asInputText(source.videoQuality).toLowerCase()
       : DEFAULT_DOWNLOAD_SETTINGS.videoQuality,
@@ -104,12 +94,7 @@ export function normalizeDownloadOptions(value: unknown): DownloadOptions {
   const requestSource = asRecord(source.request);
 
   const legacy = normalizeDownloadSettings(source);
-  const timeoutMs = clampNumber(
-    asInputText(retrySource.timeoutMs),
-    5000,
-    180000,
-    30000,
-  );
+  const timeoutMs = clampNumber(asInputText(retrySource.timeoutMs), 5000, 180000, 30000);
   const headers = normalizeRequestHeaders(requestSource.headers);
 
   return {
@@ -120,32 +105,21 @@ export function normalizeDownloadOptions(value: unknown): DownloadOptions {
         transportSource.mode === "auto"
           ? transportSource.mode
           : legacy.threadMode,
-      threads: clampNumber(
-        asInputText(transportSource.threads),
-        1,
-        8,
-        legacy.threadCount,
-      ),
+      threads: clampNumber(asInputText(transportSource.threads), 1, 8, legacy.threadCount),
       multithread:
         transportSource.multithread == null
           ? legacy.enableMultithread
           : Boolean(transportSource.multithread),
       resume:
-        transportSource.resume == null
-          ? legacy.enableResume
-          : Boolean(transportSource.resume),
+        transportSource.resume == null ? legacy.enableResume : Boolean(transportSource.resume),
     },
     retry: {
-      maxRetries: normalizeRetryCount(
-        retrySource.maxRetries,
-        legacy.maxRetries,
-      ),
+      maxRetries: normalizeRetryCount(retrySource.maxRetries, legacy.maxRetries),
       timeoutMs,
     },
     media: {
       videoQuality: VIDEO_TRANSCODE_QUALITY_OPTIONS.some(
-        (option) =>
-          option.value === asInputText(mediaSource.videoQuality).toLowerCase(),
+        (option) => option.value === asInputText(mediaSource.videoQuality).toLowerCase(),
       )
         ? asInputText(mediaSource.videoQuality).toLowerCase()
         : legacy.videoQuality,

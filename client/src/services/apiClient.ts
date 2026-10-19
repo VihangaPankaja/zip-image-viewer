@@ -1,7 +1,4 @@
-export async function fetchJson<T>(
-  input: RequestInfo | URL,
-  init?: RequestInit,
-) {
+export async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit) {
   const response = await fetch(input, init);
   const payload: unknown = await response.json().catch(() => ({}));
 
@@ -11,9 +8,7 @@ export async function fetchJson<T>(
         ? payload.error
         : undefined;
     const message =
-      typeof error === "string" && error
-        ? error
-        : `Request failed (${String(response.status)})`;
+      typeof error === "string" && error ? error : `Request failed (${String(response.status)})`;
     throw new Error(message);
   }
 

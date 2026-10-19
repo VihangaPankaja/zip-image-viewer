@@ -34,11 +34,7 @@
   },
   "typeAware": {
     "enabled": true,
-    "projects": [
-      "tsconfig.app.json",
-      "tsconfig.server.json",
-      "tsconfig.tests.json"
-    ],
+    "projects": ["tsconfig.app.json", "tsconfig.server.json", "tsconfig.tests.json"],
     "require": "complete"
   },
   "duplicates": {
@@ -51,19 +47,11 @@
     "zones": [
       {
         "name": "client-shell",
-        "patterns": [
-          "client/src/main.tsx",
-          "client/src/App.tsx",
-          "client/src/pages/**"
-        ]
+        "patterns": ["client/src/main.tsx", "client/src/App.tsx", "client/src/pages/**"]
       },
       {
         "name": "client-features",
-        "patterns": [
-          "client/src/components/**",
-          "client/src/features/**",
-          "client/src/hooks/**"
-        ]
+        "patterns": ["client/src/components/**", "client/src/features/**", "client/src/hooks/**"]
       },
       {
         "name": "client-shared",
@@ -88,12 +76,7 @@
       },
       {
         "name": "server-http",
-        "patterns": [
-          "server/handlers/**",
-          "server/realtime/**",
-          "server/rpc/**",
-          "server/tui/**"
-        ]
+        "patterns": ["server/handlers/**", "server/realtime/**", "server/rpc/**", "server/tui/**"]
       },
       {
         "name": "server-application",
@@ -105,11 +88,7 @@
       },
       {
         "name": "server-infrastructure",
-        "patterns": [
-          "server/infrastructure/**",
-          "server/media/**",
-          "server/repositories/**"
-        ]
+        "patterns": ["server/infrastructure/**", "server/media/**", "server/repositories/**"]
       }
     ],
     "rules": [
@@ -135,12 +114,7 @@
       },
       {
         "from": "server-http",
-        "allow": [
-          "server-application",
-          "server-domain",
-          "server-infrastructure",
-          "shared-contract"
-        ]
+        "allow": ["server-application", "server-domain", "server-infrastructure", "shared-contract"]
       },
       {
         "from": "server-application",

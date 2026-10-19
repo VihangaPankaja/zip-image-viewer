@@ -24,16 +24,10 @@ export function normalizeSubtitles(text: string, extension: string): string {
   if (!isSrt) blocks.shift();
   let cues = 0;
   const converted = blocks.map((block) => {
-    if (
-      !isSrt &&
-      /^(NOTE(?:[ \t\n]|$)|STYLE(?:\n|$)|REGION(?:\n|$))/.test(block)
-    )
-      return block;
+    if (!isSrt && /^(NOTE(?:[ \t\n]|$)|STYLE(?:\n|$)|REGION(?:\n|$))/.test(block)) return block;
     const lines = block.split("\n");
     const timingIndex = lines[0]?.includes("-->") ? 0 : 1;
-    const timing = /^(\S+)[ \t]+-->[ \t]+(\S+)([^\n]*)$/.exec(
-      lines[timingIndex] ?? "",
-    );
+    const timing = /^(\S+)[ \t]+-->[ \t]+(\S+)([^\n]*)$/.exec(lines[timingIndex] ?? "");
     if (
       !timing ||
       !lines
@@ -42,13 +36,10 @@ export function normalizeSubtitles(text: string, extension: string): string {
         .trim() ||
       timestamp(timing[1]) >= timestamp(timing[2])
     ) {
-      throw new Error(
-        "Malformed subtitles. Check cue timestamps and text, then try again.",
-      );
+      throw new Error("Malformed subtitles. Check cue timestamps and text, then try again.");
     }
     cues += 1;
-    if (cues > 10000)
-      throw new Error("Subtitle files may contain at most 10,000 cues.");
+    if (cues > 10000) throw new Error("Subtitle files may contain at most 10,000 cues.");
     if (!isSrt) return block;
     // Text stays in a native text track, never in the document's HTML.
     return `${timing[1].replace(",", ".")} --> ${timing[2].replace(",", ".")}\n${lines.slice(timingIndex + 1).join("\n")}`;

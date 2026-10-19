@@ -7,15 +7,7 @@ import type { DownloadOptions, ThreadMode } from "../../domain/models.js";
 const MAX_THREAD_COUNT = 8;
 const MAX_RETRIES = 8;
 const UNLIMITED_RETRIES = -1;
-const VIDEO_QUALITIES = new Set([
-  "source",
-  "360p",
-  "480p",
-  "720p",
-  "1080p",
-  "1440p",
-  "2160p",
-]);
+const VIDEO_QUALITIES = new Set(["source", "360p", "480p", "720p", "1080p", "1440p", "2160p"]);
 
 export type DownloadSettings = {
   threadMode: ThreadMode;
@@ -46,16 +38,12 @@ function integer(value: unknown, fallback: number): number {
 }
 
 function threadMode(value: unknown): ThreadMode {
-  return value === "single" || value === "segmented" || value === "auto"
-    ? value
-    : "auto";
+  return value === "single" || value === "segmented" || value === "auto" ? value : "auto";
 }
 
 function retryCount(value: unknown, fallback: number): number {
   const parsed = integer(value, fallback);
-  return parsed === UNLIMITED_RETRIES
-    ? parsed
-    : Math.max(0, Math.min(MAX_RETRIES, parsed));
+  return parsed === UNLIMITED_RETRIES ? parsed : Math.max(0, Math.min(MAX_RETRIES, parsed));
 }
 
 function videoQuality(value: unknown, fallback: string): string {
@@ -82,10 +70,7 @@ export function normalizeDownloadSettings(input: unknown): DownloadSettings {
       source.enableResume === undefined
         ? DEFAULT_DOWNLOAD_SETTINGS.enableResume
         : Boolean(source.enableResume),
-    maxRetries: retryCount(
-      source.maxRetries,
-      DEFAULT_DOWNLOAD_SETTINGS.maxRetries,
-    ),
+    maxRetries: retryCount(source.maxRetries, DEFAULT_DOWNLOAD_SETTINGS.maxRetries),
     videoQuality: videoQuality(source.videoQuality, "720p"),
   };
 }
@@ -105,26 +90,17 @@ export function normalizeDownloadOptions(input: unknown): DownloadOptions {
       mode: threadMode(transport.mode ?? flat.threadMode),
       threads: Math.max(
         1,
-        Math.min(
-          MAX_THREAD_COUNT,
-          integer(transport.threads, flat.threadCount),
-        ),
+        Math.min(MAX_THREAD_COUNT, integer(transport.threads, flat.threadCount)),
       ),
       multithread:
         transport.multithread === undefined
           ? flat.enableMultithread
           : Boolean(transport.multithread),
-      resume:
-        transport.resume === undefined
-          ? flat.enableResume
-          : Boolean(transport.resume),
+      resume: transport.resume === undefined ? flat.enableResume : Boolean(transport.resume),
     },
     retry: {
       maxRetries: retryCount(retry.maxRetries, flat.maxRetries),
-      timeoutMs: Math.max(
-        5_000,
-        Math.min(180_000, integer(retry.timeoutMs, 30_000)),
-      ),
+      timeoutMs: Math.max(5_000, Math.min(180_000, integer(retry.timeoutMs, 30_000))),
     },
     media: {
       videoQuality: videoQuality(
@@ -149,9 +125,7 @@ export function normalizeDownloadOptions(input: unknown): DownloadOptions {
   };
 }
 
-export function downloadOptionsToSettings(
-  options: DownloadOptions,
-): DownloadSettings {
+export function downloadOptionsToSettings(options: DownloadOptions): DownloadSettings {
   return {
     threadMode: options.transport.mode,
     threadCount: options.transport.threads,

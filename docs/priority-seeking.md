@@ -12,7 +12,7 @@ Retained preparation is serialized within each session. Its coordinators remain 
 
 ## Verification
 
-Run `pnpm run benchmark:seek` for the isolated Chromium benchmark. It creates an actual 60-minute 640×360 H.264 source with two AAC languages, then checks a cold seek to 48:00, switching audio across a window boundary, and 30 prepared seeks outside the browser buffer on each network profile. Each profile starts with a fresh player buffer; the controlled 10 Mbps pass also disables the HTTP cache. Measurements use `requestVideoFrameCallback`, from seek assignment to a displayed target frame. The JSON report is written to `test-results/priority-seek-metrics.json` and attached to the Playwright result.
+Run `vpr benchmark:seek` for the isolated Chromium benchmark. It creates an actual 60-minute 640×360 H.264 source with two AAC languages, then checks a cold seek to 48:00, switching audio across a window boundary, and 30 prepared seeks outside the browser buffer on each network profile. Each profile starts with a fresh player buffer; the controlled 10 Mbps pass also disables the HTTP cache. Measurements use `requestVideoFrameCallback`, from seek assignment to a displayed target frame. The JSON report is written to `test-results/priority-seek-metrics.json` and attached to the Playwright result.
 
 The enforced targets are under three seconds for the cold seek, prepared p95 under 500 ms on loopback, and p95 under 1.5 seconds at 10 Mbps. CI runs this benchmark separately from other browser tests so competing encoders do not invalidate the measurement.
 

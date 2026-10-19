@@ -39,15 +39,11 @@ export class ProcessLimiter {
     }
   }
 
-  #acquire(
-    signal: AbortSignal | undefined,
-    priority: "interactive" | "background",
-  ): Promise<void> {
+  #acquire(signal: AbortSignal | undefined, priority: "interactive" | "background"): Promise<void> {
     if (signal?.aborted) return Promise.reject(abortError());
     if (
       this.#active < this.limit &&
-      (priority === "interactive" ||
-        this.#backgroundActive < Math.max(1, this.limit - 1))
+      (priority === "interactive" || this.#backgroundActive < Math.max(1, this.limit - 1))
     ) {
       this.#active += 1;
       if (priority === "background") this.#backgroundActive += 1;
@@ -73,8 +69,7 @@ export class ProcessLimiter {
     if (priority === "background") this.#backgroundActive -= 1;
     const backgroundIndex = this.#queue.findIndex(
       (waiter) =>
-        waiter.priority === "background" &&
-        this.#backgroundActive < Math.max(1, this.limit - 1),
+        waiter.priority === "background" && this.#backgroundActive < Math.max(1, this.limit - 1),
     );
     const index =
       backgroundIndex >= 0

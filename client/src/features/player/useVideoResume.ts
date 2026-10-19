@@ -3,9 +3,7 @@ import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 function readPosition(key: string) {
   try {
     const value: unknown = JSON.parse(localStorage.getItem(key) ?? "null");
-    return typeof value === "number" && Number.isFinite(value) && value > 0
-      ? value
-      : null;
+    return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
   } catch {
     return null;
   }
@@ -22,9 +20,7 @@ function writePosition(key: string, position: number | null) {
 }
 
 function resumablePosition(video: HTMLVideoElement, time: number) {
-  return Number.isFinite(video.duration) && video.duration - time <= 10
-    ? 0
-    : time;
+  return Number.isFinite(video.duration) && video.duration - time <= 10 ? 0 : time;
 }
 
 function createResumeHandlers(
@@ -43,16 +39,9 @@ function createResumeHandlers(
     lastWrite = Date.now();
   };
   const capture = () => {
-    if (
-      !ready ||
-      offered !== null ||
-      pendingSeek !== null ||
-      video.readyState < 1
-    )
-      return;
+    if (!ready || offered !== null || pendingSeek !== null || video.readyState < 1) return;
     const time = video.currentTime;
-    if (Number.isFinite(time) && time >= 0)
-      snapshot = resumablePosition(video, time);
+    if (Number.isFinite(time) && time >= 0) snapshot = resumablePosition(video, time);
   };
   const flush = () => {
     capture();
@@ -117,14 +106,9 @@ export function useVideoResume(
     const video = videoRef.current;
     if (!video) return;
     const key = `video-resume:${JSON.stringify([sessionId, path])}`;
-    const { events, choose, flush } = createResumeHandlers(
-      video,
-      key,
-      setPosition,
-    );
+    const { events, choose, flush } = createResumeHandlers(video, key, setPosition);
     chooseRef.current = choose;
-    for (const [event, listener] of Object.entries(events))
-      video.addEventListener(event, listener);
+    for (const [event, listener] of Object.entries(events)) video.addEventListener(event, listener);
     window.addEventListener("pagehide", flush);
     return () => {
       flush();

@@ -22,8 +22,7 @@ export async function restoreRetainedTorrents(
     try {
       await checkTorrent(job, snapshot.torrentFiles, adapter);
       const selected = job.torrentFiles.filter(({ selected }) => selected);
-      if (job.sessionId && selected.some(({ complete }) => complete))
-        await restoreSession(job);
+      if (job.sessionId && selected.some(({ complete }) => complete)) await restoreSession(job);
       Object.assign(job, { status: snapshot.status, phase: snapshot.phase });
       if (
         snapshot.status === "ready" &&
@@ -31,31 +30,21 @@ export async function restoreRetainedTorrents(
         selected.length &&
         selected.every(({ complete }) => complete)
       ) {
-        job.message =
-          "Retained torrent files are verified and ready to browse.";
+        job.message = "Retained torrent files are verified and ready to browse.";
       } else if (
-        ![
-          "awaiting_selection",
-          "awaiting_confirmation",
-          "error",
-          "cancelled",
-        ].includes(job.status)
+        !["awaiting_selection", "awaiting_confirmation", "error", "cancelled"].includes(job.status)
       ) {
         Object.assign(job, {
           status: "paused",
           phase: "paused",
           canPause: false,
           canResume: true,
-          downloadedBytes: selected.reduce(
-            (sum, file) => sum + file.downloadedBytes,
-            0,
-          ),
+          downloadedBytes: selected.reduce((sum, file) => sum + file.downloadedBytes, 0),
           percent: null,
           peerCount: 0,
           downloadSpeedBytesPerSec: 0,
           uploadSpeedBytesPerSec: 0,
-          message:
-            "Restored download. Resume to recheck and fetch missing pieces.",
+          message: "Restored download. Resume to recheck and fetch missing pieces.",
         });
       }
       saveRetainedTorrent(store, job);
@@ -64,12 +53,8 @@ export async function restoreRetainedTorrents(
         status: "error",
         phase: "error",
         canPause: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Could not restore torrent data.",
-        message:
-          "Stored torrent data could not be verified. Download files again to recover.",
+        error: error instanceof Error ? error.message : "Could not restore torrent data.",
+        message: "Stored torrent data could not be verified. Download files again to recover.",
       });
       saveRetainedTorrent(store, job);
     }
@@ -123,12 +108,8 @@ async function checkTorrent(
         onMetadata: ({ files }) => {
           job.torrentFiles = files.map((file) => ({
             ...file,
-            selected: originalFiles.some(
-              (saved) => saved.id === file.id && saved.selected,
-            ),
-            priority:
-              originalFiles.find((saved) => saved.id === file.id)?.priority ??
-              "normal",
+            selected: originalFiles.some((saved) => saved.id === file.id && saved.selected),
+            priority: originalFiles.find((saved) => saved.id === file.id)?.priority ?? "normal",
           }));
           throw checked;
         },

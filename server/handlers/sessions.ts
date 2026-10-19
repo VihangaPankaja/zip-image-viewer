@@ -17,10 +17,7 @@ type SessionRouteDependencies = {
   removeSession: (_sessionId: string, _reason: string) => Promise<void>;
 };
 
-export function registerSessionRoutes(
-  app: Express,
-  deps: SessionRouteDependencies,
-): void {
+export function registerSessionRoutes(app: Express, deps: SessionRouteDependencies): void {
   app.post("/api/sessions", (req, res) => {
     const parsed = createSessionInputSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -31,8 +28,7 @@ export function registerSessionRoutes(
         },
       });
     }
-    const { url, confirmOversize, downloadOptions, downloadSettings } =
-      parsed.data;
+    const { url, confirmOversize, downloadOptions, downloadSettings } = parsed.data;
     const job = deps.createJob(url, downloadOptions ?? downloadSettings ?? {});
 
     deps.emitJob(job, { message: "Queued archive request" });
@@ -47,9 +43,7 @@ export function registerSessionRoutes(
       deps.logEvent("warn", "session.tree.missing", {
         sessionId: req.params.id,
       });
-      return res
-        .status(404)
-        .json({ error: "Session not found or already cleaned up." });
+      return res.status(404).json({ error: "Session not found or already cleaned up." });
     }
 
     deps.logEvent("info", "session.tree.read", {

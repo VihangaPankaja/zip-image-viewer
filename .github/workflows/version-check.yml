@@ -18,9 +18,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
+      - name: Set up Vite+ and the project Node.js version
+        uses: voidzero-dev/setup-vp@v1.21.2
         with:
+          run-install: false
           node-version-file: .node-version
 
       - name: Fetch base branch

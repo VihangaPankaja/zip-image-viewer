@@ -32,9 +32,7 @@ export function useArchiveCleanup({
       resetHydration();
       resetArchiveView();
       if (removeRemoteSession && sessionId) {
-        await fetch(`/api/sessions/${sessionId}`, { method: "DELETE" }).catch(
-          () => {},
-        );
+        await fetch(`/api/sessions/${sessionId}`, { method: "DELETE" }).catch(() => {});
       }
       if (removeRemoteSession && jobId)
         await fetch(`/api/session-jobs/${jobId}?release=true`, {

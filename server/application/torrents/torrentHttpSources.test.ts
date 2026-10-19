@@ -7,8 +7,7 @@ import { expect, it, vi } from "vite-plus/test";
 import { createWebTorrentAdapter } from "./torrentDownloader.js";
 
 vi.mock("webtorrent", async (importOriginal) => {
-  const { default: WebTorrent } =
-    await importOriginal<typeof import("webtorrent")>();
+  const { default: WebTorrent } = await importOriginal<typeof import("webtorrent")>();
   return {
     default: class extends WebTorrent {
       constructor(options: ConstructorParameters<typeof WebTorrent>[0]) {
@@ -30,18 +29,14 @@ it("ignores torrent HTTP web seeds rather than bypassing guarded download reques
   let requests = 0;
   const server = createServer((_request, response) => {
     requests += 1;
-    response
-      .writeHead(206, { "content-length": 3, "content-range": "bytes 0-2/3" })
-      .end("abc");
+    response.writeHead(206, { "content-length": 3, "content-range": "bytes 0-2/3" }).end("abc");
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("No TCP port");
   const url = `http://127.0.0.1:${String(address.port)}/private`;
   const metadata = Buffer.concat([
-    Buffer.from(
-      "d4:infod6:lengthi3e4:name10:secret.txt12:piece lengthi16384e6:pieces20:",
-    ),
+    Buffer.from("d4:infod6:lengthi3e4:name10:secret.txt12:piece lengthi16384e6:pieces20:"),
     createHash("sha1").update("abc").digest(),
     Buffer.from(`e8:url-list${String(Buffer.byteLength(url))}:${url}e`),
   ]);

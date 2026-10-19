@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["node", "vitest/globals"],
+    "types": ["node", "vite-plus/test/globals"],
     "noEmit": true
   },
   "include": [
@@ -9,7 +9,6 @@
     "playwright.config.ts",
     "playwright.review.config.ts",
     "playwright.seek.config.ts",
-    "vitest.config.ts",
     "vite.config.ts"
   ]
 }

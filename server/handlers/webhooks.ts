@@ -1,9 +1,7 @@
 import type { Express } from "express";
 
 function hasProperties(value: unknown): boolean {
-  return (
-    typeof value === "object" && value !== null && Object.keys(value).length > 0
-  );
+  return typeof value === "object" && value !== null && Object.keys(value).length > 0;
 }
 
 export function registerWebhookRoutes(app: Express): void {

@@ -4,15 +4,8 @@ import request from "supertest";
 import { registerRpc } from "./registerRpc.js";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { ApplicationError } from "../domain/models.js";
-import {
-  jobSchema,
-  type Job,
-  type TorrentLimits,
-} from "../../shared/contracts.js";
-import {
-  createServerRpcRouter,
-  type ServerRpcDependencies,
-} from "./serverRouter.js";
+import { jobSchema, type Job, type TorrentLimits } from "../../shared/contracts.js";
+import { createServerRpcRouter, type ServerRpcDependencies } from "./serverRouter.js";
 
 function job(id = "2bf886fc-65bf-4e2f-b973-b607766b3131"): Job {
   return jobSchema.parse({
@@ -53,9 +46,7 @@ function dependencies(): ServerRpcDependencies {
     listJobs: () => [job()],
     listSessions: () => [],
     createJob: vi.fn(() => job()),
-    enqueueJobs: vi.fn((input: { items: Array<{ url: string }> }) =>
-      input.items.map(() => job()),
-    ),
+    enqueueJobs: vi.fn((input: { items: Array<{ url: string }> }) => input.items.map(() => job())),
     getSession: () => undefined,
     cancelJob: vi.fn((): Job => ({
       ...job(),
@@ -137,9 +128,7 @@ describe("createServerRpcRouter", () => {
     });
     await call(router.storage.pin, { id, pinned: true });
     expect(pin).toHaveBeenCalledWith(id, true);
-    await expect(
-      call(router.storage.pin, { id: "invalid", pinned: true }),
-    ).rejects.toThrow();
+    await expect(call(router.storage.pin, { id: "invalid", pinned: true })).rejects.toThrow();
     expect(pin).toHaveBeenCalledOnce();
     vi.spyOn(deps.storage, "clear").mockRejectedValue(
       new ApplicationError("CONFLICT", "Media is active.", 409),
@@ -168,10 +157,7 @@ describe("createServerRpcRouter", () => {
     const deps = dependencies();
     const router = createServerRpcRouter(deps);
     const result = await call(router.jobs.enqueue, {
-      items: [
-        { url: "https://example.com/one.zip" },
-        { url: "https://example.com/two.zip" },
-      ],
+      items: [{ url: "https://example.com/one.zip" }, { url: "https://example.com/two.zip" }],
       confirmOversize: false,
     });
     expect(result.items).toHaveLength(2);
@@ -210,14 +196,12 @@ describe("createServerRpcRouter", () => {
     const router = createServerRpcRouter(deps);
     const id = job().id;
     for (const fileIds of [[], ["0", "0"]]) {
-      await expect(
-        call(router.jobs.selectFiles, { id, fileIds }),
-      ).rejects.toThrow();
+      await expect(call(router.jobs.selectFiles, { id, fileIds })).rejects.toThrow();
     }
     expect(deps.selectFiles).not.toHaveBeenCalled();
-    await expect(
-      call(router.jobs.selectFiles, { id, fileIds: ["0"] }),
-    ).resolves.toMatchObject({ status: "queued" });
+    await expect(call(router.jobs.selectFiles, { id, fileIds: ["0"] })).resolves.toMatchObject({
+      status: "queued",
+    });
     expect(deps.selectFiles).toHaveBeenCalledWith(id, ["0"]);
   });
 
@@ -233,16 +217,15 @@ describe("createServerRpcRouter", () => {
       status: "queued",
     });
     await expect(call(router.jobs.remove, { id })).resolves.toBeUndefined();
-    await expect(
-      call(router.jobs.reorder, { jobIds: [id] }),
-    ).resolves.toHaveLength(1);
+    await expect(call(router.jobs.reorder, { jobIds: [id] })).resolves.toHaveLength(1);
     await expect(call(router.scheduler.get, undefined)).resolves.toEqual({
       activeCount: 0,
       maxConcurrent: 2,
     });
-    await expect(
-      call(router.scheduler.update, { maxConcurrent: 4 }),
-    ).resolves.toEqual({ activeCount: 0, maxConcurrent: 4 });
+    await expect(call(router.scheduler.update, { maxConcurrent: 4 })).resolves.toEqual({
+      activeCount: 0,
+      maxConcurrent: 4,
+    });
   });
 });
 
@@ -257,13 +240,9 @@ it("validates video metadata paths and output through the contract", async () =>
   expect(deps.videoQualities).toHaveBeenCalledWith(input);
   vi.mocked(deps.videoQualities).mockClear();
   for (const path of ["../secret.mp4", "/clip.mp4", "C:/clip.mp4", ""]) {
-    await expect(
-      call(router.video.qualities, { ...input, path }),
-    ).rejects.toThrow();
+    await expect(call(router.video.qualities, { ...input, path })).rejects.toThrow();
   }
-  await expect(
-    call(router.video.qualities, { ...input, sessionId: "invalid" }),
-  ).rejects.toThrow();
+  await expect(call(router.video.qualities, { ...input, sessionId: "invalid" })).rejects.toThrow();
   expect(deps.videoQualities).not.toHaveBeenCalled();
   vi.mocked(deps.videoQualities).mockResolvedValue({
     path: "clip.mp4",
@@ -305,9 +284,7 @@ it("validates file priorities and global bandwidth limits at the RPC boundary", 
     call(router.jobs.setFilePriority, { id, fileId: "", priority: "low" }),
   ).rejects.toThrow();
   const limits = { downloadBytesPerSec: 262144, uploadBytesPerSec: 65536 };
-  await expect(call(router.torrentLimits.update, limits)).resolves.toEqual(
-    limits,
-  );
+  await expect(call(router.torrentLimits.update, limits)).resolves.toEqual(limits);
   expect(deps.updateTorrentLimits).toHaveBeenCalledWith(limits);
   await expect(call(router.torrentLimits.get, undefined)).resolves.toEqual({
     downloadBytesPerSec: 0,

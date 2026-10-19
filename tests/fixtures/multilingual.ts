@@ -4,10 +4,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import ffmpegPath from "ffmpeg-static";
-import type {
-  Session,
-  VideoTranscodeEntry,
-} from "../../server/domain/models.js";
+import type { Session, VideoTranscodeEntry } from "../../server/domain/models.js";
 import {
   getVideoQualities,
   registerVideoMetadataRoutes,
@@ -35,8 +32,7 @@ export async function startMultilingualFixture(
   cacheBudgetBytes?: number,
   encoderPreference: HlsEncoderPreference = "cpu",
 ) {
-  if (!ffmpegPath)
-    throw new Error("FFmpeg is required for multilingual playback.");
+  if (!ffmpegPath) throw new Error("FFmpeg is required for multilingual playback.");
   const directory = await mkdtemp(path.join(tmpdir(), "ziv-multilingual-"));
   const filename = "multilingual.mkv";
   const session = {
@@ -45,23 +41,17 @@ export async function startMultilingualFixture(
     workspaceDir: directory,
   } as Session;
   const transcodes = new Map<string, VideoTranscodeEntry>();
-  const encoderEvents: { event: string; details?: Record<string, unknown> }[] =
-    [];
+  const encoderEvents: { event: string; details?: Record<string, unknown> }[] = [];
   const cache =
     cacheBudgetBytes === undefined
       ? undefined
-      : createDerivedMediaCache(
-          new Map([[session.id, session]]),
-          transcodes,
-          cacheBudgetBytes,
-        );
+      : createDerivedMediaCache(new Map([[session.id, session]]), transcodes, cacheBudgetBytes);
   const runtime = createVideoRuntime({
     ffmpegPath,
     encoderPreference,
     transcodes,
     logEvent: (_level, event, details) => {
-      if (event.startsWith("video.encoder."))
-        encoderEvents.push({ event, details });
+      if (event.startsWith("video.encoder.")) encoderEvents.push({ event, details });
     },
     protectSession: cache?.protectSession,
     enforceDerivedMediaBudget: cache?.enforce,
@@ -222,10 +212,7 @@ export async function startMultilingualFixture(
   );
   app.post("/rpc/video/qualities", async (_req, res) =>
     res.json({
-      json: await getVideoQualities(
-        { sessionId: session.id, path: filename },
-        deps,
-      ),
+      json: await getVideoQualities({ sessionId: session.id, path: filename }, deps),
     }),
   );
   app.get(`/api/sessions/${session.id}/tree`, (_req, res) =>
@@ -250,8 +237,7 @@ export async function startMultilingualFixture(
   const server = app.listen(port, "127.0.0.1");
   await once(server, "listening");
   const address = server.address();
-  if (!address || typeof address === "string")
-    throw new Error("Media fixture did not bind.");
+  if (!address || typeof address === "string") throw new Error("Media fixture did not bind.");
   return {
     origin: `http://127.0.0.1:${address.port}`,
     requests,

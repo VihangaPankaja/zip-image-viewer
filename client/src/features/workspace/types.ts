@@ -1,10 +1,7 @@
 import type { RefObject } from "react";
 import type Hls from "hls.js";
 import type { VideoMediaTrack } from "../../../../shared/contracts";
-import type {
-  VideoAudioMode,
-  VideoAudioOption,
-} from "../player/useVideoAudioTracks";
+import type { VideoAudioMode, VideoAudioOption } from "../player/useVideoAudioTracks";
 
 export type PreviewNode = {
   extension?: string;

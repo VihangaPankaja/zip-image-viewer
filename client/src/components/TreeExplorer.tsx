@@ -99,9 +99,7 @@ function TreeItem({
       </span>
       <span className="tree-item-label">{row.node.name}</span>
       <span className="tree-item-meta">
-        {row.node.type === "directory"
-          ? "Folder"
-          : row.node.extension || "file"}
+        {row.node.type === "directory" ? "Folder" : row.node.extension || "file"}
       </span>
     </button>
   );
@@ -139,8 +137,7 @@ export function TreeExplorer({
         : rootNode,
     [rootNode, mediaType, query],
   );
-  const { treeRef, range, revealIndex, setScrollTop } =
-    useTreeWindow(filteredRoot);
+  const { treeRef, range, revealIndex, setScrollTop } = useTreeWindow(filteredRoot);
   const navigation = useTreeNavigation(
     filteredRoot ?? rootNode,
     onSelect,
@@ -174,9 +171,7 @@ export function TreeExplorer({
       />
       {!filteredRoot ? (
         <p role="status">
-          {query
-            ? "No files match your filters."
-            : "No files match this media type."}
+          {query ? "No files match your filters." : "No files match this media type."}
         </p>
       ) : (
         <div
@@ -184,8 +179,7 @@ export function TreeExplorer({
           className={`tree-shell ${compact ? "compact" : ""} ${windowed ? "tree-windowed" : ""}`}
           onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
           tabIndex={
-            windowed &&
-            (navigation.activeIndex < start || navigation.activeIndex >= end)
+            windowed && (navigation.activeIndex < start || navigation.activeIndex >= end)
               ? 0
               : undefined
           }

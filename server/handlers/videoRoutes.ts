@@ -9,10 +9,7 @@ import type { VideoRouteDependencies } from "./video/types.js";
 
 export type { VideoRouteDependencies } from "./video/types.js";
 
-export function registerVideoRoutes(
-  app: Express,
-  deps: VideoRouteDependencies,
-): void {
+export function registerVideoRoutes(app: Express, deps: VideoRouteDependencies): void {
   registerVideoHlsRoutes(app, deps);
   registerVideoPlaybackRoutes(app, deps);
   registerVideoMetadataRoutes(app, deps);

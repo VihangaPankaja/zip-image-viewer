@@ -1,10 +1,7 @@
 import path from "node:path";
 import mime from "mime-types";
 import type { Express, RequestHandler } from "express";
-import type {
-  VideoQualities,
-  VideoQualitiesInput,
-} from "../../../shared/contracts.js";
+import type { VideoQualities, VideoQualitiesInput } from "../../../shared/contracts.js";
 import { ApplicationError } from "../../domain/models.js";
 import { queryText, resolveVideoFile } from "./routeContext.js";
 import type { VideoRouteDependencies } from "./types.js";
@@ -21,23 +18,12 @@ export async function getVideoQualities(
   >,
 ): Promise<VideoQualities> {
   const context = await resolveVideoFile(input.sessionId, input.path, deps);
-  const contentType =
-    mime.lookup(context.targetPath) || "application/octet-stream";
+  const contentType = mime.lookup(context.targetPath) || "application/octet-stream";
   const extension = path.extname(context.targetPath).slice(1).toLowerCase();
-  if (
-    !contentType.startsWith("video/") &&
-    !deps.VIDEO_EXTENSIONS.has(extension)
-  ) {
-    throw new ApplicationError(
-      "INVALID_INPUT",
-      "Selected file is not a video.",
-      400,
-    );
+  if (!contentType.startsWith("video/") && !deps.VIDEO_EXTENSIONS.has(extension)) {
+    throw new ApplicationError("INVALID_INPUT", "Selected file is not a video.", 400);
   }
-  const source = await deps.getVideoMetadata(
-    context.targetPath,
-    context.session,
-  );
+  const source = await deps.getVideoMetadata(context.targetPath, context.session);
   const qualityConfig = deps.buildVideoQualityOptions(source.height);
   const options =
     source.playbackMode === "remux"
@@ -47,8 +33,7 @@ export async function getVideoQualities(
           ...qualityConfig.options.slice(1),
         ]
       : qualityConfig.options;
-  if (source.playbackMode === "direct")
-    options[0] = { ...options[0], label: "Direct play" };
+  if (source.playbackMode === "direct") options[0] = { ...options[0], label: "Direct play" };
   const preferredQuality =
     (source.audioTracks?.length ?? 0) > 1
       ? "auto"
@@ -58,11 +43,9 @@ export async function getVideoQualities(
           ? "remux"
           : source.playbackMode === "transcode"
             ? "auto"
-            : context.session.selectedVideoQuality ||
-              qualityConfig.defaultQuality;
+            : context.session.selectedVideoQuality || qualityConfig.defaultQuality;
   const defaultQuality =
-    options.find(({ id }) => id === preferredQuality)?.id ||
-    qualityConfig.defaultQuality;
+    options.find(({ id }) => id === preferredQuality)?.id || qualityConfig.defaultQuality;
   return {
     path: context.normalizedPath,
     source: {
@@ -101,9 +84,7 @@ function createHlsStatusHandler(deps: VideoRouteDependencies): RequestHandler {
   return async (req, res) => {
     const session = deps.touchSession(queryText(req.params.id));
     if (!session) {
-      res
-        .status(404)
-        .json({ error: "Session not found or already cleaned up." });
+      res.status(404).json({ error: "Session not found or already cleaned up." });
       return;
     }
     const requestedPath = queryText(req.query.path);
@@ -115,8 +96,7 @@ function createHlsStatusHandler(deps: VideoRouteDependencies): RequestHandler {
     try {
       normalizedPath = deps.sanitizeEntryPath(requestedPath);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unexpected video error.";
+      const message = error instanceof Error ? error.message : "Unexpected video error.";
       res.status(400).json({ error: message });
       return;
     }
@@ -140,8 +120,7 @@ function createHlsStatusHandler(deps: VideoRouteDependencies): RequestHandler {
         availableSegments: await deps.refreshRenditionAvailability(rendition),
         expectedSegments: rendition.expectedSegments,
         encoderWaitMs:
-          rendition.encoderWaitMs ??
-          (rendition.queuedAt ? Date.now() - rendition.queuedAt : null),
+          rendition.encoderWaitMs ?? (rendition.queuedAt ? Date.now() - rendition.queuedAt : null),
       });
     }
     res.json({
@@ -159,10 +138,7 @@ function createHlsStatusHandler(deps: VideoRouteDependencies): RequestHandler {
   };
 }
 
-export function registerVideoMetadataRoutes(
-  app: Express,
-  deps: VideoRouteDependencies,
-): void {
+export function registerVideoMetadataRoutes(app: Express, deps: VideoRouteDependencies): void {
   app.get("/api/sessions/:id/video/qualities", createQualitiesHandler(deps));
   app.get("/api/sessions/:id/video/hls/status", createHlsStatusHandler(deps));
 }

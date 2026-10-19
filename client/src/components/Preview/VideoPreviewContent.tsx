@@ -6,10 +6,7 @@ import { VideoScrubber } from "./VideoScrubber";
 import { VideoSubtitles } from "./VideoSubtitles";
 import { VideoAudioTracks } from "./VideoAudioTracks";
 
-type VideoPreviewDetailsProps = Omit<
-  VideoPreviewProps,
-  "videoRef" | "videoShellRef"
->;
+type VideoPreviewDetailsProps = Omit<VideoPreviewProps, "videoRef" | "videoShellRef">;
 
 function transcodeAction(
   props: Pick<
@@ -39,9 +36,7 @@ function VideoPreviewToolbar(props: VideoPreviewDetailsProps) {
   return (
     <div className="preview-toolbar">
       <span>{props.formatBytes(props.selectedNode.size ?? 0)}</span>
-      <span>
-        {(props.selectedNode.extension || "video").toUpperCase()} stream
-      </span>
+      <span>{(props.selectedNode.extension || "video").toUpperCase()} stream</span>
       <CustomDropdown
         id="video-quality"
         label="Quality"
@@ -52,16 +47,14 @@ function VideoPreviewToolbar(props: VideoPreviewDetailsProps) {
       <span>
         Mode:{" "}
         {props.selectedVideoQuality === "source"
-          ? props.videoQualityOptions.find(({ id }) => id === "source")
-              ?.label === "Direct play"
+          ? props.videoQualityOptions.find(({ id }) => id === "source")?.label === "Direct play"
             ? "Direct play"
             : "Original file"
           : props.selectedVideoQuality === "remux"
             ? "Remux"
             : "Transcode"}
       </span>
-      {(props.audioTracks?.length ?? 0) > 1 &&
-      (props.videoAudioTracks?.length ?? 0) <= 1
+      {(props.audioTracks?.length ?? 0) > 1 && (props.videoAudioTracks?.length ?? 0) <= 1
         ? null
         : transcodeAction(props, "Transcode instead")}
       <span>{props.formatDate(props.selectedNode.modifiedAt ?? 0)}</span>
@@ -74,12 +67,8 @@ function selectedRendition(props: VideoPreviewDetailsProps) {
     props.videoHlsStatus?.renditions.find(
       ({ quality }) =>
         quality === props.selectedVideoQuality ||
-        (props.selectedVideoQuality === "auto" &&
-          quality === `${props.videoHeight}p`),
-    ) ??
-    (props.selectedVideoQuality === "auto"
-      ? props.videoHlsStatus?.renditions[0]
-      : undefined)
+        (props.selectedVideoQuality === "auto" && quality === `${props.videoHeight}p`),
+    ) ?? (props.selectedVideoQuality === "auto" ? props.videoHlsStatus?.renditions[0] : undefined)
   );
 }
 
@@ -97,13 +86,8 @@ function playbackLabel(props: VideoPreviewDetailsProps) {
   const preparing =
     !["source", "remux"].includes(props.selectedVideoQuality) &&
     props.videoPlaybackStatus !== "ready";
-  if (preparing && rendition?.status === "queued")
-    return "Waiting for video encoder";
-  if (
-    preparing &&
-    rendition?.status === "running" &&
-    !rendition.availableSegments
-  )
+  if (preparing && rendition?.status === "queued") return "Waiting for video encoder";
+  if (preparing && rendition?.status === "running" && !rendition.availableSegments)
     return "Preparing video";
   if (props.videoPlaybackStatus === "buffering") return "Buffering video";
   if (props.videoPlaybackStatus === "loading") return "Loading video";
@@ -129,15 +113,10 @@ function PlaybackStatus(props: VideoPreviewDetailsProps) {
     <div className="progress-meta-row">
       <span aria-live="polite">{status}</span>
       {noPeers ? (
-        <button
-          className="ghost-button"
-          type="button"
-          onClick={props.onOpenDownloads}
-        >
+        <button className="ghost-button" type="button" onClick={props.onOpenDownloads}>
           Open downloads
         </button>
-      ) : rendition?.status === "queued" &&
-        props.videoPlaybackStatus !== "ready" ? (
+      ) : rendition?.status === "queued" && props.videoPlaybackStatus !== "ready" ? (
         <button
           className="ghost-button"
           type="button"
@@ -158,11 +137,7 @@ function PlaybackResume(resume: ReturnType<typeof useVideoResume>) {
   if (resume.position === null) return null;
   return (
     <div className="progress-meta-row" aria-label="Resume playback">
-      <button
-        className="ghost-button"
-        type="button"
-        onClick={resume.continuePlayback}
-      >
+      <button className="ghost-button" type="button" onClick={resume.continuePlayback}>
         Continue from {Math.floor(resume.position / 60)}:
         {String(Math.floor(resume.position % 60)).padStart(2, "0")}
       </button>
@@ -186,8 +161,7 @@ function PlaybackRecovery(
     <div className="navigation-hint" role="alert">
       <span>{props.videoPlaybackError}</span>{" "}
       {transcodeAction(props, "Try adaptive playback") ??
-        (props.videoPlaybackError ===
-          "This browser cannot decode this stream." &&
+        (props.videoPlaybackError === "This browser cannot decode this stream." &&
         props.selectedVideoQuality !== "source" ? (
           <button
             className="ghost-button"
@@ -197,11 +171,7 @@ function PlaybackRecovery(
             Try Original
           </button>
         ) : (
-          <button
-            className="ghost-button"
-            type="button"
-            onClick={props.retryVideoPlayback}
-          >
+          <button className="ghost-button" type="button" onClick={props.retryVideoPlayback}>
             Retry playback
           </button>
         ))}
@@ -209,23 +179,14 @@ function PlaybackRecovery(
   ) : null;
 }
 
-export function VideoPreviewContent({
-  videoRef,
-  videoShellRef,
-  ...props
-}: VideoPreviewProps) {
-  const resume = useVideoResume(
-    videoRef,
-    props.sessionId,
-    props.selectedNode.path,
-  );
+export function VideoPreviewContent({ videoRef, videoShellRef, ...props }: VideoPreviewProps) {
+  const resume = useVideoResume(videoRef, props.sessionId, props.selectedNode.path);
   return (
     <div className="preview-stage">
       <VideoPreviewToolbar {...props} />
       <p className="navigation-hint">
         {props.selectedVideoQuality === "source"
-          ? props.videoQualityOptions.find(({ id }) => id === "source")
-              ?.label === "Direct play"
+          ? props.videoQualityOptions.find(({ id }) => id === "source")?.label === "Direct play"
             ? "Compatible MP4: plays the original file without encoding."
             : "Original file: browser support depends on its container and codecs."
           : props.selectedVideoQuality === "remux"

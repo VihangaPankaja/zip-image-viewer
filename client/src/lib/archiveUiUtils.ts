@@ -10,19 +10,11 @@ type ArchiveJobLike = {
   totalEntries?: number;
 };
 
-export function getImageCacheKey(
-  sessionId: string,
-  imagePath: string,
-  quality: string,
-): string {
+export function getImageCacheKey(sessionId: string, imagePath: string, quality: string): string {
   return `${sessionId}:${imagePath}:${quality}`;
 }
 
-export function getWrappedPath(
-  items: string[],
-  currentIndex: number,
-  delta: number,
-): string {
+export function getWrappedPath(items: string[], currentIndex: number, delta: number): string {
   if (!items.length || currentIndex === -1) {
     return "";
   }
@@ -31,9 +23,7 @@ export function getWrappedPath(
   return items[nextIndex] || "";
 }
 
-export function formatProgressMessage(
-  job: ArchiveJobLike | null | undefined,
-): string {
+export function formatProgressMessage(job: ArchiveJobLike | null | undefined): string {
   if (!job) {
     return "";
   }

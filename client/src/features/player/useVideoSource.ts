@@ -1,18 +1,8 @@
 import type Hls from "hls.js";
-import {
-  useEffect,
-  useRef,
-  type Dispatch,
-  type RefObject,
-  type SetStateAction,
-} from "react";
+import { useEffect, useRef, type Dispatch, type RefObject, type SetStateAction } from "react";
 import { getVideoMimeType } from "../../lib/mimeTypeSystem";
 import { useVideoAudioTracks } from "./useVideoAudioTracks";
-import {
-  createAdaptiveHlsConfig,
-  loadHlsModule,
-  resolveManualLevel,
-} from "./adaptiveQuality";
+import { createAdaptiveHlsConfig, loadHlsModule, resolveManualLevel } from "./adaptiveQuality";
 
 type VideoSourceParams = {
   extension?: string;
@@ -22,19 +12,14 @@ type VideoSourceParams = {
   selectedKind: string;
   selectedQuality: string;
   setPlaybackError: Dispatch<SetStateAction<string>>;
-  setPlaybackStatus: Dispatch<
-    SetStateAction<"loading" | "buffering" | "ready">
-  >;
+  setPlaybackStatus: Dispatch<SetStateAction<"loading" | "buffering" | "ready">>;
   setVideoHeight: Dispatch<SetStateAction<number | null>>;
   videoRef: RefObject<HTMLVideoElement | null>;
 };
 
 type AudioBindings = Pick<
   ReturnType<typeof useVideoAudioTracks>,
-  | "resetAudioTracks"
-  | "updateHlsAudioTracks"
-  | "updateSelectedAudioTrack"
-  | "bindNativeAudioTracks"
+  "resetAudioTracks" | "updateHlsAudioTracks" | "updateSelectedAudioTrack" | "bindNativeAudioTracks"
 >;
 
 type AdaptiveSourceParams = Pick<
@@ -55,11 +40,7 @@ function resetVideoSource(player: HTMLVideoElement) {
   player.load();
 }
 
-function attachOriginalSource(
-  player: HTMLVideoElement,
-  originalUrl: string,
-  extension?: string,
-) {
+function attachOriginalSource(player: HTMLVideoElement, originalUrl: string, extension?: string) {
   player.querySelectorAll("source").forEach((source) => source.remove());
   player.removeAttribute("src");
   const source = document.createElement("source");
@@ -84,11 +65,7 @@ function attachFileSource(
   );
 }
 
-function restorePlayback(
-  player: HTMLVideoElement,
-  resumeTime: number,
-  wasPlaying: boolean,
-) {
+function restorePlayback(player: HTMLVideoElement, resumeTime: number, wasPlaying: boolean) {
   if (resumeTime > 0) player.currentTime = resumeTime;
   if (wasPlaying) void player.play().catch(() => {});
 }
@@ -97,9 +74,7 @@ function reportAttachmentError(
   error: unknown,
   setPlaybackError: VideoSourceParams["setPlaybackError"],
 ) {
-  setPlaybackError(
-    error instanceof Error ? error.message : "HLS playback failed.",
-  );
+  setPlaybackError(error instanceof Error ? error.message : "HLS playback failed.");
 }
 
 async function attachAdaptiveSource(
@@ -128,17 +103,14 @@ async function attachAdaptiveSource(
     createAdaptiveHlsConfig(HlsConstructor.DefaultConfig.playlistLoadPolicy),
   );
   params.hlsRef.current = hls;
-  hls.on(HlsConstructor.Events.AUDIO_TRACKS_UPDATED, () =>
-    params.updateHlsAudioTracks(hls),
-  );
+  hls.on(HlsConstructor.Events.AUDIO_TRACKS_UPDATED, () => params.updateHlsAudioTracks(hls));
   hls.on(HlsConstructor.Events.AUDIO_TRACK_SWITCHED, (_event, data) =>
     params.updateSelectedAudioTrack(data.id),
   );
   hls.on(HlsConstructor.Events.ERROR, (_event, data) => {
     if (data.fatal) {
       const missingSegment =
-        data.response?.code === 404 &&
-        data.details.toLowerCase().includes("frag");
+        data.response?.code === 404 && data.details.toLowerCase().includes("frag");
       params.setPlaybackError(
         missingSegment
           ? "Video segment is missing."
@@ -187,18 +159,12 @@ function attachVideoSource(
   destroyHls(params.hlsRef);
   const removeNativeAudioListeners = params.bindNativeAudioTracks(player);
   const onResize = () => params.setVideoHeight(player.videoHeight || null);
-  const onLoadedMetadata = () =>
-    restorePlayback(player, resumeTime, wasPlaying);
+  const onLoadedMetadata = () => restorePlayback(player, resumeTime, wasPlaying);
   player.addEventListener("resize", onResize);
   player.addEventListener("loadedmetadata", onLoadedMetadata, { once: true });
   let cancelled = false;
   if (["source", "remux"].includes(params.selectedQuality))
-    attachFileSource(
-      player,
-      params.originalUrl,
-      params.selectedQuality,
-      params.extension,
-    );
+    attachFileSource(player, params.originalUrl, params.selectedQuality, params.extension);
   else {
     resetVideoSource(player);
     void attachAdaptiveSource(
@@ -296,11 +262,7 @@ export function useVideoSource(params: VideoSourceParams) {
   useEffect(() => {
     qualityRef.current = selectedQuality;
     const hls = hlsRef.current;
-    if (
-      hls &&
-      !["source", "remux"].includes(selectedQuality) &&
-      hls.levels.length
-    ) {
+    if (hls && !["source", "remux"].includes(selectedQuality) && hls.levels.length) {
       hls.loadLevel = resolveManualLevel(
         selectedQuality,
         hls.levels.map((level) => level.height),
@@ -308,12 +270,8 @@ export function useVideoSource(params: VideoSourceParams) {
     }
   }, [hlsRef, selectedQuality]);
   useAttachedVideoSource(params, qualityRef, audio);
-  const {
-    videoAudioTracks,
-    selectedVideoAudioTrack,
-    videoAudioMode,
-    setSelectedVideoAudioTrack,
-  } = audio;
+  const { videoAudioTracks, selectedVideoAudioTrack, videoAudioMode, setSelectedVideoAudioTrack } =
+    audio;
   return {
     videoAudioTracks,
     selectedVideoAudioTrack,

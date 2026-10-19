@@ -26,10 +26,7 @@ describe("DownloadManager", () => {
     const user = userEvent.setup();
     render(
       <DownloadManager
-        jobs={[
-          job(),
-          job({ id: "f86946a1-bcf7-4137-87c6-51502024367a", queuePosition: 1 }),
-        ]}
+        jobs={[job(), job({ id: "f86946a1-bcf7-4137-87c6-51502024367a", queuePosition: 1 })]}
         onCancel={vi.fn()}
         onSelectFiles={vi.fn()}
         onFilePriority={vi.fn()}
@@ -91,18 +88,12 @@ describe("DownloadManager", () => {
 
     expect(screen.getByText("Large archive.zip")).toBeVisible();
     expect(screen.getByText(/larger than 1 GiB/)).toBeVisible();
-    await user.click(
-      screen.getByRole("button", { name: "Confirm & download" }),
-    );
-    expect(onConfirm).toHaveBeenCalledWith(
-      "2bf886fc-65bf-4e2f-b973-b607766b3131",
-    );
+    await user.click(screen.getByRole("button", { name: "Confirm & download" }));
+    expect(onConfirm).toHaveBeenCalledWith("2bf886fc-65bf-4e2f-b973-b607766b3131");
     expect(screen.getByRole("button", { name: "Confirming…" })).toBeDisabled();
     confirm?.();
     await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "Confirm & download" }),
-      ).toBeEnabled(),
+      expect(screen.getByRole("button", { name: "Confirm & download" })).toBeEnabled(),
     );
   });
 
@@ -131,16 +122,10 @@ describe("DownloadManager", () => {
       />,
     );
 
-    await user.click(
-      screen.getByRole("button", { name: "Confirm & download" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Confirm & download" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Confirmation failed",
-    );
-    expect(
-      screen.getByRole("button", { name: "Confirm & download" }),
-    ).toBeEnabled();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Confirmation failed");
+    expect(screen.getByRole("button", { name: "Confirm & download" })).toBeEnabled();
   });
 
   it("uses the pathname for HTTP torrent files", () => {
@@ -237,9 +222,7 @@ describe("DownloadDialog", () => {
     await user.tab();
 
     expect(screen.getAllByLabelText("Download URL")).toHaveLength(2);
-    expect(
-      screen.queryByRole("button", { name: "Review links" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Review links" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Add to queue" }));
     expect(onSubmit).toHaveBeenCalledWith([
       expect.objectContaining({ url: "https://example.com/a.zip" }),
@@ -302,12 +285,8 @@ describe("DownloadDialog", () => {
         onSubmit={onSubmit}
       />,
     );
-    const magnet =
-      "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567";
-    await user.type(
-      screen.getByRole("textbox", { name: "Paste download URLs" }),
-      magnet,
-    );
+    const magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567";
+    await user.type(screen.getByRole("textbox", { name: "Paste download URLs" }), magnet);
     await user.tab();
     await user.click(screen.getByText("Per-download settings"));
     await user.selectOptions(screen.getByLabelText("Source type"), "torrent");
@@ -353,17 +332,11 @@ describe("DownloadDialog", () => {
     );
     await user.tab();
     await user.click(screen.getByRole("button", { name: "Add to queue" }));
-    expect(
-      screen.getByRole("button", { name: "Adding to queue…" }),
-    ).toBeDisabled();
-    expect(screen.getByLabelText("Download URL")).toHaveValue(
-      "https://example.com/accepted.zip",
-    );
+    expect(screen.getByRole("button", { name: "Adding to queue…" })).toBeDisabled();
+    expect(screen.getByLabelText("Download URL")).toHaveValue("https://example.com/accepted.zip");
 
     accept?.();
-    await waitFor(() =>
-      expect(screen.queryByLabelText("Download URL")).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.queryByLabelText("Download URL")).not.toBeInTheDocument());
     view.rerender(
       <DownloadDialog
         defaultOptions={{
@@ -403,9 +376,7 @@ describe("DownloadDialog", () => {
       />,
     );
     expect(screen.queryByLabelText("Download URL")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("textbox", { name: "Paste download URLs" }),
-    ).toHaveValue("");
+    expect(screen.getByRole("textbox", { name: "Paste download URLs" })).toHaveValue("");
   });
 
   it("keeps the draft and reports a failed enqueue", async () => {
@@ -437,12 +408,8 @@ describe("DownloadDialog", () => {
     await user.tab();
     await user.click(screen.getByRole("button", { name: "Add to queue" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Queue unavailable",
-    );
-    expect(screen.getByLabelText("Download URL")).toHaveValue(
-      "https://example.com/retry.zip",
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("Queue unavailable");
+    expect(screen.getByLabelText("Download URL")).toHaveValue("https://example.com/retry.zip");
     expect(screen.getByRole("button", { name: "Add to queue" })).toBeEnabled();
   });
 });

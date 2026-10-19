@@ -8,11 +8,7 @@ export type ExtractedEntry = {
   modifiedAt: number;
 };
 
-function createNode(
-  name: string,
-  nodePath: string,
-  type: "file" | "directory",
-): ExplorerNode {
+function createNode(name: string, nodePath: string, type: "file" | "directory"): ExplorerNode {
   return {
     name,
     path: nodePath,
@@ -44,11 +40,7 @@ export function buildTree(entries: ExtractedEntry[], rootName: string) {
       const isFile = index === parts.length - 1 && entry.type === "file";
       const node = nodes.get(nextPath);
       if (!node) {
-        const created = createNode(
-          name,
-          nextPath,
-          isFile ? "file" : "directory",
-        );
+        const created = createNode(name, nextPath, isFile ? "file" : "directory");
         created.parentPath = currentPath;
         created.modifiedAt = entry.modifiedAt;
         if (isFile) created.size = entry.size;

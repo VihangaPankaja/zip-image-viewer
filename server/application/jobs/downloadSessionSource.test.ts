@@ -5,24 +5,16 @@ import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 import { CONFIRM_SIZE_BYTES } from "../../config/runtimeConstants.js";
 import { normalizeDownloadSettings } from "../downloads/downloadOptions.js";
 import { createJobManager } from "./jobManager.js";
-import {
-  downloadSessionSource,
-  type DownloadSourceDependencies,
-} from "./downloadSessionSource.js";
+import { downloadSessionSource, type DownloadSourceDependencies } from "./downloadSessionSource.js";
 
 const mocks = vi.hoisted(() => ({ metadata: vi.fn(), sleep: vi.fn() }));
 vi.mock("../../infrastructure/downloads/remoteMetadata.js", () => ({
   fetchRemoteMetadata: mocks.metadata,
 }));
-vi.mock(
-  "../../infrastructure/runtime/mediaClassification.js",
-  async (original) => ({
-    ...(await original<
-      typeof import("../../infrastructure/runtime/mediaClassification.js")
-    >()),
-    sleepWithSignal: mocks.sleep,
-  }),
-);
+vi.mock("../../infrastructure/runtime/mediaClassification.js", async (original) => ({
+  ...(await original<typeof import("../../infrastructure/runtime/mediaClassification.js")>()),
+  sleepWithSignal: mocks.sleep,
+}));
 
 const workspaces: string[] = [];
 beforeEach(() => {
@@ -36,11 +28,7 @@ beforeEach(() => {
 });
 afterEach(async () => {
   vi.clearAllMocks();
-  await Promise.all(
-    workspaces
-      .splice(0)
-      .map((dir) => rm(dir, { recursive: true, force: true })),
-  );
+  await Promise.all(workspaces.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
 async function setup(overrides = {}) {
@@ -50,9 +38,7 @@ async function setup(overrides = {}) {
   const job = manager.createJob("https://example.com/archive.zip");
   job.abortController = new AbortController();
   const settings = normalizeDownloadSettings(overrides);
-  const download = vi
-    .fn<DownloadSourceDependencies["download"]>()
-    .mockResolvedValue(undefined);
+  const download = vi.fn<DownloadSourceDependencies["download"]>().mockResolvedValue(undefined);
   const deps = {
     emitJob: manager.emitJob,
     closeJob: manager.closeJob,
@@ -156,18 +142,17 @@ it.each([408, 429, 500, undefined])(
   },
 );
 
-it.each([
-  { statusCode: 404 },
-  { code: "DOWNLOAD_FATAL" },
-  { name: "AbortError" },
-])("does not retry permanent or aborted failures (%j)", async (details) => {
-  const test = await setup();
-  const error = Object.assign(new Error("Stop download"), details);
-  test.download.mockRejectedValue(error);
-  await expect(test.run()).rejects.toBe(error);
-  expect(test.download).toHaveBeenCalledOnce();
-  expect(mocks.sleep).not.toHaveBeenCalled();
-});
+it.each([{ statusCode: 404 }, { code: "DOWNLOAD_FATAL" }, { name: "AbortError" }])(
+  "does not retry permanent or aborted failures (%j)",
+  async (details) => {
+    const test = await setup();
+    const error = Object.assign(new Error("Stop download"), details);
+    test.download.mockRejectedValue(error);
+    await expect(test.run()).rejects.toBe(error);
+    expect(test.download).toHaveBeenCalledOnce();
+    expect(mocks.sleep).not.toHaveBeenCalled();
+  },
+);
 
 it("stops at the retry budget and propagates the original failure", async () => {
   const test = await setup({ maxRetries: 1 });
@@ -180,9 +165,7 @@ it("stops at the retry budget and propagates the original failure", async () => 
 
 it("allows unlimited retries until success", async () => {
   const test = await setup({ maxRetries: -1 });
-  test.download
-    .mockRejectedValueOnce("offline")
-    .mockRejectedValueOnce("offline");
+  test.download.mockRejectedValueOnce("offline").mockRejectedValueOnce("offline");
   await expect(test.run()).resolves.toBe("complete");
   expect(test.download).toHaveBeenCalledTimes(3);
 });

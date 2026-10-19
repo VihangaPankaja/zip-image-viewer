@@ -1,4 +1,3 @@
-/* eslint-disable max-lines */
 import { useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { DownloadOptions } from "../../../types/download";
 import { useModalDialog } from "../../../hooks/useModalDialog";
@@ -86,8 +85,7 @@ function DraftSettings({
             onChange={(event) =>
               onChange({
                 ...draft,
-                sourcePreference: event.currentTarget
-                  .value as DownloadItem["sourcePreference"],
+                sourcePreference: event.currentTarget.value as DownloadItem["sourcePreference"],
               })
             }
           >
@@ -105,13 +103,10 @@ function DraftSettings({
             disabled={
               draft.sourcePreference === "torrent" ||
               (draft.sourcePreference === "auto" &&
-                (draft.url.startsWith("magnet:") ||
-                  /\.torrent(?:[?#]|$)/i.test(draft.url)))
+                (draft.url.startsWith("magnet:") || /\.torrent(?:[?#]|$)/i.test(draft.url)))
             }
             value={draft.downloadOptions.transport.threads}
-            onChange={(event) =>
-              updateTransport(Number(event.currentTarget.value))
-            }
+            onChange={(event) => updateTransport(Number(event.currentTarget.value))}
           />
         </label>
         <label>
@@ -121,9 +116,7 @@ function DraftSettings({
             min="0"
             max="8"
             value={draft.downloadOptions.retry.maxRetries}
-            onChange={(event) =>
-              updateRetries(Number(event.currentTarget.value))
-            }
+            onChange={(event) => updateRetries(Number(event.currentTarget.value))}
           />
         </label>
       </div>
@@ -156,9 +149,7 @@ function DownloadDraftRow({
           value={draft.url}
           aria-invalid={!valid}
           aria-describedby={valid ? undefined : errorId}
-          onChange={(event) =>
-            onChange({ ...draft, url: event.currentTarget.value })
-          }
+          onChange={(event) => onChange({ ...draft, url: event.currentTarget.value })}
         />
         {!valid ? (
           <span id={errorId} className="draft-error">
@@ -224,13 +215,9 @@ function DraftList({
           index={index}
           duplicate={(urlCounts.get(draft.url) ?? 0) > 1}
           onChange={(next) =>
-            setDrafts((current) =>
-              current.map((item) => (item.id === next.id ? next : item)),
-            )
+            setDrafts((current) => current.map((item) => (item.id === next.id ? next : item)))
           }
-          onRemove={() =>
-            setDrafts((current) => current.filter(({ id }) => id !== draft.id))
-          }
+          onRemove={() => setDrafts((current) => current.filter(({ id }) => id !== draft.id))}
         />
       ))}
     </div>
@@ -258,9 +245,7 @@ function DialogFooter({
       <button
         className="primary-button"
         type="submit"
-        disabled={
-          isSubmitting || !readyCount || invalidCount > 0 || duplicateCount > 0
-        }
+        disabled={isSubmitting || !readyCount || invalidCount > 0 || duplicateCount > 0}
       >
         {isSubmitting ? "Adding to queue…" : "Add to queue"}
       </button>
@@ -269,13 +254,8 @@ function DialogFooter({
 }
 
 // The state and native dialog lifecycle stay together so submit failures preserve drafts.
-// eslint-disable-next-line max-lines-per-function
-export function DownloadDialog({
-  defaultOptions,
-  open,
-  onClose,
-  onSubmit,
-}: DownloadDialogProps) {
+// oxlint-disable-next-line max-lines-per-function
+export function DownloadDialog({ defaultOptions, open, onClose, onSubmit }: DownloadDialogProps) {
   const [source, setSource] = useState("");
   const [drafts, setDrafts] = useState<DownloadDraft[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -289,15 +269,9 @@ export function DownloadDialog({
   );
   const submissionDrafts = [...drafts, ...pendingDrafts];
   const urlCounts = new Map<string, number>();
-  submissionDrafts.forEach(({ url }) =>
-    urlCounts.set(url, (urlCounts.get(url) ?? 0) + 1),
-  );
-  const invalidCount = submissionDrafts.filter(
-    (draft) => !validDraft(draft),
-  ).length;
-  const duplicateCount = submissionDrafts.filter(
-    ({ url }) => (urlCounts.get(url) ?? 0) > 1,
-  ).length;
+  submissionDrafts.forEach(({ url }) => urlCounts.set(url, (urlCounts.get(url) ?? 0) + 1));
+  const invalidCount = submissionDrafts.filter((draft) => !validDraft(draft)).length;
+  const duplicateCount = submissionDrafts.filter(({ url }) => (urlCounts.get(url) ?? 0) > 1).length;
   const addDrafts = () => {
     const startId = nextDraftId.current;
     const added = pendingDrafts.map((draft, index) => ({
@@ -329,9 +303,7 @@ export function DownloadDialog({
       setDrafts([]);
     } catch (error) {
       setSubmitError(
-        error instanceof Error
-          ? error.message
-          : "Could not add downloads to the queue.",
+        error instanceof Error ? error.message : "Could not add downloads to the queue.",
       );
     } finally {
       setIsSubmitting(false);
@@ -362,16 +334,8 @@ export function DownloadDialog({
             Close
           </button>
         </header>
-        <DownloadCompose
-          source={source}
-          setSource={setSource}
-          addDrafts={addDrafts}
-        />
-        <DraftList
-          drafts={drafts}
-          urlCounts={urlCounts}
-          setDrafts={setDrafts}
-        />
+        <DownloadCompose source={source} setSource={setSource} addDrafts={addDrafts} />
+        <DraftList drafts={drafts} urlCounts={urlCounts} setDrafts={setDrafts} />
         {submitError ? (
           <p className="download-submit-error" role="alert">
             {submitError}

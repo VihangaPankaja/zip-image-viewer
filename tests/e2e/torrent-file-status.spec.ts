@@ -1,24 +1,18 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { tapVisibleTarget } from "./touch";
-import {
-  installReviewFixtures,
-  reviewActiveTorrentJob,
-} from "../review/fixtures";
+import { installReviewFixtures, reviewActiveTorrentJob } from "../review/fixtures";
 
 test.use({ hasTouch: true });
 
-test("torrent file status filters compose without changing selection", async ({
-  page,
-}) => {
+test("torrent file status filters compose without changing selection", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 844 });
   const state = await installReviewFixtures(page);
   const job = reviewActiveTorrentJob();
   state.jobs = [job];
   const mutations: string[] = [];
   page.on("request", (request) => {
-    if (new URL(request.url()).pathname.endsWith("jobs/selectFiles"))
-      mutations.push(request.url());
+    if (new URL(request.url()).pathname.endsWith("jobs/selectFiles")) mutations.push(request.url());
   });
   await page.goto("/");
   const open = page.getByRole("button", { name: "View files", exact: true });
@@ -26,9 +20,7 @@ test("torrent file status filters compose without changing selection", async ({
   const dialog = page.getByRole("dialog", { name: "Torrent files" });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("checkbox")).toHaveCount(0);
-  await expect(
-    dialog.getByRole("button", { name: "Start selected download" }),
-  ).toHaveCount(0);
+  await expect(dialog.getByRole("button", { name: "Start selected download" })).toHaveCount(0);
   const status = dialog.getByRole("combobox", { name: "File status" });
   const media = dialog.getByRole("combobox", { name: "Media type" });
   const search = dialog.getByRole("searchbox", { name: "Search files" });
@@ -47,21 +39,13 @@ test("torrent file status filters compose without changing selection", async ({
   await media.selectOption("all");
   await status.selectOption("skipped");
   await expect(dialog.getByText("1 of 4 files shown")).toBeVisible();
-  await expect(
-    dialog.getByText("Behind the scenes.mp4", { exact: true }),
-  ).toBeVisible();
+  await expect(dialog.getByText("Behind the scenes.mp4", { exact: true })).toBeVisible();
   await status.selectOption("available");
   await expect(dialog.getByText("0 of 4 files shown")).toBeVisible();
   await status.selectOption("downloaded");
   await expect(dialog.getByText("1 of 4 files shown")).toBeVisible();
-  expect(
-    (await new AxeBuilder({ page }).include("dialog").analyze()).violations,
-  ).toEqual([]);
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
+  expect((await new AxeBuilder({ page }).include("dialog").analyze()).violations).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await expect(open).toBeFocused();

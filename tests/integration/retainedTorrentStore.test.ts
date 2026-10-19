@@ -23,9 +23,7 @@ it("contains failed snapshot writes during progress, close, shutdown and restore
     const save = vi.spyOn(store, "save").mockImplementation(() => {
       throw new Error("SQLITE_FULL: database or disk is full");
     });
-    expect(() =>
-      manager.emitJob(job, { status: "downloading", downloadedBytes: 1 }),
-    ).not.toThrow();
+    expect(() => manager.emitJob(job, { status: "downloading", downloadedBytes: 1 })).not.toThrow();
     expect(job).toMatchObject({
       status: "error",
       phase: "error",
@@ -35,9 +33,7 @@ it("contains failed snapshot writes during progress, close, shutdown and restore
     expect(job.abortController.signal.reason).toMatchObject({
       name: "RetainedTorrentStorageError",
     });
-    expect(response.write).toHaveBeenCalledWith(
-      expect.stringContaining("SQLITE_FULL"),
-    );
+    expect(response.write).toHaveBeenCalledWith(expect.stringContaining("SQLITE_FULL"));
     expect(response.end).toHaveBeenCalled();
     expect(log).toHaveBeenCalledWith(
       "error",
@@ -45,17 +41,10 @@ it("contains failed snapshot writes during progress, close, shutdown and restore
       expect.objectContaining({ jobId: job.id }),
     );
     expect(() => manager.closeJob(job, "ready")).not.toThrow();
-    await expect(
-      manager.cleanupJob(job.id, "shutdown"),
-    ).resolves.toBeUndefined();
+    await expect(manager.cleanupJob(job.id, "shutdown")).resolves.toBeUndefined();
     jobs.clear();
     await expect(
-      restoreRetainedTorrents(
-        store,
-        jobs,
-        { download: vi.fn(), close: vi.fn() },
-        vi.fn(),
-      ),
+      restoreRetainedTorrents(store, jobs, { download: vi.fn(), close: vi.fn() }, vi.fn()),
     ).resolves.toBeUndefined();
     expect(jobs.get(job.id)?.status).toBe("error");
     expect(store.read()[0].job.status).toBe("paused");
@@ -76,16 +65,10 @@ it("bounds progress writes while immediately committing lifecycle and shutdown s
   vi.useFakeTimers();
   try {
     const manager = createJobManager(new Map(), vi.fn(), store);
-    const job = manager.createJob(
-      "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567",
-    );
+    const job = manager.createJob("magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567");
     manager.emitJob(job, { status: "downloading", phase: "downloading" });
     const save = vi.spyOn(store, "save");
-    for (
-      let downloadedBytes = 1;
-      downloadedBytes <= 1_000;
-      downloadedBytes += 1
-    )
+    for (let downloadedBytes = 1; downloadedBytes <= 1_000; downloadedBytes += 1)
       manager.emitJob(job, { downloadedBytes });
     expect(save).toHaveBeenCalledTimes(1);
     vi.advanceTimersByTime(1_000);
@@ -111,9 +94,7 @@ it("commits torrent metadata and state together and removes only the requested r
   let store = createRetainedTorrentStore(directory);
   try {
     const manager = createJobManager(new Map(), vi.fn());
-    const job = manager.createJob(
-      "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567",
-    );
+    const job = manager.createJob("magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567");
     job.torrentMetadata = new Uint8Array([1, 2, 3]);
     job.status = "paused";
     store.save(job);
@@ -122,10 +103,7 @@ it("commits torrent metadata and state together and removes only the requested r
     store.save(job);
     store.close();
     store = createRetainedTorrentStore(directory);
-    expect(store.read().map(({ job: saved }) => saved.id)).toEqual([
-      job.id,
-      other.id,
-    ]);
+    expect(store.read().map(({ job: saved }) => saved.id)).toEqual([job.id, other.id]);
     expect(store.read()[0].metadata).toEqual(new Uint8Array([1, 2, 3]));
     expect(store.read()[0].job.status).toBe("paused");
     const queue = createSessionJobQueue({
@@ -142,10 +120,7 @@ it("commits torrent metadata and state together and removes only the requested r
     queue.reorderSessionJobs([other.id, job.id]);
     store.close();
     store = createRetainedTorrentStore(directory);
-    expect(store.read().map(({ job: saved }) => saved.id)).toEqual([
-      other.id,
-      job.id,
-    ]);
+    expect(store.read().map(({ job: saved }) => saved.id)).toEqual([other.id, job.id]);
     store.remove(job.id);
     expect(store.read().map(({ job: saved }) => saved.id)).toEqual([other.id]);
   } finally {

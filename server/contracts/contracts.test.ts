@@ -20,17 +20,14 @@ describe("server contracts", () => {
     const result = enqueueSessionsInputSchema.safeParse({ items: [{ url }] });
     expect(result.success).toBe(false);
     if (!result.success)
-      expect(
-        result.error.issues.some(({ message }) =>
-          message.includes("Direct peer hints"),
-        ),
-      ).toBe(true);
+      expect(result.error.issues.some(({ message }) => message.includes("Direct peer hints"))).toBe(
+        true,
+      );
   });
   it("rejects malformed magnets without throwing from direct hint validation", () => {
-    expect(
-      enqueueSessionsInputSchema.safeParse({ items: [{ url: "magnet://[" }] })
-        .success,
-    ).toBe(false);
+    expect(enqueueSessionsInputSchema.safeParse({ items: [{ url: "magnet://[" }] }).success).toBe(
+      false,
+    );
   });
   it("accepts a public HTTP archive URL and normalizes defaults", () => {
     const input = createSessionInputSchema.parse({
@@ -84,9 +81,7 @@ describe("server contracts", () => {
         url: "https://cdn.example.com/archive.zip",
       }).success,
     ).toBe(true);
-    expect(
-      mediaPathQuerySchema.safeParse({ path: "folder/image.jpg" }).success,
-    ).toBe(true);
+    expect(mediaPathQuerySchema.safeParse({ path: "folder/image.jpg" }).success).toBe(true);
   });
 
   it("rejects impossible job progress", () => {
@@ -132,11 +127,11 @@ describe("server contracts", () => {
   });
 
   it("accepts valid magnets and rejects malformed info hashes", () => {
-    const valid =
-      "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567";
-    expect(
-      enqueueSessionsInputSchema.parse({ items: [{ url: valid }] }).items[0],
-    ).toMatchObject({ url: valid, sourcePreference: "auto" });
+    const valid = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567";
+    expect(enqueueSessionsInputSchema.parse({ items: [{ url: valid }] }).items[0]).toMatchObject({
+      url: valid,
+      sourcePreference: "auto",
+    });
     expect(
       enqueueSessionsInputSchema.safeParse({
         items: [{ url: "magnet:?xt=urn:btih:nope" }],
@@ -144,10 +139,10 @@ describe("server contracts", () => {
     ).toBe(false);
   });
 
-  it.each([
-    [],
-    Array.from({ length: 51 }, () => ({ url: "https://example.com/a.zip" })),
-  ])("rejects a batch outside the supported bounds", (items) => {
-    expect(enqueueSessionsInputSchema.safeParse({ items }).success).toBe(false);
-  });
+  it.each([[], Array.from({ length: 51 }, () => ({ url: "https://example.com/a.zip" }))])(
+    "rejects a batch outside the supported bounds",
+    (items) => {
+      expect(enqueueSessionsInputSchema.safeParse({ items }).success).toBe(false);
+    },
+  );
 });

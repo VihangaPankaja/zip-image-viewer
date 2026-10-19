@@ -4,28 +4,15 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import ffmpegPath from "ffmpeg-static";
 import { expect, it, vi } from "vite-plus/test";
-import type {
-  Session,
-  VideoRendition,
-  VideoTranscodeEntry,
-} from "../../domain/models.js";
+import type { Session, VideoRendition, VideoTranscodeEntry } from "../../domain/models.js";
 import { createVideoRuntime } from "./videoRuntime.js";
-import {
-  buildWindowPlaylist,
-  windowDirectory,
-  HlsWindows,
-} from "./hlsWindows.js";
+import { buildWindowPlaylist, windowDirectory, HlsWindows } from "./hlsWindows.js";
 import { runCommand, runCommandCapture } from "../process/commandRunner.js";
 import { startMultilingualFixture } from "../../../tests/fixtures/multilingual.js";
 
 it("promotes queued preparation without rejecting its background consumer", async () => {
   const priorities: string[] = [];
-  const run: ConstructorParameters<typeof HlsWindows>[1] = (
-    _session,
-    _task,
-    signal,
-    priority,
-  ) => {
+  const run: ConstructorParameters<typeof HlsWindows>[1] = (_session, _task, signal, priority) => {
     priorities.push(priority ?? "interactive");
     if (priority === "interactive") return Promise.resolve();
     return new Promise<void>((_resolve, reject) =>
@@ -40,14 +27,7 @@ it("promotes queued preparation without rejecting its background consumer", asyn
     dir: path.join(tmpdir(), "unpublished-promote-window"),
     priorityJobs: new Map(),
   } as VideoRendition;
-  const background = windows.ensure(
-    entry,
-    {} as Session,
-    rendition,
-    0,
-    undefined,
-    "background",
-  );
+  const background = windows.ensure(entry, {} as Session, rendition, 0, undefined, "background");
   await vi.waitFor(() => expect(priorities).toEqual(["background"]));
   const foreground = windows.ensure(entry, {} as Session, rendition, 1);
   await Promise.all([background, foreground]);
@@ -57,11 +37,7 @@ it("promotes queued preparation without rejecting its background consumer", asyn
 it.each([20, 128])(
   "prepares retained low video and default audio through the final window at %s seconds",
   async (duration) => {
-    const fixture = await startMultilingualFixture(
-      "http://127.0.0.1:5173",
-      0,
-      duration,
-    );
+    const fixture = await startMultilingualFixture("http://127.0.0.1:5173", 0, duration);
     try {
       fixture.session.retained = true;
       const entry = await fixture.runtime.ensureVideoTranscodeEntry(
@@ -76,14 +52,12 @@ it.each([20, 128])(
             const rendition = entry.renditions.get(id);
             expect(rendition?.status).toBe("done");
             expect(rendition?.availableSegments).toBeGreaterThan(0);
-            if (duration > 120)
-              expect(rendition?.availableSegments).toBe(entry.expectedSegments);
+            if (duration > 120) expect(rendition?.availableSegments).toBe(entry.expectedSegments);
           }
         },
         { timeout: 90_000 },
       );
-      if (duration > 120)
-        expect(entry.renditions.get("audio-2")).toBeUndefined();
+      if (duration > 120) expect(entry.renditions.get("audio-2")).toBeUndefined();
     } finally {
       await fixture.close();
     }
@@ -93,37 +67,24 @@ it.each([20, 128])(
 
 it("keeps alternate audio windows on a sample clock for exact-boundary seeks", async () => {
   if (!ffmpegPath) throw new Error("FFmpeg is required.");
-  const fixture = await startMultilingualFixture(
-    "http://127.0.0.1:5173",
-    0,
-    130.25,
-  );
+  const fixture = await startMultilingualFixture("http://127.0.0.1:5173", 0, 130.25);
   try {
     const entry = await fixture.runtime.ensureVideoTranscodeEntry(
       fixture.session,
       "multilingual.mkv",
       path.join(fixture.directory, "multilingual.mkv"),
     );
-    const audio = fixture.runtime.getRenditionState(
-      entry,
-      fixture.session,
-      "audio-1",
-    );
+    const audio = fixture.runtime.getRenditionState(entry, fixture.session, "audio-1");
     for (const index of [0, 1, 8, 9, 10, 11]) {
-      await fixture.runtime.startPrioritySegmentWindow(
-        entry,
-        fixture.session,
-        audio,
-        index,
-      );
+      await fixture.runtime.startPrioritySegmentWindow(entry, fixture.session, audio, index);
       const directory = windowDirectory(audio, index);
       const media = path.join(fixture.directory, "audio-window.mp4");
       await writeFile(
         media,
         Buffer.concat(
           await Promise.all(
-            ["init.mp4", `segment_${String(index).padStart(6, "0")}.m4s`].map(
-              (name) => readFile(path.join(directory, name)),
+            ["init.mp4", `segment_${String(index).padStart(6, "0")}.m4s`].map((name) =>
+              readFile(path.join(directory, name)),
             ),
           ),
         ),
@@ -143,13 +104,10 @@ it("keeps alternate audio windows on a sample clock for exact-boundary seeks", a
         "-",
       ]);
       const packets = [
-        ...stderr.matchAll(
-          /demuxer -> .*?type:audio.*?pkt_dts_time:([-\d.]+)/g,
-        ),
+        ...stderr.matchAll(/demuxer -> .*?type:audio.*?pkt_dts_time:([-\d.]+)/g),
       ].map((match) => Number(match[1]));
       expect(packets.length).toBeGreaterThanOrEqual(2);
-      const start =
-        index % 2 ? (Math.ceil((4 * 48000) / 1024) * 1024) / 48000 : 0;
+      const start = index % 2 ? (Math.ceil((4 * 48000) / 1024) * 1024) / 48000 : 0;
       expect(packets[0]).toBeCloseTo(start, 5);
       expect(packets[1]).toBeCloseTo(start + 1024 / 48000, 5);
     }
@@ -189,11 +147,7 @@ it.each([128, 130.25])(
         "aac",
         source,
       ]);
-      const entry = await runtime.ensureVideoTranscodeEntry(
-        session,
-        "tail.mkv",
-        source,
-      );
+      const entry = await runtime.ensureVideoTranscodeEntry(session, "tail.mkv", source);
       expect(entry.durationSeconds).toBeCloseTo(duration, 2);
       expect(entry.expectedSegments).toBe(Math.ceil(duration / 4));
       const rendition = runtime.getRenditionState(entry, session, "source");
@@ -206,10 +160,7 @@ it.each([128, 130.25])(
       const decoded = await runCommandCapture(ffmpegPath, [
         "-hide_banner",
         "-i",
-        path.join(
-          windowDirectory(rendition, entry.expectedSegments - 1),
-          "index.m3u8",
-        ),
+        path.join(windowDirectory(rendition, entry.expectedSegments - 1), "index.m3u8"),
         "-f",
         "null",
         "-",
@@ -224,34 +175,18 @@ it.each([128, 130.25])(
 );
 
 it("publishes alternate audio on the same long-video window boundaries", async () => {
-  const fixture = await startMultilingualFixture(
-    "http://127.0.0.1:5173",
-    0,
-    160,
-  );
+  const fixture = await startMultilingualFixture("http://127.0.0.1:5173", 0, 160);
   try {
     const entry = await fixture.runtime.ensureVideoTranscodeEntry(
       fixture.session,
       "multilingual.mkv",
       path.join(fixture.directory, "multilingual.mkv"),
     );
-    const audio = fixture.runtime.getRenditionState(
-      entry,
-      fixture.session,
-      "audio-1",
+    const audio = fixture.runtime.getRenditionState(entry, fixture.session, "audio-1");
+    await fixture.runtime.startPrioritySegmentWindow(entry, fixture.session, audio, 32);
+    expect(await readFile(path.join(windowDirectory(audio, 32), "index.m3u8"), "utf8")).toContain(
+      "segment_000032.m4s",
     );
-    await fixture.runtime.startPrioritySegmentWindow(
-      entry,
-      fixture.session,
-      audio,
-      32,
-    );
-    expect(
-      await readFile(
-        path.join(windowDirectory(audio, 32), "index.m3u8"),
-        "utf8",
-      ),
-    ).toContain("segment_000032.m4s");
   } finally {
     await fixture.close();
   }
@@ -317,20 +252,14 @@ it("decodes audio/video at 80% of a cold hour without encoding earlier windows",
       "copy",
       source,
     ]);
-    const entry = await runtime.ensureVideoTranscodeEntry(
-      session,
-      "hour.mp4",
-      source,
-    );
+    const entry = await runtime.ensureVideoTranscodeEntry(session, "hour.mp4", source);
     expect(entry.durationSeconds).toBeCloseTo(3600, 0);
     const rendition = runtime.getRenditionState(entry, session, "source");
     await runtime.startPrioritySegmentWindow(entry, session, rendition, 720);
     const directory = windowDirectory(rendition, 720);
-    expect(
-      (await readdir(rendition.dir)).filter((name) =>
-        name.startsWith("window-"),
-      ),
-    ).toEqual(["window-720"]);
+    expect((await readdir(rendition.dir)).filter((name) => name.startsWith("window-"))).toEqual([
+      "window-720",
+    ]);
     const playlist = await readFile(path.join(directory, "index.m3u8"), "utf8");
     expect(playlist).toContain("segment_000720.m4s");
     const decoded = await runCommandCapture(ffmpegPath, [
@@ -360,11 +289,7 @@ it("cancels only after all consumers abandon a shared window", async () => {
   let release!: () => void;
   let workSignal: AbortSignal | undefined;
   let starts = 0;
-  const run = (
-    _session: Session,
-    _task: unknown,
-    signal?: AbortSignal,
-  ): Promise<never> => {
+  const run = (_session: Session, _task: unknown, signal?: AbortSignal): Promise<never> => {
     starts += 1;
     workSignal = signal;
     return new Promise<never>((resolve, reject) => {

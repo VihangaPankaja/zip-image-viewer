@@ -14,10 +14,7 @@ import {
 } from "../../infrastructure/runtime/mediaClassification.js";
 import { sanitizeEntryPath } from "../../infrastructure/runtime/runtimePrimitives.js";
 import { validateArchiveEntries } from "../../infrastructure/archive/archiveLimits.js";
-import {
-  reserveStorage,
-  resourceLimitError,
-} from "../../infrastructure/runtime/resourceLimits.js";
+import { reserveStorage, resourceLimitError } from "../../infrastructure/runtime/resourceLimits.js";
 
 type ExtractDependencies = {
   emitJob: (_job: SessionJob, _patch: Partial<SessionJob>) => void;
@@ -26,11 +23,7 @@ type ExtractDependencies = {
   listExtractedEntries: (_extractDir: string) => Promise<ExtractedEntry[]>;
 };
 
-function createProgress(
-  job: SessionJob,
-  entries: ExtractedEntry[],
-  deps: ExtractDependencies,
-) {
+function createProgress(job: SessionJob, entries: ExtractedEntry[], deps: ExtractDependencies) {
   let lastEmit = Date.now();
   return (force = false): void => {
     const now = Date.now();
@@ -86,23 +79,15 @@ async function extractZip(
             try {
               written += chunk.length;
               if (written > entry.uncompressedSize)
-                throw resourceLimitError(
-                  "Archive entry exceeds its declared size.",
-                );
+                throw resourceLimitError("Archive entry exceeds its declared size.");
               storage.check();
               callback(null, chunk);
             } catch (error) {
-              callback(
-                error instanceof Error ? error : new Error(String(error)),
-              );
+              callback(error instanceof Error ? error : new Error(String(error)));
             }
           },
         });
-        await pipeline(
-          entry.stream(),
-          budget,
-          createWriteStream(destination, { flags: "wx" }),
-        );
+        await pipeline(entry.stream(), budget, createWriteStream(destination, { flags: "wx" }));
         entries.push({
           relativePath,
           type: "file",
@@ -117,10 +102,7 @@ async function extractZip(
   }
 }
 
-async function moveDirectMedia(
-  archivePath: string,
-  extractDir: string,
-): Promise<ExtractedEntry> {
+async function moveDirectMedia(archivePath: string, extractDir: string): Promise<ExtractedEntry> {
   const mediaDir = path.join(extractDir, "direct");
   await mkdir(mediaDir, { recursive: true });
   const mediaPath = path.join(mediaDir, path.basename(archivePath));
@@ -141,12 +123,9 @@ export async function extractSessionSource(
 ): Promise<ExtractedEntry[]> {
   const detected = await fileTypeFromFile(archivePath).catch(() => undefined);
   const kind = classifyDetectedType(archivePath, detected);
-  if (kind !== "archive")
-    return [await moveDirectMedia(archivePath, extractDir)];
+  if (kind !== "archive") return [await moveDirectMedia(archivePath, extractDir)];
   if (await deps.detectEncryption(archivePath)) {
-    throw new Error(
-      "Password-protected archives are not currently supported in this flow.",
-    );
+    throw new Error("Password-protected archives are not currently supported in this flow.");
   }
   deps.emitJob(job, {
     status: "extracting",

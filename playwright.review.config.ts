@@ -16,8 +16,7 @@ export default defineConfig({
     serviceWorkers: "block",
   },
   webServer: {
-    command:
-      "node node_modules/vite-plus/bin/vp dev --configLoader runner --host 127.0.0.1 --port 5174 --strictPort",
+    command: "vp dev --host 127.0.0.1 --port 5174 --strictPort",
     url: "http://127.0.0.1:5174",
     reuseExistingServer: !process.env.CI,
   },

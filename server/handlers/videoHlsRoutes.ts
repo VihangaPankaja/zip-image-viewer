@@ -44,11 +44,7 @@ function renditionUri(
 
 function requireTranscoder(deps: VideoRouteDependencies): void {
   if (!deps.ffmpegPath) {
-    throw new ApplicationError(
-      "INTERNAL_ERROR",
-      "Video transcoder is unavailable.",
-      503,
-    );
+    throw new ApplicationError("INTERNAL_ERROR", "Video transcoder is unavailable.", 503);
   }
 }
 
@@ -77,26 +73,17 @@ async function startRendition(
   quality: string,
 ): Promise<VideoRendition> {
   if (
-    !entry.qualities.some(
-      ({ id }) => id === quality && id !== "auto" && id !== "remux",
-    ) &&
+    !entry.qualities.some(({ id }) => id === quality && id !== "auto" && id !== "remux") &&
     !(
       (entry.audioTracks?.length ?? 0) > 1 &&
       entry.audioTracks?.some((track) => track.id === quality)
     )
   ) {
-    throw new ApplicationError(
-      "INVALID_INPUT",
-      "Unknown video or audio rendition.",
-      400,
-    );
+    throw new ApplicationError("INVALID_INPUT", "Unknown video or audio rendition.", 400);
   }
   const rendition = deps.getRenditionState(entry, context.session, quality);
   rendition.lastAccessedAt = Date.now();
-  if (
-    entry.durationSeconds <= WINDOWED_AFTER_SECONDS ||
-    !entry.durationSeconds
-  ) {
+  if (entry.durationSeconds <= WINDOWED_AFTER_SECONDS || !entry.durationSeconds) {
     const levels = calculateRenditions(entry);
     const level = levels.findIndex(({ id }) => id === quality);
     // The background lane is FIFO and runs one sequential video encoder at a time.
@@ -110,11 +97,7 @@ async function startRendition(
   return rendition;
 }
 
-function sendCompletedFile(
-  response: Response,
-  filePath: string,
-  contentType: string,
-) {
+function sendCompletedFile(response: Response, filePath: string, contentType: string) {
   response.set("Cache-Control", "private, max-age=3600, immutable");
   response.type(contentType);
   response.sendFile(filePath, { cacheControl: false });
@@ -126,16 +109,10 @@ function registerMasterRoute(app: Express, deps: VideoRouteDependencies): void {
     if (!(await prepareHlsMaster(response, deps, context, entry))) return;
     const renditions = await Promise.all(
       calculateRenditions(entry).map(async (rendition) => {
-        const state = deps.getRenditionState(
-          entry,
-          context.session,
-          rendition.id,
-        );
+        const state = deps.getRenditionState(entry, context.session, rendition.id);
         const init = await readFile(
           path.join(
-            entry.durationSeconds > WINDOWED_AFTER_SECONDS
-              ? windowDirectory(state, 0)
-              : state.dir,
+            entry.durationSeconds > WINDOWED_AFTER_SECONDS ? windowDirectory(state, 0) : state.dir,
             "init.mp4",
           ),
         ).catch(() => null);
@@ -159,16 +136,10 @@ function registerMasterRoute(app: Express, deps: VideoRouteDependencies): void {
   });
 }
 
-function registerVariantRoute(
-  app: Express,
-  deps: VideoRouteDependencies,
-): void {
+function registerVariantRoute(app: Express, deps: VideoRouteDependencies): void {
   app.get("/api/sessions/:id/video/hls/playlist", async (request, response) => {
     const { context, entry } = await resolveHlsEntry(request, deps);
-    const requested = queryText(
-      request.query.quality,
-      entry.defaultQuality,
-    ).toLowerCase();
+    const requested = queryText(request.query.quality, entry.defaultQuality).toLowerCase();
     const quality = requested;
     const rendition = await startRendition(deps, context, entry, quality);
     if (entry.durationSeconds > WINDOWED_AFTER_SECONDS) {
@@ -183,16 +154,9 @@ function registerVariantRoute(
       return;
     }
     // Native HLS waits for publication; HLS.js explicitly supports preparation retries.
-    const timeout =
-      request.get("X-HLS-Preparation-Retry") === "1" ? 2_000 : Infinity;
-    const availability = await waitForPublishedSegment(
-      rendition,
-      0,
-      response,
-      timeout,
-    );
-    if (availability !== "ready")
-      return sendPreparationStatus(response, availability);
+    const timeout = request.get("X-HLS-Preparation-Retry") === "1" ? 2_000 : Infinity;
+    const availability = await waitForPublishedSegment(rendition, 0, response, timeout);
+    if (availability !== "ready") return sendPreparationStatus(response, availability);
     const playlist = buildVariantPlaylist(
       await readRenditionPlaylist(rendition),
       renditionUri(request, context, quality, "init"),
@@ -206,10 +170,7 @@ function registerVariantRoute(
 function registerInitRoute(app: Express, deps: VideoRouteDependencies): void {
   app.get("/api/sessions/:id/video/hls/init", async (request, response) => {
     const { context, entry } = await resolveHlsEntry(request, deps);
-    const quality = queryText(
-      request.query.quality,
-      entry.defaultQuality,
-    ).toLowerCase();
+    const quality = queryText(request.query.quality, entry.defaultQuality).toLowerCase();
     const rendition = await startRendition(deps, context, entry, quality);
     if (entry.durationSeconds > WINDOWED_AFTER_SECONDS) {
       await sendWindowResource(
@@ -233,20 +194,11 @@ function registerInitRoute(app: Express, deps: VideoRouteDependencies): void {
   });
 }
 
-function registerSegmentRoute(
-  app: Express,
-  deps: VideoRouteDependencies,
-): void {
+function registerSegmentRoute(app: Express, deps: VideoRouteDependencies): void {
   app.get("/api/sessions/:id/video/hls/segment", async (request, response) => {
     const { context, entry } = await resolveHlsEntry(request, deps);
-    const quality = queryText(
-      request.query.quality,
-      entry.defaultQuality,
-    ).toLowerCase();
-    const index = Math.max(
-      0,
-      Number.parseInt(queryText(request.query.index, "0"), 10) || 0,
-    );
+    const quality = queryText(request.query.quality, entry.defaultQuality).toLowerCase();
+    const index = Math.max(0, Number.parseInt(queryText(request.query.index, "0"), 10) || 0);
     const rendition = await startRendition(deps, context, entry, quality);
     if (entry.durationSeconds > WINDOWED_AFTER_SECONDS) {
       await sendWindowResource(
@@ -261,15 +213,8 @@ function registerSegmentRoute(
       );
       return;
     }
-    const segmentPath = path.join(
-      rendition.dir,
-      `segment_${String(index).padStart(6, "0")}.m4s`,
-    );
-    const availability = await waitForPublishedSegment(
-      rendition,
-      index,
-      response,
-    );
+    const segmentPath = path.join(rendition.dir, `segment_${String(index).padStart(6, "0")}.m4s`);
+    const availability = await waitForPublishedSegment(rendition, index, response);
     if (availability !== "ready") {
       return sendPreparationStatus(response, availability);
     }
@@ -289,16 +234,8 @@ async function sendWindowResource(
 ): Promise<void> {
   const raw = queryText(request.query.index, "0");
   const index = Number(raw);
-  if (
-    !/^\d+$/.test(raw) ||
-    !Number.isSafeInteger(index) ||
-    index >= entry.expectedSegments
-  )
-    throw new ApplicationError(
-      "INVALID_INPUT",
-      "Segment index is outside the video.",
-      400,
-    );
+  if (!/^\d+$/.test(raw) || !Number.isSafeInteger(index) || index >= entry.expectedSegments)
+    throw new ApplicationError("INVALID_INPUT", "Segment index is outside the video.", 400);
   const controller = new AbortController();
   const close = () => controller.abort();
   response.once("close", close);
@@ -326,28 +263,18 @@ async function sendWindowResource(
       index,
       error: error instanceof Error ? error.message : String(error),
     });
-    response
-      .status(503)
-      .json({ error: "Seek window could not be prepared. Try again." });
+    response.status(503).json({ error: "Seek window could not be prepared. Try again." });
   } finally {
     response.removeListener("close", close);
   }
 }
 
-export function registerVideoHlsRoutes(
-  app: Express,
-  deps: VideoRouteDependencies,
-): void {
+export function registerVideoHlsRoutes(app: Express, deps: VideoRouteDependencies): void {
   registerMasterRoute(app, deps);
   registerVariantRoute(app, deps);
   registerInitRoute(app, deps);
   registerSegmentRoute(app, deps);
-  const handleError: ErrorRequestHandler = (
-    error: unknown,
-    _request,
-    response,
-    next,
-  ) => {
+  const handleError: ErrorRequestHandler = (error: unknown, _request, response, next) => {
     if (error instanceof ApplicationError)
       response.status(error.status).json({ error: error.message });
     else next(error);

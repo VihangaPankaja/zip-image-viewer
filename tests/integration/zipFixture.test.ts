@@ -6,10 +6,7 @@ import unzipper from "unzipper";
 import { describe, expect, it } from "vite-plus/test";
 import { runCommand } from "../../server/infrastructure/process/commandRunner.js";
 
-function createZip(
-  archivePath: string,
-  sourceDirectory: string,
-): Promise<void> {
+function createZip(archivePath: string, sourceDirectory: string): Promise<void> {
   return runCommand(path7za, ["a", "-tzip", archivePath, "."], {
     cwd: sourceDirectory,
   });
@@ -27,14 +24,10 @@ describe("real ZIP fixture", () => {
     try {
       await createZip(archivePath, sourceDirectory);
       const archive = await unzipper.Open.file(archivePath);
-      const paths = archive.files.map((entry) =>
-        entry.path.replace(/\\/g, "/"),
-      );
+      const paths = archive.files.map((entry) => entry.path.replace(/\\/g, "/"));
 
       expect(paths).toContain("album/caption.txt");
-      expect(paths.every((entry) => !entry.split("/").includes(".."))).toBe(
-        true,
-      );
+      expect(paths.every((entry) => !entry.split("/").includes(".."))).toBe(true);
     } finally {
       await rm(workspace, { recursive: true, force: true });
     }

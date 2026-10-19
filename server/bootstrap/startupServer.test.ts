@@ -7,19 +7,12 @@ import { promisify } from "node:util";
 
 it("serves liveness while blocking application requests until restore finishes", async () => {
   const { server, setApp } = createStartupServer(() => {});
-  expect(
-    (await request(server).get("/health?probe=1").expect(200)).body,
-  ).toEqual({
+  expect((await request(server).get("/health?probe=1").expect(200)).body).toEqual({
     ok: true,
     ready: false,
   });
   await request(server).head("/health").expect(200);
-  for (const route of [
-    "/rpc/jobs",
-    "/api/session-jobs",
-    "/api/sessions/id/raw",
-    "/",
-  ]) {
+  for (const route of ["/rpc/jobs", "/api/session-jobs", "/api/sessions/id/raw", "/"]) {
     await request(server).get(route).expect(503).expect("Retry-After", "1");
   }
   await request(server).post("/health").expect(503);

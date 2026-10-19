@@ -1,22 +1,14 @@
-import {
-  useEffect,
-  type Dispatch,
-  type RefObject,
-  type SetStateAction,
-} from "react";
+import { useEffect, type Dispatch, type RefObject, type SetStateAction } from "react";
 
 type VideoEventSyncParams = {
   selectedKind: string;
   videoRef: RefObject<HTMLVideoElement | null>;
   setPlaybackError: Dispatch<SetStateAction<string>>;
-  setPlaybackStatus: Dispatch<
-    SetStateAction<"loading" | "buffering" | "ready">
-  >;
+  setPlaybackStatus: Dispatch<SetStateAction<"loading" | "buffering" | "ready">>;
 };
 
 export function useVideoEventSync(params: VideoEventSyncParams) {
-  const { selectedKind, videoRef, setPlaybackError, setPlaybackStatus } =
-    params;
+  const { selectedKind, videoRef, setPlaybackError, setPlaybackStatus } = params;
   useEffect(() => {
     const player = videoRef.current;
     if (!player || selectedKind !== "video") return;
@@ -25,16 +17,11 @@ export function useVideoEventSync(params: VideoEventSyncParams) {
       const mediaError = player.error;
       const detail =
         mediaError?.message ||
-        (mediaError?.code
-          ? `Playback failed (code ${mediaError.code}).`
-          : "Playback failed.");
-      setPlaybackError(
-        mediaError?.code === 4 ? "This browser cannot play Original." : detail,
-      );
+        (mediaError?.code ? `Playback failed (code ${mediaError.code}).` : "Playback failed.");
+      setPlaybackError(mediaError?.code === 4 ? "This browser cannot play Original." : detail);
     };
 
-    const onWaiting = () =>
-      setPlaybackStatus(player.currentTime > 0 ? "buffering" : "loading");
+    const onWaiting = () => setPlaybackStatus(player.currentTime > 0 ? "buffering" : "loading");
     const onReady = () => setPlaybackStatus("ready");
     player.addEventListener("loadstart", onWaiting);
     player.addEventListener("waiting", onWaiting);

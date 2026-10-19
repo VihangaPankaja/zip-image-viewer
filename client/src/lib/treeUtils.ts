@@ -43,10 +43,7 @@ function compareByNaturalTail(left: TreeNode, right: TreeNode): number {
   const rightTail = parseTrailingNumber(right.name);
 
   if (leftTail && rightTail) {
-    const prefixCompare = NAME_COLLATOR.compare(
-      leftTail.prefix,
-      rightTail.prefix,
-    );
+    const prefixCompare = NAME_COLLATOR.compare(leftTail.prefix, rightTail.prefix);
     if (prefixCompare !== 0) {
       return prefixCompare;
     }
@@ -58,26 +55,16 @@ function compareByNaturalTail(left: TreeNode, right: TreeNode): number {
   return compareByName(left, right);
 }
 
-function compareByDate(
-  left: TreeNode,
-  right: TreeNode,
-  direction: "asc" | "desc",
-): number {
+function compareByDate(left: TreeNode, right: TreeNode, direction: "asc" | "desc"): number {
   const leftValue = left.modifiedAt || 0;
   const rightValue = right.modifiedAt || 0;
   if (leftValue !== rightValue) {
-    return direction === "asc"
-      ? leftValue - rightValue
-      : rightValue - leftValue;
+    return direction === "asc" ? leftValue - rightValue : rightValue - leftValue;
   }
   return compareByName(left, right);
 }
 
-export function compareNodes(
-  left: TreeNode,
-  right: TreeNode,
-  sortMode: string,
-): number {
+export function compareNodes(left: TreeNode, right: TreeNode, sortMode: string): number {
   if (left.type !== right.type) {
     return left.type === "directory" ? -1 : 1;
   }
@@ -102,9 +89,7 @@ export function cloneAndSortTree(node: TreeNode, sortMode: string): TreeNode {
     return { ...node };
   }
 
-  const children = (node.children || []).map((child) =>
-    cloneAndSortTree(child, sortMode),
-  );
+  const children = (node.children || []).map((child) => cloneAndSortTree(child, sortMode));
   children.sort((left, right) => compareNodes(left, right, sortMode));
 
   return {

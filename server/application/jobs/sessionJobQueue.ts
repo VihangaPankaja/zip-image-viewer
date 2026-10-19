@@ -34,9 +34,7 @@ type QueueState = SessionJobQueueDeps & {
 
 function validateConcurrency(value: number): void {
   if (Number.isInteger(value) && value >= 1 && value <= 8) return;
-  throw new RangeError(
-    "Session job concurrency must be between one and eight.",
-  );
+  throw new RangeError("Session job concurrency must be between one and eight.");
 }
 
 function refreshPositions(state: QueueState): void {
@@ -93,11 +91,7 @@ function scheduleSessionJobs(state: QueueState): void {
   }
 }
 
-function enqueueSessionJob(
-  state: QueueState,
-  job: SessionJob,
-  confirmOversize: boolean,
-): void {
+function enqueueSessionJob(state: QueueState, job: SessionJob, confirmOversize: boolean): void {
   const item = { job, confirmOversize };
   state.jobs.set(job.id, item);
   if (!state.jobOrder.includes(job.id)) state.jobOrder.push(job.id);
@@ -113,10 +107,7 @@ function setMaxActiveSessionJobs(state: QueueState, value: number): void {
   scheduleSessionJobs(state);
 }
 
-function reorderSessionJobs(
-  state: QueueState,
-  jobIds: readonly string[],
-): void {
+function reorderSessionJobs(state: QueueState, jobIds: readonly string[]): void {
   if (
     jobIds.length !== state.jobs.size ||
     new Set(jobIds).size !== jobIds.length ||
@@ -129,12 +120,7 @@ function reorderSessionJobs(
   sortPending(state);
   const firstPending = state.pendingSessionJobs.at(0);
   const pauseJob = state.pauseJob;
-  if (
-    !firstPending ||
-    !pauseJob ||
-    state.activeItems.size < state.maxConcurrent
-  )
-    return;
+  if (!firstPending || !pauseJob || state.activeItems.size < state.maxConcurrent) return;
   const pendingPosition = state.jobOrder.indexOf(firstPending.job.id);
   const candidate = [...state.activeItems.values()]
     .filter(
@@ -144,9 +130,7 @@ function reorderSessionJobs(
         state.jobOrder.indexOf(job.id) > pendingPosition,
     )
     .sort(
-      (left, right) =>
-        state.jobOrder.indexOf(right.job.id) -
-        state.jobOrder.indexOf(left.job.id),
+      (left, right) => state.jobOrder.indexOf(right.job.id) - state.jobOrder.indexOf(left.job.id),
     )
     .at(0);
   if (!candidate) return;
@@ -163,14 +147,10 @@ function reorderSessionJobs(
   });
 }
 
-async function pauseSessionJob(
-  state: QueueState,
-  jobId: string,
-): Promise<SessionJob> {
+async function pauseSessionJob(state: QueueState, jobId: string): Promise<SessionJob> {
   const item = state.activeItems.get(jobId);
   const pauseJob = state.pauseJob;
-  if (!item || !pauseJob || !item.job.canPause)
-    throw new Error("Job cannot be paused.");
+  if (!item || !pauseJob || !item.job.canPause) throw new Error("Job cannot be paused.");
   item.job.pauseRequested = true;
   state.pausing.add(jobId);
   await pauseJob(item.job);
@@ -179,8 +159,7 @@ async function pauseSessionJob(
 
 function resumeSessionJob(state: QueueState, jobId: string): SessionJob {
   const item = state.jobs.get(jobId);
-  if (!item || item.job.status !== "paused")
-    throw new Error("Only paused jobs can be resumed.");
+  if (!item || item.job.status !== "paused") throw new Error("Only paused jobs can be resumed.");
   Object.assign(item.job, {
     status: "queued",
     phase: "queued",
@@ -199,15 +178,8 @@ function resumeSessionJob(state: QueueState, jobId: string): SessionJob {
 function confirmSessionJob(state: QueueState, jobId: string): SessionJob {
   const item = state.jobs.get(jobId);
   if (!item) throw new ApplicationError("NOT_FOUND", "Job not found.", 404);
-  if (
-    item.job.status !== "awaiting_confirmation" ||
-    !item.job.requiresConfirmation
-  ) {
-    throw new ApplicationError(
-      "CONFLICT",
-      "Job is not awaiting confirmation.",
-      409,
-    );
+  if (item.job.status !== "awaiting_confirmation" || !item.job.requiresConfirmation) {
+    throw new ApplicationError("CONFLICT", "Job is not awaiting confirmation.", 409);
   }
   Object.assign(item.job, {
     status: "queued",
@@ -227,41 +199,23 @@ function confirmSessionJob(state: QueueState, jobId: string): SessionJob {
   return item.job;
 }
 
-function selectTorrentFiles(
-  state: QueueState,
-  jobId: string,
-  fileIds: string[],
-): SessionJob {
+function selectTorrentFiles(state: QueueState, jobId: string, fileIds: string[]): SessionJob {
   const item = state.jobs.get(jobId);
   if (!item) throw new ApplicationError("NOT_FOUND", "Job not found.", 404);
   if (
     item.job.sourceKind !== "torrent" ||
     !["awaiting_selection", "ready", "paused"].includes(item.job.status)
   ) {
-    throw new ApplicationError(
-      "CONFLICT",
-      "Job is not awaiting file selection.",
-      409,
-    );
+    throw new ApplicationError("CONFLICT", "Job is not awaiting file selection.", 409);
   }
   const ids = new Set(fileIds);
   const known = new Set(item.job.torrentFiles.map((file) => file.id));
-  if (
-    !ids.size ||
-    ids.size !== fileIds.length ||
-    fileIds.some((id) => !known.has(id))
-  ) {
-    throw new ApplicationError(
-      "INVALID_INPUT",
-      "Choose one or more known torrent files.",
-      400,
-    );
+  if (!ids.size || ids.size !== fileIds.length || fileIds.some((id) => !known.has(id))) {
+    throw new ApplicationError("INVALID_INPUT", "Choose one or more known torrent files.", 400);
   }
   item.job.torrentFiles = item.job.torrentFiles.map((file) => ({
     ...file,
-    selected:
-      ids.has(file.id) ||
-      (item.job.status !== "awaiting_selection" && file.selected),
+    selected: ids.has(file.id) || (item.job.status !== "awaiting_selection" && file.selected),
   }));
   Object.assign(item.job, {
     status: "queued",
@@ -285,9 +239,7 @@ function selectTorrentFiles(
 function cancelSessionJob(state: QueueState, jobId: string): SessionJob {
   const item = state.jobs.get(jobId);
   if (!item) throw new Error("Job not found.");
-  const pendingIndex = state.pendingSessionJobs.findIndex(
-    ({ job }) => job.id === jobId,
-  );
+  const pendingIndex = state.pendingSessionJobs.findIndex(({ job }) => job.id === jobId);
   if (pendingIndex >= 0) state.pendingSessionJobs.splice(pendingIndex, 1);
   state.requeueAfterActive.delete(jobId);
   item.job.pauseRequested = false;
@@ -304,10 +256,7 @@ function cancelSessionJob(state: QueueState, jobId: string): SessionJob {
 function removeSessionJob(state: QueueState, jobId: string): SessionJob {
   const item = state.jobs.get(jobId);
   if (!item) throw new Error("Job not found.");
-  if (
-    state.activeItems.has(jobId) ||
-    state.pendingSessionJobs.some(({ job }) => job.id === jobId)
-  )
+  if (state.activeItems.has(jobId) || state.pendingSessionJobs.some(({ job }) => job.id === jobId))
     throw new ApplicationError("CONFLICT", deletionConflict, 409);
   state.jobs.delete(jobId);
   const orderIndex = state.jobOrder.indexOf(jobId);
@@ -323,9 +272,7 @@ export function createSessionJobQueue(deps: SessionJobQueueDeps) {
     ...deps,
     maxConcurrent: deps.maxActiveSessionJobs,
     activeItems: new Map(),
-    jobs: new Map(
-      initialJobs.map((job) => [job.id, { job, confirmOversize: false }]),
-    ),
+    jobs: new Map(initialJobs.map((job) => [job.id, { job, confirmOversize: false }])),
     jobOrder: initialJobs.map(({ id }) => id),
     pausing: new Set(),
     requeueAfterActive: new Set(),
@@ -352,15 +299,11 @@ export function createSessionJobQueue(deps: SessionJobQueueDeps) {
       maxConcurrent: state.maxConcurrent,
     }),
     getOrderedJobs: () =>
-      state.jobOrder
-        .map((id) => state.jobs.get(id)?.job)
-        .filter((job) => job !== undefined),
+      state.jobOrder.map((id) => state.jobs.get(id)?.job).filter((job) => job !== undefined),
     pauseSessionJob: (jobId: string) => pauseSessionJob(state, jobId),
-    reorderSessionJobs: (jobIds: readonly string[]) =>
-      reorderSessionJobs(state, jobIds),
+    reorderSessionJobs: (jobIds: readonly string[]) => reorderSessionJobs(state, jobIds),
     removeSessionJob: (jobId: string) => removeSessionJob(state, jobId),
     resumeSessionJob: (jobId: string) => resumeSessionJob(state, jobId),
-    setMaxActiveSessionJobs: (value: number) =>
-      setMaxActiveSessionJobs(state, value),
+    setMaxActiveSessionJobs: (value: number) => setMaxActiveSessionJobs(state, value),
   };
 }

@@ -23,18 +23,12 @@ export function useWorkspacePageEffects(
   }, [setSlideshowChromeHidden, slideshowOpen]);
 }
 
-function useSelectionFallback(
-  state: WorkspacePageState,
-  selection: SelectionModel,
-): void {
+function useSelectionFallback(state: WorkspacePageState, selection: SelectionModel): void {
   useEffect(() => {
     if (!selection.flatData || !selection.sortedTree) {
       return;
     }
-    if (
-      !state.selectedPath ||
-      !selection.flatData.nodesByPath.has(state.selectedPath)
-    ) {
+    if (!state.selectedPath || !selection.flatData.nodesByPath.has(state.selectedPath)) {
       state.setSelectedPath(getFirstFilePath(selection.sortedTree));
     }
   }, [selection.flatData, selection.sortedTree, state]);

@@ -6,9 +6,7 @@ export type WorkspaceProgress = {
   visualPercent: string;
 };
 
-export function buildWorkspaceProgress(
-  activeJob: JobPayload | null,
-): WorkspaceProgress {
+export function buildWorkspaceProgress(activeJob: JobPayload | null): WorkspaceProgress {
   const downloadedBytes = Math.max(0, Number(activeJob?.downloadedBytes) || 0);
   const completed = Math.max(0, Number(activeJob?.transcodedEntries) || 0);
   const total = Math.max(0, Number(activeJob?.totalTranscodeEntries) || 0);
@@ -20,10 +18,7 @@ export function buildWorkspaceProgress(
 
   return {
     transfer: buildTransferLabel(activeJob, downloadedBytes, completed, total),
-    visualPercent:
-      percent == null
-        ? "Live"
-        : `${Math.max(0, Math.min(100, Math.floor(percent)))}%`,
+    visualPercent: percent == null ? "Live" : `${Math.max(0, Math.min(100, Math.floor(percent)))}%`,
   };
 }
 

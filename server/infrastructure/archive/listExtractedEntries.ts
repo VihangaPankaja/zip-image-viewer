@@ -14,13 +14,9 @@ export async function listExtractedEntries(
 ): Promise<ExtractedEntry[]> {
   for (const entry of await readdir(currentDir, { withFileTypes: true })) {
     assertResourceEntryCount(entries.length + 1);
-    if (entry.isSymbolicLink())
-      throw resourceLimitError("Filesystem links are not supported.");
+    if (entry.isSymbolicLink()) throw resourceLimitError("Filesystem links are not supported.");
     const fullPath = path.join(currentDir, entry.name);
-    const relativePath = path
-      .relative(rootDir, fullPath)
-      .split(path.sep)
-      .join("/");
+    const relativePath = path.relative(rootDir, fullPath).split(path.sep).join("/");
     const details = await stat(fullPath);
     if (entry.isDirectory()) {
       entries.push({

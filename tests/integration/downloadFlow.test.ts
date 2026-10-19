@@ -18,10 +18,7 @@ import { CONFIRM_SIZE_BYTES } from "../../server/config/runtimeConstants.js";
 import type { Session, SessionJob } from "../../server/domain/models.js";
 import { listExtractedEntries } from "../../server/infrastructure/archive/listExtractedEntries.js";
 import { runCommand } from "../../server/infrastructure/process/commandRunner.js";
-import {
-  downloadRuntimeSource,
-  extractRuntimeArchive,
-} from "../../server/runtimeAdapters.js";
+import { downloadRuntimeSource, extractRuntimeArchive } from "../../server/runtimeAdapters.js";
 import { serverContract } from "../../shared/contracts.js";
 
 const cleanupPaths: string[] = [];
@@ -87,9 +84,7 @@ describe("real download flows", () => {
     const jobs = new Map<string, SessionJob>();
     const sessions = new Map<string, Session>();
     const manager = createJobManager(jobs, vi.fn());
-    const job = manager.createJob(
-      `http://127.0.0.1:${String(address.port)}/fixture.zip`,
-    );
+    const job = manager.createJob(`http://127.0.0.1:${String(address.port)}/fixture.zip`);
     try {
       const processJob = createProcessSessionJob({
         sessionStore: sessions,
@@ -97,8 +92,7 @@ describe("real download flows", () => {
         closeJob: manager.closeJob,
         download: downloadRuntimeSource,
         detectEncryption: () => Promise.resolve(false),
-        extractWith7zip: (archive, output) =>
-          extractRuntimeArchive(path7za, archive, output),
+        extractWith7zip: (archive, output) => extractRuntimeArchive(path7za, archive, output),
         listExtractedEntries,
         logEvent: vi.fn(),
         torrentAdapter: { download: vi.fn(), close: vi.fn() },
@@ -110,17 +104,13 @@ describe("real download flows", () => {
       expect(job.downloadedBytes).toBe(archiveBytes.length);
       const session = [...sessions.values()][0];
       expect(session).toBeDefined();
-      expect(
-        await readFile(path.join(session.workspaceDir, "fixture.zip")),
-      ).toEqual(archiveBytes);
-      expect(
-        await readFile(path.join(session.extractDir, "album", "pixels.bin")),
-      ).toEqual(expectedFile);
+      expect(await readFile(path.join(session.workspaceDir, "fixture.zip"))).toEqual(archiveBytes);
+      expect(await readFile(path.join(session.extractDir, "album", "pixels.bin"))).toEqual(
+        expectedFile,
+      );
     } finally {
       if (job.workspaceDir) cleanupPaths.push(job.workspaceDir);
-      cleanupPaths.push(
-        ...Array.from(sessions.values(), ({ workspaceDir }) => workspaceDir),
-      );
+      cleanupPaths.push(...Array.from(sessions.values(), ({ workspaceDir }) => workspaceDir));
       await new Promise<void>((resolve, reject) =>
         source.close((error) => (error ? reject(error) : resolve())),
       );
@@ -128,9 +118,7 @@ describe("real download flows", () => {
   });
 
   it("downloads a magnet from a directly addressed localhost peer", async () => {
-    const fixtureRoot = await mkdtemp(
-      path.join(tmpdir(), "ziv-torrent-source-"),
-    );
+    const fixtureRoot = await mkdtemp(path.join(tmpdir(), "ziv-torrent-source-"));
     cleanupPaths.push(fixtureRoot);
     const sourcePath = path.join(fixtureRoot, "fixture.bin");
     const expectedFile = Buffer.from(
@@ -149,10 +137,8 @@ describe("real download flows", () => {
     try {
       const torrent = await new Promise<Torrent>((resolve, reject) => {
         seeder.once("error", reject);
-        seeder.seed(
-          sourcePath,
-          { announce: [], private: true },
-          (readyTorrent) => resolve(readyTorrent),
+        seeder.seed(sourcePath, { announce: [], private: true }, (readyTorrent) =>
+          resolve(readyTorrent),
         );
       });
       const magnet = torrent.magnetURI;
@@ -165,8 +151,7 @@ describe("real download flows", () => {
         closeJob: manager.closeJob,
         download: downloadRuntimeSource,
         detectEncryption: () => Promise.resolve(false),
-        extractWith7zip: (archive, output) =>
-          extractRuntimeArchive(path7za, archive, output),
+        extractWith7zip: (archive, output) => extractRuntimeArchive(path7za, archive, output),
         listExtractedEntries,
         logEvent: vi.fn(),
         torrentAdapter: {
@@ -195,14 +180,10 @@ describe("real download flows", () => {
       expect(job.downloadedBytes).toBe(expectedFile.length);
       const session = [...sessions.values()][0];
       expect(session).toBeDefined();
-      expect(
-        await readFile(path.join(session.extractDir, "fixture.bin")),
-      ).toEqual(expectedFile);
+      expect(await readFile(path.join(session.extractDir, "fixture.bin"))).toEqual(expectedFile);
     } finally {
       if (job?.workspaceDir) cleanupPaths.push(job.workspaceDir);
-      cleanupPaths.push(
-        ...Array.from(sessions.values(), ({ workspaceDir }) => workspaceDir),
-      );
+      cleanupPaths.push(...Array.from(sessions.values(), ({ workspaceDir }) => workspaceDir));
       await adapter.close();
       await new Promise<void>((resolve, reject) =>
         seeder.destroy((error) => (error ? reject(error) : resolve())),
@@ -211,9 +192,7 @@ describe("real download flows", () => {
   }, 20_000);
 
   it("confirms an oversized URL through RPC and completes the queued download", async () => {
-    const fixtureRoot = await mkdtemp(
-      path.join(tmpdir(), "ziv-confirm-source-"),
-    );
+    const fixtureRoot = await mkdtemp(path.join(tmpdir(), "ziv-confirm-source-"));
     cleanupPaths.push(fixtureRoot);
     const sourceDirectory = path.join(fixtureRoot, "source", "album");
     const archivePath = path.join(fixtureRoot, "oversized.zip");
@@ -226,14 +205,10 @@ describe("real download flows", () => {
     const archiveBytes = await readFile(archivePath);
     const source = createServer((request, response) => {
       if (request.method === "HEAD") {
-        response
-          .writeHead(200, { "content-length": CONFIRM_SIZE_BYTES + 1 })
-          .end();
+        response.writeHead(200, { "content-length": CONFIRM_SIZE_BYTES + 1 }).end();
         return;
       }
-      response
-        .writeHead(200, { "content-length": archiveBytes.length })
-        .end(archiveBytes);
+      response.writeHead(200, { "content-length": archiveBytes.length }).end(archiveBytes);
     });
     source.listen(0, "127.0.0.1");
     await once(source, "listening");
@@ -250,9 +225,7 @@ describe("real download flows", () => {
       changes.emit("change");
     };
     let activeCount = 0;
-    const pending: Parameters<
-      typeof createSessionJobQueue
-    >[0]["pendingSessionJobs"] = [];
+    const pending: Parameters<typeof createSessionJobQueue>[0]["pendingSessionJobs"] = [];
     let queue: ReturnType<typeof createSessionJobQueue>;
     const processJob = createProcessSessionJob({
       sessionStore: sessions,
@@ -260,8 +233,7 @@ describe("real download flows", () => {
       closeJob: manager.closeJob,
       download: downloadRuntimeSource,
       detectEncryption: () => Promise.resolve(false),
-      extractWith7zip: (archive, output) =>
-        extractRuntimeArchive(path7za, archive, output),
+      extractWith7zip: (archive, output) => extractRuntimeArchive(path7za, archive, output),
       listExtractedEntries,
       logEvent: vi.fn(),
       torrentAdapter: { download: vi.fn(), close: vi.fn() },
@@ -331,18 +303,13 @@ describe("real download flows", () => {
       );
       job = createdJob;
       queue.enqueueSessionJob(createdJob, false);
-      await waitUntil(
-        () => createdJob.status === "awaiting_confirmation",
-        changes,
-      );
+      await waitUntil(() => createdJob.status === "awaiting_confirmation", changes);
       expect(createdJob.requiresConfirmation).toBe(true);
       const rpc = createORPCClient<ContractRouterClient<typeof serverContract>>(
         new RPCLink({ url: `http://127.0.0.1:${String(rpcAddress.port)}/rpc` }),
       );
 
-      await expect(
-        rpc.jobs.confirm({ id: createdJob.id }),
-      ).resolves.toMatchObject({
+      await expect(rpc.jobs.confirm({ id: createdJob.id })).resolves.toMatchObject({
         status: "queued",
         phase: "queued",
         message: "Confirmation accepted. Waiting to start.",
@@ -354,9 +321,9 @@ describe("real download flows", () => {
       const session = [...sessions.values()][0];
       expect(session).toBeDefined();
       cleanupPaths.push(session.workspaceDir);
-      expect(
-        await readFile(path.join(session.extractDir, "album", "confirmed.txt")),
-      ).toEqual(expectedFile);
+      expect(await readFile(path.join(session.extractDir, "album", "confirmed.txt"))).toEqual(
+        expectedFile,
+      );
     } finally {
       if (job?.workspaceDir) cleanupPaths.push(job.workspaceDir);
       await new Promise<void>((resolve, reject) =>

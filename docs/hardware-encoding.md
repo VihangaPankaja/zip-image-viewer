@@ -92,7 +92,7 @@ the capture manifest.
 ## Reproduction and free CI
 
 ```sh
-pnpm run benchmark:encoding -- --output test-results/video-encoding.json
+vpr benchmark:encoding --output test-results/video-encoding.json
 ```
 
 The JSON report records requested and actual modes, three encode timings, byte

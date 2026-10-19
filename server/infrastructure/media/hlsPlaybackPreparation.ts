@@ -1,8 +1,4 @@
-import type {
-  Session,
-  VideoRendition,
-  VideoTranscodeEntry,
-} from "../../domain/models.js";
+import type { Session, VideoRendition, VideoTranscodeEntry } from "../../domain/models.js";
 import { calculateRenditions } from "../../media/hlsManifest.js";
 import { getRenditionState } from "../../media/videoRendition.js";
 import { HlsWindows, WINDOW_SEGMENTS } from "./hlsWindows.js";
@@ -15,10 +11,7 @@ type Dependencies = {
 };
 
 export class HlsPlaybackPreparation {
-  private readonly warming = new WeakMap<
-    VideoRendition,
-    Map<number, Promise<void>>
-  >();
+  private readonly warming = new WeakMap<VideoRendition, Map<number, Promise<void>>>();
   constructor(
     private readonly windows: HlsWindows,
     private readonly deps: Dependencies,
@@ -57,14 +50,7 @@ export class HlsPlaybackPreparation {
         candidate.lastAccessedAt = Date.now();
         for (const next of [start, start + WINDOW_SEGMENTS]) {
           if (next >= entry.expectedSegments) continue;
-          await this.windows.ensure(
-            entry,
-            session,
-            candidate,
-            next,
-            sessionSignal,
-            "background",
-          );
+          await this.windows.ensure(entry, session, candidate, next, sessionSignal, "background");
           await this.deps.enforceBudget();
         }
       }

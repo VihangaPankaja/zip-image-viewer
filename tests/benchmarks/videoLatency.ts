@@ -6,10 +6,7 @@ import path from "node:path";
 import express, { type Express } from "express";
 import ffmpegPath from "ffmpeg-static";
 import { chromium, type Page } from "@playwright/test";
-import type {
-  Session,
-  VideoTranscodeEntry,
-} from "../../server/domain/models.js";
+import type { Session, VideoTranscodeEntry } from "../../server/domain/models.js";
 import { registerVideoRoutes } from "../../server/handlers/videoRoutes.js";
 import { createVideoRuntime } from "../../server/infrastructure/media/videoRuntime.js";
 import {
@@ -93,10 +90,7 @@ async function close(server: Server): Promise<void> {
   );
 }
 
-async function waitFor(
-  condition: () => boolean,
-  timeoutMs = 30_000,
-): Promise<void> {
+async function waitFor(condition: () => boolean, timeoutMs = 30_000): Promise<void> {
   const startedAt = Date.now();
   while (!condition()) {
     if (Date.now() - startedAt >= timeoutMs) {
@@ -215,8 +209,7 @@ function addSample(
     encoderQueueMs,
     encoderMs: 0,
     rendition: mode === "original" ? "source" : "360p",
-    cache:
-      mode === "original" ? "n/a" : mode === "prepared-hls" ? "hit" : "miss",
+    cache: mode === "original" ? "n/a" : mode === "prepared-hls" ? "hit" : "miss",
   });
 }
 
@@ -224,9 +217,7 @@ async function main(): Promise<void> {
   if (!ffmpegPath) throw new Error("ffmpeg-static is unavailable.");
   const sampleCount = positiveInteger("--samples", 5);
   const durationSeconds = positiveInteger("--duration", 24);
-  const outputPath = path.resolve(
-    argument("--output", "docs/video-latency-baseline.md"),
-  );
+  const outputPath = path.resolve(argument("--output", "docs/video-latency-baseline.md"));
   const root = await mkdtemp(path.join(tmpdir(), "ziv-video-benchmark-"));
   const sourceDir = path.join(root, "source");
   const sourcePath = path.join(sourceDir, "fixture.mp4");
@@ -301,16 +292,8 @@ async function main(): Promise<void> {
       "fixture.mp4",
       sourcePath,
     );
-    const preparedRendition = runtime.getRenditionState(
-      preparedEntry,
-      prepared,
-      "360p",
-    );
-    await runtime.startRenditionTranscode(
-      preparedEntry,
-      prepared,
-      preparedRendition,
-    );
+    const preparedRendition = runtime.getRenditionState(preparedEntry, prepared, "360p");
+    await runtime.startRenditionTranscode(preparedEntry, prepared, preparedRendition);
     await waitFor(() => preparedRendition.status === "done");
 
     const port = await listen(server);
@@ -362,15 +345,12 @@ async function main(): Promise<void> {
         "cold-hls",
         0,
       );
-      const coldEntry = transcodes.get(
-        runtime.getVideoTranscodeKey(cold.id, "fixture.mp4"),
-      );
+      const coldEntry = transcodes.get(runtime.getVideoTranscodeKey(cold.id, "fixture.mp4"));
       const coldRendition = coldEntry?.renditions.get("360p");
       await waitFor(() => coldRendition?.status === "done");
       const completed = timingEvents.find(
         ({ event, details }) =>
-          event === "video.transcode.completed" &&
-          details?.sessionId === cold.id,
+          event === "video.transcode.completed" && details?.sessionId === cold.id,
       );
       const coldSample = samples.at(-1);
       if (!coldSample) throw new Error("Cold HLS sample was not recorded.");

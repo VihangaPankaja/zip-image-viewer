@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import test from "node:test";
+import { test } from "vite-plus/test";
 import sharp from "sharp";
 import { publishScreenshotRelease } from "./pr-screenshot-release.mjs";
 import {
@@ -34,9 +34,7 @@ test("release publishing creates no branch, reuses assets and rejects inaccessib
     calls.push(args);
     if (args[0] === "api") {
       if (args[1].endsWith("/releases"))
-        return JSON.stringify(
-          exists ? [[{ id: 1, tag_name: "pr-review-assets" }]] : [[]],
-        );
+        return JSON.stringify(exists ? [[{ id: 1, tag_name: "pr-review-assets" }]] : [[]]);
       if (args[1].endsWith("/assets")) return '[[{"name":"existing.png"}]]';
       return '{"id":1}';
     }
@@ -58,16 +56,12 @@ test("release publishing creates no branch, reuses assets and rejects inaccessib
   };
   await publishScreenshotRelease(options);
   assert.equal(calls.filter((args) => args[1] === "create").length, 1);
-  assert.ok(
-    calls.find((args) => args[1] === "create").includes("--latest=false"),
-  );
+  assert.ok(calls.find((args) => args[1] === "create").includes("--latest=false"));
   assert.equal(calls.filter((args) => args[1] === "upload").length, 1);
   assert.equal(requests.length, 2);
   assert.ok(
     requests.every(
-      ([url, method]) =>
-        url.includes("/releases/download/pr-review-assets/") &&
-        method === "HEAD",
+      ([url, method]) => url.includes("/releases/download/pr-review-assets/") && method === "HEAD",
     ),
   );
   assert.ok(calls.every((args) => args[0] === "api" || args[0] === "release"));
@@ -124,8 +118,7 @@ test("represents all 560 originals once with featured images first and a bounded
     );
   const body = renderScreenshotSection({
     groups,
-    assetBaseUrl:
-      "https://github.com/owner/repo/releases/download/pr-review-assets",
+    assetBaseUrl: "https://github.com/owner/repo/releases/download/pr-review-assets",
     assetPrefix: "aaaaaaaaaaaa-bbbbbbbbbbbb-",
     originalArchiveUrl:
       "https://github.com/owner/repo/releases/download/pr-review-assets/aaaaaaaaaaaa-bbbbbbbbbbbb-originals.zip",
@@ -133,16 +126,10 @@ test("represents all 560 originals once with featured images first and a bounded
     fixtures: "Transfer progress is simulated.",
   });
   assert.ok(body.length < 60000);
-  assert.equal(
-    (body.match(/### (Mobile|Tablet|Desktop|Ultrawide)/g) ?? []).length,
-    4,
-  );
+  assert.equal((body.match(/### (Mobile|Tablet|Desktop|Ultrawide)/g) ?? []).length, 4);
   assert.equal((body.match(/<details>/g) ?? []).length, 8);
   assert.equal((body.match(/-sheet-\d+\.png\)/g) ?? []).length, 144);
-  assert.ok(
-    body.indexOf("mobile-light-0.png") <
-      body.indexOf("mobile-light-sheet-01.png"),
-  );
+  assert.ok(body.indexOf("mobile-light-0.png") < body.indexOf("mobile-light-sheet-01.png"));
   assert.match(body, /Transfer progress is simulated/);
   assert.match(
     body,
@@ -158,10 +145,7 @@ test("represents all 560 originals once with featured images first and a bounded
       ),
     /Unsupported/,
   );
-  assert.throws(
-    () => groupScreenshotGalleries([...captures, captures[0]], featured),
-    /unique/,
-  );
+  assert.throws(() => groupScreenshotGalleries([...captures, captures[0]], featured), /unique/);
 });
 
 test("creates uncropped contact sheets and an original-resolution gallery", async () => {
@@ -191,20 +175,13 @@ test("creates uncropped contact sheets and an original-resolution gallery", asyn
       );
     const groups = groupScreenshotGalleries(entries, []);
     const assets = await prepareScreenshotGalleries(directory, groups);
-    assert.deepEqual(assets, [
-      "mobile-light-sheet-01.png",
-      "mobile-light-gallery.md",
-    ]);
+    assert.deepEqual(assets, ["mobile-light-sheet-01.png", "mobile-light-gallery.md"]);
     const metadata = await sharp(path.join(directory, assets[0])).metadata();
     assert.equal(metadata.width, 184);
     assert.ok(metadata.height > 160);
     const gallery = await readFile(path.join(directory, assets[1]), "utf8");
     for (const entry of entries)
-      assert.ok(
-        gallery.includes(
-          `![${entry.screen.replaceAll("-", " ")}](./${entry.file})`,
-        ),
-      );
+      assert.ok(gallery.includes(`![${entry.screen.replaceAll("-", " ")}](./${entry.file})`));
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

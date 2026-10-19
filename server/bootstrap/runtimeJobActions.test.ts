@@ -14,9 +14,7 @@ it.each([
 ])(
   "explicitly deletes $sourceKind files and queue entry with expired job: $expired",
   async ({ sourceKind, expired }) => {
-    const workspaceDir = await mkdtemp(
-      path.join(tmpdir(), "delete-session-job-"),
-    );
+    const workspaceDir = await mkdtemp(path.join(tmpdir(), "delete-session-job-"));
     const jobs = new Map<string, SessionJob>();
     const manager = createJobManager(jobs, vi.fn());
     const job = manager.createJob("https://example.com/media.zip");
@@ -77,9 +75,7 @@ it.each([
 it.each(["pending", "active"])(
   "rejects deletion of a %s retained torrent without removing files or state",
   async (phase) => {
-    const workspaceDir = await mkdtemp(
-      path.join(tmpdir(), "busy-session-delete-"),
-    );
+    const workspaceDir = await mkdtemp(path.join(tmpdir(), "busy-session-delete-"));
     const jobs = new Map<string, SessionJob>();
     const manager = createJobManager(jobs, vi.fn());
     const job = manager.createJob("https://example.com/media.torrent");

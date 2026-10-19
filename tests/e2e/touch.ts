@@ -10,10 +10,7 @@ export async function tapVisibleTarget(target: Locator) {
     width: innerWidth,
     height: innerHeight,
   }));
-  if (
-    viewport.width === size.width &&
-    Math.abs(viewport.height - size.height) <= 1
-  ) {
+  if (viewport.width === size.width && Math.abs(viewport.height - size.height) <= 1) {
     await target.tap();
     return;
   }
@@ -29,10 +26,7 @@ export async function tapVisibleTarget(target: Locator) {
       target.evaluate((element) => {
         const bounds = element.getBoundingClientRect();
         return element.contains(
-          document.elementFromPoint(
-            bounds.x + bounds.width / 2,
-            bounds.y + bounds.height / 2,
-          ),
+          document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2),
         );
       }),
     )
@@ -49,9 +43,7 @@ export async function tapVisibleTarget(target: Locator) {
       "touchstart",
       (event) => {
         document.documentElement.dataset.e2eTouch =
-          event.isTrusted &&
-          event.target instanceof Node &&
-          element.contains(event.target)
+          event.isTrusted && event.target instanceof Node && element.contains(event.target)
             ? "received"
             : "missed";
       },
@@ -65,10 +57,7 @@ export async function tapVisibleTarget(target: Locator) {
     };
   }, viewport);
   await page.touchscreen.tap(point.x, point.y);
-  await expect(page.locator("html")).toHaveAttribute(
-    "data-e2e-touch",
-    "received",
-  );
+  await expect(page.locator("html")).toHaveAttribute("data-e2e-touch", "received");
   await page
     .locator("html")
     .evaluate((element) => delete (element as HTMLElement).dataset.e2eTouch);

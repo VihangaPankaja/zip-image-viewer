@@ -12,10 +12,7 @@ import {
   normalizeDownloadSettings,
   downloadOptionsToSettings,
 } from "../downloads/downloadOptions.js";
-import {
-  downloadSessionSource,
-  type DownloadSourceDependencies,
-} from "./downloadSessionSource.js";
+import { downloadSessionSource, type DownloadSourceDependencies } from "./downloadSessionSource.js";
 import { extractSessionSource } from "./extractSessionSource.js";
 import { downloadTorrentSource } from "../torrents/downloadTorrentSource.js";
 import type { TorrentAdapter } from "../torrents/torrentDownloader.js";
@@ -46,9 +43,7 @@ function parseSourceUrl(value: string): URL {
   return url;
 }
 
-function configureJob(
-  job: SessionJob,
-): ReturnType<typeof normalizeDownloadSettings> {
+function configureJob(job: SessionJob): ReturnType<typeof normalizeDownloadSettings> {
   const settings = downloadOptionsToSettings(job.downloadOptions);
   Object.assign(job, {
     maxRetries: settings.maxRetries,
@@ -68,13 +63,11 @@ function createSession(
   entries: Awaited<ReturnType<typeof extractSessionSource>>,
 ): Session {
   const archiveName = path.basename(sourceName) || "download";
-  const rootName =
-    archiveName.replace(/\.(zip|rar|7z|tar|gz|tgz)$/i, "") || archiveName;
+  const rootName = archiveName.replace(/\.(zip|rar|7z|tar|gz|tgz)$/i, "") || archiveName;
   const { tree, firstFilePath, stats } = buildTree(entries, rootName);
   const videoCount = entries.filter(
     ({ type, relativePath }) =>
-      type === "file" &&
-      VIDEO_EXTENSIONS.has(path.extname(relativePath).slice(1).toLowerCase()),
+      type === "file" && VIDEO_EXTENSIONS.has(path.extname(relativePath).slice(1).toLowerCase()),
   ).length;
   return {
     id: crypto.randomUUID(),
@@ -132,11 +125,7 @@ function completeSession(
   });
 }
 
-function emitFailure(
-  job: SessionJob,
-  error: Error,
-  deps: ProcessorDependencies,
-): void {
+function emitFailure(job: SessionJob, error: Error, deps: ProcessorDependencies): void {
   if (error.name === "AbortError") {
     deps.emitJob(
       job,
@@ -204,9 +193,7 @@ export async function restoreTorrentSession(
   );
   session.id = job.sessionId || session.id;
   session.availablePaths = new Set(
-    prepared.entries
-      .filter((entry) => entry.type === "file")
-      .map((entry) => entry.relativePath),
+    prepared.entries.filter((entry) => entry.type === "file").map((entry) => entry.relativePath),
   );
   session.retained = true;
   const existing = deps.sessionStore.get(session.id);
@@ -248,16 +235,10 @@ async function processSessionJob(
 ): Promise<void> {
   const sourceUrl = job.sourceKind === "http" ? parseSourceUrl(job.url) : null;
   const workspaceDir =
-    job.workspaceDir ||
-    (await mkdtemp(path.join(os.tmpdir(), "zip-image-viewer-")));
+    job.workspaceDir || (await mkdtemp(path.join(os.tmpdir(), "zip-image-viewer-")));
   const zipPath =
     job.zipPath ||
-    (sourceUrl
-      ? path.join(
-          workspaceDir,
-          path.basename(sourceUrl.pathname) || "download.bin",
-        )
-      : "");
+    (sourceUrl ? path.join(workspaceDir, path.basename(sourceUrl.pathname) || "download.bin") : "");
   const extractDir = job.extractDir || path.join(workspaceDir, "extracted");
   await mkdir(extractDir, { recursive: true });
   Object.assign(job, {
@@ -291,8 +272,7 @@ async function processSessionJob(
       );
       return;
     }
-    if (job.sourceKind === "http")
-      await rm(workspaceDir, { recursive: true, force: true });
+    if (job.sourceKind === "http") await rm(workspaceDir, { recursive: true, force: true });
     if (jobError.name !== "AbortError") {
       deps.logEvent("error", "session.create.failed", {
         jobId: job.id,

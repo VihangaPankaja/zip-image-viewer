@@ -5,10 +5,7 @@ import type { JobTransport } from "./useJobTransport";
 
 type PollContext = Pick<
   JobTransport,
-  | "jobPollTimeoutRef"
-  | "latestJobIdRef"
-  | "latestSessionIdRef"
-  | "stopJobPolling"
+  "jobPollTimeoutRef" | "latestJobIdRef" | "latestSessionIdRef" | "stopJobPolling"
 > & {
   handleJobSnapshot: (payload: JobPayload, nextUrl: string) => Promise<void>;
   setActiveJob: Dispatch<SetStateAction<JobPayload | null>>;
@@ -16,12 +13,7 @@ type PollContext = Pick<
   setIsLoading: Dispatch<SetStateAction<boolean>>;
 };
 
-function schedulePoll(
-  context: PollContext,
-  jobId: string,
-  nextUrl: string,
-  delay: number,
-) {
+function schedulePoll(context: PollContext, jobId: string, nextUrl: string, delay: number) {
   context.jobPollTimeoutRef.current = window.setTimeout(() => {
     void pollJob(context, jobId, nextUrl);
   }, delay);
@@ -36,9 +28,7 @@ async function pollJob(context: PollContext, jobId: string, nextUrl: string) {
       if (!context.latestSessionIdRef.current) {
         context.setActiveJob(null);
         context.setIsLoading(false);
-        context.setError(
-          "Archive loading was interrupted before the UI could refresh.",
-        );
+        context.setError("Archive loading was interrupted before the UI could refresh.");
       }
       return;
     }

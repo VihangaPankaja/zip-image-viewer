@@ -12,16 +12,12 @@ export function resourceLimitError(message: string): Error {
 
 export function assertResourceSize(bytes: number): void {
   if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > MAX_RESOURCE_BYTES)
-    throw resourceLimitError(
-      "Download or extraction exceeds the 10 GiB limit.",
-    );
+    throw resourceLimitError("Download or extraction exceeds the 10 GiB limit.");
 }
 
 export function assertResourceEntryCount(count: number): void {
   if (count > MAX_RESOURCE_ENTRIES)
-    throw resourceLimitError(
-      "Download or extraction exceeds the 10000 entry limit.",
-    );
+    throw resourceLimitError("Download or extraction exceeds the 10000 entry limit.");
 }
 
 export function reserveStorage(directory: string, bytes: number) {
@@ -40,9 +36,7 @@ export function reserveStorage(directory: string, bytes: number) {
       STORAGE_HEADROOM_BYTES >
       available()
   )
-    throw resourceLimitError(
-      "Insufficient storage for this download or extraction.",
-    );
+    throw resourceLimitError("Insufficient storage for this download or extraction.");
   entries.set(key, bytes);
   reservations.set(device, entries);
   return {
@@ -56,19 +50,12 @@ export function reserveStorage(directory: string, bytes: number) {
         available() - otherBytes - STORAGE_HEADROOM_BYTES,
       );
       if (capacity < 0)
-        throw resourceLimitError(
-          "Insufficient storage for this download or extraction.",
-        );
+        throw resourceLimitError("Insufficient storage for this download or extraction.");
       entries.set(key, capacity);
     },
     check: (receivedBytes = 0) => {
-      if (
-        receivedBytes > (entries.get(key) ?? 0) ||
-        available() < STORAGE_HEADROOM_BYTES
-      )
-        throw resourceLimitError(
-          "Insufficient storage for this download or extraction.",
-        );
+      if (receivedBytes > (entries.get(key) ?? 0) || available() < STORAGE_HEADROOM_BYTES)
+        throw resourceLimitError("Insufficient storage for this download or extraction.");
     },
     release: () => {
       entries.delete(key);
@@ -88,9 +75,7 @@ export function createDownloadBudget(
       try {
         received += chunk.length;
         if (received > maxBytes())
-          throw resourceLimitError(
-            "Download or extraction exceeds its allowed size.",
-          );
+          throw resourceLimitError("Download or extraction exceeds its allowed size.");
         checkStorage(received);
         state.downloadedBytes += chunk.length;
         callback(null, chunk);

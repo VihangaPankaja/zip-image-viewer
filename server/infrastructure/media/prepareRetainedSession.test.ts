@@ -31,12 +31,7 @@ it("prepares available retained videos after indexing and skips other or unavail
       .fn<Parameters<typeof prepareRetainedSession>[2]>()
       .mockResolvedValue({} as VideoTranscodeEntry);
     const errors = vi.fn();
-    await prepareRetainedSession(
-      session,
-      new Map([[session.id, session]]),
-      prepare,
-      errors,
-    );
+    await prepareRetainedSession(session, new Map([[session.id, session]]), prepare, errors);
     expect(prepare).toHaveBeenCalledExactlyOnceWith(
       session,
       paths[0],

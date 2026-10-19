@@ -1,8 +1,4 @@
-import type {
-  Session,
-  SessionJob,
-  VideoTranscodeEntry,
-} from "../domain/models.js";
+import type { Session, SessionJob, VideoTranscodeEntry } from "../domain/models.js";
 import type { createJobManager } from "../application/jobs/jobManager.js";
 import type { createSessionJobQueue } from "../application/jobs/sessionJobQueue.js";
 import { createSessionManager } from "../application/sessions/sessionManager.js";
@@ -16,20 +12,11 @@ export function createRuntimeJobActions(
   logEvent: Parameters<typeof createSessionManager>[2],
   cleanupVideoSession: (_session: Session) => Promise<void>,
 ) {
-  const sessionManager = createSessionManager(
-    sessions,
-    transcodes,
-    logEvent,
-    cleanupVideoSession,
-  );
+  const sessionManager = createSessionManager(sessions, transcodes, logEvent, cleanupVideoSession);
   const cancelSessionJob = (job: SessionJob) => {
     queue.cancelSessionJob(job.id);
     manager.closeJob(job, "cancelled");
-    manager.emitJob(
-      job,
-      { phase: "cancelled", message: "Cancelled" },
-      "cancelled",
-    );
+    manager.emitJob(job, { phase: "cancelled", message: "Cancelled" }, "cancelled");
     return job;
   };
   const retrySessionJob = (previous: SessionJob) => {
@@ -63,11 +50,7 @@ export function createRuntimeJobActions(
   }
   async function removeSessionJob(jobId: string) {
     const job = jobs.get(jobId);
-    if (
-      job?.sourceKind === "torrent" &&
-      job.sessionId &&
-      sessions.has(job.sessionId)
-    ) {
+    if (job?.sourceKind === "torrent" && job.sessionId && sessions.has(job.sessionId)) {
       await removeSession(job.sessionId, "removed");
       return;
     }

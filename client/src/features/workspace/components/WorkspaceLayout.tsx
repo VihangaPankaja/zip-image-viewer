@@ -54,11 +54,7 @@ export function WorkspaceLayout({
         </Panel>
         <Separator className="workspace-resize-handle" />
         <Panel defaultSize="70" minSize="40">
-          <section
-            className="unified-workspace-preview"
-            aria-label="Preview panel"
-            tabIndex={0}
-          >
+          <section className="unified-workspace-preview" aria-label="Preview panel" tabIndex={0}>
             <button
               className="mobile-back-action"
               type="button"
@@ -67,10 +63,7 @@ export function WorkspaceLayout({
               Back to files
             </button>
             {preview}
-            <aside
-              className="unified-workspace-metadata"
-              aria-label="Metadata panel"
-            >
+            <aside className="unified-workspace-metadata" aria-label="Metadata panel">
               {metadata}
             </aside>
           </section>
@@ -89,10 +82,7 @@ function WorkspaceMobileNavigation({
   mobilePane,
   onMobilePaneChange,
   onOpenDownloads,
-}: Pick<
-  WorkspaceLayoutProps,
-  "mobilePane" | "onMobilePaneChange" | "onOpenDownloads"
->) {
+}: Pick<WorkspaceLayoutProps, "mobilePane" | "onMobilePaneChange" | "onOpenDownloads">) {
   return (
     <nav className="workspace-mobile-nav" aria-label="Workspace views">
       <button type="button" onClick={onOpenDownloads}>

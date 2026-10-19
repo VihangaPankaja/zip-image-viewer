@@ -29,8 +29,7 @@ export async function fetchRemoteMetadata(
     const encoded = Boolean(encoding && encoding.toLowerCase() !== "identity");
     return {
       size: encoded ? 0 : Number(response.headers.get("content-length")) || 0,
-      acceptRanges:
-        !encoded && /bytes/i.test(response.headers.get("accept-ranges") ?? ""),
+      acceptRanges: !encoded && /bytes/i.test(response.headers.get("accept-ranges") ?? ""),
       etag: response.headers.get("etag") ?? "",
       lastModified: response.headers.get("last-modified") ?? "",
     };

@@ -1,9 +1,4 @@
-import {
-  useEffect,
-  type Dispatch,
-  type RefObject,
-  type SetStateAction,
-} from "react";
+import { useEffect, type Dispatch, type RefObject, type SetStateAction } from "react";
 import { getImageNavigationTarget } from "../features/workspace/imageNavigation";
 
 type KeyboardSettings = {
@@ -58,8 +53,7 @@ export function useKeyboardShortcuts({
       videoRef,
       videoShellRef,
     };
-    const onKeyDown = (event: KeyboardEvent) =>
-      handleKeyboardShortcut(event, context);
+    const onKeyDown = (event: KeyboardEvent) => handleKeyboardShortcut(event, context);
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -80,16 +74,11 @@ export function useKeyboardShortcuts({
   ]);
 }
 
-function handleKeyboardShortcut(
-  event: KeyboardEvent,
-  context: UseKeyboardShortcutsParams,
-): void {
+function handleKeyboardShortcut(event: KeyboardEvent, context: UseKeyboardShortcutsParams): void {
   if (
     event.defaultPrevented ||
     (document.querySelector("dialog[open]") && !context.slideshowOpen) ||
-    isInteractiveTarget(
-      event.target instanceof Element ? event.target : null,
-    ) ||
+    isInteractiveTarget(event.target instanceof Element ? event.target : null) ||
     isInteractiveTarget(document.activeElement)
   ) {
     return;
@@ -108,42 +97,27 @@ function isInteractiveTarget(element: Element | null): boolean {
   );
 }
 
-function handleVideoShortcut(
-  event: KeyboardEvent,
-  context: UseKeyboardShortcutsParams,
-): boolean {
+function handleVideoShortcut(event: KeyboardEvent, context: UseKeyboardShortcutsParams): boolean {
   const player = context.videoRef.current;
   if (context.selectedKind !== "video" || !player) {
     return false;
   }
   const jump = Math.max(1, Number(context.keyboardSettings.jumpSeconds) || 5);
-  const rateStep = Math.max(
-    0.05,
-    Number(context.keyboardSettings.rateStep) || 0.25,
-  );
+  const rateStep = Math.max(0.05, Number(context.keyboardSettings.rateStep) || 0.25);
   const key = event.key.toLowerCase();
   if ((key === "j" || key === "l") && document.fullscreenElement) {
     const direction = key === "l" ? 1 : -1;
-    player.currentTime = Math.max(
-      0,
-      (player.currentTime || 0) + jump * direction,
-    );
+    player.currentTime = Math.max(0, (player.currentTime || 0) + jump * direction);
   } else if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
     return false;
   } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
     const direction = event.key === "ArrowUp" ? 1 : -1;
-    const nextVolume = Math.max(
-      0,
-      Math.min(1, (player.volume || 0) + 0.05 * direction),
-    );
+    const nextVolume = Math.max(0, Math.min(1, (player.volume || 0) + 0.05 * direction));
     player.volume = nextVolume;
     context.setVideoVolume(nextVolume);
   } else if (event.key === "]" || event.key === "[") {
     const direction = event.key === "]" ? 1 : -1;
-    const nextRate = Math.max(
-      0.25,
-      Math.min(3, (player.playbackRate || 1) + rateStep * direction),
-    );
+    const nextRate = Math.max(0.25, Math.min(3, (player.playbackRate || 1) + rateStep * direction));
     player.playbackRate = nextRate;
     context.setVideoPlaybackRate(nextRate);
   } else if (key === "f") {
@@ -165,10 +139,7 @@ function toggleFullscreen(shell: HTMLDivElement | null): void {
     .catch(() => undefined);
 }
 
-function handleImageShortcut(
-  event: KeyboardEvent,
-  context: UseKeyboardShortcutsParams,
-): void {
+function handleImageShortcut(event: KeyboardEvent, context: UseKeyboardShortcutsParams): void {
   const { currentFolderImages, currentImageIndex, slideshowOpen } = context;
   if (currentImageIndex === -1) {
     if (event.key === "Escape") {

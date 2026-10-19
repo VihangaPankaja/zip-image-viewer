@@ -6,10 +6,7 @@ import { ApplicationError, type SessionJob } from "../../domain/models.js";
 import type { TorrentFile } from "../../../shared/contracts.js";
 import { isRealPathWithinRoot } from "../../infrastructure/runtime/filePaths.js";
 import type { ActiveTorrent } from "./torrentDownloader.js";
-import {
-  verifiedTorrentStream,
-  type TorrentByteRange,
-} from "./verifiedTorrentStream.js";
+import { verifiedTorrentStream, type TorrentByteRange } from "./verifiedTorrentStream.js";
 
 export function openTorrentVideoFile(
   active: Map<string, ActiveTorrent>,
@@ -23,17 +20,10 @@ export function openTorrentVideoFile(
       "Torrent is not actively downloading. Resume it or open the completed file in Explore.",
       409,
     );
-  const file = entry.torrent.files.find(
-    (_file, index) => String(index) === fileId,
-  );
-  if (!file)
-    throw new ApplicationError("NOT_FOUND", "Torrent file not found.", 404);
+  const file = entry.torrent.files.find((_file, index) => String(index) === fileId);
+  if (!file) throw new ApplicationError("NOT_FOUND", "Torrent file not found.", 404);
   if (!entry.selectedIds.has(fileId))
-    throw new ApplicationError(
-      "CONFLICT",
-      "Select this file for download first.",
-      409,
-    );
+    throw new ApplicationError("CONFLICT", "Select this file for download first.", 409);
   if (entry.readers.size >= 8)
     throw new ApplicationError(
       "CONFLICT",
@@ -68,10 +58,7 @@ export function openTorrentVideoFile(
   };
 }
 
-export async function openCompletedTorrentVideoFile(
-  job: SessionJob,
-  file: TorrentFile,
-) {
+export async function openCompletedTorrentVideoFile(job: SessionJob, file: TorrentFile) {
   const root = path.join(job.workspaceDir, "torrent");
   const target = path.resolve(root, file.path);
   const available = await isRealPathWithinRoot(target, root).catch(() => false);
@@ -96,7 +83,6 @@ export async function openCompletedTorrentVideoFile(
 
 async function collectBytes(stream: Readable): Promise<Buffer> {
   const chunks: Buffer[] = [];
-  for await (const chunk of stream)
-    chunks.push(Buffer.from(chunk as Uint8Array));
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk as Uint8Array));
   return Buffer.concat(chunks);
 }

@@ -1,13 +1,13 @@
 # Quality checks
 
-Run `pnpm run quality` before a PR. CI enforces formatting, zero lint warnings, client/server/test type checks, full production coverage, dead code and dependency checks, duplicate detection, the Fallow health floor, and a production build. CI also runs the branch audit, all test suites, Chromium/Firefox/WebKit flows, the video benchmark, and the device/theme screenshot gallery. Failed browser runs retain their reports; coverage and gallery artifacts are retained for 14 days.
+Run `vpr quality` before a PR. CI enforces formatting, zero lint warnings, client/server/test type checks, full production coverage, dead code and dependency checks, duplicate detection, the Fallow health floor, and a production build. CI also runs the branch audit, all test suites, Chromium/Firefox/WebKit flows, the video benchmark, and the device/theme screenshot gallery. Failed browser runs retain their reports; coverage and gallery artifacts are retained for 14 days.
 
-The [staged Vite+ baseline](toolchain-baseline.md) records the exact toolchain
-pins, compatibility findings, measurements and rollback. Clean Windows and
-Linux CI jobs install the frozen lockfile without a global `vp`, print the
-resolved toolchain, check all three TypeScript projects and build both client
-and server. ESLint, Prettier and Lefthook continue to enforce their existing
-policies during this stage.
+The [Vite+ toolchain record](toolchain-baseline.md) documents pins, lint parity,
+measurements and rollback. `vp check` runs Oxfmt, typed Oxlint and type checking
+from `vite.config.ts`; `vpr typecheck` additionally checks all three TS projects.
+Native Vite+ hooks check staged files on commit and types, affected tests and
+Fallow before push. Clean Windows/Linux CI jobs install the frozen lockfile,
+print the toolchain and build both client and server.
 
 ## Coverage scope and floors
 
@@ -19,9 +19,9 @@ Raise floors as coverage improves. Do not shrink the include list or exclude unt
 
 ## Fallow
 
-`pnpm run fallow:health` uses the same whole-project score scope as before, with the CI floor raised from 80 to 88. The current measured score is 88.7, below the requested 95 target. Remaining deductions are function size (10 points) and coupling (1.3 points); the size penalty is saturated, so small refactors do not move the displayed score. Large test-suite callbacks also contribute. No ignores or scoring weights were added to conceal this debt.
+`vpr fallow:health` uses the same whole-project score scope as before, with the CI floor raised from 80 to 88. The current measured score is 88.7, below the requested 95 target. Remaining deductions are function size (10 points) and coupling (1.3 points); the size penalty is saturated, so small refactors do not move the displayed score. Large test-suite callbacks also contribute. No ignores or scoring weights were added to conceal this debt.
 
-Use `pnpm run fallow:targets` and `pnpm run fallow:audit` to guide further work. Split long functions only at useful behavioral boundaries, add regression coverage before changing complex flows, and raise the floor once the full-scope score supports it. `health --score` is the stable CI metric; the full interactive report additionally includes history-dependent churn hotspots and can show a different score.
+Use `vpr fallow:targets` and `vpr fallow:audit` to guide further work. Split long functions only at useful behavioral boundaries, add regression coverage before changing complex flows, and raise the floor once the full-scope score supports it. `health --score` is the stable CI metric; the full interactive report additionally includes history-dependent churn hotspots and can show a different score.
 
 ## Visual review
 

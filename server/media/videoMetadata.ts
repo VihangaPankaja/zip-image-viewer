@@ -11,15 +11,7 @@ export type VideoMetadata = {
 };
 export type VideoPlaybackMode = "direct" | "remux" | "transcode";
 
-const TEXT_SUBTITLE_CODECS = new Set([
-  "subrip",
-  "srt",
-  "ass",
-  "ssa",
-  "webvtt",
-  "mov_text",
-  "text",
-]);
+const TEXT_SUBTITLE_CODECS = new Set(["subrip", "srt", "ass", "ssa", "webvtt", "mov_text", "text"]);
 const languageNames = new Intl.DisplayNames(["en"], { type: "language" });
 
 export function mediaTracksFromOutput(output: string): {
@@ -73,10 +65,7 @@ export function mediaTracksFromOutput(output: string): {
   return { audioTracks, subtitleTracks };
 }
 
-export function videoMetadataFromOutput(
-  output: string,
-  extension: string,
-): VideoMetadata {
+export function videoMetadataFromOutput(output: string, extension: string): VideoMetadata {
   return {
     ...dimensionsFromOutput(output),
     ...mediaTracksFromOutput(output),
@@ -85,10 +74,7 @@ export function videoMetadataFromOutput(
   };
 }
 
-export function playbackModeFromOutput(
-  output: string,
-  extension: string,
-): VideoPlaybackMode {
+export function playbackModeFromOutput(output: string, extension: string): VideoPlaybackMode {
   const streams = output.split(/\r?\n/);
   const video = streams.find((line) => /Stream #\d+:\d+.*Video:/.test(line));
   const audio = streams.filter((line) => /Stream #\d+:\d+.*Audio:/.test(line));
@@ -115,9 +101,7 @@ export function dimensionsFromOutput(output: string): {
   width: number;
   height: number;
 } {
-  const videoLine = output
-    .split(/\r?\n/)
-    .find((line) => line.includes("Video:"));
+  const videoLine = output.split(/\r?\n/).find((line) => line.includes("Video:"));
   const match = videoLine?.match(/\b(\d{2,5})x(\d{2,5})\b/);
   return {
     width: Number.parseInt(match?.[1] ?? "0", 10),
@@ -131,9 +115,7 @@ export function qualityOptions(metadata: VideoMetadata): {
 } {
   const options: VideoQualityOption[] = [
     { id: "source", label: "Original", height: metadata.height },
-    ...(metadata.height > 0
-      ? [{ id: "auto", label: "Auto", height: null }]
-      : []),
+    ...(metadata.height > 0 ? [{ id: "auto", label: "Auto", height: null }] : []),
     ...calculateRenditions(metadata)
       .filter(({ id }) => id !== "source")
       .map(({ id, height }) => ({ id, label: id, height })),

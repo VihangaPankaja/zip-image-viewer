@@ -32,22 +32,14 @@ export type ExplorerTablePanelProps = {
 function ExplorerPanelHeader(
   props: Pick<
     ExplorerTablePanelProps,
-    | "sortedTree"
-    | "session"
-    | "explorerRows"
-    | "sortMode"
-    | "setSortMode"
-    | "sortOptions"
+    "sortedTree" | "session" | "explorerRows" | "sortMode" | "setSortMode" | "sortOptions"
   >,
 ) {
   return (
     <header className="panel-header panel-header-stackable explorer-header">
       <div className="panel-title-group explorer-title-group">
         <p className="panel-label">Explorer</p>
-        <h2
-          id="explorer-title"
-          title={props.sortedTree?.name || "No archive loaded"}
-        >
+        <h2 id="explorer-title" title={props.sortedTree?.name || "No archive loaded"}>
           {props.sortedTree?.name || "No archive loaded"}
         </h2>
       </div>
@@ -98,9 +90,7 @@ function ExplorerTable(
                   <button
                     className="explorer-file-button"
                     type="button"
-                    aria-current={
-                      row.path === props.selectedPath ? "true" : undefined
-                    }
+                    aria-current={row.path === props.selectedPath ? "true" : undefined}
                     aria-label={`Open ${row.name}`}
                     onClick={() => props.setSelectedPath(row.path)}
                   >
@@ -111,12 +101,8 @@ function ExplorerTable(
                 )}
               </td>
               {columns.type ? <td>{row.type}</td> : null}
-              {columns.size ? (
-                <td>{props.formatBytes(row.size ?? 0)}</td>
-              ) : null}
-              {columns.date ? (
-                <td>{props.formatDate(row.modifiedAt ?? 0)}</td>
-              ) : null}
+              {columns.size ? <td>{props.formatBytes(row.size ?? 0)}</td> : null}
+              {columns.date ? <td>{props.formatDate(row.modifiedAt ?? 0)}</td> : null}
               {columns.path ? <td>{row.path}</td> : null}
             </tr>
           ))}

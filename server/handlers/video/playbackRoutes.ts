@@ -13,11 +13,7 @@ function pipeVideo(
   size: number,
   rangeHeader: string | undefined,
 ): void {
-  const range = applyByteRange(
-    res,
-    deps.parseRangeHeader(rangeHeader, size),
-    size,
-  );
+  const range = applyByteRange(res, deps.parseRangeHeader(rangeHeader, size), size);
   if (range === null) return;
   createReadStream(targetPath, range).pipe(res);
 }
@@ -34,10 +30,7 @@ function createPlayHandler(deps: VideoRouteDependencies): RequestHandler {
     let targetStats = context.fileStats;
     let sourceMode = "raw";
     if (quality === "remux") {
-      const metadata = await deps.getVideoMetadata(
-        context.targetPath,
-        context.session,
-      );
+      const metadata = await deps.getVideoMetadata(context.targetPath, context.session);
       if (metadata.playbackMode !== "remux") {
         res.status(400).json({ error: "This video does not need a remux." });
         return;
@@ -49,9 +42,7 @@ function createPlayHandler(deps: VideoRouteDependencies): RequestHandler {
           context.targetPath,
         );
       } catch {
-        res
-          .status(503)
-          .json({ error: "Video remux failed. Try Auto playback." });
+        res.status(503).json({ error: "Video remux failed. Try Auto playback." });
         return;
       }
       targetStats = await stat(targetPath);
@@ -69,11 +60,8 @@ function createPlayHandler(deps: VideoRouteDependencies): RequestHandler {
         sourceMode = quality;
       }
     } else if (
-      (
-        await deps
-          .getVideoMetadata(context.targetPath, context.session)
-          .catch(() => null)
-      )?.playbackMode === "direct"
+      (await deps.getVideoMetadata(context.targetPath, context.session).catch(() => null))
+        ?.playbackMode === "direct"
     ) {
       sourceMode = "direct";
     }
@@ -85,10 +73,7 @@ function createPlayHandler(deps: VideoRouteDependencies): RequestHandler {
   };
 }
 
-export function registerVideoPlaybackRoutes(
-  app: Express,
-  deps: VideoRouteDependencies,
-): void {
+export function registerVideoPlaybackRoutes(app: Express, deps: VideoRouteDependencies): void {
   app.get("/api/sessions/:id/video/play", createPlayHandler(deps));
   app.get("/api/sessions/:id/video/transcode-status", (req, res) => {
     const session = deps.touchSession(req.params.id);

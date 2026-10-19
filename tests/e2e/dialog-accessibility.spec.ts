@@ -17,9 +17,7 @@ test("dialogs return focus and keep background preview shortcuts isolated", asyn
   const dialog = page.getByRole("dialog", { name: "Add downloads" });
   await dialog.getByRole("textbox").fill("https://example.com/film.zip");
   await expect(dialog.getByRole("status")).toHaveText("1 of 50 ready");
-  expect(
-    (await new AxeBuilder({ page }).include("dialog").analyze()).violations,
-  ).toEqual([]);
+  expect((await new AxeBuilder({ page }).include("dialog").analyze()).violations).toEqual([]);
   await dialog.getByRole("button", { name: "Close", exact: true }).click();
   await expect(add).toBeFocused();
   const settings = page.getByRole("button", { name: "Settings", exact: true });
@@ -29,9 +27,7 @@ test("dialogs return focus and keep background preview shortcuts isolated", asyn
   await page.keyboard.press("Escape");
   await expect(settings).toBeFocused();
   await page.getByRole("tab", { name: "Explore", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Open Coastal collection", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
   await page.getByRole("treeitem", { name: filenames[0], exact: true }).click();
   const selected = page.locator(".preview-panel h2");
   await expect(selected).toHaveText(filenames[0]);
@@ -54,17 +50,12 @@ test("dialogs return focus and keep background preview shortcuts isolated", asyn
     exact: true,
   });
   await slideshow.click();
-  expect(
-    (await new AxeBuilder({ page }).include("dialog").analyze()).violations,
-  ).toEqual([]);
+  expect((await new AxeBuilder({ page }).include("dialog").analyze()).violations).toEqual([]);
   await page.keyboard.press("Escape");
   await expect(slideshow).toBeFocused();
 });
 
-test("touch can dismiss the batch without losing the opener", async ({
-  page,
-  appOrigin,
-}) => {
+test("touch can dismiss the batch without losing the opener", async ({ page, appOrigin }) => {
   await page.setViewportSize({ width: 360, height: 844 });
   await installReviewFixtures(page);
   await page.goto(appOrigin);
@@ -74,14 +65,8 @@ test("touch can dismiss the batch without losing the opener", async ({
   });
   await tapVisibleTarget(opener);
   await tapVisibleTarget(
-    page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Close", exact: true }),
+    page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }),
   );
   await expect(opener).toBeFocused();
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

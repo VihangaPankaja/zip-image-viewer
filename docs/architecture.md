@@ -54,7 +54,7 @@ Manual quality selection remains available and does not reset playback time.
 
 ## Quality gates
 
-Pull requests run formatting, ESLint, strict TypeScript, Vitest coverage,
-Fallow, a production build, and Chromium Playwright tests. The default branch
-and scheduled workflow add Firefox and WebKit. Local Lefthook checks staged
-format/lint on commit and the wider typed/test/Fallow gates before push.
+Pull requests run Oxfmt, typed Oxlint, strict TypeScript, Vitest coverage,
+Fallow, production builds and Chromium/Firefox/WebKit Playwright tests. Native
+Vite+ hooks check staged format/lint on commit and types/tests/Fallow before
+push. Toolchain settings share `vite.config.ts`.

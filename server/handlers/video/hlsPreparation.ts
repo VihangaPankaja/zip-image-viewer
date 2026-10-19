@@ -23,13 +23,7 @@ export async function prepareHlsMaster(
       const close = () => controller.abort();
       response.once("close", close);
       try {
-        await deps.startPrioritySegmentWindow(
-          entry,
-          context.session,
-          low,
-          0,
-          controller.signal,
-        );
+        await deps.startPrioritySegmentWindow(entry, context.session, low, 0, controller.signal);
       } catch (error) {
         if (!controller.signal.aborted) throw error;
       } finally {

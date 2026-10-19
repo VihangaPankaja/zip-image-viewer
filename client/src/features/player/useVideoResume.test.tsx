@@ -13,9 +13,7 @@ function Harness({ session = "one", path = "a/clip.mp4" }) {
       <video ref={ref} aria-label="player" />
       {resume.position !== null && (
         <>
-          <button onClick={resume.continuePlayback}>
-            Continue {resume.position}
-          </button>
+          <button onClick={resume.continuePlayback}>Continue {resume.position}</button>
           <button onClick={resume.startOver}>Start over</button>
         </>
       )}

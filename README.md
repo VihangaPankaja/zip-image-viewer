@@ -13,7 +13,7 @@ contents, and previewing files while work continues in the background.
   validated API surface with typed errors.
 - Video uses adaptive fMP4 HLS. A source-aware rendition ladder is generated on
   demand, `hls.js` selects quality automatically, and users can choose a level.
-- Strict TypeScript, type-aware ESLint, Fallow, Lefthook, Vitest, Playwright,
+- Strict TypeScript, typed Oxlint, Oxfmt, Fallow, Vite+ hooks, Vitest, Playwright,
   Axe, and coverage reporting are part of the normal quality workflow.
 
 ## Torrent playback while downloading
@@ -45,7 +45,7 @@ Viewers at different positions share completed windows and keep independent
 foreground requests; `hls.js` still makes bandwidth and buffer decisions.
 
 See [long-video seeking and verification](docs/priority-seeking.md) and run
-`pnpm run benchmark:seek` for the isolated cold/prepared seek benchmark.
+`vpr benchmark:seek` for the isolated cold/prepared seek benchmark.
 
 ## Optional hardware encoding
 
@@ -62,7 +62,7 @@ so a failed attempt cannot expose incompatible partial media. This can delay
 startup for short clips, which normally publish progressively on CPU. Original
 playback, remuxing, audio and thumbnails keep their existing behavior.
 
-Run `pnpm run benchmark:encoding -- --output test-results/video-encoding.json`
+Run `vpr benchmark:encoding --output test-results/video-encoding.json`
 to compare the same fixture's encode time, SSIM, output size and decoded seeks.
 It also runs without a GPU and labels CPU fallback explicitly. See
 [hardware encoding verification](docs/hardware-encoding.md) for the measured
@@ -84,23 +84,32 @@ without closing the video.
 
 ## Requirements
 
-- Node.js 26.7.0
-- pnpm 12.1.0
-- FFmpeg and 7-Zip are supplied by project dependencies for supported platforms.
+Install [Vite+](https://viteplus.dev/guide/), then open a new terminal:
 
-```bash
-nvm install 26.7.0
-nvm use 26.7.0
-npm install --global pnpm@12.1.0
-pnpm install --frozen-lockfile
-pnpm run dev
+```powershell
+# Windows
+irm https://vite.plus/ps1 | iex
 ```
 
-On nvm-windows, run `nvm install 26.7.0` followed by `nvm use 26.7.0`;
-nvm-windows and nvm do not read `.node-version` automatically. Other version
-managers can use that file directly. Vite+ is installed locally by pnpm;
-no global `vp` installation is required. See the [staged toolchain migration](docs/toolchain-baseline.md)
-for exact versions, measurements, compatibility decisions and rollback.
+```sh
+# macOS / Linux
+curl -fsSL https://vite.plus | bash
+```
+
+```sh
+vp install --frozen-lockfile
+vpr dev
+```
+
+Vite+ selects Node 26.7.0 from `.node-version` and pnpm 12.1.0 from
+`package.json#packageManager`. FFmpeg and 7-Zip come from project dependencies.
+Installation enables staged formatting/lint and pre-push type/test/Fallow checks.
+
+A global CLI is optional. With those Node/pnpm versions already available,
+run `pnpm install --frozen-lockfile`, then `pnpm exec vp run dev`.
+Use `pnpm exec vp run <script>` for the commands below (`pnpm.cmd` on Windows).
+See the [toolchain record](docs/toolchain-baseline.md) for exact pins, lint
+parity, measurements and rollback.
 
 - Client: <http://localhost:5173>
 - API: <http://localhost:8080>
@@ -108,38 +117,38 @@ for exact versions, measurements, compatibility decisions and rollback.
 ## Quality commands
 
 ```bash
-pnpm run format:check
-pnpm run lint
-pnpm run typecheck
-pnpm run test:unit
-pnpm run test:integration
-pnpm run test:component
-pnpm run test:ui
-pnpm run test:coverage
-pnpm exec playwright install chromium
-pnpm run test:e2e
-pnpm run fallow:health
-pnpm run fallow:dead
-pnpm run fallow:duplicates
-pnpm run fallow:coverage-gaps
-pnpm run fallow:targets
-pnpm run fallow:audit
-pnpm run build
+vpr format:check
+vpr lint
+vpr typecheck
+vpr test:unit
+vpr test:integration
+vpr test:component
+vpr test:ui
+vpr test:coverage
+vp exec playwright install
+vpr test:e2e
+vpr fallow:health
+vpr fallow:dead
+vpr fallow:duplicates
+vpr fallow:coverage-gaps
+vpr fallow:targets
+vpr fallow:audit
+vpr build
 ```
 
-`pnpm run quality` runs the non-browser pull-request gate. Playwright covers the
+`vpr quality` runs the non-browser pull-request gate. Playwright covers the
 desktop workspace, mobile pane navigation, and automated Axe accessibility
 checks. Coverage output is written to `coverage/`.
 
-The application compiles with TypeScript 7. ESLint's TypeScript parser runs in
-the isolated `tooling/eslint` workspace on TypeScript 5.9, the newest compiler
-version its current peer range supports.
+Vite+ owns formatting, typed lint, tests and client builds in `vite.config.ts`.
+TypeScript 7 checks the client, server and test projects. `vpr build` emits
+both client and server; `vp build` alone emits only the client.
 
 ## Production
 
 ```bash
-pnpm run build
-pnpm start
+vpr build
+vpr start
 ```
 
 Or use the hardened multi-stage image:

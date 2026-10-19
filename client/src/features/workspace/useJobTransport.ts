@@ -6,10 +6,7 @@ type HydrationRef = {
   promise: Promise<SessionPayload | null> | null;
 };
 
-export function useJobTransport(
-  sessionId: string | undefined,
-  activeJobId: string | undefined,
-) {
+export function useJobTransport(sessionId: string | undefined, activeJobId: string | undefined) {
   const jobSocketRef = useRef<{ close: () => void } | null>(null);
   const jobPollTimeoutRef = useRef<number | null>(null);
   const latestSessionIdRef = useRef("");

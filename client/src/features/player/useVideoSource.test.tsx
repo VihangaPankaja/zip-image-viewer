@@ -1,11 +1,5 @@
 import { useRef, useState } from "react";
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { vi } from "vite-plus/test";
 import { useVideoSource } from "./useVideoSource";
 
@@ -65,9 +59,7 @@ function Harness({
   active?: boolean;
   ready?: boolean;
 }) {
-  const hlsRef = useRef<InstanceType<typeof import("hls.js").default> | null>(
-    null,
-  );
+  const hlsRef = useRef<InstanceType<typeof import("hls.js").default> | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState("");
   const [, setStatus] = useState<"loading" | "buffering" | "ready">("loading");
@@ -92,9 +84,7 @@ function Harness({
         <select
           aria-label="Audio language"
           value={audio.selectedVideoAudioTrack}
-          onChange={(event) =>
-            audio.setSelectedVideoAudioTrack(event.target.value)
-          }
+          onChange={(event) => audio.setSelectedVideoAudioTrack(event.target.value)}
         >
           {audio.videoAudioTracks.map((track) => (
             <option key={track.id} value={track.id}>
@@ -109,16 +99,10 @@ function Harness({
 
 describe("video quality switching", () => {
   it("detaches and pauses the previous file while qualities are pending", () => {
-    const load = vi
-      .spyOn(HTMLMediaElement.prototype, "load")
-      .mockImplementation(() => {});
-    const pause = vi
-      .spyOn(HTMLMediaElement.prototype, "pause")
-      .mockImplementation(() => {});
+    const load = vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
+    const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
     try {
-      const { container, rerender } = render(
-        <Harness quality="source" file="one.mp4" />,
-      );
+      const { container, rerender } = render(<Harness quality="source" file="one.mp4" />);
       const video = container.querySelector("video");
       if (!video) throw new Error("Video element was not rendered.");
       video.setAttribute("src", "blob:old-video");
@@ -130,9 +114,7 @@ describe("video quality switching", () => {
       expect(video.querySelector("source")).toBeNull();
       expect(load).toHaveBeenCalled();
       rerender(<Harness quality="source" file="two.mp4" />);
-      expect(video.querySelector("source")?.getAttribute("src")).toBe(
-        "/play?path=two.mp4",
-      );
+      expect(video.querySelector("source")?.getAttribute("src")).toBe("/play?path=two.mp4");
     } finally {
       load.mockRestore();
       pause.mockRestore();
@@ -140,13 +122,9 @@ describe("video quality switching", () => {
   });
   it("attaches remux as byte-range MP4, preserves position, and explicitly switches to transcode", async () => {
     instances.length = 0;
-    const load = vi
-      .spyOn(HTMLMediaElement.prototype, "load")
-      .mockImplementation(() => {});
+    const load = vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
     try {
-      const { container, rerender } = render(
-        <Harness quality="remux" file="one.mkv" />,
-      );
+      const { container, rerender } = render(<Harness quality="remux" file="one.mkv" />);
       const video = container.querySelector("video");
       if (!video) throw new Error("Video element was not rendered.");
       expect(video.querySelector("source")?.getAttribute("src")).toBe(
@@ -166,9 +144,7 @@ describe("video quality switching", () => {
   });
   it("reattaches the source after leaving and reopening the player view", async () => {
     instances.length = 0;
-    const { rerender, container } = render(
-      <Harness quality="auto" file="one.mp4" />,
-    );
+    const { rerender, container } = render(<Harness quality="auto" file="one.mp4" />);
     await waitFor(() => expect(instances).toHaveLength(1));
     const originalPlayer = container.querySelector("video");
     rerender(<Harness quality="auto" file="one.mp4" active={false} />);
@@ -182,9 +158,7 @@ describe("video quality switching", () => {
 
   it("changes HLS level without replacing the player or resetting position", async () => {
     instances.length = 0;
-    const { rerender, container } = render(
-      <Harness quality="auto" file="one.mp4" />,
-    );
+    const { rerender, container } = render(<Harness quality="auto" file="one.mp4" />);
     await waitFor(() => expect(instances).toHaveLength(1));
     const player = container.querySelector("video");
     if (!player) throw new Error("Video element was not rendered.");
@@ -200,14 +174,10 @@ describe("video quality switching", () => {
     expect(instances[0].loadLevel).toBe(-1);
     expect(instances).toHaveLength(1);
 
-    const load = vi
-      .spyOn(HTMLMediaElement.prototype, "load")
-      .mockImplementation(() => {});
+    const load = vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
     rerender(<Harness quality="source" file="one.mp4" />);
     expect(instances[0].destroyed).toBe(true);
-    expect(player.querySelector("source")?.getAttribute("src")).toBe(
-      "/play?path=one.mp4",
-    );
+    expect(player.querySelector("source")?.getAttribute("src")).toBe("/play?path=one.mp4");
     load.mockRestore();
 
     player.currentTime = 0;
@@ -229,9 +199,7 @@ describe("video quality switching", () => {
         response: { code: 404 },
       }),
     );
-    expect(container.querySelector("output")?.textContent).toBe(
-      "Video segment is missing.",
-    );
+    expect(container.querySelector("output")?.textContent).toBe("Video segment is missing.");
   });
 });
 
@@ -268,34 +236,21 @@ it("uses native audio tracks for Safari HLS and follows browser selections witho
     0: { label: "English", language: "eng", enabled: true },
     1: { label: "Spanish", language: "spa", enabled: false },
   });
-  const original = Object.getOwnPropertyDescriptor(
-    HTMLMediaElement.prototype,
-    "audioTracks",
-  );
+  const original = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, "audioTracks");
   Object.defineProperty(HTMLMediaElement.prototype, "audioTracks", {
     configurable: true,
     get: () => tracks,
   });
   const remove = vi.spyOn(tracks, "removeEventListener");
-  const load = vi
-    .spyOn(HTMLMediaElement.prototype, "load")
-    .mockImplementation(() => {});
-  const pause = vi
-    .spyOn(HTMLMediaElement.prototype, "pause")
-    .mockImplementation(() => {});
-  const canPlay = vi
-    .spyOn(HTMLMediaElement.prototype, "canPlayType")
-    .mockReturnValue("probably");
+  const load = vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
+  const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+  const canPlay = vi.spyOn(HTMLMediaElement.prototype, "canPlayType").mockReturnValue("probably");
   FakeHls.supported = false;
   try {
-    const { container, unmount } = render(
-      <Harness quality="auto" file="native.mkv" />,
-    );
+    const { container, unmount } = render(<Harness quality="auto" file="native.mkv" />);
     const video = container.querySelector("video");
     if (!video) throw new Error("Video missing.");
-    await waitFor(() =>
-      expect(video).toHaveAttribute("src", "/hls/master?path=native.mkv"),
-    );
+    await waitFor(() => expect(video).toHaveAttribute("src", "/hls/master?path=native.mkv"));
     const picker = screen.getByLabelText("Audio language");
     expect(picker).toHaveValue("0");
     video.currentTime = 12;
@@ -317,25 +272,16 @@ it("uses native audio tracks for Safari HLS and follows browser selections witho
     load.mockRestore();
     pause.mockRestore();
     canPlay.mockRestore();
-    if (original)
-      Object.defineProperty(
-        HTMLMediaElement.prototype,
-        "audioTracks",
-        original,
-      );
+    if (original) Object.defineProperty(HTMLMediaElement.prototype, "audioTracks", original);
     else Reflect.deleteProperty(HTMLMediaElement.prototype, "audioTracks");
   }
 });
 
 it("preserves subtitle tracks when switching between Original and adaptive playback", async () => {
   instances.length = 0;
-  const load = vi
-    .spyOn(HTMLMediaElement.prototype, "load")
-    .mockImplementation(() => {});
+  const load = vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
   try {
-    const { container, rerender } = render(
-      <Harness quality="auto" file="one.mp4" />,
-    );
+    const { container, rerender } = render(<Harness quality="auto" file="one.mp4" />);
     await waitFor(() => expect(instances).toHaveLength(1));
     const video = container.querySelector("video");
     if (!video) throw new Error("Video element missing.");

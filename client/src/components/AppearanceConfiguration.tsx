@@ -14,9 +14,7 @@ export function AppearanceConfiguration(props: {
   return (
     <fieldset className="settings-group settings-group-appearance">
       <legend>Appearance</legend>
-      <p className="settings-hint">
-        Follow your device, or choose a light or dark theme.
-      </p>
+      <p className="settings-hint">Follow your device, or choose a light or dark theme.</p>
       <div className="theme-options">
         {THEME_OPTIONS.map(({ value, label, Icon }) => (
           <label className="theme-option" key={value}>

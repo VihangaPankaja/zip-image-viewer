@@ -24,9 +24,7 @@ export function remuxVideo(
   normalizedPath: string,
   targetPath: string,
   executable: string | null,
-  runTask: (
-    _task: (_signal?: AbortSignal) => Promise<string>,
-  ) => Promise<string>,
+  runTask: (_task: (_signal?: AbortSignal) => Promise<string>) => Promise<string>,
   enforceBudget: () => Promise<void>,
 ): Promise<string> {
   let pending = pendingRemuxes.get(session);
@@ -36,11 +34,7 @@ export function remuxVideo(
   }
   const existing = pending.get(normalizedPath);
   if (existing) return existing;
-  const outputPath = getSessionQualityOutputPath(
-    session,
-    normalizedPath,
-    "remux",
-  );
+  const outputPath = getSessionQualityOutputPath(session, normalizedPath, "remux");
   const remux = runTask(async (signal) => {
     if ((await stat(outputPath).catch(() => null))?.isFile()) return outputPath;
     if (!executable) throw new Error("Video transcoder is unavailable.");
@@ -76,8 +70,6 @@ export function remuxVideo(
     }
   });
   pending.set(normalizedPath, remux);
-  void remux
-    .finally(() => pending.delete(normalizedPath))
-    .catch(() => undefined);
+  void remux.finally(() => pending.delete(normalizedPath)).catch(() => undefined);
   return remux;
 }

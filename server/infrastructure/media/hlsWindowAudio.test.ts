@@ -12,9 +12,7 @@ it.each([false, true])(
   "seeks beyond a short audio track without losing video or failing audio (audio: %s)",
   async (audio) => {
     if (!ffmpegPath) throw new Error("FFmpeg is required.");
-    const workspaceDir = await mkdtemp(
-      path.join(tmpdir(), "window-audio-tail-"),
-    );
+    const workspaceDir = await mkdtemp(path.join(tmpdir(), "window-audio-tail-"));
     const session = { id: "audio-tail", workspaceDir } as Session;
     const runtime = createVideoRuntime({
       ffmpegPath,
@@ -55,25 +53,15 @@ it.each([false, true])(
         "libx264",
         source,
       ]);
-      const entry = await runtime.ensureVideoTranscodeEntry(
-        session,
-        "source.mkv",
-        source,
-      );
-      const rendition = runtime.getRenditionState(
-        entry,
-        session,
-        audio ? "audio-1" : "source",
-      );
+      const entry = await runtime.ensureVideoTranscodeEntry(session, "source.mkv", source);
+      const rendition = runtime.getRenditionState(entry, session, audio ? "audio-1" : "source");
       await runtime.startPrioritySegmentWindow(entry, session, rendition, 32);
       const playlist = path.join(windowDirectory(rendition, 32), "index.m3u8");
       const decoded = await runCommandCapture(ffmpegPath, [
         "-hide_banner",
         "-i",
         playlist,
-        ...(audio
-          ? ["-map", "0:a:0", "-ac", "1", "-t", "1", "-f", "s16le"]
-          : ["-f", "null"]),
+        ...(audio ? ["-map", "0:a:0", "-ac", "1", "-t", "1", "-f", "s16le"] : ["-f", "null"]),
         "-",
       ]);
       if (audio) {

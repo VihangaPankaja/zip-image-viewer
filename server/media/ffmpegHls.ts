@@ -34,9 +34,7 @@ export function buildFmp4HlsArgs(input: Fmp4HlsInput): string[] {
     input.inputPath,
     ...(input.window ? ["-t", String(input.window.durationSeconds)] : []),
     "-map",
-    input.audioStreamIndex === undefined
-      ? "0:v:0"
-      : `0:${String(input.audioStreamIndex)}`,
+    input.audioStreamIndex === undefined ? "0:v:0" : `0:${String(input.audioStreamIndex)}`,
   ];
   if (input.audioStreamIndex === undefined) {
     if (!input.videoOnly) args.push("-map", "0:a:0?");

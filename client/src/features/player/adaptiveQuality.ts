@@ -39,10 +39,7 @@ export function createAdaptiveHlsConfig(
   };
 }
 
-export function resolveManualLevel(
-  quality: string,
-  levelHeights: readonly number[],
-): number {
+export function resolveManualLevel(quality: string, levelHeights: readonly number[]): number {
   if (quality === AUTO_QUALITY) return -1;
   const requestedHeight = Number.parseInt(quality, 10);
   if (!Number.isFinite(requestedHeight) || levelHeights.length === 0) return -1;

@@ -25,9 +25,7 @@ export function VideoAudioTracks(props: Props) {
             Audio language
             <select
               value={props.selectedVideoAudioTrack ?? ""}
-              onChange={(event) =>
-                props.setSelectedVideoAudioTrack?.(event.target.value)
-              }
+              onChange={(event) => props.setSelectedVideoAudioTrack?.(event.target.value)}
             >
               {!props.selectedVideoAudioTrack ? (
                 <option value="" disabled>
@@ -54,8 +52,7 @@ export function VideoAudioTracks(props: Props) {
               ? "This file has multiple audio languages. Adaptive playback makes them selectable."
               : "Use this browser's native audio controls when an audio picker is unavailable."}
           </p>
-          {filePlayback &&
-          props.videoQualityOptions.some(({ id }) => id === "auto") ? (
+          {filePlayback && props.videoQualityOptions.some(({ id }) => id === "auto") ? (
             <button
               className="ghost-button"
               type="button"

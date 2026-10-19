@@ -36,9 +36,7 @@ function rounded(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
-export function summarizeVideoLatency(
-  samples: VideoLatencySample[],
-): VideoLatencySummary[] {
+export function summarizeVideoLatency(samples: VideoLatencySample[]): VideoLatencySummary[] {
   return [...new Set(samples.map(({ mode }) => mode))].map((mode) => {
     const group = samples.filter((sample) => sample.mode === mode);
     const metric = (key: keyof VideoLatencySample, fraction: number) =>

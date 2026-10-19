@@ -1,10 +1,6 @@
 import crypto from "node:crypto";
 import path from "node:path";
-import type {
-  Session,
-  VideoRendition,
-  VideoTranscodeEntry,
-} from "../domain/models.js";
+import type { Session, VideoRendition, VideoTranscodeEntry } from "../domain/models.js";
 
 export function getRenditionState(
   entry: VideoTranscodeEntry,
@@ -13,10 +9,7 @@ export function getRenditionState(
 ): VideoRendition {
   const existing = entry.renditions.get(qualityId);
   if (existing) return existing;
-  const height =
-    qualityId === "source"
-      ? 0
-      : Number.parseInt(qualityId.replace("p", ""), 10) || 0;
+  const height = qualityId === "source" ? 0 : Number.parseInt(qualityId.replace("p", ""), 10) || 0;
   const hash = crypto
     .createHash("sha1")
     .update(`${session.id}:${entry.path}:${qualityId}`)

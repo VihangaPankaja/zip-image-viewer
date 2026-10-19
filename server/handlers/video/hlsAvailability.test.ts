@@ -3,9 +3,7 @@ import { afterEach, expect, it, vi } from "vite-plus/test";
 import type { VideoRendition } from "../../domain/models.js";
 import { waitForPublishedSegment } from "./hlsAvailability.js";
 
-const read = vi.hoisted(() =>
-  vi.fn<(..._args: unknown[]) => Promise<string>>(),
-);
+const read = vi.hoisted(() => vi.fn<(..._args: unknown[]) => Promise<string>>());
 vi.mock("node:fs/promises", () => ({ readFile: read }));
 
 afterEach(() => {

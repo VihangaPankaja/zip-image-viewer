@@ -5,16 +5,13 @@ import type { SessionStorage } from "../../../shared/contracts.js";
 export function createSessionStorage(
   touchSession: (_id: string) => Session | undefined,
   media: {
-    storage: (
-      _session: Session,
-    ) => Promise<Omit<SessionStorage, "retained" | "pinned">>;
+    storage: (_session: Session) => Promise<Omit<SessionStorage, "retained" | "pinned">>;
     clearMediaCache: (_session: Session) => Promise<void>;
   },
 ) {
   function session(id: string) {
     const item = touchSession(id);
-    if (!item)
-      throw new ApplicationError("NOT_FOUND", "Session not found.", 404);
+    if (!item) throw new ApplicationError("NOT_FOUND", "Session not found.", 404);
     return item;
   }
   return {

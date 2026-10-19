@@ -1,9 +1,5 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
-import type {
-  JobPayload,
-  OversizePrompt,
-  SessionPayload,
-} from "./sessionSchemas";
+import type { JobPayload, OversizePrompt, SessionPayload } from "./sessionSchemas";
 
 type ArchiveResetParams = {
   clearImagePreviewCache: () => void;

@@ -24,13 +24,8 @@ export function groupScreenshotGalleries(captures, featuredScreens) {
   for (const device of devices)
     for (const theme of themes) {
       const entries = captures
-        .filter(
-          (capture) => capture.device === device && capture.theme === theme,
-        )
-        .sort(
-          (a, b) =>
-            (rank.get(a.screen) ?? Infinity) - (rank.get(b.screen) ?? Infinity),
-        );
+        .filter((capture) => capture.device === device && capture.theme === theme)
+        .sort((a, b) => (rank.get(a.screen) ?? Infinity) - (rank.get(b.screen) ?? Infinity));
       if (!entries.length) continue;
       const prefix = `${device.toLowerCase()}-${theme}`;
       const standard = entries.filter(({ screen }) => !rank.has(screen));
@@ -65,9 +60,7 @@ export function groupScreenshotGalleries(captures, featuredScreens) {
     ...group.sheets.map(({ file }) => file),
   ]);
   assert.ok(
-    generated.every(
-      (file) => !captures.some((capture) => capture.file === file),
-    ),
+    generated.every((file) => !captures.some((capture) => capture.file === file)),
     "Generated gallery files must not overwrite original screenshots.",
   );
   return groups;
@@ -82,10 +75,7 @@ function caption(text, width, dark) {
     else lines.push(word);
   }
   const escape = (value) =>
-    value
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;");
+    value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
   const height = lines.length * 22 + 16;
   return {
     height,
@@ -106,11 +96,7 @@ async function contactSheet(directory, group, sheet) {
       .toBuffer({ resolveWithObject: true });
     tiles.push({
       image,
-      title: caption(
-        `${index + 1}. ${label(entry)}`,
-        width,
-        group.theme === "dark",
-      ),
+      title: caption(`${index + 1}. ${label(entry)}`, width, group.theme === "dark"),
     });
   }
   const layers = [];
@@ -124,10 +110,7 @@ async function contactSheet(directory, group, sheet) {
         { input: tile.image.data, left, top: top + tile.title.height },
       );
     }
-    top +=
-      Math.max(
-        ...pair.map((tile) => tile.title.height + tile.image.info.height),
-      ) + gap;
+    top += Math.max(...pair.map((tile) => tile.title.height + tile.image.info.height)) + gap;
   }
   await sharp({
     create: {
@@ -179,19 +162,11 @@ export function renderScreenshotSection({
   fixtures,
 }) {
   const assetUrl = (file) => `${assetBaseUrl}/${assetPrefix}${file}`;
-  const lines = [
-    "## Screenshots",
-    "",
-    `Captured from \`${sourceCommit}\`. ${fixtures}`,
-    "",
-  ];
+  const lines = ["## Screenshots", "", `Captured from \`${sourceCommit}\`. ${fixtures}`, ""];
   for (const device of devices) {
     const entries = groups.filter((group) => group.device === device);
     if (!entries.length) continue;
-    lines.push(
-      `### ${device} · ${entries[0].width} × ${entries[0].height}`,
-      "",
-    );
+    lines.push(`### ${device} · ${entries[0].width} × ${entries[0].height}`, "");
     for (const group of entries) {
       lines.push(
         `<details><summary>${group.theme === "light" ? "Light" : "Dark"} theme</summary>`,

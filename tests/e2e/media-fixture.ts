@@ -46,8 +46,7 @@ export const test = base.extend<{ appOrigin: string; withAudio: boolean }>({
     await once(server, "listening");
     try {
       const address = server.address();
-      if (!address || typeof address === "string")
-        throw new Error("Media fixture did not bind.");
+      if (!address || typeof address === "string") throw new Error("Media fixture did not bind.");
       await provide("http://127.0.0.1:" + String(address.port));
     } finally {
       server.closeAllConnections();

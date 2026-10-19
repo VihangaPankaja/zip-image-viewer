@@ -1,5 +1,4 @@
-export type PreviewKind =
-  "image" | "video" | "audio" | "text" | "binary" | "directory";
+export type PreviewKind = "image" | "video" | "audio" | "text" | "binary" | "directory";
 
 export type FileNodeLike = {
   type?: "file" | "directory";

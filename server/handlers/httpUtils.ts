@@ -1,8 +1,5 @@
 import type { Response } from "express";
-export {
-  isWithinRoot,
-  isRealPathWithinRoot,
-} from "../infrastructure/runtime/filePaths.js";
+export { isWithinRoot, isRealPathWithinRoot } from "../infrastructure/runtime/filePaths.js";
 
 export type ByteRange = { start: number; end: number };
 

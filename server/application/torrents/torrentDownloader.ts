@@ -1,9 +1,5 @@
 import WebTorrent, { type Torrent } from "webtorrent";
-import type {
-  TorrentFile,
-  TorrentLimits,
-  TorrentPriority,
-} from "../../../shared/contracts.js";
+import type { TorrentFile, TorrentLimits, TorrentPriority } from "../../../shared/contracts.js";
 import {
   describeTorrentFiles,
   selectedProgress,
@@ -16,10 +12,7 @@ import type { Readable } from "node:stream";
 import type { TorrentByteRange } from "./verifiedTorrentStream.js";
 import { openTorrentVideoFile } from "./torrentVideoFiles.js";
 import type { TorrentVideoSource } from "./torrentVideo.js";
-import {
-  reserveStorage,
-  resourceLimitError,
-} from "../../infrastructure/runtime/resourceLimits.js";
+import { reserveStorage, resourceLimitError } from "../../infrastructure/runtime/resourceLimits.js";
 import { fetchWithValidatedRedirects } from "../../infrastructure/downloads/publicDownload.js";
 
 import { MAX_TORRENT_METADATA_BYTES } from "./torrentSource.js";
@@ -57,11 +50,7 @@ export type TorrentDownloadInput = {
 
 export type TorrentAdapter = {
   download: (_input: TorrentDownloadInput) => Promise<{ files: string[] }>;
-  setFilePriority?: (
-    _jobId: string,
-    _fileId: string,
-    _priority: TorrentPriority,
-  ) => void;
+  setFilePriority?: (_jobId: string, _fileId: string, _priority: TorrentPriority) => void;
   getLimits?: () => TorrentLimits;
   setLimits?: (_limits: TorrentLimits) => TorrentLimits;
   openVideoFile?: (
@@ -81,9 +70,7 @@ export async function fetchTorrentMetadata(
 ): Promise<Uint8Array> {
   const response = await fetchWithValidatedRedirects(url, { signal }, fetcher);
   if (!response.ok) {
-    throw new Error(
-      `Torrent metadata request failed with HTTP ${String(response.status)}.`,
-    );
+    throw new Error(`Torrent metadata request failed with HTTP ${String(response.status)}.`);
   }
   const declared = Number(response.headers.get("content-length")) || 0;
   if (declared > MAX_TORRENT_METADATA_BYTES) {
@@ -147,13 +134,8 @@ async function downloadTorrent(
   active: Map<string, ActiveTorrent>,
   input: TorrentDownloadInput,
 ): Promise<{ files: string[] }> {
-  if (
-    typeof input.source !== "string" &&
-    input.source.length > MAX_TORRENT_METADATA_BYTES
-  )
-    return Promise.reject(
-      resourceLimitError("Torrent metadata exceeds the 10 MiB limit."),
-    );
+  if (typeof input.source !== "string" && input.source.length > MAX_TORRENT_METADATA_BYTES)
+    return Promise.reject(resourceLimitError("Torrent metadata exceeds the 10 MiB limit."));
   mkdirSync(input.downloadDir, { recursive: true });
   const previous = input.jobId ? active.get(input.jobId) : undefined;
   if (previous?.completed) {
@@ -185,11 +167,7 @@ function transferTorrent(
         if (settled || readyTorrent !== torrent) return;
         try {
           entry = createActiveTorrent(readyTorrent, input, readers);
-          storage = reserveTorrentSelection(
-            readyTorrent,
-            entry.selectedIds,
-            input.downloadDir,
-          );
+          storage = reserveTorrentSelection(readyTorrent, entry.selectedIds, input.downloadDir);
           resultFiles = activateTorrent(active, input, entry);
           emitProgress();
         } catch (error) {
@@ -214,10 +192,7 @@ function transferTorrent(
       };
       if (!destroy || (!error && readers.size)) complete();
       else
-        torrent.destroy(
-          { destroyStore: Boolean(error) && !input.retainStoreOnAbort() },
-          complete,
-        );
+        torrent.destroy({ destroyStore: Boolean(error) && !input.retainStoreOnAbort() }, complete);
     };
     const abort = () => finish(abortReason(input.signal));
     const emitProgress = () => {
@@ -228,15 +203,7 @@ function transferTorrent(
         finish(error instanceof Error ? error : new Error(String(error)));
         return;
       }
-      if (
-        emitSelectedProgress(
-          input,
-          torrent,
-          entry.selectedIds,
-          entry.priorities,
-        )
-      )
-        finish();
+      if (emitSelectedProgress(input, torrent, entry.selectedIds, entry.priorities)) finish();
     };
     const progressTimer = setInterval(emitProgress, 250);
     monitorTorrent(torrent, input, finish, emitProgress);
@@ -266,12 +233,7 @@ function activateTorrent(
   input: TorrentDownloadInput,
   entry: ActiveTorrent,
 ): string[] {
-  applyFilePriorities(
-    entry.torrent,
-    entry.selectedIds,
-    entry.priorities,
-    entry.ranges,
-  );
+  applyFilePriorities(entry.torrent, entry.selectedIds, entry.priorities, entry.ranges);
   for (const peer of input.peerHints ?? []) entry.torrent.addPeer(peer);
   if (input.jobId) active.set(input.jobId, entry);
   return entry.torrent.files
@@ -287,11 +249,7 @@ function emitSelectedProgress(
 ): boolean {
   const progress = selectedProgress(torrent, selectedIds, priorities);
   input.onProgress(progress);
-  return (
-    progress.files
-      ?.filter((file) => file.selected)
-      .every((file) => file.complete) ?? false
-  );
+  return progress.files?.filter((file) => file.selected).every((file) => file.complete) ?? false;
 }
 
 export function createWebTorrentAdapter(): TorrentAdapter {
@@ -305,12 +263,7 @@ export function createWebTorrentAdapter(): TorrentAdapter {
       if (!entry || !entry.selectedIds.has(fileId))
         throw new Error("Selected torrent file is not actively downloading.");
       entry.priorities.set(fileId, priority);
-      applyFilePriorities(
-        entry.torrent,
-        entry.selectedIds,
-        entry.priorities,
-        entry.ranges,
-      );
+      applyFilePriorities(entry.torrent, entry.selectedIds, entry.priorities, entry.ranges);
     },
     getLimits: () => ({ ...limits }),
     setLimits: (next) => {
@@ -319,8 +272,7 @@ export function createWebTorrentAdapter(): TorrentAdapter {
       limits = { ...next };
       return { ...limits };
     },
-    openVideoFile: (jobId, fileId) =>
-      openTorrentVideoFile(active, jobId, fileId),
+    openVideoFile: (jobId, fileId) => openTorrentVideoFile(active, jobId, fileId),
     close: () =>
       new Promise((resolve, reject) => {
         client.destroy((error) => (error ? reject(error) : resolve()));

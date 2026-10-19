@@ -52,9 +52,7 @@ async function requestImagePreview(
 }
 
 function useImageCache(sessionId: string) {
-  const imagePreviewCacheRef = useRef<Map<string, ImagePreviewCacheEntry>>(
-    new Map(),
-  );
+  const imagePreviewCacheRef = useRef<Map<string, ImagePreviewCacheEntry>>(new Map());
 
   const clearImagePreviewCache = useCallback(() => {
     clearPreviewCache(imagePreviewCacheRef.current);

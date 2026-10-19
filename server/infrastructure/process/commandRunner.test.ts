@@ -1,24 +1,11 @@
 import { describe, expect, test, vi } from "vite-plus/test";
 import { type SpawnOptions } from "node:child_process";
-import {
-  mkdtemp,
-  mkdir,
-  readFile,
-  readdir,
-  rm,
-  stat,
-  utimes,
-  writeFile,
-} from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { gzipSync } from "node:zlib";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { path7za } from "7zip-bin";
-import {
-  extractWith7zip,
-  runCommand,
-  runCommandCapture,
-} from "./commandRunner.js";
+import { extractWith7zip, runCommand, runCommandCapture } from "./commandRunner.js";
 
 const disk = vi.hoisted(() => ({
   free: 64 * 1024 ** 2 + 512,
@@ -37,8 +24,7 @@ vi.mock("node:child_process", async (importOriginal) => {
   return {
     ...actual,
     spawn: (command: string, args: string[], options: SpawnOptions) => {
-      if (command !== "storage-extractor")
-        return actual.spawn(command, args, options);
+      if (command !== "storage-extractor") return actual.spawn(command, args, options);
       const script =
         args[0] === "l"
           ? `process.stdout.write('----------\\nPath = child.bin\\nSize = ${disk.size}\\n\\n')`
@@ -72,8 +58,7 @@ test.each([false, true])(
         code: "DOWNLOAD_FATAL",
       });
       const files = await readdir(directory);
-      for (const file of files)
-        expect(await readFile(path.join(directory, file))).toHaveLength(0);
+      for (const file of files) expect(await readFile(path.join(directory, file))).toHaveLength(0);
       if (hold) expect(disk.aborted).toBe(true);
     } finally {
       disk.fail = true;
@@ -116,9 +101,9 @@ test("rejects missing output for an ordinary declared archive entry", async () =
   const directory = await mkdtemp(path.join(tmpdir(), "extraction-missing-"));
   disk.fail = false;
   try {
-    await expect(
-      extractWith7zip("storage-extractor", "fixture.7z", directory),
-    ).rejects.toThrow("does not match its declared size");
+    await expect(extractWith7zip("storage-extractor", "fixture.7z", directory)).rejects.toThrow(
+      "does not match its declared size",
+    );
   } finally {
     disk.fail = true;
     await rm(directory, { recursive: true, force: true });
@@ -146,9 +131,7 @@ test("streams literal 7-Zip members with their contents and timestamps intact", 
     await runCommand(path7za, ["a", "-t7z", archive, "."], { cwd: source });
     await extractWith7zip(path7za, archive, output);
     for (const [index, name] of members.entries()) {
-      expect(await readFile(path.join(output, name), "utf8")).toBe(
-        `member ${index}`,
-      );
+      expect(await readFile(path.join(output, name), "utf8")).toBe(`member ${index}`);
       expect((await stat(path.join(output, name))).mtimeMs).toBe(
         Date.parse("2020-01-02T03:04:05Z"),
       );
@@ -181,10 +164,7 @@ describe("commandRunner", () => {
     ).resolves.toEqual({ stdout: "ready", stderr: "note" });
 
     await expect(
-      runCommand(process.execPath, [
-        "-e",
-        "process.stderr.write('failed'); process.exit(3)",
-      ]),
+      runCommand(process.execPath, ["-e", "process.stderr.write('failed'); process.exit(3)"]),
     ).rejects.toThrow("failed");
   });
 });
@@ -200,21 +180,14 @@ test.each([512, 1024])(
       await mkdir(output);
       await writeFile(
         archive,
-        Buffer.concat([
-          gzipSync(Buffer.alloc(512, 65)),
-          gzipSync(Buffer.from("B")),
-        ]),
+        Buffer.concat([gzipSync(Buffer.alloc(512, 65)), gzipSync(Buffer.from("B"))]),
       );
       if (capacity === 512) {
-        await expect(
-          extractWith7zip(path7za, archive, output),
-        ).rejects.toMatchObject({
+        await expect(extractWith7zip(path7za, archive, output)).rejects.toMatchObject({
           code: "DOWNLOAD_FATAL",
         });
         for (const file of await readdir(output))
-          expect(
-            (await readFile(path.join(output, file))).length,
-          ).toBeLessThanOrEqual(capacity);
+          expect((await readFile(path.join(output, file))).length).toBeLessThanOrEqual(capacity);
       } else {
         await extractWith7zip(path7za, archive, output);
         const files = await readdir(output);
@@ -232,40 +205,37 @@ test.each([
   { name: "../outside.txt", link: false },
   { name: "linked", link: true },
   { name: "regular.txt", link: false },
-])(
-  "extracts regular TAR entries and rejects unsafe entries (%j)",
-  async ({ name, link }) => {
-    const directory = await mkdtemp(path.join(tmpdir(), "archive-preflight-"));
-    const archive = path.join(directory, "fixture.tar");
-    const output = path.join(directory, "output");
-    const header = Buffer.alloc(512);
-    header.write(name);
-    header.write("0000777\0", 100);
-    header.write("0000000\0", 108);
-    header.write("0000000\0", 116);
-    header.write("00000000000\0", 124);
-    header.write("00000000000\0", 136);
-    header.fill(32, 148, 156);
-    header.write(link ? "2" : "0", 156);
-    if (link) header.write("../other-session", 157);
-    header.write("ustar\0", 257);
-    header.write("00", 263);
-    const checksum = header.reduce((total, byte) => total + byte, 0);
-    header.write(`${checksum.toString(8).padStart(6, "0")}\0 `, 148);
-    try {
-      await mkdir(output);
-      await writeFile(archive, Buffer.concat([header, Buffer.alloc(1024)]));
-      if (name === "regular.txt") {
-        await extractWith7zip(path7za, archive, output);
-        expect(await readdir(output)).toEqual(["regular.txt"]);
-      } else {
-        await expect(extractWith7zip(path7za, archive, output)).rejects.toThrow(
-          link ? "links" : "Unsafe",
-        );
-        expect(await readdir(output)).toEqual([]);
-      }
-    } finally {
-      await rm(directory, { recursive: true, force: true });
+])("extracts regular TAR entries and rejects unsafe entries (%j)", async ({ name, link }) => {
+  const directory = await mkdtemp(path.join(tmpdir(), "archive-preflight-"));
+  const archive = path.join(directory, "fixture.tar");
+  const output = path.join(directory, "output");
+  const header = Buffer.alloc(512);
+  header.write(name);
+  header.write("0000777\0", 100);
+  header.write("0000000\0", 108);
+  header.write("0000000\0", 116);
+  header.write("00000000000\0", 124);
+  header.write("00000000000\0", 136);
+  header.fill(32, 148, 156);
+  header.write(link ? "2" : "0", 156);
+  if (link) header.write("../other-session", 157);
+  header.write("ustar\0", 257);
+  header.write("00", 263);
+  const checksum = header.reduce((total, byte) => total + byte, 0);
+  header.write(`${checksum.toString(8).padStart(6, "0")}\0 `, 148);
+  try {
+    await mkdir(output);
+    await writeFile(archive, Buffer.concat([header, Buffer.alloc(1024)]));
+    if (name === "regular.txt") {
+      await extractWith7zip(path7za, archive, output);
+      expect(await readdir(output)).toEqual(["regular.txt"]);
+    } else {
+      await expect(extractWith7zip(path7za, archive, output)).rejects.toThrow(
+        link ? "links" : "Unsafe",
+      );
+      expect(await readdir(output)).toEqual([]);
     }
-  },
-);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

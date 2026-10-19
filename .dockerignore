@@ -1,3 +1,12 @@
 node_modules
 dist
+build
+coverage
+sessions
+test-results
+playwright-report
+.git
+.vite-cache
+.vitest
+.vite-hooks/_
 npm-debug.log*

@@ -38,18 +38,10 @@ export function WorkspacePageView({ controller }: ViewProps) {
           className={`unified-workspace ${state.activeView === "downloads" ? "downloads-workspace" : ""}`}
         >
           <header className="unified-workspace-header">
-            <WorkspaceHeader
-              controller={controller}
-              onOpenStorage={() => setStorageOpen(true)}
-            />
+            <WorkspaceHeader controller={controller} onOpenStorage={() => setStorageOpen(true)} />
           </header>
-          {state.activeView === "downloads" ? (
-            <WorkspaceDownloads controller={controller} />
-          ) : null}
-          <div
-            className="workspace-explore-content"
-            hidden={state.activeView !== "explore"}
-          >
+          {state.activeView === "downloads" ? <WorkspaceDownloads controller={controller} /> : null}
+          <div className="workspace-explore-content" hidden={state.activeView !== "explore"}>
             <WorkspaceLayout
               mobilePane={state.mobilePane}
               onMobilePaneChange={state.setMobilePane}
@@ -72,9 +64,7 @@ export function WorkspacePageView({ controller }: ViewProps) {
           state.setDownloadDialogOpen(false);
         }}
       />
-      {state.activeView === "explore" ? (
-        <WorkspacePageOverlays controller={controller} />
-      ) : null}
+      {state.activeView === "explore" ? <WorkspacePageOverlays controller={controller} /> : null}
       {storageOpen && state.session?.id ? (
         <SessionStorageDialog
           id={state.session.id}
@@ -92,9 +82,7 @@ function WorkspaceDownloads({ controller }: ViewProps) {
     <DownloadManager
       jobs={queue.jobs}
       onCancel={(id) => void queue.cancel(id)}
-      onSelectFiles={(id, fileIds) =>
-        queue.selectFiles(id, fileIds).then(() => undefined)
-      }
+      onSelectFiles={(id, fileIds) => queue.selectFiles(id, fileIds).then(() => undefined)}
       onFilePriority={(id, fileId, priority) =>
         queue.setFilePriority(id, fileId, priority).then(() => undefined)
       }
@@ -112,10 +100,7 @@ function WorkspaceDownloads({ controller }: ViewProps) {
   );
 }
 
-function WorkspaceHeader({
-  controller,
-  onOpenStorage,
-}: ViewProps & { onOpenStorage: () => void }) {
+function WorkspaceHeader({ controller, onOpenStorage }: ViewProps & { onOpenStorage: () => void }) {
   const { state } = controller;
   return (
     <WorkspaceAppBar
@@ -147,13 +132,9 @@ function WorkspaceFiles({ controller }: ViewProps) {
       <header className="panel-header explorer-header">
         <div className="panel-title-group">
           <p className="panel-label">Files</p>
-          <h2 id="explorer-title">
-            {selection.sortedTree?.name || "Explorer"}
-          </h2>
+          <h2 id="explorer-title">{selection.sortedTree?.name || "Explorer"}</h2>
         </div>
-        {session ? (
-          <span className="panel-chip">{selection.explorerRows.length}</span>
-        ) : null}
+        {session ? <span className="panel-chip">{selection.explorerRows.length}</span> : null}
       </header>
       {selection.sortedTree ? (
         <TreeExplorer
@@ -207,10 +188,7 @@ function WorkspaceMetadata({ controller }: ViewProps) {
   const { lifecycle, media, state } = controller;
   const selected = media.selection.selectedNode;
   return (
-    <section
-      className="workspace-metadata-panel"
-      aria-labelledby="details-title"
-    >
+    <section className="workspace-metadata-panel" aria-labelledby="details-title">
       <p className="panel-label">Selection</p>
       <h2 id="details-title">Details</h2>
       <dl>
@@ -257,9 +235,7 @@ function WorkspaceSettings({ controller }: ViewProps) {
   >["setDownloadSettings"] = (update) => {
     settings.setDownloadOptions((current) =>
       normalizeDownloadOptions(
-        typeof update === "function"
-          ? update(downloadOptionsToLegacySettings(current))
-          : update,
+        typeof update === "function" ? update(downloadOptionsToLegacySettings(current)) : update,
       ),
     );
   };
@@ -269,12 +245,8 @@ function WorkspaceSettings({ controller }: ViewProps) {
       {...state}
       maxConcurrent={queue.maxConcurrent}
       torrentLimits={queue.torrentLimits}
-      onSetTorrentLimits={(limits) =>
-        queue.setTorrentLimits(limits).then(() => undefined)
-      }
-      onSetConcurrency={(value) =>
-        queue.setMaxConcurrent(value).then(() => undefined)
-      }
+      onSetTorrentLimits={(limits) => queue.setTorrentLimits(limits).then(() => undefined)}
+      onSetConcurrency={(value) => queue.setMaxConcurrent(value).then(() => undefined)}
       clampNumber={clampNumber}
       downloadRetryOptions={DOWNLOAD_RETRY_OPTIONS}
       downloadSettings={downloadSettings}
@@ -310,9 +282,7 @@ function WorkspacePageOverlays({ controller }: ViewProps) {
       onCloseExplorer={() => state.setExplorerModalOpen(false)}
       onCloseSlideshow={() => state.setSlideshowOpen(false)}
       onSelectPath={state.setSelectedPath}
-      selectedImageUrl={
-        image.selectedImageSrc || selection.selectedImagePreviewUrl
-      }
+      selectedImageUrl={image.selectedImageSrc || selection.selectedImagePreviewUrl}
       slideshowFitOptions={SLIDESHOW_FIT_OPTIONS}
     />
   );

@@ -1,17 +1,8 @@
 import { stat, type Stats } from "node:fs";
 import path from "node:path";
 import type { Request, Response } from "express";
-import {
-  ApplicationError,
-  type Session,
-  type VideoQualityOption,
-} from "../../domain/models.js";
-import {
-  errorMessage,
-  isWithinRoot,
-  isRealPathWithinRoot,
-  queryText,
-} from "../httpUtils.js";
+import { ApplicationError, type Session, type VideoQualityOption } from "../../domain/models.js";
+import { errorMessage, isWithinRoot, isRealPathWithinRoot, queryText } from "../httpUtils.js";
 import type { VideoRouteDependencies } from "./types.js";
 
 export type VideoContext = {
@@ -33,10 +24,7 @@ export function selectVideoQuality(
     : { quality: "source", height: 0 };
 }
 
-export function requireTranscoder(
-  res: Response,
-  deps: VideoRouteDependencies,
-): string | null {
+export function requireTranscoder(res: Response, deps: VideoRouteDependencies): string | null {
   if (deps.ffmpegPath) return deps.ffmpegPath;
   res.status(503).json({ error: "Video transcoder is unavailable." });
   return null;
@@ -49,11 +37,7 @@ export async function resolveVideoFile(
 ): Promise<VideoContext> {
   const session = deps.touchSession(sessionId);
   if (!session) {
-    throw new ApplicationError(
-      "NOT_FOUND",
-      "Session not found or already cleaned up.",
-      404,
-    );
+    throw new ApplicationError("NOT_FOUND", "Session not found or already cleaned up.", 404);
   }
   if (!requestedPath || requestedPath === ".") {
     throw new ApplicationError("INVALID_INPUT", "File path is required.", 400);
@@ -94,11 +78,7 @@ export async function resolveVideoContext(
   deps: VideoRouteDependencies,
 ): Promise<VideoContext | null> {
   try {
-    return await resolveVideoFile(
-      queryText(req.params.id),
-      queryText(req.query.path),
-      deps,
-    );
+    return await resolveVideoFile(queryText(req.params.id), queryText(req.query.path), deps);
   } catch (error) {
     if (!(error instanceof ApplicationError)) throw error;
     res.status(error.status).json({ error: error.message });

@@ -63,9 +63,7 @@ async function encode(directory: string, height: number) {
       stderr += chunk.toString();
     });
     child.on("error", reject);
-    child.on("close", (code) =>
-      code === 0 ? resolve() : reject(new Error(stderr)),
-    );
+    child.on("close", (code) => (code === 0 ? resolve() : reject(new Error(stderr))));
   });
 }
 
@@ -79,9 +77,7 @@ test("switches HLS quality and resumes real playback after reopening", async ({
   const root = await mkdtemp(path.join(tmpdir(), "ziv-quality-e2e-"));
   try {
     await Promise.all(
-      [360, 720].map((height) =>
-        encode(path.join(root, `${String(height)}p`), height),
-      ),
+      [360, 720].map((height) => encode(path.join(root, `${String(height)}p`), height)),
     );
     await page.route("**/rpc/sessions/list", (route) =>
       route.fulfill({
@@ -131,82 +127,75 @@ test("switches HLS quality and resumes real playback after reopening", async ({
         },
       }),
     );
-    await page.route(
-      `**/api/sessions/${sessionId}/video/hls/**`,
-      async (route) => {
-        const url = new URL(route.request().url());
-        const resource = url.pathname.split("/").at(-1);
-        if (resource === "master") {
-          await route.fulfill({
-            contentType: "application/vnd.apple.mpegurl",
-            body:
-              "#EXTM3U\n#EXT-X-VERSION:7\n" +
-              [360, 720]
-                .map(
-                  (height) =>
-                    `#EXT-X-STREAM-INF:BANDWIDTH=${height === 360 ? 900000 : 2500000},RESOLUTION=${height === 360 ? 640 : 1280}x${String(height)},CODECS="avc1.42c01f,mp4a.40.2"\n/api/sessions/${sessionId}/video/hls/playlist?quality=${String(height)}p\n`,
-                )
-                .join(""),
-          });
-          return;
-        }
-        if (resource === "status") {
-          await route.fulfill({
-            json: {
+    await page.route(`**/api/sessions/${sessionId}/video/hls/**`, async (route) => {
+      const url = new URL(route.request().url());
+      const resource = url.pathname.split("/").at(-1);
+      if (resource === "master") {
+        await route.fulfill({
+          contentType: "application/vnd.apple.mpegurl",
+          body:
+            "#EXTM3U\n#EXT-X-VERSION:7\n" +
+            [360, 720]
+              .map(
+                (height) =>
+                  `#EXT-X-STREAM-INF:BANDWIDTH=${height === 360 ? 900000 : 2500000},RESOLUTION=${height === 360 ? 640 : 1280}x${String(height)},CODECS="avc1.42c01f,mp4a.40.2"\n/api/sessions/${sessionId}/video/hls/playlist?quality=${String(height)}p\n`,
+              )
+              .join(""),
+        });
+        return;
+      }
+      if (resource === "status") {
+        await route.fulfill({
+          json: {
+            status: "ready",
+            renditions: [360, 720].map((height) => ({
+              quality: `${String(height)}p`,
               status: "ready",
-              renditions: [360, 720].map((height) => ({
-                quality: `${String(height)}p`,
-                status: "ready",
-                availableSegments: 15,
-                expectedSegments: 15,
-                encoderWaitMs: 120,
-              })),
-            },
-          });
-          return;
-        }
-        const quality = url.searchParams.get("quality");
-        if (quality !== "360p" && quality !== "720p")
-          throw new Error(`Unexpected quality: ${quality}`);
-        const directory = path.join(root, quality);
-        if (resource === "playlist") {
-          const source = await readFile(
-            path.join(directory, "index.m3u8"),
-            "utf8",
+              availableSegments: 15,
+              expectedSegments: 15,
+              encoderWaitMs: 120,
+            })),
+          },
+        });
+        return;
+      }
+      const quality = url.searchParams.get("quality");
+      if (quality !== "360p" && quality !== "720p")
+        throw new Error(`Unexpected quality: ${quality}`);
+      const directory = path.join(root, quality);
+      if (resource === "playlist") {
+        const source = await readFile(path.join(directory, "index.m3u8"), "utf8");
+        const body = source
+          .replace(
+            /#EXT-X-MAP:URI="[^"]+"/,
+            `#EXT-X-MAP:URI="/api/sessions/${sessionId}/video/hls/init?quality=${quality}"`,
+          )
+          .replace(
+            /segment_(\d+)\.m4s/g,
+            (_match, index: string) =>
+              `/api/sessions/${sessionId}/video/hls/segment?quality=${quality}&index=${index}`,
           );
-          const body = source
-            .replace(
-              /#EXT-X-MAP:URI="[^"]+"/,
-              `#EXT-X-MAP:URI="/api/sessions/${sessionId}/video/hls/init?quality=${quality}"`,
-            )
-            .replace(
-              /segment_(\d+)\.m4s/g,
-              (_match, index: string) =>
-                `/api/sessions/${sessionId}/video/hls/segment?quality=${quality}&index=${index}`,
-            );
-          await route.fulfill({
-            contentType: "application/vnd.apple.mpegurl",
-            body,
-          });
-        } else if (resource === "init") {
-          await route.fulfill({
-            path: path.join(directory, "init.mp4"),
-            contentType: "video/mp4",
-          });
-        } else if (resource === "segment") {
-          const index = url.searchParams.get("index") ?? "";
-          await route.fulfill({
-            path: path.join(directory, `segment_${index.padStart(6, "0")}.m4s`),
-            contentType: "video/iso.segment",
-          });
-        }
-      },
-    );
+        await route.fulfill({
+          contentType: "application/vnd.apple.mpegurl",
+          body,
+        });
+      } else if (resource === "init") {
+        await route.fulfill({
+          path: path.join(directory, "init.mp4"),
+          contentType: "video/mp4",
+        });
+      } else if (resource === "segment") {
+        const index = url.searchParams.get("index") ?? "";
+        await route.fulfill({
+          path: path.join(directory, `segment_${index.padStart(6, "0")}.m4s`),
+          contentType: "video/iso.segment",
+        });
+      }
+    });
 
     let masterRequests = 0;
     page.on("request", (request) => {
-      if (request.url().includes(`/api/sessions/${sessionId}/video/hls/master`))
-        masterRequests++;
+      if (request.url().includes(`/api/sessions/${sessionId}/video/hls/master`)) masterRequests++;
     });
     await page.goto("/");
     await page.getByRole("tab", { name: "Explore" }).click();
@@ -219,14 +208,10 @@ test("switches HLS quality and resumes real playback after reopening", async ({
       await element.play();
     });
     await expect
-      .poll(() =>
-        video.evaluate((element: HTMLVideoElement) => element.currentTime),
-      )
+      .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
       .toBeGreaterThan(0.5);
     await video.evaluate((element: HTMLVideoElement) => element.pause());
-    const before = await video.evaluate(
-      (element: HTMLVideoElement) => element.currentTime,
-    );
+    const before = await video.evaluate((element: HTMLVideoElement) => element.currentTime);
     await page.getByRole("button", { name: "Quality", exact: true }).click();
     await page.getByRole("option", { name: "720p" }).click();
     await page.getByRole("button", { name: "Quality", exact: true }).click();
@@ -267,18 +252,12 @@ test("switches HLS quality and resumes real playback after reopening", async ({
       await element.play();
     });
     await expect
-      .poll(() =>
-        video.evaluate((element: HTMLVideoElement) => element.currentTime),
-      )
+      .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
       .toBeGreaterThan(12.1);
     await video.evaluate((element: HTMLVideoElement) => element.pause());
-    let savedTime = await video.evaluate(
-      (element: HTMLVideoElement) => element.currentTime,
-    );
+    let savedTime = await video.evaluate((element: HTMLVideoElement) => element.currentTime);
     await expect
-      .poll(() =>
-        page.evaluate((key) => Number(localStorage.getItem(key)), resumeKey),
-      )
+      .poll(() => page.evaluate((key) => Number(localStorage.getItem(key)), resumeKey))
       .toBeCloseTo(savedTime, 1);
 
     const continuePlayback = async () => {
@@ -295,41 +274,31 @@ test("switches HLS quality and resumes real playback after reopening", async ({
         )
         .toBe(true);
       await video.evaluate((element: HTMLVideoElement) => element.pause());
-      savedTime = await video.evaluate(
-        (element: HTMLVideoElement) => element.currentTime,
-      );
+      savedTime = await video.evaluate((element: HTMLVideoElement) => element.currentTime);
     };
     const retainedVideo = await video.elementHandle();
-    const retainedSource = await video.evaluate(
-      (element: HTMLVideoElement) => element.currentSrc,
-    );
+    const retainedSource = await video.evaluate((element: HTMLVideoElement) => element.currentSrc);
     expect(retainedSource).not.toBe("");
     await page.getByRole("tab", { name: "Downloads" }).click();
     await expect(video).toHaveCount(1);
     await expect(video).toBeHidden();
-    expect(await retainedVideo.evaluate((element) => element.isConnected)).toBe(
-      true,
-    );
-    const hiddenPlayback = await video.evaluate(
-      (element: HTMLVideoElement) => ({
-        source: element.currentSrc,
-        time: element.currentTime,
-        paused: element.paused,
-        readyState: element.readyState,
-      }),
-    );
+    expect(await retainedVideo.evaluate((element) => element.isConnected)).toBe(true);
+    const hiddenPlayback = await video.evaluate((element: HTMLVideoElement) => ({
+      source: element.currentSrc,
+      time: element.currentTime,
+      paused: element.paused,
+      readyState: element.readyState,
+    }));
     expect(hiddenPlayback.source).toBe(retainedSource);
     expect(hiddenPlayback.time).toBeCloseTo(savedTime, 1);
     expect(hiddenPlayback.paused).toBe(true);
     expect(hiddenPlayback.readyState).toBeGreaterThanOrEqual(2);
     await page.getByRole("tab", { name: "Explore" }).click();
     await expect(video).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /^Continue from / }),
-    ).toHaveCount(0);
-    expect(
-      await video.evaluate((element: HTMLVideoElement) => element.currentSrc),
-    ).toBe(retainedSource);
+    await expect(page.getByRole("button", { name: /^Continue from / })).toHaveCount(0);
+    expect(await video.evaluate((element: HTMLVideoElement) => element.currentSrc)).toBe(
+      retainedSource,
+    );
     expect(masterRequests).toBe(1);
     await video.evaluate(async (element: HTMLVideoElement) => {
       await element.play();
@@ -338,17 +307,13 @@ test("switches HLS quality and resumes real playback after reopening", async ({
       .poll(() =>
         video.evaluate(
           (element: HTMLVideoElement, position) =>
-            !element.paused &&
-            element.readyState >= 2 &&
-            element.currentTime > position + 0.1,
+            !element.paused && element.readyState >= 2 && element.currentTime > position + 0.1,
           savedTime,
         ),
       )
       .toBe(true);
     await video.evaluate((element: HTMLVideoElement) => element.pause());
-    savedTime = await video.evaluate(
-      (element: HTMLVideoElement) => element.currentTime,
-    );
+    savedTime = await video.evaluate((element: HTMLVideoElement) => element.currentTime);
 
     const reopen = async () => {
       await page.reload();
@@ -363,23 +328,17 @@ test("switches HLS quality and resumes real playback after reopening", async ({
       .poll(() => page.evaluate((key) => localStorage.getItem(key), resumeKey))
       .toBeNull();
     await expect
-      .poll(() =>
-        video.evaluate((element: HTMLVideoElement) => element.currentTime),
-      )
+      .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
       .toBeLessThan(1);
     await reopen();
-    await expect(
-      page.getByRole("button", { name: /^Continue from / }),
-    ).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Continue from / })).toHaveCount(0);
 
     await page.setViewportSize({ width: 360, height: 800 });
     await page.locator('label[for="workspace-pane-preview"]').click();
     await expect(page.getByLabel("Video preview")).toBeVisible();
     await expect(page.getByText("Playback diagnostics")).toBeVisible();
     expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth + 1,
-      ),
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
     ).toBe(true);
     await page.screenshot({
       animations: "disabled",

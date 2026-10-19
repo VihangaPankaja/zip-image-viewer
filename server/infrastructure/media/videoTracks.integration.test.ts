@@ -23,17 +23,15 @@ it("probes real multilingual streams, converts subtitles and encodes distinct sy
       { id: "subtitle-4", language: "spa" },
     ]);
     const resource = `${fixture.origin}/api/sessions/${fixture.session.id}/video`;
-    const master = await fetch(
-      `${resource}/hls/master?path=multilingual.mkv`,
-    ).then((response) => response.text());
+    const master = await fetch(`${resource}/hls/master?path=multilingual.mkv`).then((response) =>
+      response.text(),
+    );
     expect(master).toContain('AUDIO="audio"');
     for (const [id, text] of [
       ["subtitle-3", "English coastal captions"],
       ["subtitle-4", "Subtítulos de la costa"],
     ]) {
-      const response = await fetch(
-        `${resource}/subtitles?path=multilingual.mkv&track=${id}`,
-      );
+      const response = await fetch(`${resource}/subtitles?path=multilingual.mkv&track=${id}`);
       expect(response.status).toBe(200);
       expect(await response.text()).toContain(text);
     }
@@ -46,11 +44,7 @@ it("probes real multilingual streams, converts subtitles and encodes distinct sy
       fixture.runtime.getRenditionState(entry, fixture.session, id),
     );
     for (const rendition of renditions)
-      await fixture.runtime.startRenditionTranscode(
-        entry,
-        fixture.session,
-        rendition,
-      );
+      await fixture.runtime.startRenditionTranscode(entry, fixture.session, rendition);
     await expect
       .poll(() => renditions.map(({ status }) => status), { timeout: 30_000 })
       .toEqual(["done", "done", "done"]);
@@ -65,10 +59,7 @@ it("probes real multilingual streams, converts subtitles and encodes distinct sy
       const sample = path.join(fixture.directory, `${rendition.qualityId}.mp4`);
       await writeFile(
         sample,
-        Buffer.concat([
-          init,
-          await readFile(path.join(rendition.dir, "segment_000002.m4s")),
-        ]),
+        Buffer.concat([init, await readFile(path.join(rendition.dir, "segment_000002.m4s"))]),
       );
       const { stderr } = await runCommandCapture(ffmpegPath, [
         "-hide_banner",
@@ -121,34 +112,20 @@ it("publishes both audio languages before a long video finishes and drains the s
       "multilingual.mkv",
       path.join(fixture.directory, "multilingual.mkv"),
     );
-    const video = fixture.runtime.getRenditionState(
-      entry,
-      fixture.session,
-      "360p",
-    );
+    const video = fixture.runtime.getRenditionState(entry, fixture.session, "360p");
     const audio = ["audio-1", "audio-2"].map((id) =>
       fixture.runtime.getRenditionState(entry, fixture.session, id),
     );
-    await fixture.runtime.startRenditionTranscode(
-      entry,
-      fixture.session,
-      video,
-    );
+    await fixture.runtime.startRenditionTranscode(entry, fixture.session, video);
     for (const rendition of audio)
-      await fixture.runtime.startRenditionTranscode(
-        entry,
-        fixture.session,
-        rendition,
-      );
+      await fixture.runtime.startRenditionTranscode(entry, fixture.session, rendition);
     await expect
       .poll(
         async () =>
           Promise.all(
             audio.map(
               async (rendition) =>
-                (await fixture.runtime.refreshRenditionAvailability(
-                  rendition,
-                )) > 0,
+                (await fixture.runtime.refreshRenditionAvailability(rendition)) > 0,
             ),
           ),
         { timeout: 20_000, interval: 100 },

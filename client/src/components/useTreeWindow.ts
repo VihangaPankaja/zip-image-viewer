@@ -24,24 +24,15 @@ export function useTreeWindow(root: ExplorerNode | null) {
     const tree = treeRef.current;
     if (!tree) return;
     const top = index * rowHeight;
-    if (
-      top < tree.scrollTop ||
-      top + rowHeight > tree.scrollTop + tree.clientHeight
-    ) {
+    if (top < tree.scrollTop || top + rowHeight > tree.scrollTop + tree.clientHeight) {
       tree.scrollTop = top;
       setScrollTop(top);
     }
   }
   function range(length: number): [number, number] {
     if (length <= 500) return [0, length];
-    const start = Math.max(
-      0,
-      Math.min(length - 1, Math.floor(scrollTop / rowHeight) - 5),
-    );
-    return [
-      start,
-      Math.min(length, start + Math.ceil(viewportHeight / rowHeight) + 10),
-    ];
+    const start = Math.max(0, Math.min(length - 1, Math.floor(scrollTop / rowHeight) - 5));
+    return [start, Math.min(length, start + Math.ceil(viewportHeight / rowHeight) + 10)];
   }
   return { treeRef, setScrollTop, revealIndex, range };
 }

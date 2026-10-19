@@ -37,3 +37,4 @@ coverage/
 #other
 improvemennt ideas.txt
 .vitest/
+tests/tooling/.lint-fixture-*/

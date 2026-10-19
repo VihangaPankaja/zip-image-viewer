@@ -6,10 +6,7 @@ import request from "supertest";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 import type { Session } from "../../domain/models.js";
 import { sanitizeEntryPath } from "../../infrastructure/runtime/runtimePrimitives.js";
-import {
-  getVideoQualities,
-  registerVideoMetadataRoutes,
-} from "./metadataRoutes.js";
+import { getVideoQualities, registerVideoMetadataRoutes } from "./metadataRoutes.js";
 import type { VideoRouteDependencies } from "./types.js";
 
 let directory = "";
@@ -58,10 +55,7 @@ it("shares quality metadata and file validation with the legacy HTTP endpoint", 
   const app = express();
   registerVideoMetadataRoutes(app, deps as unknown as VideoRouteDependencies);
   const url = "/api/sessions/" + session.id + "/video/qualities";
-  const legacy = await request(app)
-    .get(url)
-    .query({ path: "clip.mp4" })
-    .expect(200);
+  const legacy = await request(app).get(url).query({ path: "clip.mp4" }).expect(200);
   expect(legacy.body).toEqual(await getVideoQualities(input, deps));
   for (const [file, status] of [
     ["../secret.mp4", 400],
@@ -69,14 +63,14 @@ it("shares quality metadata and file validation with the legacy HTTP endpoint", 
     ["missing.mp4", 404],
     ["notes.txt", 400],
   ] as const) {
-    await expect(
-      getVideoQualities({ ...input, path: file }, deps),
-    ).rejects.toMatchObject({ status });
+    await expect(getVideoQualities({ ...input, path: file }, deps)).rejects.toMatchObject({
+      status,
+    });
     await request(app).get(url).query({ path: file }).expect(status);
   }
-  await expect(
-    getVideoQualities({ ...input, sessionId: "missing" }, deps),
-  ).rejects.toMatchObject({ status: 404 });
+  await expect(getVideoQualities({ ...input, sessionId: "missing" }, deps)).rejects.toMatchObject({
+    status: 404,
+  });
 });
 
 it("reports queued encoder time", async () => {
@@ -155,11 +149,7 @@ it("prefers the probed playback mode and still offers a transcode fallback", asy
   metadata.playbackMode = "remux";
   expect(await getVideoQualities(input, deps)).toMatchObject({
     defaultQuality: "remux",
-    options: [
-      { id: "source" },
-      { id: "remux", label: "Remuxed MP4" },
-      { id: "auto" },
-    ],
+    options: [{ id: "source" }, { id: "remux", label: "Remuxed MP4" }, { id: "auto" }],
   });
   metadata.playbackMode = "transcode";
   expect(await getVideoQualities(input, deps)).toMatchObject({

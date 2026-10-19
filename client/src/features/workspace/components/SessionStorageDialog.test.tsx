@@ -38,9 +38,7 @@ function setup() {
   const onDeleted = vi.fn(() => Promise.resolve());
   render(
     <QueryClientProvider
-      client={
-        new QueryClient({ defaultOptions: { queries: { retry: false } } })
-      }
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
       <SessionStorageDialog
         id="00000000-0000-4000-8000-000000000001"
@@ -58,9 +56,7 @@ it("shows separate byte totals and refreshes after pinning and clearing only cac
   expect(screen.getByText("2.0 MB")).toBeVisible();
   expect(screen.getByText("12 MB")).toBeVisible();
   api.get.mockResolvedValue({ ...initial, pinned: true });
-  await user.click(
-    screen.getByRole("checkbox", { name: "Keep until the server stops" }),
-  );
+  await user.click(screen.getByRole("checkbox", { name: "Keep until the server stops" }));
   await screen.findByText("Session kept until the server stops.");
   expect(api.pin.mock.calls[0][0]).toMatchObject({ pinned: true });
   api.get.mockResolvedValue({
@@ -69,9 +65,7 @@ it("shows separate byte totals and refreshes after pinning and clearing only cac
     previewsBytes: 0,
     transcodesBytes: 0,
   });
-  await user.click(
-    screen.getByRole("button", { name: "Clear preview & transcode cache" }),
-  );
+  await user.click(screen.getByRole("button", { name: "Clear preview & transcode cache" }));
   await screen.findByText("Cache cleared. Original files kept.");
   expect(screen.getByText("50 MB")).toBeVisible();
   expect(screen.getAllByText("0 B")).toHaveLength(2);
@@ -83,20 +77,12 @@ it("warns about retained torrent files and requires a separate destructive actio
   const { user, onDeleted } = setup();
   await screen.findByText(/Retained torrent/);
   expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-  await user.click(
-    screen.getByRole("button", { name: "Delete session files…" }),
-  );
-  expect(
-    screen.getByText(/files needed to download skipped items later/),
-  ).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Delete session files…" }));
+  expect(screen.getByText(/files needed to download skipped items later/)).toBeVisible();
   expect(api.remove).not.toHaveBeenCalled();
   await user.click(screen.getByRole("button", { name: "Keep files" }));
-  expect(
-    screen.queryByRole("button", { name: "Delete permanently" }),
-  ).not.toBeInTheDocument();
-  await user.click(
-    screen.getByRole("button", { name: "Delete session files…" }),
-  );
+  expect(screen.queryByRole("button", { name: "Delete permanently" })).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Delete session files…" }));
   await user.click(screen.getByRole("button", { name: "Delete permanently" }));
   await waitFor(() => expect(onDeleted).toHaveBeenCalledOnce());
   expect(api.remove).toHaveBeenCalledOnce();
@@ -107,19 +93,11 @@ it("keeps failed deletion and active-media cleanup errors recoverable", async ()
   api.remove.mockRejectedValue(new Error("Download is running."));
   const { user, onDeleted } = setup();
   await screen.findByText("50 MB");
-  await user.click(
-    screen.getByRole("button", { name: "Clear preview & transcode cache" }),
-  );
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Media is active.",
-  );
-  await user.click(
-    screen.getByRole("button", { name: "Delete session files…" }),
-  );
+  await user.click(screen.getByRole("button", { name: "Clear preview & transcode cache" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Media is active.");
+  await user.click(screen.getByRole("button", { name: "Delete session files…" }));
   await user.click(screen.getByRole("button", { name: "Delete permanently" }));
-  await waitFor(() =>
-    expect(screen.getByRole("alert")).toHaveTextContent("Download is running."),
-  );
+  await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Download is running."));
   expect(onDeleted).not.toHaveBeenCalled();
   expect(screen.getByRole("button", { name: "Keep files" })).toBeEnabled();
 });
@@ -127,12 +105,8 @@ it("keeps failed deletion and active-media cleanup errors recoverable", async ()
 it("shows a failed measurement without offering file actions", async () => {
   api.get.mockRejectedValue(new Error("Session not found."));
   setup();
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Session not found.",
-  );
-  expect(
-    screen.queryByRole("button", { name: "Delete session files…" }),
-  ).not.toBeInTheDocument();
+  expect(await screen.findByRole("alert")).toHaveTextContent("Session not found.");
+  expect(screen.queryByRole("button", { name: "Delete session files…" })).not.toBeInTheDocument();
 });
 
 it("reflects the pending pin immediately and restores the saved value on failure", async () => {

@@ -159,8 +159,7 @@ button:disabled {
   transition: transform var(--transition-fast);
 }
 
-.custom-dropdown-trigger:has(+ .custom-dropdown-menu:popover-open)
-  .custom-dropdown-caret {
+.custom-dropdown-trigger:has(+ .custom-dropdown-menu:popover-open) .custom-dropdown-caret {
   transform: rotate(225deg) translate(-1px, -1px);
 }
 

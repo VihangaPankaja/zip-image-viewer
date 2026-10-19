@@ -2,10 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator } from "@playwright/test";
 
 async function expectContained(container: Locator, child: Locator) {
-  const [outer, inner] = await Promise.all([
-    container.boundingBox(),
-    child.boundingBox(),
-  ]);
+  const [outer, inner] = await Promise.all([container.boundingBox(), child.boundingBox()]);
   expect(outer).not.toBeNull();
   expect(inner).not.toBeNull();
   if (!outer || !inner) throw new Error("Expected visible layout bounds.");
@@ -26,17 +23,11 @@ test("queues a magnet on blur, clears the composer, and contains long content", 
 
   await page.getByRole("button", { name: "Add downloads" }).click();
   const composer = page.getByRole("dialog");
-  await composer
-    .getByRole("textbox", { name: "Paste download URLs" })
-    .fill(magnet);
+  await composer.getByRole("textbox", { name: "Paste download URLs" }).fill(magnet);
   await composer.getByRole("heading", { name: "Add downloads" }).click();
 
-  await expect(
-    composer.getByLabel("Download URL", { exact: true }),
-  ).toHaveCount(1);
-  await expect(
-    composer.getByRole("button", { name: "Review links" }),
-  ).toHaveCount(0);
+  await expect(composer.getByLabel("Download URL", { exact: true })).toHaveCount(1);
+  await expect(composer.getByRole("button", { name: "Review links" })).toHaveCount(0);
   await composer.getByRole("button", { name: "Add to queue" }).click();
   await expect(composer).toBeHidden();
 
@@ -46,12 +37,10 @@ test("queues a magnet on blur, clears the composer, and contains long content", 
   await expect(row.getByRole("button", { name: "Cancel" })).toBeVisible();
   await expectContained(row, row.locator(".download-row-title > span"));
   await expectContained(row, row.locator(".download-progress-line b"));
-  const managerWidth = await page
-    .locator(".download-manager")
-    .evaluate((manager) => ({
-      client: manager.clientWidth,
-      scroll: manager.scrollWidth,
-    }));
+  const managerWidth = await page.locator(".download-manager").evaluate((manager) => ({
+    client: manager.clientWidth,
+    scroll: manager.scrollWidth,
+  }));
   expect(managerWidth.scroll).toBeLessThanOrEqual(managerWidth.client + 1);
   const overflowingElements = await page.evaluate(() =>
     [...document.querySelectorAll<HTMLElement>("body *")]
@@ -64,24 +53,16 @@ test("queues a magnet on blur, clears the composer, and contains long content", 
   expect(overflowingElements).toEqual([]);
   const rowBounds = await row.boundingBox();
   expect(rowBounds?.x ?? -1).toBeGreaterThanOrEqual(0);
-  expect(
-    (rowBounds?.x ?? 0) + (rowBounds?.width ?? Infinity),
-  ).toBeLessThanOrEqual(390);
+  expect((rowBounds?.x ?? 0) + (rowBounds?.width ?? Infinity)).toBeLessThanOrEqual(390);
   await page.screenshot({
     animations: "disabled",
     path: testInfo.outputPath("download-queue-mobile.png"),
   });
 
   await page.getByRole("button", { name: "Add downloads" }).click();
-  await expect(
-    composer.getByLabel("Download URL", { exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    composer.getByRole("textbox", { name: "Paste download URLs" }),
-  ).toHaveValue("");
-  expect(
-    (await new AxeBuilder({ page }).include("dialog").analyze()).violations,
-  ).toEqual([]);
+  await expect(composer.getByLabel("Download URL", { exact: true })).toHaveCount(0);
+  await expect(composer.getByRole("textbox", { name: "Paste download URLs" })).toHaveValue("");
+  expect((await new AxeBuilder({ page }).include("dialog").analyze()).violations).toEqual([]);
   await page.screenshot({
     animations: "disabled",
     path: testInfo.outputPath("download-composer-mobile.png"),
@@ -94,9 +75,7 @@ test("queues a magnet on blur, clears the composer, and contains long content", 
   await expect(row).toBeHidden();
 });
 
-test("confirms an oversized transfer through the browser control flow", async ({
-  page,
-}) => {
+test("confirms an oversized transfer through the browser control flow", async ({ page }) => {
   const job = {
     id: "00000000-0000-4000-8000-000000000001",
     url: "https://downloads.example.com/oversized-archive.zip",
@@ -142,16 +121,12 @@ test("confirms an oversized transfer through the browser control flow", async ({
     element.textContent = "confirmation-error-".repeat(60);
   });
   await expectContained(row, alert);
-  expect(
-    await row.evaluate(
-      (element) => element.scrollWidth <= element.clientWidth + 1,
-    ),
-  ).toBe(true);
+  expect(await row.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(
+    true,
+  );
   await page.getByRole("button", { name: "Confirm & download" }).click();
 
   await expect(page.getByText("Confirmed. Waiting to start")).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Confirm & download" }),
-  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Confirm & download" })).toHaveCount(0);
   expect(confirmCalls).toBe(2);
 });

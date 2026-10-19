@@ -1,7 +1,4 @@
-import {
-  formatBytes,
-  type LogEntry,
-} from "../infrastructure/runtime/runtimePrimitives.js";
+import { formatBytes, type LogEntry } from "../infrastructure/runtime/runtimePrimitives.js";
 import {
   color,
   crop,
@@ -71,9 +68,7 @@ class TerminalDashboard {
   }
 
   private jobs(): DashboardJob[] {
-    return [...this.deps.getJobs()].sort(
-      (a, b) => a.queuePosition - b.queuePosition,
-    );
+    return [...this.deps.getJobs()].sort((a, b) => a.queuePosition - b.queuePosition);
   }
 
   private sessions(): DashboardSession[] {
@@ -88,10 +83,7 @@ class TerminalDashboard {
 
   private selectedSession(): DashboardSession | undefined {
     const items = this.sessions();
-    this.sessionIndex = Math.min(
-      this.sessionIndex,
-      Math.max(0, items.length - 1),
-    );
+    this.sessionIndex = Math.min(this.sessionIndex, Math.max(0, items.length - 1));
     return items.at(this.sessionIndex);
   }
 
@@ -101,9 +93,7 @@ class TerminalDashboard {
     return this.deps
       .getLogs()
       .filter((entry) =>
-        this.pane() === "sessions"
-          ? entry.sessionId === sessionId
-          : entry.jobId === jobId,
+        this.pane() === "sessions" ? entry.sessionId === sessionId : entry.jobId === jobId,
       );
   }
 
@@ -116,14 +106,9 @@ class TerminalDashboard {
     const currentSession = this.selectedSession();
     const jobItems = this.jobs();
     const sessionItems = this.sessions();
-    const logItems = this.filteredLogs().slice(
-      -(compact ? 4 : 8) - this.logOffset,
-    );
+    const logItems = this.filteredLogs().slice(-(compact ? 4 : 8) - this.logOffset);
     const lines = [
-      color(
-        36,
-        `ZIP IMAGE VIEWER • Backend Dashboard${compact ? " • COMPACT" : ""}`,
-      ),
+      color(36, `ZIP IMAGE VIEWER • Backend Dashboard${compact ? " • COMPACT" : ""}`),
       `Scheduler: ${String(scheduler.activeCount)}/${String(scheduler.maxConcurrent)} active   Pane: ${this.pane().toUpperCase()}`,
       "",
     ];
@@ -140,9 +125,7 @@ class TerminalDashboard {
       lines.push(
         ...sessionItems
           .slice(0, compact ? 5 : 6)
-          .map((session, index) =>
-            sessionLine(session, index === this.sessionIndex, width),
-          ),
+          .map((session, index) => sessionLine(session, index === this.sessionIndex, width)),
       );
     }
     this.appendSelection(lines, compact, width, currentJob, currentSession);
@@ -225,10 +208,7 @@ class TerminalDashboard {
 
   private moveSelection(delta: number): void {
     if (this.pane() === "jobs")
-      this.jobIndex = Math.max(
-        0,
-        Math.min(this.jobs().length - 1, this.jobIndex + delta),
-      );
+      this.jobIndex = Math.max(0, Math.min(this.jobs().length - 1, this.jobIndex + delta));
     else if (this.pane() === "sessions")
       this.sessionIndex = Math.max(
         0,
@@ -251,8 +231,7 @@ class TerminalDashboard {
   }
 
   private removeSelected(): void {
-    const item =
-      this.pane() === "sessions" ? this.selectedSession() : this.selectedJob();
+    const item = this.pane() === "sessions" ? this.selectedSession() : this.selectedJob();
     if (!item) return;
     const key = `${this.pane()}:${item.id}`;
     if (this.confirmation !== key) {

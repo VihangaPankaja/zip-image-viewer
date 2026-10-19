@@ -19,10 +19,7 @@ export function attachJobWebSocketServer(
   });
 
   socketServer.on("connection", (socket, req) => {
-    const requestUrl = new URL(
-      req.url || "/ws/jobs",
-      `http://${req.headers.host || "localhost"}`,
-    );
+    const requestUrl = new URL(req.url || "/ws/jobs", `http://${req.headers.host || "localhost"}`);
     const jobId = requestUrl.searchParams.get("jobId") || "";
     const job = jobStore.get(jobId);
 

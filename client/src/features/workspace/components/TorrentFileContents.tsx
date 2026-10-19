@@ -15,10 +15,7 @@ export const fileStates = {
   cancelled: "Cancelled",
 };
 
-export function fileState(
-  file: TorrentFile,
-  job: Job,
-): keyof typeof fileStates {
+export function fileState(file: TorrentFile, job: Job): keyof typeof fileStates {
   if (!file.selected) return "skipped";
   if (job.status === "error") return "failed";
   if (job.status === "cancelled") return "cancelled";
@@ -30,15 +27,8 @@ export function fileState(
   return "downloading";
 }
 
-export function FileTools({
-  job,
-  selection,
-}: {
-  job: Job;
-  selection: Selection;
-}) {
-  const { selecting, search, mediaType, submitting, change, visible } =
-    selection;
+export function FileTools({ job, selection }: { job: Job; selection: Selection }) {
+  const { selecting, search, mediaType, submitting, change, visible } = selection;
   return (
     <div className="torrent-file-tools">
       <TorrentDescription selection={selection} />
@@ -50,11 +40,7 @@ export function FileTools({
           onChange={(event) => selection.setSearch(event.currentTarget.value)}
         />
       </label>
-      <MediaTypeFilter
-        value={mediaType}
-        onChange={selection.setMediaType}
-        disabled={submitting}
-      />
+      <MediaTypeFilter value={mediaType} onChange={selection.setMediaType} disabled={submitting} />
       {!selecting ? (
         <label className="media-type-filter">
           File status
@@ -99,8 +85,8 @@ export function FileTools({
       <SelectionHelp selecting={selecting} />
       {selecting && (search || mediaType !== "all") ? (
         <p>
-          Folder checkboxes affect matching files. Select all and Select none
-          affect every file, including other pages.
+          Folder checkboxes affect matching files. Select all and Select none affect every file,
+          including other pages.
         </p>
       ) : null}
     </div>
@@ -110,9 +96,8 @@ export function FileTools({
 function SelectionHelp({ selecting }: { selecting: boolean }) {
   return selecting ? (
     <p id="torrent-keyboard-help">
-      Use ↑ and ↓ to move between choices, Home and End to jump to the first or
-      last file, and Space to select. Folder checkboxes affect all matching
-      files, including other pages.
+      Use ↑ and ↓ to move between choices, Home and End to jump to the first or last file, and Space
+      to select. Folder checkboxes affect all matching files, including other pages.
     </p>
   ) : null;
 }

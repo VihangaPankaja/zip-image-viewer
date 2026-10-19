@@ -1,9 +1,5 @@
 import { mkdir } from "node:fs/promises";
-import type {
-  Session,
-  VideoRendition,
-  VideoTranscodeEntry,
-} from "../../domain/models.js";
+import type { Session, VideoRendition, VideoTranscodeEntry } from "../../domain/models.js";
 import { buildFmp4AudioGroupArgs } from "../../media/ffmpegHls.js";
 import { getRenditionState } from "../../media/videoRendition.js";
 import { runCommand } from "../process/commandRunner.js";
@@ -35,9 +31,7 @@ function audioArgs(
   segmentSeconds: number,
 ): string[] {
   const outputs = (entry.audioTracks ?? []).flatMap((track) => {
-    const rendition = renditions.find(
-      ({ qualityId }) => qualityId === track.id,
-    );
+    const rendition = renditions.find(({ qualityId }) => qualityId === track.id);
     return rendition ? [{ index: track.index, directory: rendition.dir }] : [];
   });
   return buildFmp4AudioGroupArgs(entry.targetPath, outputs, segmentSeconds);
@@ -52,11 +46,7 @@ async function encodeRenditions(
   signal?: AbortSignal,
 ): Promise<void> {
   if (audio) {
-    await runCommand(
-      executable,
-      audioArgs(entry, renditions, deps.segmentSeconds),
-      { signal },
-    );
+    await runCommand(executable, audioArgs(entry, renditions, deps.segmentSeconds), { signal });
   } else {
     await deps.encoder.encode(
       {
@@ -81,9 +71,7 @@ export function startRenditionJob(
   const executable = deps.ffmpegPath;
   if (!executable || requested.status !== "idle") return Promise.resolve();
   const audioTracks = entry.audioTracks ?? [];
-  const audioTrack = audioTracks.find(
-    (track) => track.id === requested.qualityId,
-  );
+  const audioTrack = audioTracks.find((track) => track.id === requested.qualityId);
   if (!audioTrack && requested.qualityId.startsWith("audio-"))
     return Promise.reject(new Error("Unknown audio track."));
   const renditions = audioTrack
@@ -115,14 +103,7 @@ export function startRenditionJob(
   const encode = async (signal?: AbortSignal) => {
     startedAt = await prepareRenditions(renditions, queuedAt);
     log("video.transcode.started", { queueMs: startedAt - queuedAt });
-    await encodeRenditions(
-      executable,
-      entry,
-      renditions,
-      Boolean(audioTrack),
-      deps,
-      signal,
-    );
+    await encodeRenditions(executable, entry, renditions, Boolean(audioTrack), deps, signal);
   };
   const completion = deps
     .runVideoTask(
@@ -140,23 +121,14 @@ export function startRenditionJob(
     })
     .catch((error: unknown) => {
       for (const rendition of renditions) rendition.status = "error";
-      log(
-        "video.transcode.failed",
-        { error: errorFromUnknown(error).message },
-        "warn",
-      );
+      log("video.transcode.failed", { error: errorFromUnknown(error).message }, "warn");
     });
   for (const rendition of renditions) rendition.completion = completion;
   return Promise.resolve();
 }
 
-async function prepareRenditions(
-  renditions: VideoRendition[],
-  queuedAt: number,
-): Promise<number> {
-  await Promise.all(
-    renditions.map((rendition) => mkdir(rendition.dir, { recursive: true })),
-  );
+async function prepareRenditions(renditions: VideoRendition[], queuedAt: number): Promise<number> {
+  await Promise.all(renditions.map((rendition) => mkdir(rendition.dir, { recursive: true })));
   const startedAt = Date.now();
   for (const rendition of renditions) {
     rendition.status = "running";
@@ -165,13 +137,8 @@ async function prepareRenditions(
   return startedAt;
 }
 
-async function finishRenditions(
-  renditions: VideoRendition[],
-  deps: Dependencies,
-): Promise<void> {
-  await Promise.all(
-    renditions.map((rendition) => deps.refreshRenditionAvailability(rendition)),
-  );
+async function finishRenditions(renditions: VideoRendition[], deps: Dependencies): Promise<void> {
+  await Promise.all(renditions.map((rendition) => deps.refreshRenditionAvailability(rendition)));
   for (const rendition of renditions) rendition.status = "done";
   void deps.enforceDerivedMediaBudget().catch((error: unknown) =>
     deps.logEvent("warn", "media.cache.cleanup.failed", {

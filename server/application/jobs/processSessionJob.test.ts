@@ -22,9 +22,7 @@ const workspaces: string[] = [];
 afterEach(async () => {
   mocks.downloadSessionSource.mockReset();
   await Promise.all(
-    workspaces
-      .splice(0)
-      .map((workspace) => rm(workspace, { force: true, recursive: true })),
+    workspaces.splice(0).map((workspace) => rm(workspace, { force: true, recursive: true })),
   );
 });
 
@@ -32,9 +30,7 @@ describe("createProcessSessionJob", () => {
   it.each(["indexing", "ready"])(
     "keeps a transient persistence failure at %s in a controlled error state",
     async (phase) => {
-      const workspace = await mkdtemp(
-        path.join(os.tmpdir(), "torrent-lifecycle-full-"),
-      );
+      const workspace = await mkdtemp(path.join(os.tmpdir(), "torrent-lifecycle-full-"));
       workspaces.push(workspace);
       const store = createRetainedTorrentStore(workspace);
       try {
@@ -106,14 +102,10 @@ describe("createProcessSessionJob", () => {
       canPause: true,
       pauseRequested: false,
     });
-    mocks.downloadSessionSource.mockImplementation(
-      (downloadJob: SessionJob) => {
-        downloadJob.pauseRequested = true;
-        return Promise.reject(
-          Object.assign(new Error("Paused"), { name: "AbortError" }),
-        );
-      },
-    );
+    mocks.downloadSessionSource.mockImplementation((downloadJob: SessionJob) => {
+      downloadJob.pauseRequested = true;
+      return Promise.reject(Object.assign(new Error("Paused"), { name: "AbortError" }));
+    });
     const processJob = createProcessSessionJob({
       sessionStore: new Map(),
       torrentAdapter: { download: vi.fn(), close: vi.fn() },
@@ -155,11 +147,7 @@ describe("createProcessSessionJob", () => {
     await processJob(job);
 
     expect(job.status).toBe("cancelled");
-    expect(logEvent).not.toHaveBeenCalledWith(
-      "error",
-      "session.create.failed",
-      expect.anything(),
-    );
+    expect(logEvent).not.toHaveBeenCalledWith("error", "session.create.failed", expect.anything());
   });
 
   it("builds a completed session directly from deterministic torrent files", async () => {
@@ -181,30 +169,28 @@ describe("createProcessSessionJob", () => {
         complete: false,
       },
     ];
-    const download = vi.fn<TorrentAdapter["download"]>(
-      ({ onMetadata, onProgress }) => {
-        onMetadata({
-          files: torrentFiles,
-          length: 100,
-          name: "fixture",
-        });
-        onProgress({
-          files: torrentFiles.map((file) => ({
-            ...file,
-            selected: true,
-            complete: true,
-            downloadedBytes: file.size,
-          })),
-          downloadedBytes: 100,
-          downloadSpeedBytesPerSec: 50,
-          peerCount: 1,
-          progress: 1,
-          uploadedBytes: 0,
-          uploadSpeedBytesPerSec: 0,
-        });
-        return Promise.resolve({ files: ["album/image.jpg"] });
-      },
-    );
+    const download = vi.fn<TorrentAdapter["download"]>(({ onMetadata, onProgress }) => {
+      onMetadata({
+        files: torrentFiles,
+        length: 100,
+        name: "fixture",
+      });
+      onProgress({
+        files: torrentFiles.map((file) => ({
+          ...file,
+          selected: true,
+          complete: true,
+          downloadedBytes: file.size,
+        })),
+        downloadedBytes: 100,
+        downloadSpeedBytesPerSec: 50,
+        peerCount: 1,
+        progress: 1,
+        uploadedBytes: 0,
+        uploadSpeedBytesPerSec: 0,
+      });
+      return Promise.resolve({ files: ["album/image.jpg"] });
+    });
     const prepareRetainedSession = vi.fn();
     const processJob = createProcessSessionJob({
       prepareRetainedSession,
@@ -248,13 +234,9 @@ describe("createProcessSessionJob", () => {
     expect(download).toHaveBeenCalledTimes(2);
     expect(job.status).toBe("ready");
     expect(sessionStore.size).toBe(1);
-    expect(prepareRetainedSession).toHaveBeenCalledExactlyOnceWith(
-      sessionStore.get(job.sessionId),
-    );
+    expect(prepareRetainedSession).toHaveBeenCalledExactlyOnceWith(sessionStore.get(job.sessionId));
     expect(sessionStore.get(job.sessionId)?.stats.fileCount).toBe(1);
-    expect(sessionStore.get(job.sessionId)?.firstFilePath).toBe(
-      "album/image.jpg",
-    );
+    expect(sessionStore.get(job.sessionId)?.firstFilePath).toBe("album/image.jpg");
     const originalSession = sessionStore.get(job.sessionId);
     if (!originalSession) throw new Error("Retained session was not indexed.");
     originalSession.pinned = true;

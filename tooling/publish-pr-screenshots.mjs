@@ -21,18 +21,12 @@ const run = (command, args, cwd = process.cwd()) =>
     stdio: ["ignore", "pipe", "pipe"],
   }).trim();
 const directory = path.resolve("test-results/pr-screenshots");
-const manifest = JSON.parse(
-  await readFile(path.join(directory, "manifest.json"), "utf8"),
-);
+const manifest = JSON.parse(await readFile(path.join(directory, "manifest.json"), "utf8"));
 const head = run("git", ["rev-parse", "HEAD"]);
 if (head !== manifest.sourceCommit)
-  throw new Error(
-    "Screenshots are stale. Capture again at the current commit.",
-  );
+  throw new Error("Screenshots are stale. Capture again at the current commit.");
 if (run("git", ["status", "--porcelain", "--untracked-files=normal"]))
-  throw new Error(
-    "Commit implementation changes before publishing screenshots.",
-  );
+  throw new Error("Commit implementation changes before publishing screenshots.");
 const requiredScreens = [
   "video-opt-in-encoding-playback",
   "video-opt-in-encoding-seek",
@@ -115,18 +109,14 @@ if (
   new Set(featuredScreens).size !== featuredScreens.length ||
   featuredScreens.some((screen) => !requiredScreens.includes(screen))
 )
-  throw new Error(
-    "PR_SCREENSHOT_FEATURED must list unique gallery screen names.",
-  );
+  throw new Error("PR_SCREENSHOT_FEATURED must list unique gallery screen names.");
 for (const device of ["Mobile", "Tablet", "Desktop", "Ultrawide"]) {
   for (const theme of ["light", "dark"]) {
     for (const screen of requiredScreens) {
       if (
         manifest.captures.filter(
           (capture) =>
-            capture.device === device &&
-            capture.theme === theme &&
-            capture.screen === screen,
+            capture.device === device && capture.theme === theme && capture.screen === screen,
         ).length !== 1
       )
         throw new Error(
@@ -135,25 +125,13 @@ for (const device of ["Mobile", "Tablet", "Desktop", "Ultrawide"]) {
     }
   }
 }
-if (
-  new Set(manifest.captures.map((capture) => capture.file)).size !==
-  manifest.captures.length
-)
+if (new Set(manifest.captures.map((capture) => capture.file)).size !== manifest.captures.length)
   throw new Error("Screenshot filenames must be unique.");
-const repository = run("gh", [
-  "repo",
-  "view",
-  "--json",
-  "nameWithOwner",
-  "--jq",
-  ".nameWithOwner",
-]);
-if (!/^[\w.-]+\/[\w.-]+$/.test(repository))
-  throw new Error("Invalid GitHub repository name.");
+const repository = run("gh", ["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"]);
+if (!/^[\w.-]+\/[\w.-]+$/.test(repository)) throw new Error("Invalid GitHub repository name.");
 const hash = createHash("sha256");
 for (const capture of manifest.captures) {
-  if (!/^[a-z0-9-]+\.png$/.test(capture.file))
-    throw new Error("Invalid screenshot filename.");
+  if (!/^[a-z0-9-]+\.png$/.test(capture.file)) throw new Error("Invalid screenshot filename.");
 }
 const groups = groupScreenshotGalleries(manifest.captures, featuredScreens);
 const generatedAssets = await prepareScreenshotGalleries(directory, groups);
@@ -188,21 +166,13 @@ try {
     ["a", "-tzip", "-mx=0", path.join(temporary, archiveName), `@${listPath}`],
     directory,
   );
-  const publishedFiles = [
-    ...groups.flatMap((group) => [
-      ...group.featured.map((entry) => entry.file),
-      ...group.sheets.map((sheet) => sheet.file),
-    ]),
-  ];
+  const publishedFiles = groups.flatMap((group) => [
+    ...group.featured.map((entry) => entry.file),
+    ...group.sheets.map((sheet) => sheet.file),
+  ]);
   for (const file of publishedFiles)
-    await cp(
-      path.join(directory, file),
-      path.join(temporary, `${assetPrefix}${file}`),
-    );
-  const names = [
-    archiveName,
-    ...publishedFiles.map((file) => `${assetPrefix}${file}`),
-  ];
+    await cp(path.join(directory, file), path.join(temporary, `${assetPrefix}${file}`));
+  const names = [archiveName, ...publishedFiles.map((file) => `${assetPrefix}${file}`)];
   await publishScreenshotRelease({
     run: (args) => run("gh", args),
     repository,

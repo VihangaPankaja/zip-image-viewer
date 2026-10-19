@@ -1,10 +1,7 @@
 import type { Server } from "node:http";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 import type { Session, SessionJob } from "../domain/models.js";
-import {
-  CLEANUP_INTERVAL_MS,
-  SESSION_TTL_MS,
-} from "../config/runtimeConstants.js";
+import { CLEANUP_INTERVAL_MS, SESSION_TTL_MS } from "../config/runtimeConstants.js";
 import { registerRuntimeLifecycle } from "./runtimeLifecycle.js";
 
 afterEach(() => {
@@ -21,9 +18,7 @@ function setup() {
     signals.set(event, handler as () => void);
     return process;
   });
-  const exit = vi
-    .spyOn(process, "exit")
-    .mockImplementation(() => undefined as never);
+  const exit = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
   const deps = {
     sessions: new Map<string, Session>(),
     jobs: new Map<string, SessionJob>(),
@@ -31,12 +26,8 @@ function setup() {
     removeSession: vi
       .fn<(id: string, reason: string) => Promise<void>>()
       .mockResolvedValue(undefined),
-    cleanupJob: vi
-      .fn<(id: string, reason: string) => Promise<void>>()
-      .mockResolvedValue(undefined),
-    shutdownServices: [
-      vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
-    ],
+    cleanupJob: vi.fn<(id: string, reason: string) => Promise<void>>().mockResolvedValue(undefined),
+    shutdownServices: [vi.fn<() => Promise<void>>().mockResolvedValue(undefined)],
     logEvent: vi.fn(),
   };
   registerRuntimeLifecycle(deps);
@@ -94,8 +85,7 @@ it("shuts down sessions, jobs and services once even when both signals arrive", 
 it("reports server-close failure and exits unsuccessfully", async () => {
   const { deps, signals, exit } = setup();
   deps.getServer.mockReturnValue({
-    close: (callback: (error: Error) => void) =>
-      callback(new Error("Close failed")),
+    close: (callback: (error: Error) => void) => callback(new Error("Close failed")),
   } as Server);
   signals.get("SIGINT")?.();
   await vi.advanceTimersByTimeAsync(0);

@@ -24,20 +24,14 @@ export function color(code: number, value: string): string {
 }
 
 export function crop(value: string, width: number): string {
-  return value.length <= width
-    ? value
-    : `${value.slice(0, Math.max(0, width - 1))}…`;
+  return value.length <= width ? value : `${value.slice(0, Math.max(0, width - 1))}…`;
 }
 
 function percent(value: number | null): string {
   return value === null ? "--" : `${value.toFixed(0)}%`;
 }
 
-export function jobLine(
-  job: DashboardJob,
-  selected: boolean,
-  width: number,
-): string {
+export function jobLine(job: DashboardJob, selected: boolean, width: number): string {
   const marker = selected ? color(36, ">") : " ";
   const state =
     job.status === "error"
@@ -51,11 +45,7 @@ export function jobLine(
   );
 }
 
-export function sessionLine(
-  session: DashboardSession,
-  selected: boolean,
-  width: number,
-): string {
+export function sessionLine(session: DashboardSession, selected: boolean, width: number): string {
   return crop(
     `${selected ? color(36, ">") : " "} ${session.id.slice(0, 8)}  ${String(session.stats.fileCount)} files`,
     width,

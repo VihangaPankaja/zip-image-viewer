@@ -48,18 +48,12 @@ export function createRetainedTorrentStore(directory: string) {
           job: jobSchema
             .extend({
               downloadOptions: z.unknown(),
-              torrentArchivePath: z
-                .string()
-                .transform(sanitizeEntryPath)
-                .optional(),
+              torrentArchivePath: z.string().transform(sanitizeEntryPath).optional(),
             })
             .parse(JSON.parse(String(row.snapshot))),
-          metadata:
-            row.metadata instanceof Uint8Array ? row.metadata : undefined,
+          metadata: row.metadata instanceof Uint8Array ? row.metadata : undefined,
         }))
-        .sort(
-          (left, right) => left.job.queuePosition - right.job.queuePosition,
-        );
+        .sort((left, right) => left.job.queuePosition - right.job.queuePosition);
     },
     remove(id: string) {
       remove.run(id);
@@ -70,14 +64,9 @@ export function createRetainedTorrentStore(directory: string) {
   };
 }
 
-export type RetainedTorrentStore = ReturnType<
-  typeof createRetainedTorrentStore
->;
+export type RetainedTorrentStore = ReturnType<typeof createRetainedTorrentStore>;
 
-export function saveRetainedTorrent(
-  store: RetainedTorrentStore | undefined,
-  job: SessionJob,
-) {
+export function saveRetainedTorrent(store: RetainedTorrentStore | undefined, job: SessionJob) {
   try {
     store?.save(job);
   } catch (error) {

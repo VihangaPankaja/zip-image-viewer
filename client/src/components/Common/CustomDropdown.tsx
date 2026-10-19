@@ -26,13 +26,10 @@ export function CustomDropdown({
 }: CustomDropdownProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const menuId = `${id}-menu`;
-  const activeOption =
-    options.find((option) => option.value === value) ?? options.at(0);
+  const activeOption = options.find((option) => option.value === value) ?? options.at(0);
 
   return (
-    <div
-      className={`toolbar-select-shell custom-dropdown-shell ${className}`.trim()}
-    >
+    <div className={`toolbar-select-shell custom-dropdown-shell ${className}`.trim()}>
       <span className="toolbar-label">{label}</span>
       <button
         type="button"

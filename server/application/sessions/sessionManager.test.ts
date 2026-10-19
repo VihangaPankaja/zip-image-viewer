@@ -6,9 +6,7 @@ import type { Session } from "../../domain/models.js";
 import { createSessionManager } from "./sessionManager.js";
 
 it("keeps retained originals through viewer close, expiry and shutdown until explicit removal", async () => {
-  const workspaceDir = await mkdtemp(
-    path.join(os.tmpdir(), "retained-cleanup-"),
-  );
+  const workspaceDir = await mkdtemp(path.join(os.tmpdir(), "retained-cleanup-"));
   const session: Session = {
     id: "retained",
     retained: true,
@@ -91,17 +89,10 @@ it("rejects new session access and drains media work before deleting its files",
 it.each(["manual", "shutdown"])(
   "keeps a pinned temporary session on viewer close and expiry but deletes it on %s",
   async (reason) => {
-    const workspaceDir = await mkdtemp(
-      path.join(os.tmpdir(), "pinned-session-"),
-    );
+    const workspaceDir = await mkdtemp(path.join(os.tmpdir(), "pinned-session-"));
     const session = { id: "pinned", pinned: true, workspaceDir } as Session;
     const sessions = new Map([[session.id, session]]);
-    const manager = createSessionManager(
-      sessions,
-      new Map(),
-      vi.fn(),
-      async () => {},
-    );
+    const manager = createSessionManager(sessions, new Map(), vi.fn(), async () => {});
     try {
       await manager.removeSession(session.id, "viewer");
       await manager.removeSession(session.id, "expired");

@@ -7,26 +7,16 @@ import { extractSessionSource } from "../jobs/extractSessionSource.js";
 const ARCHIVE_EXTENSION = /\.(zip|rar|7z|tar|gz|tgz)$/i;
 
 type EntryDependencies = Parameters<typeof extractSessionSource>[3] & {
-  logEvent: (
-    _level: "warn",
-    _event: string,
-    _details: Record<string, unknown>,
-  ) => void;
+  logEvent: (_level: "warn", _event: string, _details: Record<string, unknown>) => void;
 };
 
-async function cleanupDerived(
-  directory: string,
-  job: SessionJob,
-  deps: EntryDependencies,
-) {
-  await rm(directory, { recursive: true, force: true }).catch(
-    (error: unknown) => {
-      deps.logEvent("warn", "torrent.extraction.cleanup.failed", {
-        jobId: job.id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    },
-  );
+async function cleanupDerived(directory: string, job: SessionJob, deps: EntryDependencies) {
+  await rm(directory, { recursive: true, force: true }).catch((error: unknown) => {
+    deps.logEvent("warn", "torrent.extraction.cleanup.failed", {
+      jobId: job.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
 }
 
 export async function prepareTorrentEntries(
@@ -36,9 +26,7 @@ export async function prepareTorrentEntries(
   deps: EntryDependencies,
 ) {
   const selectedPaths = new Set(
-    job.torrentFiles
-      .filter((file) => file.selected && file.complete)
-      .map((file) => file.path),
+    job.torrentFiles.filter((file) => file.selected && file.complete).map((file) => file.path),
   );
   // Shared torrent pieces may also leave partial, unselected files on disk.
   const files = (await deps.listExtractedEntries(torrentDir)).filter(
@@ -56,8 +44,7 @@ export async function prepareTorrentEntries(
   const staging = `${extractDir}.staging`;
   const previous = `${extractDir}.previous`;
   if (existsSync(previous)) {
-    if (existsSync(extractDir))
-      await rm(previous, { recursive: true, force: true });
+    if (existsSync(extractDir)) await rm(previous, { recursive: true, force: true });
     else await rename(previous, extractDir);
   }
   await rm(staging, { recursive: true, force: true });
@@ -72,9 +59,7 @@ export async function prepareTorrentEntries(
     let siblingFolder = "Torrent files";
     while (
       entries.some(
-        (entry) =>
-          entry.relativePath.split("/")[0]?.toLowerCase() ===
-          siblingFolder.toLowerCase(),
+        (entry) => entry.relativePath.split("/")[0]?.toLowerCase() === siblingFolder.toLowerCase(),
       )
     )
       siblingFolder += "-";
@@ -85,10 +70,8 @@ export async function prepareTorrentEntries(
       const destination = path.join(staging, relativePath);
       await mkdir(path.dirname(destination), { recursive: true });
       await link(source, destination).catch(async (error: unknown) => {
-        const code =
-          error instanceof Error && "code" in error ? error.code : undefined;
-        if (code !== "EXDEV" && code !== "EPERM" && code !== "ENOTSUP")
-          throw error;
+        const code = error instanceof Error && "code" in error ? error.code : undefined;
+        if (code !== "EXDEV" && code !== "EPERM" && code !== "ENOTSUP") throw error;
         await copyFile(source, destination);
       });
       entries.push({ ...file, relativePath });

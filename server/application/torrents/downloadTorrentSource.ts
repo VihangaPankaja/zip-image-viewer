@@ -10,11 +10,7 @@ import {
   type TorrentProgress,
 } from "./torrentDownloader.js";
 
-type EmitJob = (
-  _job: SessionJob,
-  _patch: Partial<SessionJob>,
-  _event?: string,
-) => void;
+type EmitJob = (_job: SessionJob, _patch: Partial<SessionJob>, _event?: string) => void;
 
 function confirmationError(): Error {
   return Object.assign(new Error("Torrent exceeds 1 GiB."), {
@@ -53,9 +49,7 @@ function handleMetadata(
       (file) =>
         !metadata.files.some(
           (resolved) =>
-            resolved.id === file.id &&
-            resolved.path === file.path &&
-            resolved.size === file.size,
+            resolved.id === file.id && resolved.path === file.path && resolved.size === file.size,
         ),
     )
   ) {
@@ -74,11 +68,7 @@ function handleMetadata(
   return selected.map((file) => file.id);
 }
 
-function emitProgress(
-  job: SessionJob,
-  emitJob: EmitJob,
-  progress: TorrentProgress,
-): void {
+function emitProgress(job: SessionJob, emitJob: EmitJob, progress: TorrentProgress): void {
   emitJob(job, {
     ...(progress.files ? { torrentFiles: progress.files } : {}),
     downloadedBytes: progress.downloadedBytes,
@@ -97,11 +87,7 @@ function emitProgress(
   });
 }
 
-function waitForUser(
-  job: SessionJob,
-  error: unknown,
-  emitJob: EmitJob,
-): boolean {
+function waitForUser(job: SessionJob, error: unknown, emitJob: EmitJob): boolean {
   if (errorCode(error) === "FILE_SELECTION") {
     emitJob(job, {
       status: "awaiting_selection",
@@ -131,10 +117,7 @@ function monitorProgress(job: SessionJob, emitJob: EmitJob) {
   let lastProgressBytes = job.downloadedBytes;
   let lastProgressAt = Date.now();
   return (progress: TorrentProgress) => {
-    if (
-      progress.downloadedBytes > lastProgressBytes ||
-      progress.downloadSpeedBytesPerSec > 0
-    ) {
+    if (progress.downloadedBytes > lastProgressBytes || progress.downloadSpeedBytesPerSec > 0) {
       lastProgressBytes = progress.downloadedBytes;
       lastProgressAt = Date.now();
     }
@@ -185,10 +168,7 @@ export async function downloadTorrentSource(
       await deps.adapter.download({
         jobId: job.id,
         priorities: Object.fromEntries(
-          job.torrentFiles.map(({ id, priority }) => [
-            id,
-            priority ?? "normal",
-          ]),
+          job.torrentFiles.map(({ id, priority }) => [id, priority ?? "normal"]),
         ),
         source,
         downloadDir: input.downloadDir,
@@ -201,8 +181,7 @@ export async function downloadTorrentSource(
           deps.emitJob(job, {
             isStalled: true,
             peerCount: 0,
-            message:
-              "No peers connected. Download resumes when peers become available.",
+            message: "No peers connected. Download resumes when peers become available.",
           }),
       });
       deps.emitJob(job, {

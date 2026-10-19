@@ -1,20 +1,8 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type RefObject,
-} from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { MAX_SUBTITLE_BYTES, normalizeSubtitles } from "./subtitles";
 import type { VideoMediaTrack } from "../../../../shared/contracts";
 
-function shiftCue(
-  cue: TextTrackCue,
-  start: number,
-  end: number,
-  offset: number,
-  track: TextTrack,
-) {
+function shiftCue(cue: TextTrackCue, start: number, end: number, offset: number, track: TextTrack) {
   track.removeCue(cue);
   cue.startTime = Math.max(0, start + offset);
   cue.endTime = Math.max(0, end + offset);
@@ -85,17 +73,11 @@ function useSubtitleFile() {
     } catch (cause) {
       if (current === request.current)
         setError(
-          cause instanceof Error
-            ? cause.message
-            : "Subtitles could not be read. Try another file.",
+          cause instanceof Error ? cause.message : "Subtitles could not be read. Try another file.",
         );
     }
   }
-  async function loadEmbedded(
-    track: VideoMediaTrack,
-    sessionId: string,
-    path: string,
-  ) {
+  async function loadEmbedded(track: VideoMediaTrack, sessionId: string, path: string) {
     const current = beginRequest();
     const pending = new AbortController();
     controllerRef.current = pending;
@@ -104,20 +86,12 @@ function useSubtitleFile() {
     setLoading(true);
     setEmbeddedTrackId(track.id);
     try {
-      const normalized = await readEmbeddedSubtitles(
-        track,
-        sessionId,
-        path,
-        pending.signal,
-      );
-      if (current === request.current)
-        setFile({ name: track.label, text: normalized });
+      const normalized = await readEmbeddedSubtitles(track, sessionId, path, pending.signal);
+      if (current === request.current) setFile({ name: track.label, text: normalized });
     } catch {
       if (current === request.current) {
         setEmbeddedTrackId("");
-        setError(
-          "Embedded subtitles could not be loaded. Try another track or a local file.",
-        );
+        setError("Embedded subtitles could not be loaded. Try another track or a local file.");
       }
     } finally {
       if (current === request.current) setLoading(false);
@@ -153,9 +127,7 @@ function useNativeSubtitleTrack(
   onError: (message: string) => void,
 ) {
   const trackRef = useRef<HTMLTrackElement | null>(null);
-  const originalTimes = useRef<
-    { cue: TextTrackCue; start: number; end: number }[]
-  >([]);
+  const originalTimes = useRef<{ cue: TextTrackCue; start: number; end: number }[]>([]);
   const [enabled, setEnabled] = useState(true);
   const [offset, setOffset] = useState(0);
   const [ready, setReady] = useState(false);
@@ -168,9 +140,7 @@ function useNativeSubtitleTrack(
     const track = document.createElement("track");
     track.kind = "subtitles";
     track.label = file.name;
-    const url = URL.createObjectURL(
-      new Blob([file.text], { type: "text/vtt" }),
-    );
+    const url = URL.createObjectURL(new Blob([file.text], { type: "text/vtt" }));
     track.src = url;
     trackRef.current = track;
     const onLoad = () => {
@@ -188,8 +158,7 @@ function useNativeSubtitleTrack(
       setEnabled(true);
       setReady(true);
     };
-    const failed = () =>
-      onError("Subtitles could not be loaded. Choose another file.");
+    const failed = () => onError("Subtitles could not be loaded. Choose another file.");
     const onChange = () => setEnabled(track.track.mode === "showing");
     track.addEventListener("load", onLoad);
     track.addEventListener("error", failed);
@@ -221,15 +190,9 @@ function useNativeSubtitleTrack(
   return { ready, enabled, setEnabled, offset, setOffset };
 }
 
-export function useVideoSubtitles(
-  videoRef: RefObject<HTMLVideoElement | null>,
-) {
+export function useVideoSubtitles(videoRef: RefObject<HTMLVideoElement | null>) {
   const subtitles = useSubtitleFile();
-  const track = useNativeSubtitleTrack(
-    videoRef,
-    subtitles.file,
-    subtitles.fail,
-  );
+  const track = useNativeSubtitleTrack(videoRef, subtitles.file, subtitles.fail);
   const [size, setSize] = useState("medium");
   useEffect(() => {
     const video = videoRef.current;

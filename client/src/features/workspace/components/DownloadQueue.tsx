@@ -2,11 +2,7 @@ import { TorrentReviewAction } from "./TorrentFileDialog";
 import { Download } from "lucide-react";
 import { useMemo, useState, type DragEvent } from "react";
 import type { Job, TorrentPriority } from "../../../../../shared/contracts";
-import {
-  formatEta,
-  formatSpeed,
-  formatTransferBytes,
-} from "../../../lib/formatterUtils";
+import { formatEta, formatSpeed, formatTransferBytes } from "../../../lib/formatterUtils";
 
 type DownloadManagerProps = {
   jobs: readonly Job[];
@@ -19,11 +15,7 @@ type DownloadManagerProps = {
   onResume: (id: string) => void;
   onRetry: (id: string) => void;
   onSelectFiles: (id: string, fileIds: string[]) => Promise<void>;
-  onFilePriority: (
-    id: string,
-    fileId: string,
-    priority: TorrentPriority,
-  ) => Promise<void>;
+  onFilePriority: (id: string, fileId: string, priority: TorrentPriority) => Promise<void>;
 };
 
 function moveJob(ids: string[], from: number, to: number): string[] {
@@ -63,11 +55,7 @@ function JobActions({ job, ...actions }: JobActionsProps) {
     try {
       await actions.onConfirm(job.id);
     } catch (error) {
-      setConfirmError(
-        error instanceof Error
-          ? error.message
-          : "Could not confirm this download.",
-      );
+      setConfirmError(error instanceof Error ? error.message : "Could not confirm this download.");
     } finally {
       setIsConfirming(false);
     }
@@ -81,11 +69,7 @@ function JobActions({ job, ...actions }: JobActionsProps) {
         onPriorityChange={actions.onFilePriority}
       />
       {job.status === "awaiting_confirmation" ? (
-        <button
-          type="button"
-          disabled={isConfirming}
-          onClick={() => void confirm()}
-        >
+        <button type="button" disabled={isConfirming} onClick={() => void confirm()}>
           {isConfirming ? "Confirming…" : "Confirm & download"}
         </button>
       ) : null}
@@ -176,8 +160,7 @@ function DownloadTelemetry({ job }: { job: Job }) {
           <div>
             <dt>Uploaded</dt>
             <dd>
-              {formatTransferBytes(job.uploadedBytes)} ·{" "}
-              {formatSpeed(job.uploadSpeedBytesPerSec)}
+              {formatTransferBytes(job.uploadedBytes)} · {formatSpeed(job.uploadSpeedBytesPerSec)}
             </dd>
           </div>
         </>
@@ -210,10 +193,7 @@ function DownloadRow({
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => onDrop(event, job.id)}
     >
-      <div
-        className="download-priority"
-        aria-label={`Priority ${String(index + 1)}`}
-      >
+      <div className="download-priority" aria-label={`Priority ${String(index + 1)}`}>
         <span>{String(index + 1).padStart(2, "0")}</span>
         <button
           type="button"
@@ -235,11 +215,7 @@ function DownloadRow({
       <div className="download-row-main">
         <div className="download-row-title">
           <strong title={job.url}>{downloadTitle(job)}</strong>
-          <span
-            role="status"
-            aria-label={downloadTitle(job)}
-            aria-atomic="true"
-          >
+          <span role="status" aria-label={downloadTitle(job)} aria-atomic="true">
             {job.status.replaceAll("_", " ")}
           </span>
         </div>
@@ -253,9 +229,7 @@ function DownloadRow({
         </div>
         <DownloadTelemetry job={job} />
         <TorrentSelectionSummary job={job} />
-        {job.message ? (
-          <p className="download-status-message">{job.message}</p>
-        ) : null}
+        {job.message ? <p className="download-status-message">{job.message}</p> : null}
         <code>{job.url}</code>
       </div>
       <JobActions job={job} {...actions} />
@@ -326,8 +300,7 @@ function TorrentSelectionSummary({ job }: { job: Job }) {
   const complete = selected.filter((file) => file.complete).length;
   return (
     <p className="torrent-selection-summary" role="status" aria-atomic="true">
-      {selected.length} of {job.torrentFiles.length} files selected · {complete}{" "}
-      complete
+      {selected.length} of {job.torrentFiles.length} files selected · {complete} complete
     </p>
   );
 }

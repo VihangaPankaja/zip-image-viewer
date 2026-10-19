@@ -1,10 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { tapVisibleTarget } from "./touch";
-import {
-  installReviewFixtures,
-  reviewActiveTorrentJob,
-} from "../review/fixtures";
+import { installReviewFixtures, reviewActiveTorrentJob } from "../review/fixtures";
 
 test.use({ hasTouch: true });
 
@@ -61,12 +58,8 @@ for (const width of [360, 1440]) {
       await subtitle.focus();
       await page.keyboard.press("Space");
     }
-    await expect(dialog.getByRole("status")).toContainText(
-      "1 of 3 files selected",
-    );
-    expect(
-      (await new AxeBuilder({ page }).include("dialog").analyze()).violations,
-    ).toEqual([]);
+    await expect(dialog.getByRole("status")).toContainText("1 of 3 files selected");
+    expect((await new AxeBuilder({ page }).include("dialog").analyze()).violations).toEqual([]);
     const start = dialog.getByRole("button", {
       name: "Start selected download",
     });
@@ -97,14 +90,12 @@ for (const width of [360, 1440]) {
     ];
     await page.reload();
     await view.click();
-    await expect(
-      page.locator(".torrent-file-state").filter({ hasText: "Available" }),
-    ).toHaveCount(2);
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
-      ),
-    ).toBe(true);
+    await expect(page.locator(".torrent-file-state").filter({ hasText: "Available" })).toHaveCount(
+      2,
+    );
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
     await page.keyboard.press("Escape");
     await expect(view).toBeFocused();
   });
@@ -145,18 +136,15 @@ test("reopening the current torrent session refreshes its tree after adding file
   await expect(page.getByRole("treeitem", { name: /first.txt/ })).toBeVisible();
   await page.getByRole("tab", { name: "Downloads", exact: true }).click();
   await page.getByRole("button", { name: "View files", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Download skipped files", exact: true })
-    .click();
-  await page
-    .getByRole("button", { name: "Start selected download", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Download skipped files", exact: true }).click();
+  await page.getByRole("button", { name: "Start selected download", exact: true }).click();
   names = ["first.txt", "added.txt"];
   state.jobs = [{ ...original, status: "ready", phase: "ready", sessionId }];
   await page.getByRole("button", { name: "Open", exact: true }).click();
-  await expect(
-    page.getByRole("tab", { name: "Explore", exact: true }),
-  ).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Explore", exact: true })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
   await expect(page.getByRole("treeitem", { name: /first.txt/ })).toBeVisible();
   await expect(page.getByRole("treeitem", { name: /added.txt/ })).toBeVisible();
 });

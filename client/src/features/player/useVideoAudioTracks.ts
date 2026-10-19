@@ -21,12 +21,7 @@ function audioOptions(
 ) {
   return Array.from(tracks, (track, index) => ({
     id: String(index),
-    label:
-      track.name ||
-      track.label ||
-      track.lang ||
-      track.language ||
-      `Audio ${index + 1}`,
+    label: track.name || track.label || track.lang || track.language || `Audio ${index + 1}`,
   }));
 }
 
@@ -47,15 +42,11 @@ export function useVideoAudioTracks(
     setTracks(audioOptions(hls.audioTracks));
     setSelected(hls.audioTrack >= 0 ? String(hls.audioTrack) : "");
   }, []);
-  const updateSelectedAudioTrack = useCallback(
-    (id: number) => setSelected(String(id)),
-    [],
-  );
+  const updateSelectedAudioTrack = useCallback((id: number) => setSelected(String(id)), []);
   const bindNativeAudioTracks = useCallback(
     (player: HTMLVideoElement) => {
       const tracks = nativeTracks(player);
-      if (!tracks || typeof tracks.addEventListener !== "function")
-        return () => {};
+      if (!tracks || typeof tracks.addEventListener !== "function") return () => {};
       const update = () => {
         if (hlsRef.current) return;
         setMode("native");

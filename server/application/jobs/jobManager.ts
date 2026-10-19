@@ -14,10 +14,7 @@ import {
   normalizeDownloadSettings,
 } from "../downloads/downloadOptions.js";
 import { isTerminalJobStatus } from "../../infrastructure/runtime/runtimePrimitives.js";
-import {
-  detectSourceKind,
-  type SourcePreference,
-} from "../torrents/torrentSource.js";
+import { detectSourceKind, type SourcePreference } from "../torrents/torrentSource.js";
 
 type LogEvent = (
   _level: "info" | "warn" | "error",
@@ -164,19 +161,11 @@ class JobManager {
     this.saveJob(job);
   };
 
-  emitJob = (
-    job: SessionJob,
-    patch: Partial<SessionJob> = {},
-    event = "progress",
-  ): void => {
+  emitJob = (job: SessionJob, patch: Partial<SessionJob> = {}, event = "progress"): void => {
     Object.assign(job, patch, { updatedAt: Date.now() });
     if (this.retained && job.sourceKind === "torrent") {
-      const progress =
-        job.status === "downloading" && patch.downloadedBytes !== undefined;
-      if (
-        !progress ||
-        Date.now() - (this.progressSavedAt.get(job) ?? 0) >= 1_000
-      ) {
+      const progress = job.status === "downloading" && patch.downloadedBytes !== undefined;
+      if (!progress || Date.now() - (this.progressSavedAt.get(job) ?? 0) >= 1_000) {
         this.saveJob(job);
         if (progress) this.progressSavedAt.set(job, Date.now());
       }
@@ -201,8 +190,7 @@ class JobManager {
     if (!job) return;
     if (job.sourceKind === "torrent" && reason === "expired") return;
     for (const response of job.subscribers) response.end();
-    for (const socket of job.socketSubscribers)
-      socket.close(1000, "job-cleanup");
+    for (const socket of job.socketSubscribers) socket.close(1000, "job-cleanup");
     job.subscribers.clear();
     job.socketSubscribers.clear();
     if (job.sourceKind === "torrent" && reason === "shutdown") {

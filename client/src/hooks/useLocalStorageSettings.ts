@@ -18,14 +18,11 @@ export function useLocalStorageSettings() {
     return stored === "light" || stored === "dark" ? stored : "system";
   });
 
-  const [keyboardSettings, setKeyboardSettings] =
-    useState<KeyboardSettings>(readKeyboardSettings);
+  const [keyboardSettings, setKeyboardSettings] = useState<KeyboardSettings>(readKeyboardSettings);
 
-  const [explorerColumns, setExplorerColumns] =
-    useState<ExplorerColumns>(readExplorerColumns);
+  const [explorerColumns, setExplorerColumns] = useState<ExplorerColumns>(readExplorerColumns);
 
-  const [downloadOptions, setDownloadOptions] =
-    useState<DownloadOptions>(readDownloadOptions);
+  const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>(readDownloadOptions);
 
   useEffect(() => {
     const preference = window.matchMedia("(prefers-color-scheme: dark)");
@@ -48,10 +45,7 @@ export function useLocalStorageSettings() {
   }, [explorerColumns]);
 
   useEffect(() => {
-    writeStoredSetting(
-      "zip-shortcut-settings",
-      JSON.stringify(keyboardSettings),
-    );
+    writeStoredSetting("zip-shortcut-settings", JSON.stringify(keyboardSettings));
   }, [keyboardSettings]);
 
   return {

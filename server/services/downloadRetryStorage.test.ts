@@ -13,11 +13,7 @@ vi.mock("node:fs", async (importOriginal) => {
     statfsSync: () => {
       const used = actual
         .readdirSync(disk.root)
-        .reduce(
-          (total, name) =>
-            total + actual.statSync(path.join(disk.root, name)).size,
-          0,
-        );
+        .reduce((total, name) => total + actual.statSync(path.join(disk.root, name)).size, 0);
       return { bsize: 1, bavail: disk.capacity - used };
     },
   };
@@ -75,20 +71,13 @@ it.each([
     const retained = Buffer.from("other retained bytes");
     const backup = Buffer.from("personal backup");
     disk.root = directory;
-    disk.capacity =
-      64 * 1024 ** 2 +
-      retained.length +
-      backup.length +
-      (segmented ? 240 : 120);
+    disk.capacity = 64 * 1024 ** 2 + retained.length + backup.length + (segmented ? 240 : 120);
     await writeFile(path.join(directory, "retained.bin"), retained);
     await writeFile(`${target}.part.backup`, backup);
     await writeFile(target, payload.subarray(0, segmented ? 40 : 80));
     await writeFile(`${target}.part.9`, "obsolete partial");
     if (segmented) {
-      await writeFile(
-        `${target}.part.0`,
-        oversized ? Buffer.alloc(61) : payload.subarray(0, 60),
-      );
+      await writeFile(`${target}.part.0`, oversized ? Buffer.alloc(61) : payload.subarray(0, 60));
       await writeFile(`${target}.part.1`, payload.subarray(60, 80));
     }
     const requests: string[] = [];
@@ -96,20 +85,13 @@ it.each([
       const range = request.headers.range;
       requests.push(range ?? "full");
       const match = /^bytes=(\d+)-(\d+)$/.exec(range ?? "");
-      const body = match
-        ? payload.subarray(Number(match[1]), Number(match[2]) + 1)
-        : payload;
-      response
-        .writeHead(match ? 206 : 200, { "content-length": body.length })
-        .end(body);
+      const body = match ? payload.subarray(Number(match[1]), Number(match[2]) + 1) : payload;
+      response.writeHead(match ? 206 : 200, { "content-length": body.length }).end(body);
     });
     try {
-      await new Promise<void>((resolve) =>
-        server.listen(0, "127.0.0.1", resolve),
-      );
+      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
       const address = server.address();
-      if (!address || typeof address === "string")
-        throw new Error("No TCP port");
+      if (!address || typeof address === "string") throw new Error("No TCP port");
       await downloadWithSegmentedManager({
         url: `http://127.0.0.1:${address.port}/file`,
         targetPath: target,
@@ -124,9 +106,7 @@ it.each([
         },
       });
       expect(await readFile(target)).toEqual(payload);
-      expect(await readFile(path.join(directory, "retained.bin"))).toEqual(
-        retained,
-      );
+      expect(await readFile(path.join(directory, "retained.bin"))).toEqual(retained);
       expect(await readFile(`${target}.part.backup`)).toEqual(backup);
       expect((await readdir(directory)).sort()).toEqual([
         "download.bin",

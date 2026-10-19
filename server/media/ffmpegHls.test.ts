@@ -20,15 +20,9 @@ describe("FFmpeg adaptive HLS arguments", () => {
       });
       expect(args[args.indexOf("-c:v") + 1]).toBe(encoder);
       expect(args[args.indexOf("-b:v") + 1]).toBe("2800k");
-      expect(args[args.indexOf("-preset") + 1]).toBe(
-        encoder === "h264_qsv" ? "veryfast" : "p4",
-      );
-      expect(args[args.indexOf("-pix_fmt") + 1]).toBe(
-        encoder === "h264_qsv" ? "nv12" : "yuv420p",
-      );
-      expect(args).toContain(
-        encoder === "h264_qsv" ? "-forced_idr" : "-forced-idr",
-      );
+      expect(args[args.indexOf("-preset") + 1]).toBe(encoder === "h264_qsv" ? "veryfast" : "p4");
+      expect(args[args.indexOf("-pix_fmt") + 1]).toBe(encoder === "h264_qsv" ? "nv12" : "yuv420p");
+      expect(args).toContain(encoder === "h264_qsv" ? "-forced_idr" : "-forced-idr");
       expect(args).toContain("expr:gte(t,n_forced*4)");
       expect(args[args.indexOf("-bf") + 1]).toBe("0");
       expect(args).not.toContain("-sc_threshold");
@@ -113,9 +107,7 @@ describe("FFmpeg adaptive HLS arguments", () => {
             height: 0,
           }),
         );
-        const codecs = codecsFromInit(
-          await readFile(path.join(output, "init.mp4")),
-        );
+        const codecs = codecsFromInit(await readFile(path.join(output, "init.mp4")));
         expect(codecs).toMatch(/^avc1\.4d40[0-9a-f]{2}/);
         expect(codecs?.includes("mp4a.40.2")).toBe(audio);
       } finally {

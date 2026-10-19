@@ -17,9 +17,7 @@ it("follows system appearance, persists overrides, and removes its media listene
     }),
     removeEventListener,
   };
-  vi.spyOn(window, "matchMedia").mockReturnValue(
-    preference as unknown as MediaQueryList,
-  );
+  vi.spyOn(window, "matchMedia").mockReturnValue(preference as unknown as MediaQueryList);
   localStorage.setItem("zip-image-viewer-theme", "invalid");
   const { result, unmount } = renderHook(useLocalStorageSettings);
   expect(result.current.theme).toBe("system");
@@ -34,10 +32,7 @@ it("follows system appearance, persists overrides, and removes its media listene
   act(() => onChange());
   expect(document.documentElement.dataset.theme).toBe("light");
   unmount();
-  expect(removeEventListener).toHaveBeenCalledWith(
-    "change",
-    expect.any(Function),
-  );
+  expect(removeEventListener).toHaveBeenCalledWith("change", expect.any(Function));
   const restored = renderHook(useLocalStorageSettings);
   expect(restored.result.current.theme).toBe("light");
 });

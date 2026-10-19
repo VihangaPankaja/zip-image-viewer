@@ -13,11 +13,7 @@ const commands = vi.hoisted(() => ({
   args: [] as string[][],
 }));
 vi.mock("../process/commandRunner.js", () => {
-  const run = (
-    command: string,
-    args: string[],
-    { signal }: { signal?: AbortSignal } = {},
-  ) =>
+  const run = (command: string, args: string[], { signal }: { signal?: AbortSignal } = {}) =>
     new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
       commands.active += 1;
       commands.peak = Math.max(commands.peak, commands.active);
@@ -90,12 +86,8 @@ it("pins media work and waits for an ongoing eviction before starting it", async
     waitForEviction,
   });
   const session = { id: "eviction" } as Session;
-  const result = Promise.allSettled([
-    runtime.runCommand("window", [], session),
-  ]);
-  await vi.waitFor(() =>
-    expect(waitForEviction).toHaveBeenCalledWith(session.id),
-  );
+  const result = Promise.allSettled([runtime.runCommand("window", [], session)]);
+  await vi.waitFor(() => expect(waitForEviction).toHaveBeenCalledWith(session.id));
   expect(protectSession).toHaveBeenCalledWith(session.id, false);
   expect(commands.started).toEqual([]);
   finishEviction();
@@ -143,18 +135,12 @@ it("starts all audio streams together beside a running background video encoder"
     await runtime.startRenditionTranscode(entry, session, first);
     await runtime.startRenditionTranscode(entry, session, second);
     await vi.waitFor(() => expect(commands.active).toBe(2));
-    expect([video.status, first.status, second.status]).toEqual([
-      "running",
-      "running",
-      "running",
-    ]);
+    expect([video.status, first.status, second.status]).toEqual(["running", "running", "running"]);
     expect(commands.args[1]).toContain("0:1");
     expect(commands.args[1]).toContain("0:2");
     expect(commands.started).toHaveLength(2);
     commands.releases[1]?.();
-    await vi.waitFor(() =>
-      expect([first.status, second.status]).toEqual(["done", "done"]),
-    );
+    await vi.waitFor(() => expect([first.status, second.status]).toEqual(["done", "done"]));
     expect(video.status).toBe("running");
     await runtime.startRenditionTranscode(entry, session, second);
     expect(commands.started).toHaveLength(2);
@@ -182,9 +168,9 @@ it("rejects unprobed audio IDs before queuing an encoder", async () => {
     audioTracks: [],
   } as unknown as VideoTranscodeEntry;
   const rendition = runtime.getRenditionState(entry, session, "audio-99");
-  await expect(
-    runtime.startRenditionTranscode(entry, session, rendition),
-  ).rejects.toThrow("Unknown audio track");
+  await expect(runtime.startRenditionTranscode(entry, session, rendition)).rejects.toThrow(
+    "Unknown audio track",
+  );
   expect(rendition.status).toBe("idle");
   expect(commands.started).toHaveLength(0);
 });
@@ -222,17 +208,13 @@ it("shares two permits across runtime instances, coalesces probes and cancels qu
     subtitleTracks: [],
   });
   await runtime.getVideoMetadata("clip", firstSession);
-  expect(commands.started.filter((name) => name === "metadata")).toHaveLength(
-    1,
-  );
+  expect(commands.started.filter((name) => name === "metadata")).toHaveLength(1);
   const running = runtime.runCommand("storyboard", [], firstSession);
   const queued = runtime.runCommand("queued thumbnail", [], firstSession);
   const failures = Promise.allSettled([running, queued]);
   await vi.waitFor(() => expect(commands.started).toContain("storyboard"));
   await runtime.cleanupVideoSession(firstSession);
-  expect((await failures).every((result) => result.status === "rejected")).toBe(
-    true,
-  );
+  expect((await failures).every((result) => result.status === "rejected")).toBe(true);
   expect(commands.started).not.toContain("queued thumbnail");
   expect(commands.peak).toBe(2);
   const secondResult = Promise.allSettled([second]);
@@ -271,15 +253,11 @@ it("drains rapid queued seeks before a session workspace can be removed", async 
     logEvent: () => undefined,
   });
   const session = { id: "rapid-seeks" } as Session;
-  const requests = Array.from({ length: 40 }, () =>
-    runtime.runCommand("seek", [], session),
-  );
+  const requests = Array.from({ length: 40 }, () => runtime.runCommand("seek", [], session));
   const settled = Promise.allSettled(requests);
   await vi.waitFor(() => expect(commands.active).toBe(2));
   await runtime.cleanupVideoSession(session);
-  expect((await settled).every(({ status }) => status === "rejected")).toBe(
-    true,
-  );
+  expect((await settled).every(({ status }) => status === "rejected")).toBe(true);
   expect(commands.active).toBe(0);
   expect(commands.started).toHaveLength(2);
 });

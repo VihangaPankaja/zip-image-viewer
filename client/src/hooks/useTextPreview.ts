@@ -48,10 +48,7 @@ export function useTextPreview({
       },
       (previewError: unknown) => {
         if (!cancelled) {
-          const message =
-            previewError instanceof Error
-              ? previewError.message
-              : "Unknown error.";
+          const message = previewError instanceof Error ? previewError.message : "Unknown error.";
           setTextPreview(`Preview unavailable: ${message}`);
         }
       },

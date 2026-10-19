@@ -30,9 +30,7 @@ describe("SessionRail", () => {
 
     expect(screen.getByRole("list", { name: "Sessions" })).toBeInTheDocument();
 
-    await user.click(
-      screen.getByRole("button", { name: /open brand-kit.zip/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /open brand-kit.zip/i }));
 
     expect(onSelect).toHaveBeenCalledWith("session-2");
     expect(screen.getByText("68% · 12 MB/s")).toBeInTheDocument();

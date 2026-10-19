@@ -46,9 +46,7 @@ describe("runtime primitives", () => {
   it("writes structured events to the selected logger", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     logEvent("warn", "fixture", { jobId: "job-1" });
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('[WARN] fixture {"jobId":"job-1"}'),
-    );
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('[WARN] fixture {"jobId":"job-1"}'));
     warn.mockRestore();
   });
 

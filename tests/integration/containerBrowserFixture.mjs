@@ -6,8 +6,7 @@ import process from "node:process";
 import { pathToFileURL } from "node:url";
 import ffmpegPath from "ffmpeg-static";
 
-const builtModule = (name) =>
-  pathToFileURL(path.join(process.cwd(), "build/server", name)).href;
+const builtModule = (name) => pathToFileURL(path.join(process.cwd(), "build/server", name)).href;
 
 const directory = mkdtempSync(path.join(tmpdir(), "ziv-browser-hls-"));
 const extractDir = path.join(directory, "extracted");
@@ -75,9 +74,7 @@ for (const { name, args } of fixtures) {
 }
 
 const { buildTree } = await import(builtModule("domain/explorerTree.js"));
-const { sessionStore } = await import(
-  builtModule("repositories/memoryStores.js")
-);
+const { sessionStore } = await import(builtModule("repositories/memoryStores.js"));
 const { tree, firstFilePath, stats } = buildTree(
   fixtures.map(({ name }) => ({
     relativePath: `direct/${name}`,

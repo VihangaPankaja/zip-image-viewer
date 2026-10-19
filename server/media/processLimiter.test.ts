@@ -68,9 +68,7 @@ describe("ProcessLimiter", () => {
 
     releases.get("encode 1")?.();
     await firstEncode;
-    await vi.waitFor(() =>
-      expect(started).toEqual(["encode 1", "preview 1", "encode 2"]),
-    );
+    await vi.waitFor(() => expect(started).toEqual(["encode 1", "preview 1", "encode 2"]));
     releases.get("preview 1")?.();
     await firstPreview;
     await vi.waitFor(() => expect(started).toContain("preview 2"));
@@ -101,9 +99,9 @@ describe("ProcessLimiter", () => {
     const limiter = new ProcessLimiter(1);
     const controller = new AbortController();
     controller.abort();
-    await expect(
-      limiter.run(() => Promise.resolve(), controller.signal),
-    ).rejects.toMatchObject({ name: "AbortError" });
+    await expect(limiter.run(() => Promise.resolve(), controller.signal)).rejects.toMatchObject({
+      name: "AbortError",
+    });
   });
 
   it("removes a queued task's abort listener when it starts", async () => {
@@ -117,10 +115,7 @@ describe("ProcessLimiter", () => {
     );
     const controller = new AbortController();
     const remove = vi.spyOn(controller.signal, "removeEventListener");
-    const queued = limiter.run(
-      () => Promise.resolve("started"),
-      controller.signal,
-    );
+    const queued = limiter.run(() => Promise.resolve("started"), controller.signal);
     await vi.waitFor(() => expect(release).toBeTypeOf("function"));
     release?.();
     await expect(queued).resolves.toBe("started");
@@ -137,7 +132,5 @@ it("does not start a task cancelled just after an immediate permit grant", async
   controller.abort();
   await expect(pending).rejects.toMatchObject({ name: "AbortError" });
   expect(task).not.toHaveBeenCalled();
-  await expect(limiter.run(() => Promise.resolve("available"))).resolves.toBe(
-    "available",
-  );
+  await expect(limiter.run(() => Promise.resolve("available"))).resolves.toBe("available");
 });

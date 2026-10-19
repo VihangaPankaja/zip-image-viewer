@@ -11,9 +11,7 @@ const origin = process.env.CONTAINER_ORIGIN ?? "http://127.0.0.1:8080";
 const screenshot = path.resolve(
   process.env.CONTAINER_SCREENSHOT ?? "test-results/container-playback.png",
 );
-const { items: sessions } = await (
-  await globalThis.fetch(origin + "/api/sessions")
-).json();
+const { items: sessions } = await (await globalThis.fetch(origin + "/api/sessions")).json();
 assert.equal(sessions.length, 1, "Container fixture session is missing");
 const sessionId = sessions[0].id;
 const { firstFilePath } = await (
@@ -47,18 +45,13 @@ function assertCodecs(master, init, hasAudio) {
   const box = init.indexOf("avcC");
   assert.ok(box >= 0 && box + 8 <= init.length, "Missing AVC codec data");
   const actual =
-    "avc1." +
-    init.subarray(box + 5, box + 8).toString("hex") +
-    (hasAudio ? ",mp4a.40.2" : "");
+    "avc1." + init.subarray(box + 5, box + 8).toString("hex") + (hasAudio ? ",mp4a.40.2" : "");
   assert.equal(match[1], actual, "Master codec does not match init segment");
 }
 
 async function verifyMedia(file, hasAudio, negativeProbes = false) {
   const masterUrl = new URL(
-    "/api/sessions/" +
-      sessionId +
-      "/video/hls/master?path=" +
-      encodeURIComponent(file),
+    "/api/sessions/" + sessionId + "/video/hls/master?path=" + encodeURIComponent(file),
     origin,
   );
   const master = (await readMedia(masterUrl)).toString();
@@ -66,9 +59,9 @@ async function verifyMedia(file, hasAudio, negativeProbes = false) {
   assert.ok(variant, "Master playlist has no rendition");
   const playlist = (await readMedia(variant)).toString();
   const initUrl = playlist.match(/^#EXT-X-MAP:URI="([^"]+)"/m)?.[1];
-  const segmentUrls = [
-    ...playlist.matchAll(/^(.+\/video\/hls\/segment\?[^\n]+)$/gm),
-  ].map((match) => match[1]);
+  const segmentUrls = [...playlist.matchAll(/^(.+\/video\/hls\/segment\?[^\n]+)$/gm)].map(
+    (match) => match[1],
+  );
   assert.ok(initUrl, "Variant playlist has no init segment");
   assert.ok(segmentUrls.length >= 1, "Variant playlist has no segments");
   const init = await readMedia(initUrl);
@@ -81,25 +74,13 @@ async function verifyMedia(file, hasAudio, negativeProbes = false) {
     firstSegment ??= bytes;
   }
   if (negativeProbes) {
+    assert.throws(() => assertBoxes(Buffer.alloc(0), ["ftyp", "moov"]), /Missing MP4 box/);
     assert.throws(
-      () => assertBoxes(Buffer.alloc(0), ["ftyp", "moov"]),
-      /Missing MP4 box/,
-    );
-    assert.throws(
-      () =>
-        assertBoxes(firstSegment.subarray(0, firstSegment.length - 1), [
-          "moof",
-          "mdat",
-        ]),
+      () => assertBoxes(firstSegment.subarray(0, firstSegment.length - 1), ["moof", "mdat"]),
       /Truncated MP4 box/,
     );
     assert.throws(
-      () =>
-        assertCodecs(
-          master.replace(/CODECS="[^"]+"/, 'CODECS="avc1.000000"'),
-          init,
-          hasAudio,
-        ),
+      () => assertCodecs(master.replace(/CODECS="[^"]+"/, 'CODECS="avc1.000000"'), init, hasAudio),
       /codec does not match/,
     );
   }
@@ -109,22 +90,15 @@ async function prepare(file) {
   const base = "/api/sessions/" + sessionId + "/video/hls/";
   const query = "?path=" + encodeURIComponent(file);
   for (let attempt = 0; attempt < 90; attempt += 1) {
-    const playlist = (
-      await readMedia(base + "playlist" + query + "&quality=360p")
-    ).toString();
+    const playlist = (await readMedia(base + "playlist" + query + "&quality=360p")).toString();
     const master = (await readMedia(base + "master" + query)).toString();
-    if (master.includes('CODECS="') && playlist.includes("#EXT-X-ENDLIST"))
-      return;
+    if (master.includes('CODECS="') && playlist.includes("#EXT-X-ENDLIST")) return;
     await delay(500);
   }
   assert.fail("Container did not prepare HLS for " + file);
 }
 
-for (const file of [
-  "direct/long-gop.mp4",
-  "direct/vfr-silent.mp4",
-  "direct/unsupported-mpeg4.mp4",
-])
+for (const file of ["direct/long-gop.mp4", "direct/vfr-silent.mp4", "direct/unsupported-mpeg4.mp4"])
   await prepare(file);
 const browser = await chromium.launch();
 try {
@@ -139,9 +113,7 @@ try {
     if (message.type() === "error") browserErrors.push(message.text());
   });
   page.on("response", (response) => {
-    const match = response
-      .url()
-      .match(/\/video\/hls\/(master|playlist|init|segment)/);
+    const match = response.url().match(/\/video\/hls\/(master|playlist|init|segment)/);
     if (
       match &&
       response.status() === 200 &&
@@ -156,10 +128,7 @@ try {
     activeFile = file;
     mediaResponses.clear();
     const qualitiesResponse = page.waitForResponse(async (response) => {
-      if (
-        new URL(response.url()).pathname !== "/rpc/video/qualities" ||
-        response.status() !== 200
-      )
+      if (new URL(response.url()).pathname !== "/rpc/video/qualities" || response.status() !== 200)
         return false;
       return (await response.json()).json.path === file;
     });
@@ -171,11 +140,8 @@ try {
         name: path.dirname(file),
         exact: true,
       });
-      if ((await folder.getAttribute("aria-expanded")) === "false")
-        await folder.click();
-      await page
-        .getByRole("treeitem", { name: path.basename(file), exact: true })
-        .click();
+      if ((await folder.getAttribute("aria-expanded")) === "false") await folder.click();
+      await page.getByRole("treeitem", { name: path.basename(file), exact: true }).click();
     }
     const { defaultQuality } = (await (await qualitiesResponse).json()).json;
     const compatible = file !== "direct/unsupported-mpeg4.mp4";
@@ -187,9 +153,7 @@ try {
       .waitFor({ timeout: 30_000 });
     await page.waitForFunction(
       ({ file, compatible }) => {
-        const video = globalThis.document.querySelector(
-          'video[aria-label="Video preview"]',
-        );
+        const video = globalThis.document.querySelector('video[aria-label="Video preview"]');
         if (!video?.currentSrc || video.readyState < 2) return false;
         return compatible
           ? new URL(video.currentSrc).searchParams.get("path") === file
@@ -206,26 +170,15 @@ try {
     );
     await quality.click();
     await page.getByRole("option", { name: "360p", exact: true }).click();
-    for (
-      let attempt = 0;
-      attempt < 180 && !mediaResponses.has("segment");
-      attempt += 1
-    ) {
+    for (let attempt = 0; attempt < 180 && !mediaResponses.has("segment"); attempt += 1) {
       await page.waitForTimeout(500);
     }
-    assert.ok(
-      mediaResponses.has("segment"),
-      "Browser did not request HLS segment for " + file,
-    );
-    await page
-      .getByText("360p playback", { exact: true })
-      .waitFor({ timeout: 30_000 });
+    assert.ok(mediaResponses.has("segment"), "Browser did not request HLS segment for " + file);
+    await page.getByText("360p playback", { exact: true }).waitFor({ timeout: 30_000 });
     const video = page.getByLabel("Video preview");
     await page.waitForFunction(
       () => {
-        const video = globalThis.document.querySelector(
-          'video[aria-label="Video preview"]',
-        );
+        const video = globalThis.document.querySelector('video[aria-label="Video preview"]');
         return video?.currentSrc.startsWith("blob:") && video.readyState >= 2;
       },
       null,
@@ -237,9 +190,7 @@ try {
     });
     await page.waitForFunction(
       () => {
-        const video = globalThis.document.querySelector(
-          'video[aria-label="Video preview"]',
-        );
+        const video = globalThis.document.querySelector('video[aria-label="Video preview"]');
         return (
           video?.videoWidth > 0 &&
           video.currentTime > 0.5 &&
@@ -263,9 +214,7 @@ try {
     }, target);
     await page.waitForFunction(
       ({ time, frames }) => {
-        const video = globalThis.document.querySelector(
-          'video[aria-label="Video preview"]',
-        );
+        const video = globalThis.document.querySelector('video[aria-label="Video preview"]');
         return (
           video?.readyState >= 2 &&
           !video.seeking &&
@@ -310,10 +259,7 @@ try {
     downloadThroughput: -1,
     uploadThroughput: -1,
   });
-  for (const file of [
-    "direct/vfr-silent.mp4",
-    "direct/unsupported-mpeg4.mp4",
-  ]) {
+  for (const file of ["direct/vfr-silent.mp4", "direct/unsupported-mpeg4.mp4"]) {
     const video = await open(file);
     await seek(video, 2.1);
     assert.equal(await page.getByRole("alert").count(), 0);
@@ -329,9 +275,7 @@ try {
   assert.deepEqual(browserErrors, []);
   await mkdir(path.dirname(screenshot), { recursive: true });
   await page.screenshot({ path: screenshot });
-  process.stdout.write(
-    "Container browser playback passed. " + screenshot + "\n",
-  );
+  process.stdout.write("Container browser playback passed. " + screenshot + "\n");
 } finally {
   await browser.close();
 }

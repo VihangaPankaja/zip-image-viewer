@@ -70,13 +70,7 @@ describe("real FFmpeg HLS fixture", () => {
     },
     {
       name: "MPEG-4 source transcoded to browser codec",
-      input: [
-        "testsrc2=size=640x360:rate=24:duration=5",
-        "-c:v",
-        "mpeg4",
-        "-q:v",
-        "4",
-      ],
+      input: ["testsrc2=size=640x360:rate=24:duration=5", "-c:v", "mpeg4", "-q:v", "4"],
       audio: false,
       unsupportedSource: true,
     },
@@ -116,18 +110,13 @@ describe("real FFmpeg HLS fixture", () => {
         expect(outputs).toContain("index.m3u8");
         expect(outputs.some((file) => file.endsWith(".m4s"))).toBe(true);
         expect(outputs.some((file) => file.endsWith(".tmp"))).toBe(false);
-        const playlist = await readFile(
-          path.join(renditionDirectory, "index.m3u8"),
-          "utf8",
-        );
+        const playlist = await readFile(path.join(renditionDirectory, "index.m3u8"), "utf8");
         const segments = publishedSegments(playlist);
         expect(segments.length).toBeGreaterThan(1);
         expect(segments).toEqual(segments.map((_, index) => index));
         expect(playlist.match(/^#EXTINF:/gm)).toHaveLength(segments.length);
         expect(playlist).toContain("#EXT-X-ENDLIST");
-        const codecs = codecsFromInit(
-          await readFile(path.join(renditionDirectory, "init.mp4")),
-        );
+        const codecs = codecsFromInit(await readFile(path.join(renditionDirectory, "init.mp4")));
         expect(codecs).toMatch(/^avc1\.[0-9a-f]{6}/);
         expect(codecs?.includes("mp4a.40.2")).toBe(audio);
         const master = buildMasterPlaylist(
@@ -143,18 +132,15 @@ describe("real FFmpeg HLS fixture", () => {
           expect((await readFile(sourcePath)).includes("mp4v")).toBe(true);
           expect(codecs).not.toContain("mp4v");
         }
-        const durations = [...playlist.matchAll(/^#EXTINF:([\d.]+),/gm)].map(
-          (match) => Number(match[1]),
+        const durations = [...playlist.matchAll(/^#EXTINF:([\d.]+),/gm)].map((match) =>
+          Number(match[1]),
         );
         const sizes = await Promise.all(
           segments.map(
             async (index) =>
               (
                 await stat(
-                  path.join(
-                    renditionDirectory,
-                    `segment_${String(index).padStart(6, "0")}.m4s`,
-                  ),
+                  path.join(renditionDirectory, `segment_${String(index).padStart(6, "0")}.m4s`),
                 )
               ).size,
           ),

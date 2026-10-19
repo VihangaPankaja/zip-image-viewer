@@ -1,10 +1,7 @@
 import { EventEmitter } from "node:events";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { LogEntry } from "../infrastructure/runtime/runtimePrimitives.js";
-import {
-  createTerminalDashboard,
-  shouldUseTerminalDashboard,
-} from "./dashboard.js";
+import { createTerminalDashboard, shouldUseTerminalDashboard } from "./dashboard.js";
 
 class InputFixture extends EventEmitter {
   isTTY = true;
@@ -131,9 +128,7 @@ describe("terminal dashboard", () => {
   beforeEach(() => vi.useFakeTimers());
 
   it("requires both TTY streams and stays off in development", () => {
-    expect(
-      shouldUseTerminalDashboard({ inputTTY: true, outputTTY: true }),
-    ).toBe(true);
+    expect(shouldUseTerminalDashboard({ inputTTY: true, outputTTY: true })).toBe(true);
     expect(
       shouldUseTerminalDashboard({
         inputTTY: true,
@@ -148,9 +143,7 @@ describe("terminal dashboard", () => {
         lifecycleEvent: "dev:server",
       }),
     ).toBe(false);
-    expect(
-      shouldUseTerminalDashboard({ inputTTY: false, outputTTY: true }),
-    ).toBe(false);
+    expect(shouldUseTerminalDashboard({ inputTTY: false, outputTTY: true })).toBe(false);
   });
 
   it("renders wide and compact views with logs filtered to the selection", () => {

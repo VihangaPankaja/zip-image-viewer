@@ -13,30 +13,12 @@ try {
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(new URL("./app-roadmap.html", import.meta.url).href);
   assert.equal(await page.locator(".card").count(), 70);
-  for (const id of [
-    "A01",
-    "D01",
-    "L01",
-    "L05",
-    "F04",
-    "N01",
-    "N05",
-    "N06",
-    "P01",
-    "B04",
-    "B06",
-  ])
-    assert.equal(
-      await page.getByLabel(`${id} status`, { exact: true }).inputValue(),
-      "Proposed",
-    );
+  for (const id of ["A01", "D01", "L01", "L05", "F04", "N01", "N05", "N06", "P01", "B04", "B06"])
+    assert.equal(await page.getByLabel(`${id} status`, { exact: true }).inputValue(), "Proposed");
   await page.locator("#status").selectOption("Proposed");
-  assert.equal(await page.locator(".card:visible").count(), 41);
+  assert.equal(await page.locator(".card:visible").count(), 39);
   await page.getByRole("button", { name: "Clear filters" }).click();
-  assert.equal(
-    await page.getByLabel("V01 status", { exact: true }).inputValue(),
-    "Done",
-  );
+  assert.equal(await page.getByLabel("V01 status", { exact: true }).inputValue(), "Done");
   for (const id of [
     "T05",
     "S01",
@@ -56,40 +38,29 @@ try {
     "V05",
     "S03",
     "B01",
+    "B02",
+    "B03",
   ]) {
-    assert.equal(
-      await page.getByLabel(`${id} status`, { exact: true }).inputValue(),
-      "Done",
-    );
+    assert.equal(await page.getByLabel(`${id} status`, { exact: true }).inputValue(), "Done");
   }
-  assert.match(
-    await page.locator("#note-V01").inputValue(),
-    /baseline report/i,
-  );
-  assert.equal(await page.locator("#percent").textContent(), "41%");
-  await page
-    .getByLabel("V01 status", { exact: true })
-    .selectOption("In progress");
+  assert.match(await page.locator("#note-V01").inputValue(), /baseline report/i);
+  assert.equal(await page.locator("#percent").textContent(), "44%");
+  await page.getByLabel("V01 status", { exact: true }).selectOption("In progress");
   await page.locator("#V01 summary").click();
-  await page
-    .locator("#note-V01")
-    .fill("Verified locally <script>never execute</script>");
+  await page.locator("#note-V01").fill("Verified locally <script>never execute</script>");
   await page.reload();
-  assert.equal(
-    await page.getByLabel("V01 status", { exact: true }).inputValue(),
-    "In progress",
-  );
+  assert.equal(await page.getByLabel("V01 status", { exact: true }).inputValue(), "In progress");
   assert.equal(
     await page.locator("#note-V01").inputValue(),
     "Verified locally <script>never execute</script>",
   );
-  assert.equal(await page.locator("#percent").textContent(), "40%");
+  assert.equal(await page.locator("#percent").textContent(), "43%");
   await page.getByLabel("V01 status", { exact: true }).selectOption("Done");
   await page.getByLabel("Search ideas").fill("CRC");
   assert.equal(await page.locator(".card:visible").count(), 1);
   await page.getByRole("button", { name: "Clear filters" }).click();
   await page.locator("#status").selectOption("Done");
-  assert.equal(await page.locator(".card:visible").count(), 29);
+  assert.equal(await page.locator(".card:visible").count(), 31);
   await page.getByLabel("Search ideas").fill("nothing-will-match-this");
   assert.equal(await page.locator("#empty").isVisible(), true);
   await page.getByRole("button", { name: "Clear filters" }).click();
@@ -110,32 +81,23 @@ try {
     mimeType: "application/json",
     buffer: Buffer.from(exported),
   });
-  await page.waitForFunction(
-    () => document.querySelector("#state-V01").value === "Done",
-  );
+  await page.waitForFunction(() => document.querySelector("#state-V01").value === "Done");
   await page.locator("#import-file").setInputFiles({
     name: "bad.json",
     mimeType: "application/json",
-    buffer: Buffer.from(
-      '{"version":1,"items":{"V01":{"status":"Bad","note":""}}}',
-    ),
+    buffer: Buffer.from('{"version":1,"items":{"V01":{"status":"Bad","note":""}}}'),
   });
   await page.waitForFunction(() =>
     document.querySelector("#notice").textContent.startsWith("Import failed."),
   );
-  assert.equal(
-    await page.getByLabel("V01 status", { exact: true }).inputValue(),
-    "Done",
-  );
+  assert.equal(await page.getByLabel("V01 status", { exact: true }).inputValue(), "Done");
   await page.evaluate(() => window.dispatchEvent(new Event("beforeprint")));
   assert.equal(await page.locator(".card details[open]").count(), 70);
   await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
   for (const width of [1440, 768, 360]) {
     await page.setViewportSize({ width, height: 1000 });
     assert.equal(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
-      ),
+      await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
       true,
       `Overflow at ${width}px`,
     );
@@ -155,14 +117,9 @@ try {
   });
   const blockedPage = await blocked.newPage();
   await blockedPage.goto(new URL("./app-roadmap.html", import.meta.url).href);
-  await blockedPage
-    .getByLabel("V01 status", { exact: true })
-    .selectOption("Planned");
-  assert.match(
-    await blockedPage.locator("#notice").textContent(),
-    /storage is unavailable/,
-  );
-  assert.equal(await blockedPage.locator("#percent").textContent(), "40%");
+  await blockedPage.getByLabel("V01 status", { exact: true }).selectOption("Planned");
+  assert.match(await blockedPage.locator("#notice").textContent(), /storage is unavailable/);
+  assert.equal(await blockedPage.locator("#percent").textContent(), "43%");
   console.log(
     "Roadmap checks passed: persistence, filters, export/import, invalid data, print, responsive widths and blocked storage.",
   );

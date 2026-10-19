@@ -2,25 +2,16 @@ import { useEffect, useState } from "react";
 import { readStoredSetting, writeStoredSetting } from "./settingsStorage";
 import { SORT_OPTIONS, PREVIEW_QUALITY_OPTIONS } from "../../lib/appConstants";
 import type { WorkspaceView } from "./components/WorkspaceAppBar";
-import type {
-  JobPayload,
-  OversizePrompt,
-  SessionPayload,
-} from "./sessionSchemas";
+import type { JobPayload, OversizePrompt, SessionPayload } from "./sessionSchemas";
 
 function readSortMode() {
   const stored = readStoredSetting("zip-explorer-sort");
-  return (
-    SORT_OPTIONS.find(({ value }) => value === stored)?.value ?? "natural-tail"
-  );
+  return SORT_OPTIONS.find(({ value }) => value === stored)?.value ?? "natural-tail";
 }
 
 function readPreviewQuality() {
   const stored = readStoredSetting("zip-preview-quality");
-  return (
-    PREVIEW_QUALITY_OPTIONS.find(({ value }) => value === stored)?.value ??
-    "balanced"
-  );
+  return PREVIEW_QUALITY_OPTIONS.find(({ value }) => value === stored)?.value ?? "balanced";
 }
 
 export function useWorkspacePageState() {

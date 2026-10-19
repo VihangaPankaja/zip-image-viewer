@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import {
-  getBatchValidationMessage,
-  MAX_BATCH_URLS,
-  parseWorkspaceUrls,
-} from "./workspaceUrls";
+import { getBatchValidationMessage, MAX_BATCH_URLS, parseWorkspaceUrls } from "./workspaceUrls";
 
 describe("workspace URL batches", () => {
   it("splits new lines, trims input, and removes duplicate URLs", () => {
@@ -18,10 +14,7 @@ describe("workspace URL batches", () => {
     expect(getBatchValidationMessage([])).toMatch(/at least one/i);
     expect(
       getBatchValidationMessage(
-        Array.from(
-          { length: MAX_BATCH_URLS + 1 },
-          () => "https://example.com/a.zip",
-        ),
+        Array.from({ length: MAX_BATCH_URLS + 1 }, () => "https://example.com/a.zip"),
       ),
     ).toMatch(/up to 50/i);
     expect(getBatchValidationMessage(["https://example.com/a.zip"])).toBe("");

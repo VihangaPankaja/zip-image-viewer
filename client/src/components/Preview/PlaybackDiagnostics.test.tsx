@@ -38,9 +38,7 @@ it("shows playback measurements and copies a report without media paths", async 
   await waitFor(() => expect(screen.getByText("42 ms")).toBeInTheDocument());
   expect(screen.getByText("2.5 Mbps")).toBeInTheDocument();
 
-  fireEvent.click(
-    screen.getByRole("button", { name: "Copy diagnostic report" }),
-  );
+  fireEvent.click(screen.getByRole("button", { name: "Copy diagnostic report" }));
   await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
   expect(writeText.mock.calls[0][0]).not.toContain("example.test");
   expect(writeText.mock.calls[0][0]).toContain('"encoderWaitMs": 42');

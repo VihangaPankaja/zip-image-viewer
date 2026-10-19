@@ -55,10 +55,7 @@ export function verifiedTorrentStream(
         const absolute = file.offset + position;
         const piece = Math.floor(absolute / torrent.pieceLength);
         const offset = absolute % torrent.pieceLength;
-        const length = Math.min(
-          torrent.pieceLength - offset,
-          range.end - position + 1,
-        );
+        const length = Math.min(torrent.pieceLength - offset, range.end - position + 1);
         clearSelection();
         const endPiece = Math.min(
           piece + 2,

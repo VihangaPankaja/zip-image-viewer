@@ -6,13 +6,9 @@ export function registerSseRoutes(app: Express) {
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
 
-    res.write(
-      `event: ready\ndata: ${JSON.stringify({ ok: true, channel: "sse" })}\n\n`,
-    );
+    res.write(`event: ready\ndata: ${JSON.stringify({ ok: true, channel: "sse" })}\n\n`);
     const timer = setInterval(() => {
-      res.write(
-        `event: heartbeat\ndata: ${JSON.stringify({ timestamp: Date.now() })}\n\n`,
-      );
+      res.write(`event: heartbeat\ndata: ${JSON.stringify({ timestamp: Date.now() })}\n\n`);
     }, 15000);
 
     _req.on("close", () => {

@@ -1,11 +1,4 @@
-import {
-  mkdtemp,
-  mkdir,
-  readFile,
-  readdir,
-  rm,
-  writeFile,
-} from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
@@ -31,10 +24,7 @@ async function output(args: string[], contents = "complete") {
   if (!playlist || playlist === "-") return;
   await writeFile(playlist, contents);
   await writeFile(path.join(path.dirname(playlist), "init.mp4"), contents);
-  await writeFile(
-    path.join(path.dirname(playlist), "segment_000000.m4s"),
-    contents,
-  );
+  await writeFile(path.join(path.dirname(playlist), "segment_000000.m4s"), contents);
 }
 
 beforeEach(async () => {
@@ -77,12 +67,8 @@ it("probes the device, caches its choice and publishes the completed hardware ou
   });
   await encoder.encode(input());
   expect(checkedPublication).toBe(true);
-  expect(await readFile(path.join(directory, "index.m3u8"), "utf8")).toBe(
-    "complete",
-  );
-  expect(
-    (await readdir(directory)).some((name) => name.startsWith(".encode-")),
-  ).toBe(false);
+  expect(await readFile(path.join(directory, "index.m3u8"), "utf8")).toBe("complete");
+  expect((await readdir(directory)).some((name) => name.startsWith(".encode-"))).toBe(false);
   run.mockImplementation(async (_command, args) => output(args));
   await encoder.encode(input());
   expect(capture).toHaveBeenCalledTimes(1);
@@ -101,11 +87,9 @@ it("tries another available encoder when the first device is inaccessible", asyn
 it.each(["missing", "device", "listing"])(
   "falls back once to CPU for %s failure",
   async (failure) => {
-    if (failure === "missing")
-      capture.mockResolvedValue({ stdout: "libx264", stderr: "" });
+    if (failure === "missing") capture.mockResolvedValue({ stdout: "libx264", stderr: "" });
     if (failure === "device") run.mockRejectedValueOnce(new Error("No GPU"));
-    if (failure === "listing")
-      capture.mockRejectedValue(new Error("Cannot inspect encoders"));
+    if (failure === "listing") capture.mockRejectedValue(new Error("Cannot inspect encoders"));
     const encoder = new HlsEncoder("ffmpeg", "h264_nvenc", log);
     await encoder.encode(input());
     await encoder.encode(input());
@@ -155,18 +139,16 @@ it.each(["listing", "probe", "encode"])(
     await expect(
       new HlsEncoder("ffmpeg", "auto", log).encode(input(), controller.signal),
     ).rejects.toThrow("Session deleted");
-    expect(run.mock.calls.every(([, args]) => !args.includes("libx264"))).toBe(
-      true,
-    );
+    expect(run.mock.calls.every(([, args]) => !args.includes("libx264"))).toBe(true);
     expect(await readdir(directory)).toEqual([]);
   },
 );
 
 it("propagates CPU failures", async () => {
   run.mockRejectedValue(new Error("Invalid source"));
-  await expect(
-    new HlsEncoder("ffmpeg", "cpu", log).encode(input()),
-  ).rejects.toThrow("Invalid source");
+  await expect(new HlsEncoder("ffmpeg", "cpu", log).encode(input())).rejects.toThrow(
+    "Invalid source",
+  );
 });
 
 it("keeps CPU fallback when a concurrent cold device probe finishes later", async () => {
@@ -199,11 +181,7 @@ it("keeps CPU fallback when a concurrent cold device probe finishes later", asyn
   finishProbe();
   await second;
   expect(
-    run.mock.calls.filter(
-      ([, args]) => args.at(-1) !== "-" && args.includes("h264_qsv"),
-    ),
+    run.mock.calls.filter(([, args]) => args.at(-1) !== "-" && args.includes("h264_qsv")),
   ).toHaveLength(1);
-  expect(await readFile(path.join(secondDirectory, "index.m3u8"), "utf8")).toBe(
-    "complete",
-  );
+  expect(await readFile(path.join(secondDirectory, "index.m3u8"), "utf8")).toBe("complete");
 });

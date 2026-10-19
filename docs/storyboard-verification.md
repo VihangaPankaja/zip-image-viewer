@@ -1,6 +1,6 @@
 # Storyboard and selected-torrent verification
 
-Run `pnpm run benchmark:storyboard` to generate a real H.264 clip, serve it through the media routes, and drive the delivered React scrubber in Chromium. The report defaults to `test-results/storyboard-performance.json`.
+Run `vpr benchmark:storyboard` to generate a real H.264 clip, serve it through the media routes, and drive the delivered React scrubber in Chromium. The report defaults to `test-results/storyboard-performance.json`.
 
 Measured on 2026-09-27 at 04:38 UTC: Windows, Intel Core i7-8565U, unthrottled loopback, a 150-second 640×360 clip, 30 frames across two sheets. Two competing FFmpeg processes occupied the shared media budget during the warm measurements.
 

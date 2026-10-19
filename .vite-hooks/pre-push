@@ -1,0 +1,4 @@
+set -e
+vp run typecheck
+vp test --changed origin/master
+vp run fallow:audit

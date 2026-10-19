@@ -23,12 +23,12 @@ describe("job snapshot actions", () => {
     expect(getJobSnapshotAction({ id: "ready", status: "ready" })).toEqual({
       kind: "ready",
     });
-    expect(
-      getJobSnapshotAction({ id: "cancelled", status: "cancelled" }),
-    ).toEqual({ kind: "cancelled" });
-    expect(
-      getJobSnapshotAction({ id: "working", status: "extracting" }),
-    ).toEqual({ kind: "progress" });
+    expect(getJobSnapshotAction({ id: "cancelled", status: "cancelled" })).toEqual({
+      kind: "cancelled",
+    });
+    expect(getJobSnapshotAction({ id: "working", status: "extracting" })).toEqual({
+      kind: "progress",
+    });
   });
 
   it("uses a stable fallback for non-string job errors", () => {

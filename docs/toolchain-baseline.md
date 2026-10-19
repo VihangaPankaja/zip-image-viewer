@@ -1,163 +1,119 @@
-# Staged Vite+ baseline
+# Vite+ toolchain baseline
 
-Roadmap task B01, recorded on 2026-10-20. The rollback point is
-`e0b234c`, before this migration. B02 owns configuration consolidation and
-the remaining CLI scripts; B03 owns the lint rule parity review. This stage
-installs and exercises the target toolchain while preserving the existing
-ESLint, Prettier, Lefthook, TypeScript server build and separate Vitest projects.
+Roadmap tasks B01, B02 and B03, implemented together in v3.20.0.
+The reference and rollback point is `e0b234c`.
 
-## Release selection
+## Versions and ownership
 
-The npm registry's stable `vite-plus` release was **1.3.0**, not a preview.
-Its supported Node range is `^22.18.0 || ^24.11.0 || >=26.0.0`.
-The repository keeps Node **26.7.0** and pnpm **12.1.0**. The migrator moved
-the Node pin from `.nvmrc` to `.node-version`; CI and setup instructions
-use the new filename.
+Stable Vite+ **1.3.0** supplies the core alias (Vite 8.3.4), Vitest/coverage
+**5.0.5**, Rolldown 1.2.14, Oxlint 1.88.0, oxlint-tsgolint 7.0.2004 and
+Oxfmt 0.73.0. Exact catalog pins and overrides live in `pnpm-workspace.yaml`.
+No runtime dependency upgrades or canary releases were needed.
 
-The exact catalog entries in `pnpm-workspace.yaml` are:
+`.node-version` pins Node **26.7.0**; `package.json#packageManager` pins pnpm
+**12.1.0**. The global Vite+ CLI manages both. Without a global CLI, use these
+versions, `pnpm install --frozen-lockfile` and `pnpm exec vp run <script>`.
 
-| Package               | Before  | Staged target                                                  |
-| --------------------- | ------- | -------------------------------------------------------------- |
-| `vite-plus`           | Absent  | `1.3.0`                                                        |
-| `vite`                | `8.2.2` | `npm:@voidzero-dev/vite-plus-core@1.3.0`, bundles Vite `8.3.4` |
-| `vitest`              | `5.0.0` | `5.0.5`                                                        |
-| `@vitest/coverage-v8` | `5.0.0` | `5.0.5`                                                        |
+`vite.config.ts` owns client builds, both test projects, production coverage,
+Oxlint, Oxfmt and staged checks. The three TS projects retain client/server/test
+compilation boundaries. Playwright and Fallow configure their independent checks.
+Use `vp check`, `vp test` and `vpr build`. The latter builds client **and**
+server; `vp build` alone builds the client. Server `tsc` emission and the
+complete `build/server` and `build/shared` output remain. The direct `vite`
+alias serves the benchmark's programmatic API. Test imports/types use Vite+.
 
-`pnpm exec vp toolchain` also reports Rolldown `1.2.14`, tsdown `0.23.1`,
-Oxlint `1.88.0`, oxlint-tsgolint `7.0.2004` and Oxfmt `0.73.0`.
-The latter tools are bundled dependencies, not replacements for the current
-lint/format gates. No canary versions or runtime dependency upgrades were needed.
-The original lockfile was used when resolving the staged graph to avoid
-refreshing unrelated dependency ranges.
+Oxfmt uses native defaults, including package sorting. Native hooks replace
+Lefthook: prepare installs the dispatcher, pre-commit runs `vp staged`, and
+pre-push runs all TS checks, changed tests against `origin/master`, and Fallow's
+branch audit. Docker disables hook installation with `VP_GIT_HOOKS=0`.
 
-## Reproduce the migration
+CI uses official setup-vp with frozen installs, including clean Windows/Linux
+install/typecheck/build jobs. Docker builds with the pinned official Vite+ image,
+installs production dependencies separately, and copies the Node selected by
+`.node-version` into the non-root runtime. No dev toolchain is needed at runtime.
 
-From the workspace root, with the original dependencies still installed:
+## Migration review
 
-```sh
-pnpm install --frozen-lockfile
-pnpm dlx --package=vite-plus@1.3.0 vp help
-pnpm dlx --package=vite-plus@1.3.0 vp help migrate
-pnpm dlx --package=vite-plus@1.3.0 vp migrate --no-interactive --no-agent --no-editor --no-hooks
-```
+The target migrator ran from the root with original manifests/dependencies
+available, using `pnpm dlx --package=vite-plus@1.3.0 vp migrate
+--no-interactive --no-agent --no-editor --no-hooks`. After a staged baseline,
+the full config/lint/format/hooks migration was completed. Vite 8 and Vitest 5
+already met prerequisites; no v4 test or tsdown compatibility settings were
+needed. Native runner validation allowed removing runner-loader/webstorage flags.
 
-The target CLI runs through pnpm. Contributors do not need a global `vp`,
-Oxlint, Oxfmt or TypeScript installation. The migrator may bootstrap its own
-copy of the declared package manager; this is not a project prerequisite.
-After reviewing the generated changes, retain the staged decisions below and
-run `pnpm install`. Subsequent clean installs use `--frozen-lockfile`.
+Two rejection assertions register before triggering their rejection and await
+a saved promise afterward. Narrow explained `vitest/valid-expect` exceptions
+preserve these in useImagePreviewCache.test.tsx and torrentDownloader.test.ts.
+The old related-test hook forwarded an extra `--` and silently selected no
+changed files. The native hook uses `--changed origin/master`.
 
-Sources checked at implementation time:
-[migration](https://viteplus.dev/guide/migrate),
-[dependency and rewrite rules](https://viteplus.dev/guide/migrate-rules), and
-[Vitest 5 compatibility](https://viteplus.dev/guide/vitest-v5).
+References reviewed: [migration](https://viteplus.dev/guide/migrate),
+[migration rules](https://viteplus.dev/guide/migrate-rules),
+[Vitest 5](https://viteplus.dev/guide/vitest-v5),
+[lint](https://viteplus.dev/guide/lint), [Docker](https://viteplus.dev/guide/docker).
 
-## Migration findings and decisions
+## Lint parity
 
-- No blocking preflight findings. Vite 8 and Vitest 5 already satisfy the
-  Vite 7+/Vitest 4+ prerequisites. No generated v4 compatibility settings
-  or tsdown compatibility settings were added.
-- Two asynchronous-assertion review findings were checked manually.
-  `useImagePreviewCache.test.tsx` saves the assertion in `failure` and awaits it
-  after rejecting the pending fetch. `torrentDownloader.test.ts` saves the
-  assertion in `duplicate` inside `onMetadata` and awaits it after the download.
-  Both already preserve the intended rejection checks.
-- The generated ESLint replacement skipped `no-dupe-args`, `no-octal`,
-  `react-hooks/config` and `react-hooks/gating`. The complete existing ESLint
-  config, workspace package, inline exceptions and fatal-warning script were
-  restored. No rule was dropped. B03 must evaluate these mappings explicitly.
-- The migrator reported Prettier without a root config and requested manual
-  migration. Prettier remains the sole formatter, including in Lefthook and CI.
-  The empty generated `fmt` block and generated Oxlint block were not retained.
-- The existing Lefthook configuration remains in charge of commits and pushes.
-  The migration was run with `--no-hooks`, `--no-agent` and `--no-editor`.
-- The catalog and `vite@*`/`vitest@*` overrides keep the dependency graph on
-  one compatible core and runner. Generated peer rules allow Vite consumers
-  to accept the core package's alias version. Direct `vitest` remains necessary
-  for `vitest/globals` and jest-dom's upstream type augmentation.
-- Config/test imports use the supported `vite-plus`/`vite-plus/test` entries.
-  The existing test projects, test filters, runner loader and Node webstorage
-  workaround remain. There are no new skips or threshold changes.
-- Dev/client build commands use local `vp`. Playwright's two hard-coded
-  `node_modules/vite/bin/vite.js` launchers now invoke `vite-plus/bin/vp dev`;
-  the aliased core does not ship the old executable path. The benchmark's
-  programmatic `vite` import continues to resolve through the core alias.
-- The server still compiles with `tsc`; Docker still copies the complete
-  `build` tree. All coverage, Fallow, browser, gallery, benchmark and image
-  checks remain enabled. CI adds clean Windows and Linux install/type/build
-  jobs so no developer-specific global tool can hide a missing dependency.
+Original effective JS, TS, TSX and test configs were compared with native rules.
+Warnings remain fatal and unused disable directives are errors. Strict rules
+are explicit in vite.config.ts.
 
-## Baseline evidence
+| Original policy                            | Decision                | Owner and reason                                                                                                                                                                                                                                                |
+| ------------------------------------------ | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Recommended core correctness               | Kept                    | Same native core rules; TS overrides preserve compiler-owned exclusions.                                                                                                                                                                                        |
+| strictTypeChecked                          | Replaced                | Native typescript/* checks preserve await-thenable, floating/misused promises, unsafe argument/assignment/call/member/return, unnecessary conditions/assertions, restricted operands/templates, return-await and unbound methods, with original scoped options. |
+| Explicit any / unused variables            | Replaced                | typescript/no-explicit-any and native no-unused-vars retain the underscore argument convention.                                                                                                                                                                 |
+| Union exhaustiveness                       | Added                   | switch-exhaustiveness-check rejects missing cases even with a default.                                                                                                                                                                                          |
+| Hooks recommended                          | Replaced                | Native react/* checks preserve order, dependencies, purity, immutability, refs, memoization, static components and render-state checks. Warnings are fatal.                                                                                                     |
+| react-hooks/config and gating              | Removed as inapplicable | Validate React Compiler options/gating; this app enables neither. Reassess if compiler configuration is added. No ESLint bridge is needed.                                                                                                                      |
+| no-dupe-args / no-octal                    | Parser/compiler         | Strict ESM parsing rejects duplicate parameters and legacy octal literals. Original TS config already delegated duplicate arguments to the compiler.                                                                                                            |
+| File/function size 350/80                  | Kept                    | Native rules retain production scopes, blank/comment exclusions and narrow inline exceptions. Test callbacks remain excluded.                                                                                                                                   |
+| set-state-in-effect disabled               | Kept                    | Controllers synchronize external media/session state in effects, e.g. useVideoSource and useSessionHydration. Changing that needs a behavioral refactor; hook/dependency/render-state checks stay enabled.                                                      |
+| SessionRail incompatible-library exception | Kept                    | TanStack Virtual exposes intentionally non-memoizable functions; exception remains file-scoped.                                                                                                                                                                 |
+| No test-specific gate                      | Added                   | Native Vitest rejects focused tests, malformed/unawaited assertions, duplicate titles and invalid suite callbacks. Supertest/Node assert are recognized.                                                                                                        |
+| No JSX accessibility gate                  | Added                   | Native alt text, anchor content, ARIA name/type and role checks supplement existing Axe/browser tests.                                                                                                                                                          |
+| Prettier                                   | Replaced                | Oxfmt is the sole formatter; native defaults reflow existing code without altering assertions or coverage scope.                                                                                                                                                |
 
-The source baseline contains 113 Vitest files and 552 tests, plus four Node
-screenshot-publishing tests. Test edits in this stage change import specifiers
-only. The baseline coverage report measured 80.61% statements, 76.05% branches,
-76.77% functions and 82.10% lines against the existing production-file scope.
+New opinionated mock-generic, conditional-assertion and required-error-message
+rules are off: contextual mocks, parameterized tests and type/status assertions
+are valid. User-media previews load captions separately; focusable preview
+regions, keyboard-equivalent drag controls and the roving torrent checkbox list
+have narrow explained JSX exceptions. There is no global accessibility disable.
 
-Windows baseline lint and all three TypeScript checks passed. A clean WSL
-Ubuntu 24.04 install/build passed with isolated Node 26.7.0 and pnpm 12.1.0.
-The first overlapping Windows/WSL coverage runs hit five-second UI timeouts in
-`GlobalSettingsSheet` and `TorrentFileDialog`, followed by a focus failure in
-the latter. The Windows run was stopped after 179 seconds. All 17 tests in
-those two baseline files passed with `--maxWorkers=1` in 9.36 seconds, without
-editing tests or increasing timeouts. Avoid competing media/coverage jobs
-when reproducing timings on this host.
+The real-CLI regression in tests/integration/toolchainLint.test.ts requires
+eight diagnostics from a temporary invalid fixture: floating/misused promises,
+unsafe assignment, missing union case, hook order/dependencies, focused tests
+and an unawaited assertion. It catches broken scopes/type-aware rule loading.
 
-### Cold and warm builds
+## Measurements and verification
 
-Measured with `/usr/bin/time -f %e pnpm run build` on the same WSL Ubuntu
-24.04 host, Node 26.7.0 and pnpm 12.1.0, with competing test jobs stopped.
-Each tree had its own frozen installation. Cold here means removing that
-tree's `dist`, `build` and `.vite-cache` directories before its first build;
-warm is the immediately following build. OS caches, the pnpm store and Node's
-compile cache were retained. In particular, `vp` enables Node's compile cache,
-so these are project-cache measurements, not uncached Node startup timings.
+Baseline: 113 Vitest files / 552 tests plus four Node publishing tests.
+Whole-production coverage: 80.61% statements, 76.05% branches, 76.77% functions,
+82.10% lines. Windows baseline lint/all TS checks and clean Ubuntu 24.04
+install/build passed with isolated Node 26.7.0/pnpm 12.1.0.
 
-| Complete client + server build | Baseline `e0b234c` | Staged Vite+ |
-| ------------------------------ | -----------------: | -----------: |
-| Cold                           |             2.68 s |       2.27 s |
-| Warm                           |             2.66 s |       2.47 s |
+Paired quiet WSL builds used separate frozen installs. Cold removed dist, build
+and .vite-cache; OS, pnpm store and Node compile caches remained. Warm was the
+immediately following build.
 
-These are single wall-clock samples, not a speed guarantee or a CI threshold.
-The baseline Windows lint and typecheck runs took 82.77 s and 7.52 s.
-The first staged Windows lint, typecheck and build runs passed in 48.53 s,
-5.54 s and 5.97 s. Those Windows runs had other validation activity on the
-host and should not be used for a performance comparison.
+| Complete client/server build | Baseline e0b234c | Initial Vite+ stage |
+| ---------------------------- | ---------------: | ------------------: |
+| Cold                         |           2.68 s |              2.27 s |
+| Warm                         |           2.66 s |              2.47 s |
 
-### Staged validation
+These single samples are observations, not guarantees. Competing media/coverage
+jobs caused baseline five-second UI timeouts; all 17 affected tests passed in
+isolation without timeout/assertion changes. The staged baseline passed all 552
+tests on Windows/Linux plus four publishing tests. Windows coverage passed the
+unchanged floors at 80.59/76.08/76.90/82.08% (statements/branches/functions/lines).
 
-- Fresh Windows and Linux directories passed `pnpm install --frozen-lockfile`,
-  all three TypeScript checks and the complete production build.
-- Windows `pnpm run test:coverage --maxWorkers=2` passed all 113 files and
-  552 tests, plus the four Node publishing tests. The unchanged coverage gates
-  passed at 80.59% statements, 76.08% branches, 76.90% functions and 82.08% lines.
-  Small differences from the Linux baseline reflect platform-specific paths;
-  the production include/exclude patterns are unchanged.
-- Linux `pnpm run test --maxWorkers=2` passed the same 113 files and 552 tests,
-  plus the four publishing tests. No skips or timeout changes were added.
-- `pnpm run test:related client/src/lib/formatterUtils.ts` selected eight
-  affected files and passed all 60 tests. `pnpm exec vp test --config
-vitest.config.ts --configLoader runner client/src/lib/coreUtils.test.ts`
-  passed all eight tests through the local target CLI.
-- Formatting, zero-warning ESLint, dead-code/dependency analysis and duplication
-  checks passed. Fallow's measured health score is 88, meeting its existing floor.
-- The roadmap's persistence, filters, export/import, responsive layout, print
-  and blocked-storage checks passed after marking B01 complete.
-- A real dev-server browser check opened settings and the download composer
-  at desktop and 390px, verified Escape/focus restoration and no horizontal
-  overflow. The initial requests raced backend startup and returned 502;
-  after health readiness and reload, the API requests succeeded.
-- Windows Chromium passed 47 of 48 E2E flows. The live public-magnet case hit
-  the host's `bind EACCES 0.0.0.0:6771` restriction before the expected Cancel
-  state. Keep this environment limitation distinct from test/migration failures;
-  the unchanged Linux browser and production-container CI gates remain required.
+The final unified suite includes publishing and one new lint regression:
+115 files / 557 tests. Final verification evidence is recorded in the PR.
 
 ## Rollback
 
-Revert this PR's commits together, then run `pnpm install --frozen-lockfile`
-with the restored Node/package-manager pins. Restore the package manifest,
-lockfile, workspace catalog, config/test imports, Playwright launchers and
-Node filename/CI references as one change. Reverting only the manifest leaves
-unsupported imports and an incompatible frozen lockfile. The reference tree
-is `e0b234c`; do not reset a shared branch to it. No session data or persistent
-schema changes are part of this migration.
+Revert this PR's commits together and install the restored frozen lockfile with
+the restored Node/package-manager pins. Manifest, lockfile, catalog, config/test
+imports, hooks, Docker and CI must move together; reverting only the manifest
+leaves incompatible imports/resolution. Compare with e0b234c, without resetting
+a shared branch. No persistent schema or session-data changes are involved.

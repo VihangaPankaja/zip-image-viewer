@@ -1,8 +1,5 @@
 import type { Job, SessionSummary } from "../../../../shared/contracts";
-import type {
-  JobPayload,
-  SessionPayload,
-} from "../../hooks/useSessionLifecycle";
+import type { JobPayload, SessionPayload } from "../../hooks/useSessionLifecycle";
 import type { SessionRailItem } from "../../components/Workspace/SessionRail";
 
 type ProgressLabels = {
@@ -18,18 +15,10 @@ export function buildWorkspaceRailItems(
   labels: ProgressLabels,
 ): SessionRailItem[] {
   const items: SessionRailItem[] = jobs.map((job) => ({
-    detail:
-      job.percent == null
-        ? job.phase
-        : `${Math.floor(job.percent)}% · ${job.phase}`,
+    detail: job.percent == null ? job.phase : `${Math.floor(job.percent)}% · ${job.phase}`,
     id: job.id,
     label: job.url,
-    state:
-      job.status === "error"
-        ? "error"
-        : job.status === "ready"
-          ? "ready"
-          : "downloading",
+    state: job.status === "error" ? "error" : job.status === "ready" ? "ready" : "downloading",
   }));
 
   for (const session of sessions) {
@@ -50,10 +39,7 @@ export function buildWorkspaceRailItems(
     });
   }
 
-  if (
-    activeSession?.id &&
-    !items.some((item) => item.id === activeSession.id)
-  ) {
+  if (activeSession?.id && !items.some((item) => item.id === activeSession.id)) {
     items.push({
       detail: "Ready to browse",
       id: activeSession.id,

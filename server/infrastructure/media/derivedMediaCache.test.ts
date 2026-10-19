@@ -1,28 +1,14 @@
 import { afterEach, expect, it } from "vite-plus/test";
-import {
-  mkdtemp,
-  mkdir,
-  readFile,
-  rm,
-  utimes,
-  writeFile,
-  link,
-} from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, utimes, writeFile, link } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type {
-  Session,
-  VideoRendition,
-  VideoTranscodeEntry,
-} from "../../domain/models.js";
+import type { Session, VideoRendition, VideoTranscodeEntry } from "../../domain/models.js";
 import { createDerivedMediaCache } from "./derivedMediaCache.js";
 
 const workspaces: string[] = [];
 afterEach(async () => {
   await Promise.all(
-    workspaces
-      .splice(0)
-      .map((directory) => rm(directory, { recursive: true, force: true })),
+    workspaces.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
   );
 });
 
@@ -35,11 +21,7 @@ async function session(id: string): Promise<Session> {
   return { id, workspaceDir, extractDir } as Session;
 }
 
-async function cachedFile(
-  filePath: string,
-  content: string,
-  ageMs: number,
-): Promise<void> {
+async function cachedFile(filePath: string, content: string, ageMs: number): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, content);
   const modifiedAt = new Date(Date.now() - ageMs);
@@ -51,40 +33,22 @@ it("evicts completed preparation output while preventing a manual clear of pendi
   const item = await session("preparing");
   const file = path.join(item.workspaceDir, "video-quality", "completed.mp4");
   await cachedFile(file, "completed output", 0);
-  const cache = createDerivedMediaCache(
-    new Map([[item.id, item]]),
-    new Map(),
-    0,
-  );
+  const cache = createDerivedMediaCache(new Map([[item.id, item]]), new Map(), 0);
   const release = cache.protectSession(item.id, true);
   await cache.enforce();
   await expect(readFile(file)).rejects.toMatchObject({ code: "ENOENT" });
   await expect(cache.clear(item)).rejects.toMatchObject({ status: 409 });
   release();
   await expect(cache.clear(item)).resolves.toBeUndefined();
-  expect(
-    await readFile(path.join(item.extractDir, "original.mp4"), "utf8"),
-  ).toBe("original");
+  expect(await readFile(path.join(item.extractDir, "original.mp4"), "utf8")).toBe("original");
 });
 
 it("reports separate storage totals and clears derived files without deleting originals", async () => {
   const item = await session("storage");
-  await cachedFile(
-    path.join(item.workspaceDir, "previews", "image.jpg"),
-    "preview",
-    0,
-  );
-  await cachedFile(
-    path.join(item.workspaceDir, "video-quality", "clip.mp4"),
-    "remux",
-    0,
-  );
+  await cachedFile(path.join(item.workspaceDir, "previews", "image.jpg"), "preview", 0);
+  await cachedFile(path.join(item.workspaceDir, "video-quality", "clip.mp4"), "remux", 0);
   const transcodes = new Map<string, VideoTranscodeEntry>();
-  const cache = createDerivedMediaCache(
-    new Map([[item.id, item]]),
-    transcodes,
-    1_000,
-  );
+  const cache = createDerivedMediaCache(new Map([[item.id, item]]), transcodes, 1_000);
   expect(await cache.storage(item)).toEqual({
     originalsBytes: 8,
     previewsBytes: 7,
@@ -96,9 +60,7 @@ it("reports separate storage totals and clears derived files without deleting or
     previewsBytes: 0,
     transcodesBytes: 0,
   });
-  expect(
-    await readFile(path.join(item.extractDir, "original.mp4"), "utf8"),
-  ).toBe("original");
+  expect(await readFile(path.join(item.extractDir, "original.mp4"), "utf8")).toBe("original");
 });
 
 it("counts retained torrent hardlinks once in storage totals", async () => {
@@ -107,11 +69,7 @@ it("counts retained torrent hardlinks once in storage totals", async () => {
     path.join(item.extractDir, "original.mp4"),
     path.join(item.workspaceDir, "original-link.mp4"),
   );
-  const cache = createDerivedMediaCache(
-    new Map([[item.id, item]]),
-    new Map(),
-    1_000,
-  );
+  const cache = createDerivedMediaCache(new Map([[item.id, item]]), new Map(), 1_000);
   expect((await cache.storage(item)).originalsBytes).toBe(8);
 });
 
@@ -147,16 +105,8 @@ it("evicts the oldest completed rendition across sessions without removing origi
     status: "done",
     availableSegments: 1,
   } as VideoRendition;
-  await cachedFile(
-    path.join(renditionDir, "segment_000000.m4s"),
-    "123456",
-    20_000,
-  );
-  const thumbnail = path.join(
-    second.workspaceDir,
-    "video-thumbnails",
-    "new.jpg",
-  );
+  await cachedFile(path.join(renditionDir, "segment_000000.m4s"), "123456", 20_000);
+  const thumbnail = path.join(second.workspaceDir, "video-thumbnails", "new.jpg");
   await cachedFile(thumbnail, "abcdef", 1_000);
   const sessions = new Map([
     [first.id, first],
@@ -172,18 +122,14 @@ it("evicts the oldest completed rendition across sessions without removing origi
     ],
   ]);
   await createDerivedMediaCache(sessions, transcodes, 6).enforce();
-  await expect(
-    readFile(path.join(renditionDir, "segment_000000.m4s")),
-  ).rejects.toMatchObject({ code: "ENOENT" });
+  await expect(readFile(path.join(renditionDir, "segment_000000.m4s"))).rejects.toMatchObject({
+    code: "ENOENT",
+  });
   expect(rendition.status).toBe("idle");
   expect(rendition.availableSegments).toBe(0);
   expect(await readFile(thumbnail, "utf8")).toBe("abcdef");
-  expect(
-    await readFile(path.join(first.extractDir, "original.mp4"), "utf8"),
-  ).toBe("original");
-  expect(
-    await readFile(path.join(second.extractDir, "original.mp4"), "utf8"),
-  ).toBe("original");
+  expect(await readFile(path.join(first.extractDir, "original.mp4"), "utf8")).toBe("original");
+  expect(await readFile(path.join(second.extractDir, "original.mp4"), "utf8")).toBe("original");
 });
 
 it("keeps in-flight reads and recently requested HLS segments while evicting unused files", async () => {
@@ -191,11 +137,7 @@ it("keeps in-flight reads and recently requested HLS segments while evicting unu
   const playing = await session("playing");
   const idle = await session("idle");
   const activeFile = path.join(active.workspaceDir, "previews", "active.jpg");
-  const playingDir = path.join(
-    playing.workspaceDir,
-    "video-transcodes",
-    "playing",
-  );
+  const playingDir = path.join(playing.workspaceDir, "video-transcodes", "playing");
   const playingFile = path.join(playingDir, "segment_000000.m4s");
   const idleFile = path.join(idle.workspaceDir, "thumbnails", "idle.jpg");
   await cachedFile(activeFile, "aaaa", 30_000);
@@ -233,19 +175,11 @@ it("keeps in-flight reads and recently requested HLS segments while evicting unu
 
 it("honors a rendition registered after a sweep starts", async () => {
   const current = await session("late-rendition");
-  const renditionDir = path.join(
-    current.workspaceDir,
-    "video-transcodes",
-    "late",
-  );
+  const renditionDir = path.join(current.workspaceDir, "video-transcodes", "late");
   const segment = path.join(renditionDir, "segment_000000.m4s");
   await cachedFile(segment, "123456", 20_000);
   const transcodes = new Map<string, VideoTranscodeEntry>();
-  const cache = createDerivedMediaCache(
-    new Map([[current.id, current]]),
-    transcodes,
-    0,
-  );
+  const cache = createDerivedMediaCache(new Map([[current.id, current]]), transcodes, 0);
   const sweep = cache.enforce();
   const rendition = {
     dir: renditionDir,

@@ -3,9 +3,7 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 
 describe("useKeyboardShortcuts", () => {
-  function renderShortcuts(
-    overrides: Partial<Parameters<typeof useKeyboardShortcuts>[0]> = {},
-  ) {
+  function renderShortcuts(overrides: Partial<Parameters<typeof useKeyboardShortcuts>[0]> = {}) {
     const video = document.createElement("video");
     const setSelectedPath = vi.fn();
     renderHook(() =>
@@ -54,9 +52,7 @@ describe("useKeyboardShortcuts", () => {
       }),
     );
 
-    video.dispatchEvent(
-      new KeyboardEvent("keydown", { bubbles: true, key: "ArrowRight" }),
-    );
+    video.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "ArrowRight" }));
 
     expect(video.currentTime).toBe(12);
     video.remove();
@@ -75,9 +71,7 @@ describe("useKeyboardShortcuts", () => {
     document.body.append(button);
     button.focus();
     button.addEventListener("keydown", () => button.blur());
-    button.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
-    );
+    button.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     expect(setSlideshowOpen).not.toHaveBeenCalled();
     button.remove();
   });
@@ -124,8 +118,6 @@ describe("useKeyboardShortcuts", () => {
   it("ignores the fullscreen shortcut when the API is unavailable", () => {
     renderShortcuts();
 
-    expect(() =>
-      window.dispatchEvent(new KeyboardEvent("keydown", { key: "f" })),
-    ).not.toThrow();
+    expect(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "f" }))).not.toThrow();
   });
 });

@@ -16,19 +16,13 @@ test("keyboard adds a torrent, reviews files, starts selection, seeks and closes
   const state = await installReviewFixtures(page);
   await page.setViewportSize({ width: 360, height: 844 });
   await page.goto(appOrigin);
-  await keyboardActivate(
-    page,
-    page.getByRole("button", { name: "Add downloads", exact: true }),
-  );
+  await keyboardActivate(page, page.getByRole("button", { name: "Add downloads", exact: true }));
   await page.getByRole("textbox", { name: "Paste download URLs" }).focus();
   await page.keyboard.insertText(
     "magnet:?xt=urn:btih:1234567890abcdef1234567890abcdef12345678&dn=Open%20film%20collection",
   );
   await page.keyboard.press("Tab");
-  await keyboardActivate(
-    page,
-    page.getByRole("button", { name: "Add to queue", exact: true }),
-  );
+  await keyboardActivate(page, page.getByRole("button", { name: "Add to queue", exact: true }));
   const review = page.getByRole("button", {
     name: "Review files",
     exact: true,
@@ -47,14 +41,9 @@ test("keyboard adds a torrent, reviews files, starts selection, seeks and closes
   await expect(dialog).toHaveCount(0);
   await expect(review).toBeFocused();
   await page.keyboard.press("Enter");
-  await keyboardActivate(
-    page,
-    dialog.getByRole("button", { name: "Select none" }),
-  );
+  await keyboardActivate(page, dialog.getByRole("button", { name: "Select none" }));
   await expect(start).toBeDisabled();
-  await expect(dialog.getByRole("status")).toContainText(
-    "0 of 4 files selected",
-  );
+  await expect(dialog.getByRole("status")).toContainText("0 of 4 files selected");
   await dialog.getByRole("searchbox", { name: "Search files" }).focus();
   await page.keyboard.type("03-film");
   const file = dialog.getByRole("checkbox", {
@@ -64,53 +53,28 @@ test("keyboard adds a torrent, reviews files, starts selection, seeks and closes
   await file.focus();
   await page.keyboard.press("Space");
   await expect(file).toBeChecked();
-  await expect(dialog.getByRole("status")).toContainText(
-    "1 of 4 files selected",
-  );
-  expect(
-    (await new AxeBuilder({ page }).include("dialog").analyze()).violations,
-  ).toEqual([]);
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
+  await expect(dialog.getByRole("status")).toContainText("1 of 4 files selected");
+  expect((await new AxeBuilder({ page }).include("dialog").analyze()).violations).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await keyboardActivate(page, start);
   await expect(dialog).toHaveCount(0);
   expect(state.selectedFileIds).toEqual(["0"]);
-  await expect(
-    page.getByRole("button", { name: "View files", exact: true }),
-  ).toBeFocused();
-  await expect(
-    page.locator(".download-row-title").getByRole("status"),
-  ).toHaveText("downloading");
+  await expect(page.getByRole("button", { name: "View files", exact: true })).toBeFocused();
+  await expect(page.locator(".download-row-title").getByRole("status")).toHaveText("downloading");
 
-  await keyboardActivate(
-    page,
-    page.getByRole("tab", { name: "Explore", exact: true }),
-  );
-  await keyboardActivate(
-    page,
-    page.getByRole("button", { name: "Show sessions" }),
-  );
+  await keyboardActivate(page, page.getByRole("tab", { name: "Explore", exact: true }));
+  await keyboardActivate(page, page.getByRole("button", { name: "Show sessions" }));
   await keyboardActivate(
     page,
     page.getByRole("button", { name: "Open Coastal collection", exact: true }),
   );
-  await page
-    .getByRole("treeitem", { name: "Coastal collection", exact: true })
-    .focus();
+  await page.getByRole("treeitem", { name: "Coastal collection", exact: true }).focus();
   for (const name of filenames.slice(0, 3)) {
     await page.keyboard.press("ArrowDown");
-    await expect(
-      page.getByRole("treeitem", { name, exact: true }),
-    ).toBeFocused();
+    await expect(page.getByRole("treeitem", { name, exact: true })).toBeFocused();
   }
   await page.keyboard.press("Enter");
-  await expect(page.locator("video source")).toHaveAttribute(
-    "src",
-    /\/api\/sessions\//,
-  );
+  await expect(page.locator("video source")).toHaveAttribute("src", /\/api\/sessions\//);
   await page.locator("video").evaluate(async (video: HTMLVideoElement) => {
     video.muted = true;
     await video.play();
@@ -132,10 +96,7 @@ test("keyboard adds a torrent, reviews files, starts selection, seeks and closes
   await seek.focus();
   await page.keyboard.press("End");
   await expect(page.locator("video")).toHaveJSProperty("currentTime", 8);
-  await keyboardActivate(
-    page,
-    page.getByRole("button", { name: "Open explorer", exact: true }),
-  );
+  await keyboardActivate(page, page.getByRole("button", { name: "Open explorer", exact: true }));
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);

@@ -11,9 +11,7 @@ const runtimeEnvironmentSchema = z.object({
   HLS_ENCODER: z.enum(["cpu", "auto", "h264_qsv", "h264_nvenc"]).default("cpu"),
 });
 
-export function parseRuntimeEnvironment(
-  environment: Readonly<Record<string, string | undefined>>,
-) {
+export function parseRuntimeEnvironment(environment: Readonly<Record<string, string | undefined>>) {
   const parsed = runtimeEnvironmentSchema.parse(environment);
   return {
     port: parsed.PORT,
@@ -22,15 +20,11 @@ export function parseRuntimeEnvironment(
   };
 }
 
-export type HlsEncoderPreference = ReturnType<
-  typeof parseRuntimeEnvironment
->["hlsEncoder"];
+export type HlsEncoderPreference = ReturnType<typeof parseRuntimeEnvironment>["hlsEncoder"];
 export const HLS_ENCODER = parseRuntimeEnvironment(process.env).hlsEncoder;
 
 export const PORT = parseRuntimeEnvironment(process.env).port;
-export const MEDIA_CACHE_BUDGET_BYTES = parseRuntimeEnvironment(
-  process.env,
-).mediaCacheBudgetBytes;
+export const MEDIA_CACHE_BUDGET_BYTES = parseRuntimeEnvironment(process.env).mediaCacheBudgetBytes;
 export const SESSION_TTL_MS = 30 * 60 * 1000;
 export const JOB_TTL_MS = 30 * 60 * 1000;
 export const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;

@@ -8,10 +8,7 @@ import { useTextPreview } from "../../hooks/useTextPreview";
 import { useVideoPlaybackController } from "../../hooks/useVideoPlaybackController";
 import { downloadOptionsToLegacySettings } from "../../lib/downloadOptions";
 import { useWorkspacePageEffects } from "./useWorkspacePageEffects";
-import {
-  useWorkspacePageState,
-  type WorkspacePageState,
-} from "./useWorkspacePageState";
+import { useWorkspacePageState, type WorkspacePageState } from "./useWorkspacePageState";
 import { useWorkspaceQueue } from "./useWorkspaceQueue";
 import { buildWorkspaceProgress } from "./workspaceProgress";
 import { buildWorkspaceRailItems } from "./workspaceRail";
@@ -92,9 +89,7 @@ function useWorkspaceActions(state: WorkspacePageState, queue: WorkspaceQueue) {
         return;
       }
       state.setSession(parsed.data);
-      state.setSelectedPath(
-        parsed.data.firstFilePath || parsed.data.tree?.path || "",
-      );
+      state.setSelectedPath(parsed.data.firstFilePath || parsed.data.tree?.path || "");
       state.setError("");
       state.setActiveView("explore");
     },
@@ -110,13 +105,11 @@ function useWorkspaceKeyboard(
 ): void {
   useKeyboardShortcuts({
     currentFolderImages: media.selection.currentFolderPreviewables,
-    currentImageIndex:
-      state.activeView === "explore" ? media.selection.currentPreviewIndex : -1,
+    currentImageIndex: state.activeView === "explore" ? media.selection.currentPreviewIndex : -1,
     keyboardSettings: settings.keyboardSettings,
     nextImagePath: media.selection.nextPreviewPath,
     previousImagePath: media.selection.previousPreviewPath,
-    selectedKind:
-      state.activeView === "explore" ? media.selection.selectedKind : "",
+    selectedKind: state.activeView === "explore" ? media.selection.selectedKind : "",
     setSelectedPath: state.setSelectedPath,
     setSlideshowOpen: state.setSlideshowOpen,
     setVideoPlaybackRate: media.video.setVideoPlaybackRate,
@@ -135,12 +128,7 @@ export function useWorkspacePageController() {
     [settings.downloadOptions],
   );
   const media = useWorkspaceMedia(state);
-  const lifecycle = useWorkspaceLifecycle(
-    state,
-    settings,
-    media,
-    downloadSettings,
-  );
+  const lifecycle = useWorkspaceLifecycle(state, settings, media, downloadSettings);
   const queue = useWorkspaceQueue();
   const actions = useWorkspaceActions(state, queue);
   useWorkspacePageEffects(state, media.selection, media.image.loadImagePreview);
@@ -148,13 +136,7 @@ export function useWorkspacePageController() {
   const progress = buildWorkspaceProgress(state.activeJob);
   const railItems = useMemo(
     () =>
-      buildWorkspaceRailItems(
-        queue.jobs,
-        queue.sessions,
-        state.activeJob,
-        state.session,
-        progress,
-      ),
+      buildWorkspaceRailItems(queue.jobs, queue.sessions, state.activeJob, state.session, progress),
     [progress, queue.jobs, queue.sessions, state.activeJob, state.session],
   );
   return {
@@ -169,6 +151,4 @@ export function useWorkspacePageController() {
   };
 }
 
-export type WorkspacePageController = ReturnType<
-  typeof useWorkspacePageController
->;
+export type WorkspacePageController = ReturnType<typeof useWorkspacePageController>;

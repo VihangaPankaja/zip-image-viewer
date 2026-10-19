@@ -1,10 +1,7 @@
 import { createHash } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { expect, it } from "vite-plus/test";
-import {
-  startTorrentPlaybackFixture,
-  waitForPlayback,
-} from "../fixtures/torrentPlayback.js";
+import { startTorrentPlaybackFixture, waitForPlayback } from "../fixtures/torrentPlayback.js";
 
 it("streams only verified selected pieces with precise ranges and resumes missing seeks after peer loss", async () => {
   const fixture = await startTorrentPlaybackFixture();
@@ -42,12 +39,7 @@ it("streams only verified selected pieces with precise ranges and resumes missin
     expect((await get("bytes=0-0", "999")).status).toBe(404);
     expect((await get("bytes=0-0", "../0")).status).toBe(404);
     const total = files[0].bytes.length;
-    for (const range of [
-      "bytes=8-2",
-      `bytes=${total}-`,
-      "bytes=0-1,4-5",
-      "bytes=oops",
-    ])
+    for (const range of ["bytes=8-2", `bytes=${total}-`, "bytes=0-1,4-5", "bytes=oops"])
       expect((await get(range)).status).toBe(416);
     for (const [start, end] of [
       [0, 0],
@@ -55,12 +47,8 @@ it("streams only verified selected pieces with precise ranges and resumes missin
     ]) {
       const response = await get(`bytes=${start}-${end}`);
       expect(response.status).toBe(206);
-      expect(response.headers.get("content-range")).toBe(
-        `bytes ${start}-${end}/${total}`,
-      );
-      expect(response.headers.get("content-length")).toBe(
-        String(end - start + 1),
-      );
+      expect(response.headers.get("content-range")).toBe(`bytes ${start}-${end}/${total}`);
+      expect(response.headers.get("content-length")).toBe(String(end - start + 1));
       const received = Buffer.from(await response.arrayBuffer());
       expect(createHash("sha256").update(received).digest("hex")).toBe(
         createHash("sha256")
@@ -100,17 +88,11 @@ it("streams only verified selected pieces with precise ranges and resumes missin
     expect(receivedBytes).toBe(0);
     await fixture.reconnect();
     const resumed = await pending;
-    expect(
-      resumed.equals(files[0].bytes.subarray(seekStart, seekEnd + 1)),
-    ).toBe(true);
+    expect(resumed.equals(files[0].bytes.subarray(seekStart, seekEnd + 1))).toBe(true);
     expect(resumed.some((byte) => byte !== 0)).toBe(true);
     const suffix = await get("bytes=-17");
     expect(suffix.status).toBe(206);
-    expect(
-      Buffer.from(await suffix.arrayBuffer()).equals(
-        files[0].bytes.subarray(-17),
-      ),
-    ).toBe(true);
+    expect(Buffer.from(await suffix.arrayBuffer()).equals(files[0].bytes.subarray(-17))).toBe(true);
 
     // Aborted, paused, and canceled readers must release their live torrent leases.
     await fixture.disconnect();
@@ -203,22 +185,13 @@ it("keeps an open full-file response alive through last-piece completion", async
       (phase) => phase === "downloading",
     );
     expect(
-      (
-        await fetch(
-          `${fixture.origin}/api/session-jobs/${id}/video/stream?fileId=1`,
-        )
-      ).status,
+      (await fetch(`${fixture.origin}/api/session-jobs/${id}/video/stream?fileId=1`)).status,
     ).toBe(409);
-    const response = await fetch(
-      `${fixture.origin}/api/session-jobs/${id}/video/stream?fileId=0`,
-      {
-        signal: AbortSignal.timeout(30_000),
-      },
-    );
+    const response = await fetch(`${fixture.origin}/api/session-jobs/${id}/video/stream?fileId=0`, {
+      signal: AbortSignal.timeout(30_000),
+    });
     expect(response.status).toBe(200);
-    expect(response.headers.get("content-length")).toBe(
-      String(fixture.files[0].bytes.length),
-    );
+    expect(response.headers.get("content-length")).toBe(String(fixture.files[0].bytes.length));
     fixture.setUploadLimit(-1);
     const received = Buffer.from(await response.arrayBuffer());
     expect(createHash("sha256").update(received).digest("hex")).toBe(
@@ -228,19 +201,14 @@ it("keeps an open full-file response alive through last-piece completion", async
       async () => (await fixture.client.jobs.list()).items[0].status,
       (status) => status === "ready",
     );
-    const seek = await fetch(
-      `${fixture.origin}/api/session-jobs/${id}/video/stream?fileId=0`,
-      {
-        headers: { Range: "bytes=-31" },
-        signal: AbortSignal.timeout(5_000),
-      },
-    );
+    const seek = await fetch(`${fixture.origin}/api/session-jobs/${id}/video/stream?fileId=0`, {
+      headers: { Range: "bytes=-31" },
+      signal: AbortSignal.timeout(5_000),
+    });
     expect(seek.status).toBe(206);
-    expect(
-      Buffer.from(await seek.arrayBuffer()).equals(
-        fixture.files[0].bytes.subarray(-31),
-      ),
-    ).toBe(true);
+    expect(Buffer.from(await seek.arrayBuffer()).equals(fixture.files[0].bytes.subarray(-31))).toBe(
+      true,
+    );
   } finally {
     await fixture.close();
   }

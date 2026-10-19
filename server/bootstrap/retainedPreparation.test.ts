@@ -43,8 +43,7 @@ vi.mock("../infrastructure/process/commandRunner.js", () => ({
     const segments = [start, start + 1].map(
       (index) => `segment_${String(index).padStart(6, "0")}.m4s`,
     );
-    for (const segment of segments)
-      await writeFile(path.join(directory, segment), "x".repeat(300));
+    for (const segment of segments) await writeFile(path.join(directory, segment), "x".repeat(300));
     await writeFile(
       playlist,
       `#EXTM3U\n${segments.map((segment) => `#EXTINF:4.000000,\n${segment}`).join("\n")}\n#EXT-X-ENDLIST\n`,
@@ -72,12 +71,8 @@ it.each([
   async (count, duration, interactive) => {
     encoding.duration = duration;
     const directory = await mkdtemp(path.join(tmpdir(), "retained-budget-"));
-    const files = Array.from(
-      { length: count },
-      (_value, index) => `clip-${index}.mkv`,
-    );
-    for (const file of files)
-      await writeFile(path.join(directory, file), "original");
+    const files = Array.from({ length: count }, (_value, index) => `clip-${index}.mkv`);
+    for (const file of files) await writeFile(path.join(directory, file), "original");
     const session = {
       id: "retained-budget",
       retained: true,
@@ -95,12 +90,7 @@ it.each([
     } as Session;
     const entries = new Map<string, VideoTranscodeEntry>();
     const log = vi.fn();
-    const media = createRuntimeMedia(
-      "ffmpeg",
-      new Map([[session.id, session]]),
-      entries,
-      log,
-    );
+    const media = createRuntimeMedia("ffmpeg", new Map([[session.id, session]]), entries, log);
     const sizes: number[] = [];
     encoding.before = async () => {
       sizes.push((await media.storage(session)).transcodesBytes);
@@ -113,18 +103,13 @@ it.each([
       if (interactive)
         await Promise.all(
           files.map((file) =>
-            media.videoRuntime.ensureVideoTranscodeEntry(
-              session,
-              file,
-              path.join(directory, file),
-            ),
+            media.videoRuntime.ensureVideoTranscodeEntry(session, file, path.join(directory, file)),
           ),
         );
       else media.prepareRetainedSession(session);
-      await vi.waitFor(
-        () => expect(encoding.completed).toBe((duration / 8) * count),
-        { timeout: 10_000 },
-      );
+      await vi.waitFor(() => expect(encoding.completed).toBe((duration / 8) * count), {
+        timeout: 10_000,
+      });
       await Promise.all(
         files.map((file) =>
           media.videoRuntime.ensureVideoTranscodeEntry(
@@ -136,14 +121,10 @@ it.each([
         ),
       );
       expect(Math.max(...sizes)).toBeLessThanOrEqual(512);
-      expect(
-        (await media.storage(session)).transcodesBytes,
-      ).toBeLessThanOrEqual(512);
+      expect((await media.storage(session)).transcodesBytes).toBeLessThanOrEqual(512);
       expect(log.mock.calls.filter(([level]) => level === "warn")).toEqual([]);
       for (const file of files)
-        expect(await readFile(path.join(directory, file), "utf8")).toBe(
-          "original",
-        );
+        expect(await readFile(path.join(directory, file), "utf8")).toBe("original");
     } finally {
       await media.videoRuntime.cleanupVideoSession(session);
       await rm(directory, { recursive: true, force: true });

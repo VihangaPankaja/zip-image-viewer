@@ -31,14 +31,7 @@ export function useVideoQualities(params: VideoQualitiesParams) {
   const [loadedFile, setLoadedFile] = useState("");
   const [audioTracks, setAudioTracks] = useState<VideoMediaTrack[]>([]);
   const [subtitleTracks, setSubtitleTracks] = useState<VideoMediaTrack[]>([]);
-  const {
-    isFile,
-    path,
-    selectedKind,
-    sessionId,
-    setOptions,
-    setSelectedQuality,
-  } = params;
+  const { isFile, path, selectedKind, sessionId, setOptions, setSelectedQuality } = params;
   useEffect(() => {
     setLoadedFile("");
     setAudioTracks([]);
@@ -71,8 +64,6 @@ export function useVideoQualities(params: VideoQualitiesParams) {
       cancelled = true;
     };
   }, [isFile, path, selectedKind, sessionId, setOptions, setSelectedQuality]);
-  const ready =
-    selectedKind === "video" &&
-    loadedFile === JSON.stringify([sessionId, path]);
+  const ready = selectedKind === "video" && loadedFile === JSON.stringify([sessionId, path]);
   return { ready, audioTracks, subtitleTracks };
 }

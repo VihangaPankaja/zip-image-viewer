@@ -85,9 +85,7 @@ export async function runCommandCapture(
     const text = chunkText(chunk);
     capturedBytes += Buffer.byteLength(text);
     if (capturedBytes > MAX_COMMAND_OUTPUT_BYTES) {
-      controller.abort(
-        resourceLimitError("Command metadata exceeds the 10 MiB limit."),
-      );
+      controller.abort(resourceLimitError("Command metadata exceeds the 10 MiB limit."));
       return "";
     }
     return text;
@@ -139,9 +137,7 @@ async function writeArchiveEntry({
     const text = chunkText(chunk);
     stderrBytes += Buffer.byteLength(text);
     if (stderrBytes > MAX_COMMAND_OUTPUT_BYTES)
-      controller.abort(
-        resourceLimitError("Command metadata exceeds the 10 MiB limit."),
-      );
+      controller.abort(resourceLimitError("Command metadata exceeds the 10 MiB limit."));
     else stderr += text;
   });
   const closed = waitForClose(child).catch((error: unknown) => {
@@ -162,19 +158,12 @@ async function writeArchiveEntry({
     }
   }, 100);
   try {
-    await pipeline(
-      child.stdout,
-      budget,
-      createWriteStream(destination, { flags: "wx" }),
-    );
+    await pipeline(child.stdout, budget, createWriteStream(destination, { flags: "wx" }));
     const code = await closed;
     controller.signal.throwIfAborted();
-    if (code !== 0)
-      throw new Error(stderr || `Command failed with code ${String(code)}`);
+    if (code !== 0) throw new Error(stderr || `Command failed with code ${String(code)}`);
     if (!gzip && state.downloadedBytes - before !== entry.size)
-      throw resourceLimitError(
-        "Archive entry does not match its declared size.",
-      );
+      throw resourceLimitError("Archive entry does not match its declared size.");
   } catch (error) {
     controller.abort(error);
     await closed;
@@ -190,11 +179,7 @@ export async function extractWith7zip(
   archivePath: string,
   extractDirectory: string,
 ): Promise<void> {
-  const { stdout } = await runCommandCapture(executable, [
-    "l",
-    "-slt",
-    archivePath,
-  ]);
+  const { stdout } = await runCommandCapture(executable, ["l", "-slt", archivePath]);
   const listing = stdout.split(/^----------\r?$/m).at(-1) ?? "";
   const entries = listing
     .trim()
@@ -210,11 +195,11 @@ export async function extractWith7zip(
       return {
         path: values.Path ?? "",
         size: Number(values.Size ?? 0),
-        directory: values.Folder === "+" || /^D/.test(values.Attributes ?? ""),
+        directory: values.Folder === "+" || (values.Attributes ?? "").startsWith("D"),
         modifiedAt: Date.parse(values.Modified ?? ""),
         isLink:
           Boolean(values["Symbolic Link"] || values["Hard Link"]) ||
-          /^l/.test(values.Attributes ?? ""),
+          (values.Attributes ?? "").startsWith("l"),
       };
     });
   const bytes = validateArchiveEntries(entries);
@@ -225,10 +210,7 @@ export async function extractWith7zip(
     // Gzip listings can report only one member's modulo-32-bit output size.
     if (gzip) storage.reserveAvailable();
     for (const entry of entries) {
-      const destination = path.join(
-        extractDirectory,
-        sanitizeEntryPath(entry.path),
-      );
+      const destination = path.join(extractDirectory, sanitizeEntryPath(entry.path));
       if (entry.directory) await mkdir(destination, { recursive: true });
       else {
         await mkdir(path.dirname(destination), { recursive: true });
@@ -245,15 +227,8 @@ export async function extractWith7zip(
     }
     for (const entry of [...entries].reverse()) {
       if (!Number.isFinite(entry.modifiedAt)) continue;
-      const destination = path.join(
-        extractDirectory,
-        sanitizeEntryPath(entry.path),
-      );
-      await utimes(
-        destination,
-        new Date(entry.modifiedAt),
-        new Date(entry.modifiedAt),
-      );
+      const destination = path.join(extractDirectory, sanitizeEntryPath(entry.path));
+      await utimes(destination, new Date(entry.modifiedAt), new Date(entry.modifiedAt));
     }
   } finally {
     storage.release();
@@ -265,12 +240,8 @@ export async function detectArchiveEncryption(
   archivePath: string,
 ): Promise<boolean> {
   if (!executable) return false;
-  const { stdout } = await runCommandCapture(
-    executable,
-    ["l", "-slt", archivePath],
-    { allowNonZeroExit: true },
-  );
-  return (
-    /Encrypted\s*=\s*\+/i.test(stdout) || /Method\s*=\s*\w+\s+AES/i.test(stdout)
-  );
+  const { stdout } = await runCommandCapture(executable, ["l", "-slt", archivePath], {
+    allowNonZeroExit: true,
+  });
+  return /Encrypted\s*=\s*\+/i.test(stdout) || /Method\s*=\s*\w+\s+AES/i.test(stdout);
 }

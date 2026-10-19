@@ -1,9 +1,5 @@
 import { expect, test } from "@playwright/test";
-import {
-  filenames,
-  installReviewFixtures,
-  prepareMedia,
-} from "../review/fixtures";
+import { filenames, installReviewFixtures, prepareMedia } from "../review/fixtures";
 
 test.use({ hasTouch: true });
 
@@ -27,9 +23,7 @@ test("real video previews pointer, keyboard and touch seeks before committing", 
   });
   await page.goto("/");
   await page.getByRole("tab", { name: "Explore" }).click();
-  await page
-    .getByRole("button", { name: "Open Coastal collection", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
   await page.getByRole("treeitem", { name: filenames[2], exact: true }).click();
   const video = page.getByLabel("Video preview");
   const seek = page.getByRole("slider", { name: "Seek video" });
@@ -40,23 +34,16 @@ test("real video previews pointer, keyboard and touch seeks before committing", 
     await element.play();
   });
   await expect
-    .poll(() =>
-      video.evaluate((element: HTMLVideoElement) => element.currentTime),
-    )
+    .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
     .toBeGreaterThan(3);
   await video.evaluate((element: HTMLVideoElement) => element.pause());
   expect(thumbnailTimes).toEqual([]);
   await expect(thumbnail).toHaveCount(0);
-  const before = await video.evaluate(
-    (element: HTMLVideoElement) => element.currentTime,
-  );
+  const before = await video.evaluate((element: HTMLVideoElement) => element.currentTime);
   await seek.scrollIntoViewIfNeeded();
   const box = await seek.boundingBox();
   if (!box) throw new Error("Seek control is missing");
-  await page.mouse.move(
-    box.x + (box.width * before) / 8,
-    box.y + box.height / 2,
-  );
+  await page.mouse.move(box.x + (box.width * before) / 8, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width * 0.92, box.y + box.height / 2, {
     steps: 8,
@@ -84,14 +71,10 @@ test("real video previews pointer, keyboard and touch seeks before committing", 
   expect(thumbnailTimes.every((time) => time >= 0 && time < 8)).toBe(true);
   await page.keyboard.up("End");
   await expect(video).toHaveJSProperty("currentTime", 8);
-  await expect
-    .poll(() => video.evaluate((element: HTMLVideoElement) => element.ended))
-    .toBe(true);
+  await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.ended)).toBe(true);
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page
-    .getByRole("radio", { name: "Preview", exact: true })
-    .check({ force: true });
+  await page.getByRole("radio", { name: "Preview", exact: true }).check({ force: true });
   await seek.scrollIntoViewIfNeeded();
   const touchBox = await seek.boundingBox();
   if (!touchBox) throw new Error("Mobile seek control is missing");
@@ -121,15 +104,11 @@ test("real video previews pointer, keyboard and touch seeks before committing", 
     await element.play();
   });
   await expect
-    .poll(() =>
-      video.evaluate((element: HTMLVideoElement) => element.currentTime),
-    )
+    .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
     .toBeGreaterThan(touchTime + 0.3);
   await video.evaluate((element: HTMLVideoElement) => element.pause());
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth + 1,
-    ),
-  ).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
+    true,
+  );
   await client.detach();
 });

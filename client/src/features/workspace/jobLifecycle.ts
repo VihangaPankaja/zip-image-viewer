@@ -22,10 +22,7 @@ export function getJobSnapshotAction(payload: JobPayload): JobSnapshotAction {
   if (payload.status === "error") {
     return {
       kind: "error",
-      message:
-        typeof payload.error === "string"
-          ? payload.error
-          : "Could not process this file.",
+      message: typeof payload.error === "string" ? payload.error : "Could not process this file.",
     };
   }
   if (payload.status === "cancelled") return { kind: "cancelled" };

@@ -91,13 +91,7 @@ it("validates available files and text stream IDs before converting through the 
     stdout: "x".repeat(2 * 1024 ** 2 + 1),
     stderr: "",
   });
-  await request(app)
-    .get(url)
-    .query({ path: "clip.mkv", track: "subtitle-3" })
-    .expect(422);
+  await request(app).get(url).query({ path: "clip.mkv", track: "subtitle-3" }).expect(422);
   session.availablePaths = new Set();
-  await request(app)
-    .get(url)
-    .query({ path: "clip.mkv", track: "subtitle-3" })
-    .expect(404);
+  await request(app).get(url).query({ path: "clip.mkv", track: "subtitle-3" }).expect(404);
 });

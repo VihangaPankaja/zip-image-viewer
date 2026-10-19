@@ -1,16 +1,6 @@
-import {
-  useCallback,
-  useMemo,
-  type Dispatch,
-  type RefObject,
-  type SetStateAction,
-} from "react";
+import { useCallback, useMemo, type Dispatch, type RefObject, type SetStateAction } from "react";
 import { wait } from "../../lib/archiveUiUtils";
-import {
-  sessionPayloadSchema,
-  type OversizePrompt,
-  type SessionPayload,
-} from "./sessionSchemas";
+import { sessionPayloadSchema, type OversizePrompt, type SessionPayload } from "./sessionSchemas";
 
 type HydrationParams = {
   clearImagePreviewCache: () => void;
@@ -72,30 +62,17 @@ export function useSessionHydration(params: HydrationParams) {
     ],
   );
   return useCallback(
-    (sessionId: string, nextUrl: string) =>
-      hydrateSession(stableParams, sessionId, nextUrl),
+    (sessionId: string, nextUrl: string) => hydrateSession(stableParams, sessionId, nextUrl),
     [stableParams],
   );
 }
 
-async function hydrateSession(
-  params: HydrationParams,
-  sessionId: string,
-  nextUrl: string,
-) {
+async function hydrateSession(params: HydrationParams, sessionId: string, nextUrl: string) {
   const { hydrationRef, latestSessionIdRef } = params;
   if (!sessionId) return null;
-  if (
-    hydrationRef.current.sessionId === sessionId &&
-    hydrationRef.current.promise
-  )
+  if (hydrationRef.current.sessionId === sessionId && hydrationRef.current.promise)
     return hydrationRef.current.promise;
-  const request = requestSession(
-    params,
-    sessionId,
-    nextUrl,
-    latestSessionIdRef.current,
-  );
+  const request = requestSession(params, sessionId, nextUrl, latestSessionIdRef.current);
   hydrationRef.current = { sessionId, promise: request };
   try {
     return await request;
@@ -138,9 +115,7 @@ function applySession(
   params.latestSessionIdRef.current = payload.id || "";
   params.setSession(payload);
   params.setZipUrl(nextUrl);
-  params.setSelectedPath(
-    payload.firstFilePath || payload.tree?.path || payload.id || "",
-  );
+  params.setSelectedPath(payload.firstFilePath || payload.tree?.path || payload.id || "");
   params.resetTextPreview();
   params.resetSelectedImageSrc();
   params.setOversizePrompt(null);
@@ -150,10 +125,7 @@ function applySession(
 }
 
 function getSessionError(raw: unknown) {
-  return raw &&
-    typeof raw === "object" &&
-    "error" in raw &&
-    typeof raw.error === "string"
+  return raw && typeof raw === "object" && "error" in raw && typeof raw.error === "string"
     ? raw.error
     : "Could not open file URL.";
 }

@@ -28,19 +28,16 @@ test("real multilingual audio switches in sync and embedded captions recover on 
     const audio = page.getByRole("combobox", { name: "Audio language" });
     await expect(audio).toBeVisible();
     await expect
-      .poll(
-        () => video.evaluate((element: HTMLVideoElement) => element.readyState),
-        { timeout: 30_000 },
-      )
+      .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState), {
+        timeout: 30_000,
+      })
       .toBeGreaterThanOrEqual(2);
     await video.evaluate(async (element: HTMLVideoElement) => {
       element.muted = true;
       await element.play();
     });
     await expect
-      .poll(() =>
-        video.evaluate((element: HTMLVideoElement) => element.currentTime),
-      )
+      .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
       .toBeGreaterThan(1);
     // A progressive EVENT playlist initially exposes only its first segment.
     // Wait until the requested seek is available instead of seeking past its end.
@@ -49,8 +46,7 @@ test("real multilingual audio switches in sync and embedded captions recover on 
         () =>
           video.evaluate(
             (element: HTMLVideoElement) =>
-              element.seekable.length > 0 &&
-              element.seekable.end(element.seekable.length - 1) > 5,
+              element.seekable.length > 0 && element.seekable.end(element.seekable.length - 1) > 5,
           ),
         { timeout: 30_000 },
       )
@@ -71,23 +67,20 @@ test("real multilingual audio switches in sync and embedded captions recover on 
         { timeout: 30_000 },
       )
       .toBe(true);
-    const originalSource = await video.evaluate(
-      (element: HTMLVideoElement) => element.currentSrc,
-    );
+    const originalSource = await video.evaluate((element: HTMLVideoElement) => element.currentSrc);
     await audio.selectOption({ label: "Spanish" });
     await expect(audio).toHaveValue("1");
     await expect
-      .poll(() =>
-        fixture.requests.some((url) => url.includes("quality=audio-2")),
-      )
+      .poll(() => fixture.requests.some((url) => url.includes("quality=audio-2")))
       .toBe(true);
     await expect(video).toHaveJSProperty("paused", true);
-    expect(
-      await video.evaluate((element: HTMLVideoElement) => element.currentTime),
-    ).toBeCloseTo(5, 0);
-    expect(
-      await video.evaluate((element: HTMLVideoElement) => element.currentSrc),
-    ).toBe(originalSource);
+    expect(await video.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeCloseTo(
+      5,
+      0,
+    );
+    expect(await video.evaluate((element: HTMLVideoElement) => element.currentSrc)).toBe(
+      originalSource,
+    );
     const subtitles = page.getByRole("combobox", {
       name: "Embedded subtitles",
     });
@@ -97,9 +90,7 @@ test("real multilingual audio switches in sync and embedded captions recover on 
         Array.from(element.textTracks)
           .filter((track) => track.mode === "showing")
           .flatMap((track) =>
-            Array.from(track.activeCues ?? []).map(
-              (cue) => (cue as VTTCue).text,
-            ),
+            Array.from(track.activeCues ?? []).map((cue) => (cue as VTTCue).text),
           ),
       );
     await expect.poll(activeText).toEqual(["Subtítulos de la costa"]);
@@ -114,14 +105,10 @@ test("real multilingual audio switches in sync and embedded captions recover on 
     await page.keyboard.press("Enter");
     await expect(audio).toHaveValue("0");
     await expect
-      .poll(() =>
-        fixture.requests.some((url) => url.includes("quality=audio-1")),
-      )
+      .poll(() => fixture.requests.some((url) => url.includes("quality=audio-1")))
       .toBe(true);
     await expect
-      .poll(() =>
-        video.evaluate((element: HTMLVideoElement) => element.currentTime),
-      )
+      .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
       .toBeGreaterThan(5.25);
     await expect(video).toHaveJSProperty("paused", false);
     await expect.poll(activeText).toEqual(["Subtítulos de la costa"]);
@@ -141,11 +128,9 @@ test("real multilingual audio switches in sync and embedded captions recover on 
     await subtitles.selectOption({ label: "Spanish captions" });
     await expect(page.getByRole("alert")).toHaveCount(0);
     await expect.poll(activeText).toEqual(["Subtítulos de la costa"]);
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
-      ),
-    ).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
     await page.screenshot({
       path: testInfo.outputPath("mobile-recovered-language.png"),
     });
@@ -159,9 +144,7 @@ mediaTest(
   "embedded subtitle choices render native captions and recover across browsers at 360px",
   async ({ page, appOrigin }) => {
     await installReviewFixtures(page);
-    await page.route("**/api/sessions/*/video/play?*", (route) =>
-      route.continue(),
-    );
+    await page.route("**/api/sessions/*/video/play?*", (route) => route.continue());
     await page.route("**/rpc/video/qualities", (route) =>
       route.fulfill({
         json: {
@@ -200,9 +183,7 @@ mediaTest(
           status: 422,
           json: { error: "Subtitle conversion failed." },
         });
-      const spanish =
-        new URL(route.request().url()).searchParams.get("track") ===
-        "subtitle-4";
+      const spanish = new URL(route.request().url()).searchParams.get("track") === "subtitle-4";
       return route.fulfill({
         contentType: "text/vtt",
         body: `WEBVTT\n\n00:00:00.000 --> 00:00:07.500\n${spanish ? "Subtítulos de la costa" : "English coastal captions"}\n`,
@@ -212,17 +193,11 @@ mediaTest(
     await page.goto(appOrigin);
     await page.getByRole("tab", { name: "Explore" }).click();
     await page.getByRole("button", { name: "Show sessions" }).click();
-    await page
-      .getByRole("button", { name: "Open Coastal collection", exact: true })
-      .click();
-    await page
-      .getByRole("treeitem", { name: filenames[2], exact: true })
-      .click();
+    await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
+    await page.getByRole("treeitem", { name: filenames[2], exact: true }).click();
     const video = page.getByLabel("Video preview");
     await expect
-      .poll(() =>
-        video.evaluate((element: HTMLVideoElement) => element.readyState),
-      )
+      .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState))
       .toBeGreaterThanOrEqual(2);
     await video.evaluate(async (element: HTMLVideoElement) => {
       element.muted = true;
@@ -236,9 +211,7 @@ mediaTest(
         Array.from(element.textTracks)
           .filter((track) => track.mode === "showing")
           .flatMap((track) =>
-            Array.from(track.activeCues ?? []).map(
-              (cue) => (cue as VTTCue).text,
-            ),
+            Array.from(track.activeCues ?? []).map((cue) => (cue as VTTCue).text),
           ),
       );
     await picker.selectOption({ label: "Spanish captions" });
@@ -261,10 +234,8 @@ mediaTest(
     await picker.selectOption({ label: "English captions" });
     await expect(page.getByRole("alert")).toHaveCount(0);
     await expect.poll(activeText).toEqual(["English coastal captions"]);
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
-      ),
-    ).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
   },
 );

@@ -13,6 +13,7 @@
 *.css text eol=lf
 *.html text eol=lf
 *.sh text eol=lf
+.vite-hooks/* text eol=lf
 
 *.bat text eol=crlf
 *.cmd text eol=crlf

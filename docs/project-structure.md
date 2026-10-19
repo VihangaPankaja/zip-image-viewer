@@ -58,6 +58,7 @@ Both client and server compile against this module. Network JSON remains
 
 - `.node-version` / `packageManager` - Node 26 and pnpm pinning.
 - `.fallowrc.json` - dead code, dependency, duplicate, and boundary analysis.
-- `lefthook.yml` - local commit/push checks.
+- `.vite-hooks/` - native staged commit and typed/test/Fallow push checks.
+- `vite.config.ts` - build, test, coverage, lint, format and staged configuration.
 - `.github/workflows/quality.yml` - CI quality and cross-browser E2E.
-- `Dockerfile` - Node 26 multi-stage, non-root runtime with Tini and healthcheck.
+- `Dockerfile` - Vite+ build and pinned Node runtime, multi-stage, non-root runtime with Tini and healthcheck.

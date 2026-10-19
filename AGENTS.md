@@ -16,16 +16,16 @@
 ## Common Commands
 
 ```bash
-pnpm install --frozen-lockfile
-pnpm run dev
-pnpm run lint
-pnpm run typecheck
-pnpm run format
-pnpm run format:check
-pnpm run build
-pnpm run test
-pnpm run test:e2e
-pnpm start
+vp install --frozen-lockfile
+vpr dev
+vpr lint
+vpr typecheck
+vpr format
+vpr format:check
+vpr build
+vpr test
+vpr test:e2e
+vpr start
 ```
 
 ## Repo Conventions
@@ -40,21 +40,21 @@ pnpm start
 - Visually inspect every screenshot. Fix clipping, missing content, errors, and unusable controls, then recapture. Screenshots must match the reviewed code and be published and embedded in the PR description with verified working URLs under the four device sections.
 - Never create `pr-assets/*` or other screenshot-only branches. Publish durable review media as GitHub release assets through `screenshots:publish`, then embed the gallery in the PR description. Historical screenshot commits may be retained by archival tags so existing PR image URLs remain valid.
 - For multi-step feature work, create a commit after each major implementation step
-- Before each major commit, run `pnpm run format`, `pnpm run lint`, `pnpm run typecheck`, and `pnpm run build`
+- Before each major commit, run `vpr format`, `vpr lint`, `vpr typecheck`, and `vpr build`
 - Keep formatter, lint, and typecheck configurations current with repo scripts
 - Keep test tooling current: Vitest for unit/component and Playwright for e2e smoke/regression
 
 ## Tooling Rule
 
-- Always run `pnpm run format`, `pnpm run lint`, `pnpm run typecheck`, and `pnpm run build` before each major commit and before opening a PR
-- Always run `pnpm run test` and `pnpm run test:e2e` before opening a PR (or document why skipped)
-- Formatting is mandatory for every commit: run `pnpm run format` immediately before `git commit` (no exceptions)
+- Always run `vpr format`, `vpr lint`, `vpr typecheck`, and `vpr build` before each major commit and before opening a PR
+- Always run `vpr test` and `vpr test:e2e` before opening a PR (or document why skipped)
+- Formatting is mandatory for every commit: run `vpr format` immediately before `git commit` (no exceptions)
 - If any step fails, fix the issue before committing
 - Run the delivered app locally and verify the changed user flows in a real browser, including relevant pointer, touch, keyboard, and responsive behavior. Automated component tests alone do not satisfy browser verification.
 - Run formatting, lint, typecheck, build, unit/component/integration/UI tests, coverage, and the existing browser checks, including all configured E2E browsers and the screenshot gallery. Preserve existing check requirements.
 - Monitor every check on the latest PR commit until all finish successfully. Inspect failures, fix their causes, verify locally, push, and repeat. Never weaken checks to obtain green CI.
 - Report external blockers honestly. Do not claim completion while checks, screenshots, or local execution and browser verification remain unfinished.
-- Never run long-lived scripts (for example `pnpm run dev`, `pnpm run dev:client`, `pnpm run dev:server`, or any watch mode) as a blocking foreground command in agent sessions. Use non-blocking/background patterns or explicit short timeouts for health checks so the session never hangs waiting forever.
+- Never run long-lived scripts (for example `vpr dev`, `vpr dev:client`, `vpr dev:server`, or any watch mode) as a blocking foreground command in agent sessions. Use non-blocking/background patterns or explicit short timeouts for health checks so the session never hangs waiting forever.
 
 ## CI/PR Workflow Snapshot
 
@@ -62,9 +62,9 @@ pnpm start
   - `version-check.yml` (PRs to `master`)
   - `docker-build.yml` (pushes to `master`)
 - Scripts now available for local/CI enforcement:
-  - `pnpm run lint`
-  - `pnpm run typecheck`
-  - `pnpm run format:check`
-  - `pnpm run test`
-  - `pnpm run test:e2e`
-  - `pnpm run build`
+  - `vpr lint`
+  - `vpr typecheck`
+  - `vpr format:check`
+  - `vpr test`
+  - `vpr test:e2e`
+  - `vpr build`
