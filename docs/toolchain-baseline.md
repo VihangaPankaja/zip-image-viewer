@@ -96,23 +96,47 @@ Whole-production coverage: 80.61% statements, 76.05% branches, 76.77% functions,
 82.10% lines. Windows baseline lint/all TS checks and clean Ubuntu 24.04
 install/build passed with isolated Node 26.7.0/pnpm 12.1.0.
 
-Paired quiet WSL builds used separate frozen installs. Cold removed dist, build
-and .vite-cache; OS, pnpm store and Node compile caches remained. Warm was the
-immediately following build.
+Paired quiet WSL Ubuntu 24.04 builds used Node 26.7.0, pnpm 12.1.0 and
+separate frozen installs. Each tree had an untimed warmup first. Cold removed
+dist, build and .vite-cache; OS, pnpm store and Node compile caches remained.
+Warm was the immediately following build. The baseline manifests/configs were
+checked against e0b234c before measurement.
 
-| Complete client/server build | Baseline e0b234c | Initial Vite+ stage |
-| ---------------------------- | ---------------: | ------------------: |
-| Cold                         |           2.68 s |              2.27 s |
-| Warm                         |           2.66 s |              2.47 s |
+| Complete client/server build | Baseline e0b234c | Final Vite+ setup |
+| ---------------------------- | ---------------: | ----------------: |
+| Cold                         |           2.08 s |            2.49 s |
+| Warm                         |           2.16 s |            2.63 s |
 
-These single samples are observations, not guarantees. Competing media/coverage
-jobs caused baseline five-second UI timeouts; all 17 affected tests passed in
-isolation without timeout/assertion changes. The staged baseline passed all 552
-tests on Windows/Linux plus four publishing tests. Windows coverage passed the
-unchanged floors at 80.59/76.08/76.90/82.08% (statements/branches/functions/lines).
+These single samples are observations, not guarantees. The complete task-runner
+build adds roughly half a second in this pair; this migration does not claim a
+build-speed improvement. Use quiet runs: parallel Windows media tests sometimes
+hit the retained-preparation test's existing five-second timeout and cascade
+into its next cases. The isolated six cases, their seven-test concurrent run
+with the lint probe, and the final full two-worker run all passed unchanged.
 
-The final unified suite includes publishing and one new lint regression:
-115 files / 557 tests. Final verification evidence is recorded in the PR.
+Final local verification:
+
+- Fresh Windows and Linux frozen installs, all three TS projects, native lint,
+  formatting and complete client/server builds passed. Windows used compatible
+  Node 26.8.1; Linux used the 26.7.0 pin. CI selects 26.7.0 on both platforms.
+- The unified suite passed 115 files / 557 tests from a fresh Windows install
+  with two workers. Linux coverage passed the same 557 tests with two workers:
+  80.62% statements, 76.12% branches, 76.90% functions and 82.32% lines, against
+  the unchanged whole-production scope and critical-module floors.
+- Checkout-local Vitest results were created without modifying the shared
+  parent cache. The invalid fixture required all eight lint diagnostics, and
+  a warning-only hook-dependency probe exited with failure.
+- Chromium passed 48 E2E tests; Firefox and WebKit passed 37 each. Their 22
+  existing browser exclusions remain unchanged. Desktop and 390px manual
+  browser checks covered dialogs, Escape/focus restoration and overflow.
+- The production image reported healthy, preserved retained data across restart,
+  decoded HLS and passed real Chromium playback/seeking. Its runtime dependency
+  tree contains no Vite+, Vitest, TypeScript or Oxlint packages.
+- Video latency, encoder fallback, storyboard dragging and the hour-long
+  priority-seek benchmark passed. Fallow dead-code/duplication checks and the
+  unchanged health floor passed at 88; roadmap interaction checks passed.
+
+The PR records the final device/theme gallery and CI results.
 
 ## Rollback
 
