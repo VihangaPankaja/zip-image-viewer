@@ -12,7 +12,28 @@ try {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(new URL("./app-roadmap.html", import.meta.url).href);
-  assert.equal(await page.locator(".card").count(), 28);
+  assert.equal(await page.locator(".card").count(), 70);
+  for (const id of [
+    "A01",
+    "D01",
+    "L01",
+    "L05",
+    "F04",
+    "N01",
+    "N05",
+    "N06",
+    "P01",
+    "B01",
+    "B04",
+    "B06",
+  ])
+    assert.equal(
+      await page.getByLabel(`${id} status`, { exact: true }).inputValue(),
+      "Proposed",
+    );
+  await page.locator("#status").selectOption("Proposed");
+  assert.equal(await page.locator(".card:visible").count(), 42);
+  await page.getByRole("button", { name: "Clear filters" }).click();
   assert.equal(
     await page.getByLabel("V01 status", { exact: true }).inputValue(),
     "Done",
@@ -45,7 +66,7 @@ try {
     await page.locator("#note-V01").inputValue(),
     /baseline report/i,
   );
-  assert.equal(await page.locator("#percent").textContent(), "100%");
+  assert.equal(await page.locator("#percent").textContent(), "40%");
   await page
     .getByLabel("V01 status", { exact: true })
     .selectOption("In progress");
@@ -62,9 +83,9 @@ try {
     await page.locator("#note-V01").inputValue(),
     "Verified locally <script>never execute</script>",
   );
-  assert.equal(await page.locator("#percent").textContent(), "96%");
+  assert.equal(await page.locator("#percent").textContent(), "39%");
   await page.getByLabel("V01 status", { exact: true }).selectOption("Done");
-  await page.getByLabel("Search ideas").fill("SQLite");
+  await page.getByLabel("Search ideas").fill("CRC");
   assert.equal(await page.locator(".card:visible").count(), 1);
   await page.getByRole("button", { name: "Clear filters" }).click();
   await page.locator("#status").selectOption("Done");
@@ -73,6 +94,7 @@ try {
   assert.equal(await page.locator("#empty").isVisible(), true);
   await page.getByRole("button", { name: "Clear filters" }).click();
   const downloadPromise = page.waitForEvent("download");
+  await page.getByLabel("A01 status", { exact: true }).selectOption("Planned");
   await page.getByRole("button", { name: "Export progress" }).click();
   const download = await downloadPromise;
   const stream = await download.createReadStream();
@@ -80,6 +102,7 @@ try {
   for await (const chunk of stream) exported += chunk;
   const payload = JSON.parse(exported);
   assert.equal(payload.items.V01.status, "Done");
+  assert.equal(payload.items.A01.status, "Planned");
   page.on("dialog", (dialog) => dialog.accept());
   await page.getByLabel("V01 status", { exact: true }).selectOption("Planned");
   await page.locator("#import-file").setInputFiles({
@@ -105,7 +128,7 @@ try {
     "Done",
   );
   await page.evaluate(() => window.dispatchEvent(new Event("beforeprint")));
-  assert.equal(await page.locator(".card details[open]").count(), 28);
+  assert.equal(await page.locator(".card details[open]").count(), 70);
   await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
   for (const width of [1440, 768, 360]) {
     await page.setViewportSize({ width, height: 1000 });
@@ -139,7 +162,7 @@ try {
     await blockedPage.locator("#notice").textContent(),
     /storage is unavailable/,
   );
-  assert.equal(await blockedPage.locator("#percent").textContent(), "96%");
+  assert.equal(await blockedPage.locator("#percent").textContent(), "39%");
   console.log(
     "Roadmap checks passed: persistence, filters, export/import, invalid data, print, responsive widths and blocked storage.",
   );

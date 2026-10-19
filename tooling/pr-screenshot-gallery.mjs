@@ -172,12 +172,13 @@ export async function prepareScreenshotGalleries(directory, groups) {
 
 export function renderScreenshotSection({
   groups,
-  repository,
-  assetCommit,
+  assetBaseUrl,
+  assetPrefix,
+  originalArchiveUrl,
   sourceCommit,
   fixtures,
 }) {
-  const raw = `https://raw.githubusercontent.com/${repository}/${assetCommit}`;
+  const assetUrl = (file) => `${assetBaseUrl}/${assetPrefix}${file}`;
   const lines = [
     "## Screenshots",
     "",
@@ -197,16 +198,16 @@ export function renderScreenshotSection({
         "",
       );
       for (const entry of group.featured)
-        lines.push(`![${label(entry)}](${raw}/${entry.file})`, "");
+        lines.push(`![${label(entry)}](${assetUrl(entry.file)})`, "");
       lines.push(
-        `[Browse every full-resolution original](https://github.com/${repository}/blob/${assetCommit}/${group.galleryFile})`,
+        `[Download all full-resolution originals and galleries](${originalArchiveUrl})`,
         "",
         "All remaining screenshots are included below. Click a sheet to open it at full size.",
         "",
       );
       for (const [index, sheet] of group.sheets.entries())
         lines.push(
-          `[![${group.device} ${group.theme} gallery sheet ${index + 1}](${raw}/${sheet.file})](${raw}/${sheet.file})`,
+          `[![${group.device} ${group.theme} gallery sheet ${index + 1}](${assetUrl(sheet.file)})](${assetUrl(sheet.file)})`,
           "",
         );
       lines.push("</details>", "");

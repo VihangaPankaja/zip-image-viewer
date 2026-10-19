@@ -38,6 +38,7 @@ pnpm start
 - Add screenshots showing the changed feature working, including interaction and result states. Video scrub preview changes must show a loaded video, the seek thumbnail/time preview, and the playback position after committing the seek.
 - Put screenshots relevant to the PR first within each device and theme gallery, ahead of the standard screens. Set `PR_SCREENSHOT_FEATURED` to their comma-separated screen names when publishing.
 - Visually inspect every screenshot. Fix clipping, missing content, errors, and unusable controls, then recapture. Screenshots must match the reviewed code and be published and embedded in the PR description with verified working URLs under the four device sections.
+- Never create `pr-assets/*` or other screenshot-only branches. Publish durable review media as GitHub release assets through `screenshots:publish`, then embed the gallery in the PR description. Historical screenshot commits may be retained by archival tags so existing PR image URLs remain valid.
 - For multi-step feature work, create a commit after each major implementation step
 - Before each major commit, run `pnpm run format`, `pnpm run lint`, `pnpm run typecheck`, and `pnpm run build`
 - Keep formatter, lint, and typecheck configurations current with repo scripts
