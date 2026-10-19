@@ -64,7 +64,8 @@ jobs:
       - name: Render Fallow SARIF
         if: always()
         continue-on-error: true
-        run: vpr fallow:dead --format sarif --quiet > fallow.sarif
+        # Task banners would corrupt the machine-readable stdout.
+        run: vp exec fallow dead-code --format sarif --quiet > fallow.sarif
       - run: vpr build
       - name: Publish coverage and quality reports
         if: always()
