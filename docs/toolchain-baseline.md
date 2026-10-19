@@ -103,6 +103,55 @@ those two baseline files passed with `--maxWorkers=1` in 9.36 seconds, without
 editing tests or increasing timeouts. Avoid competing media/coverage jobs
 when reproducing timings on this host.
 
+### Cold and warm builds
+
+Measured with `/usr/bin/time -f %e pnpm run build` on the same WSL Ubuntu
+24.04 host, Node 26.7.0 and pnpm 12.1.0, with competing test jobs stopped.
+Each tree had its own frozen installation. Cold here means removing that
+tree's `dist`, `build` and `.vite-cache` directories before its first build;
+warm is the immediately following build. OS caches, the pnpm store and Node's
+compile cache were retained. In particular, `vp` enables Node's compile cache,
+so these are project-cache measurements, not uncached Node startup timings.
+
+| Complete client + server build | Baseline `e0b234c` | Staged Vite+ |
+| ------------------------------ | -----------------: | -----------: |
+| Cold                           |             2.68 s |       2.27 s |
+| Warm                           |             2.66 s |       2.47 s |
+
+These are single wall-clock samples, not a speed guarantee or a CI threshold.
+The baseline Windows lint and typecheck runs took 82.77 s and 7.52 s.
+The first staged Windows lint, typecheck and build runs passed in 48.53 s,
+5.54 s and 5.97 s. Those Windows runs had other validation activity on the
+host and should not be used for a performance comparison.
+
+### Staged validation
+
+- Fresh Windows and Linux directories passed `pnpm install --frozen-lockfile`,
+  all three TypeScript checks and the complete production build.
+- Windows `pnpm run test:coverage --maxWorkers=2` passed all 113 files and
+  552 tests, plus the four Node publishing tests. The unchanged coverage gates
+  passed at 80.59% statements, 76.08% branches, 76.90% functions and 82.08% lines.
+  Small differences from the Linux baseline reflect platform-specific paths;
+  the production include/exclude patterns are unchanged.
+- Linux `pnpm run test --maxWorkers=2` passed the same 113 files and 552 tests,
+  plus the four publishing tests. No skips or timeout changes were added.
+- `pnpm run test:related client/src/lib/formatterUtils.ts` selected eight
+  affected files and passed all 60 tests. `pnpm exec vp test --config
+vitest.config.ts --configLoader runner client/src/lib/coreUtils.test.ts`
+  passed all eight tests through the local target CLI.
+- Formatting, zero-warning ESLint, dead-code/dependency analysis and duplication
+  checks passed. Fallow's measured health score is 88, meeting its existing floor.
+- The roadmap's persistence, filters, export/import, responsive layout, print
+  and blocked-storage checks passed after marking B01 complete.
+- A real dev-server browser check opened settings and the download composer
+  at desktop and 390px, verified Escape/focus restoration and no horizontal
+  overflow. The initial requests raced backend startup and returned 502;
+  after health readiness and reload, the API requests succeeded.
+- Windows Chromium passed 47 of 48 E2E flows. The live public-magnet case hit
+  the host's `bind EACCES 0.0.0.0:6771` restriction before the expected Cancel
+  state. Keep this environment limitation distinct from test/migration failures;
+  the unchanged Linux browser and production-container CI gates remain required.
+
 ## Rollback
 
 Revert this PR's commits together, then run `pnpm install --frozen-lockfile`

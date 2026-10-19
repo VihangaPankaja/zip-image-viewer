@@ -89,7 +89,7 @@ try {
   assert.equal(await page.locator(".card:visible").count(), 1);
   await page.getByRole("button", { name: "Clear filters" }).click();
   await page.locator("#status").selectOption("Done");
-  assert.equal(await page.locator(".card:visible").count(), 28);
+  assert.equal(await page.locator(".card:visible").count(), 29);
   await page.getByLabel("Search ideas").fill("nothing-will-match-this");
   assert.equal(await page.locator("#empty").isVisible(), true);
   await page.getByRole("button", { name: "Clear filters" }).click();
