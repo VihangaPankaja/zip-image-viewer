@@ -12,7 +12,7 @@ try {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(new URL("./app-roadmap.html", import.meta.url).href);
-  assert.equal(await page.locator(".card").count(), 69);
+  assert.equal(await page.locator(".card").count(), 70);
   for (const id of [
     "A01",
     "D01",
@@ -25,13 +25,14 @@ try {
     "P01",
     "B01",
     "B04",
+    "B06",
   ])
     assert.equal(
       await page.getByLabel(`${id} status`, { exact: true }).inputValue(),
       "Proposed",
     );
   await page.locator("#status").selectOption("Proposed");
-  assert.equal(await page.locator(".card:visible").count(), 41);
+  assert.equal(await page.locator(".card:visible").count(), 42);
   await page.getByRole("button", { name: "Clear filters" }).click();
   assert.equal(
     await page.getByLabel("V01 status", { exact: true }).inputValue(),
@@ -65,7 +66,7 @@ try {
     await page.locator("#note-V01").inputValue(),
     /baseline report/i,
   );
-  assert.equal(await page.locator("#percent").textContent(), "41%");
+  assert.equal(await page.locator("#percent").textContent(), "40%");
   await page
     .getByLabel("V01 status", { exact: true })
     .selectOption("In progress");
@@ -127,7 +128,7 @@ try {
     "Done",
   );
   await page.evaluate(() => window.dispatchEvent(new Event("beforeprint")));
-  assert.equal(await page.locator(".card details[open]").count(), 69);
+  assert.equal(await page.locator(".card details[open]").count(), 70);
   await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
   for (const width of [1440, 768, 360]) {
     await page.setViewportSize({ width, height: 1000 });

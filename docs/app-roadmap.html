@@ -759,7 +759,7 @@
               >Archives first. Reliable transfers. Less interface
               clutter.</strong
             ><br />The 28 original video and torrent tasks are complete and
-            remain below as history. The 41 new proposals start unimplemented.
+            remain below as history. The 42 new proposals start unimplemented.
             Prioritize archive selection, download recovery and compact
             controls; migrate tooling in a separate, verifiable step.
           </p>
@@ -878,7 +878,7 @@
             <span class="small" id="count-label"></span>
           </div>
           <p class="track-intro">
-            41 new proposals are listed first. The 28 completed video/torrent
+            42 new proposals are listed first. The 28 completed video/torrent
             items retain their IDs, notes and history. New proposals do not
             claim implementation. Open an item for current behavior, direction,
             dependencies and completion checks.
@@ -1212,7 +1212,8 @@
               <p>
                 B01–B04 can proceed after a baseline without waiting for every
                 feature. Pin stable compatible releases, prove lint parity, add
-                CSS lint and retain checks.
+                CSS lint and retain checks. Then move colocated tests into
+                dedicated suites with mirrored app paths in B06.
               </p>
             </article>
             <article>
@@ -1320,7 +1321,7 @@
             Updated from local v3.19.0 at commit 8b01237 on 19 October 2026.
             Code inspection covers extraction, downloads, retention, previews,
             themes, session rail and tooling. The original 28 tasks are complete
-            per their delivery notes and the requested scope. The 41 new tasks
+            per their delivery notes and the requested scope. The 42 new tasks
             are proposals. Reported visual issues are audit targets; this
             planning pass does not certify production performance or
             site-specific authenticated downloads.
@@ -2096,6 +2097,23 @@
           note: "",
           evidence:
             "package.json; pnpm-lock.yaml; vite.config.ts; vitest.config.ts; tooling/eslint/index.js; lefthook.yml; .github/workflows/quality.yml; tooling/publish-pr-screenshots.mjs; .agents/skills/pr-screenshots/SKILL.md",
+        },
+        {
+          id: "B06",
+          area: "Tooling",
+          priority: "P1",
+          effort: "M",
+          status: "Proposed",
+          title: "Move colocated tests into dedicated test suites",
+          summary:
+            "Keep production client/server folders focused on app logic and put tests under the existing tests/ root.",
+          now: "Client and server *.test.ts/tsx files currently sit beside implementation files. tests/ already holds integration, E2E, benchmarks, review flows and fixtures; scripts and configs depend on both arrangements.",
+          plan: "Move client/server tests into tests/unit/{client,server}/, tests/component/client/, tests/integration/{client,server}/ and tests/ui/client/ as appropriate. Mirror each production path below its suite, for example tests/unit/server/application/downloads/ and tests/component/client/components/Preview/. Preserve existing e2e/review/benchmarks. Keep shared fixtures/helpers under tests/ and suite-only setup nearby. Update relative imports or stable aliases, Vitest/Vite+ projects, TypeScript includes, coverage ownership/exclusions, ESLint/Fallow patterns, package scripts, related-test hooks, CI and docs. Classify by what a test exercises rather than filename alone; keep test utilities out of production bundles.",
+          done: "No production test files remain under client/src or server. Before/after inventories show the same tests and assertions with no new skips. Every suite, coverage gate, related-file selection and all browsers still run from a clean checkout. Coverage maps to original app files; production builds exclude tests/fixtures, and renamed paths preserve history through focused moves.",
+          depends: "B02",
+          note: "User-requested test organization follow-up. Move tests as a dedicated change after the Vite+ baseline, so tooling failures and path migration failures can be isolated.",
+          evidence:
+            "vitest.config.ts; tsconfig.tests.json; tsconfig.app.json; tsconfig.server.json; tooling/eslint/index.js; .fallowrc.json; package.json; lefthook.yml; .github/workflows/quality.yml; client/src/test/setup.ts; tests/",
         },
         {
           id: "V01",
