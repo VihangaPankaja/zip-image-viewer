@@ -2,6 +2,13 @@
 
 Run `pnpm run quality` before a PR. CI enforces formatting, zero lint warnings, client/server/test type checks, full production coverage, dead code and dependency checks, duplicate detection, the Fallow health floor, and a production build. CI also runs the branch audit, all test suites, Chromium/Firefox/WebKit flows, the video benchmark, and the device/theme screenshot gallery. Failed browser runs retain their reports; coverage and gallery artifacts are retained for 14 days.
 
+The [staged Vite+ baseline](toolchain-baseline.md) records the exact toolchain
+pins, compatibility findings, measurements and rollback. Clean Windows and
+Linux CI jobs install the frozen lockfile without a global `vp`, print the
+resolved toolchain, check all three TypeScript projects and build both client
+and server. ESLint, Prettier and Lefthook continue to enforce their existing
+policies during this stage.
+
 ## Coverage scope and floors
 
 Coverage includes every production TypeScript module under `client/src`, `server`, and `shared`, including modules with no tests. Only test files, declarations, and client test setup are excluded. The previous report included 11 selected files: its 96.68% statement coverage did not measure the rest of the app.

@@ -8,7 +8,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 import { HlsEncoder } from "./hlsEncoder.js";
 import { runCommand, runCommandCapture } from "../process/commandRunner.js";
 

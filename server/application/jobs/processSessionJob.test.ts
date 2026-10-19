@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Session, SessionJob } from "../../domain/models.js";
 import type { TorrentAdapter } from "../torrents/torrentDownloader.js";
 import { createJobManager } from "./jobManager.js";

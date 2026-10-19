@@ -4,7 +4,7 @@ import path from "node:path";
 import express from "express";
 import ffmpegPath from "ffmpeg-static";
 import request from "supertest";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it } from "vite-plus/test";
 import type {
   Session,
   VideoTranscodeEntry,

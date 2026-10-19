@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import { createJobManager } from "../../server/application/jobs/jobManager.js";
 import { createRetainedTorrentStore } from "../../server/repositories/retainedTorrents.js";
 import { createSessionJobQueue } from "../../server/application/jobs/sessionJobQueue.js";

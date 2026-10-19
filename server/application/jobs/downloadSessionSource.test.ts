@@ -1,7 +1,7 @@
 import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 import { CONFIRM_SIZE_BYTES } from "../../config/runtimeConstants.js";
 import { normalizeDownloadSettings } from "../downloads/downloadOptions.js";
 import { createJobManager } from "./jobManager.js";

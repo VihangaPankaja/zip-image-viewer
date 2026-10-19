@@ -89,15 +89,18 @@ without closing the video.
 - FFmpeg and 7-Zip are supplied by project dependencies for supported platforms.
 
 ```bash
-nvm install
-nvm use
+nvm install 26.7.0
+nvm use 26.7.0
 npm install --global pnpm@12.1.0
 pnpm install --frozen-lockfile
 pnpm run dev
 ```
 
 On nvm-windows, run `nvm install 26.7.0` followed by `nvm use 26.7.0`;
-nvm-windows does not read `.nvmrc` automatically.
+nvm-windows and nvm do not read `.node-version` automatically. Other version
+managers can use that file directly. Vite+ is installed locally by pnpm;
+no global `vp` installation is required. See the [staged toolchain migration](docs/toolchain-baseline.md)
+for exact versions, measurements, compatibility decisions and rollback.
 
 - Client: <http://localhost:5173>
 - API: <http://localhost:8080>

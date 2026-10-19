@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import request from "supertest";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { createVideoRuntime } from "../../infrastructure/media/videoRuntime.js";
 import type { Session } from "../../domain/models.js";
 import { registerVideoThumbnailRoute } from "./thumbnailRoute.js";

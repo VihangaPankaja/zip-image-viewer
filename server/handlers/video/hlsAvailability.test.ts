@@ -1,5 +1,5 @@
 import type { Response } from "express";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vite-plus/test";
 import type { VideoRendition } from "../../domain/models.js";
 import { waitForPublishedSegment } from "./hlsAvailability.js";
 

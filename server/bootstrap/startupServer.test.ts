@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import request from "supertest";
 import { createApp } from "./createApp.js";
 import { createStartupServer } from "./startupServer.js";

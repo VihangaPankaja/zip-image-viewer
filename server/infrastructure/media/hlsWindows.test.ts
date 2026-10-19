@@ -3,7 +3,7 @@ import { Buffer } from "node:buffer";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import ffmpegPath from "ffmpeg-static";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import type {
   Session,
   VideoRendition,

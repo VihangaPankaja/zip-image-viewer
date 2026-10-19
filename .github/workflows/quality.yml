@@ -15,6 +15,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  toolchain-install:
+    name: Clean toolchain install (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v2
+        with:
+          install: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vp toolchain
+      - run: pnpm run typecheck
+      - run: pnpm run build
+
   checks:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -28,7 +49,7 @@ jobs:
           install: false
       - uses: actions/setup-node@v7
         with:
-          node-version-file: .nvmrc
+          node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
       - run: pnpm run format:check
       - run: pnpm run lint
@@ -75,7 +96,7 @@ jobs:
           install: false
       - uses: actions/setup-node@v7
         with:
-          node-version-file: .nvmrc
+          node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
       - run: pnpm run test:${{ matrix.suite }}
 
@@ -90,7 +111,7 @@ jobs:
           install: false
       - uses: actions/setup-node@v7
         with:
-          node-version-file: .nvmrc
+          node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm run check:roadmap
@@ -151,7 +172,7 @@ jobs:
           install: false
       - uses: actions/setup-node@v7
         with:
-          node-version-file: .nvmrc
+          node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
       - run: pnpm exec playwright test --project=${{ matrix.browser }}

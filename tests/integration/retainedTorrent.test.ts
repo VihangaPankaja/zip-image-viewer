@@ -12,7 +12,7 @@ import { runCommand } from "../../server/infrastructure/process/commandRunner.js
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import type { ContractRouterClient } from "@orpc/contract";
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import { serverContract } from "../../shared/contracts.js";
 
 async function startServer(directory: string, seedPort: number) {

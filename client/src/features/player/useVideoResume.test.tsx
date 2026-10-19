@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { vi } from "vitest";
+import { vi } from "vite-plus/test";
 import { useVideoResume } from "./useVideoResume";
 
 const key = (session = "one", path = "a/clip.mp4") =>

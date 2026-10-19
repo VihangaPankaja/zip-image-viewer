@@ -21,7 +21,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version-file: .nvmrc
+          node-version-file: .node-version
 
       - name: Fetch base branch
         run: git fetch origin "${{ github.base_ref }}" --depth=1

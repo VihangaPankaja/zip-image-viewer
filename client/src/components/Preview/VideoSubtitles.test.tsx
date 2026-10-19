@@ -5,7 +5,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { vi } from "vitest";
+import { vi } from "vite-plus/test";
 import { VideoSubtitles } from "./VideoSubtitles";
 
 const vtt = "WEBVTT\n\n00:01.000 --> 00:03.000\nHello";

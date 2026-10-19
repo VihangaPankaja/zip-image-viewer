@@ -5,7 +5,7 @@ import express from "express";
 import ffmpegPath from "ffmpeg-static";
 import sharp from "sharp";
 import request from "supertest";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import type { Session } from "../../server/domain/models.js";
 import { createVideoRuntime } from "../../server/infrastructure/media/videoRuntime.js";
 import { registerVideoThumbnailRoute } from "../../server/handlers/video/thumbnailRoute.js";

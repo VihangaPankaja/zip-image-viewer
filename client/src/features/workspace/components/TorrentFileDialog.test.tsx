@@ -6,7 +6,7 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { jobSchema } from "../../../../../shared/contracts";
 import { TorrentFileDialog, TorrentReviewAction } from "./TorrentFileDialog";
 

@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import WebTorrent, { type Torrent } from "webtorrent";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import { createJobManager } from "../jobs/jobManager.js";
 import { createRetainedTorrentStore } from "../../repositories/retainedTorrents.js";
 import {

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { path7za } from "7zip-bin";
 import unzipper from "unzipper";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { runCommand } from "../../server/infrastructure/process/commandRunner.js";
 
 function createZip(

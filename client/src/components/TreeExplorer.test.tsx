@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import { TreeExplorer, type ExplorerNode } from "./TreeExplorer";
 
 const root: ExplorerNode = {

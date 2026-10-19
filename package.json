@@ -1,6 +1,6 @@
 {
   "name": "zip-image-viewer",
-  "version": "3.19.0",
+  "version": "3.19.1",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@12.1.0",
@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "concurrently \"pnpm run dev:server\" \"pnpm run dev:client\"",
     "dev:server": "tsx watch server/index.ts",
-    "dev:client": "vite --configLoader runner",
+    "dev:client": "vp dev --configLoader runner",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "pnpm run typecheck:client && pnpm run typecheck:server && pnpm run typecheck:tests",
     "typecheck:client": "tsc --noEmit -p tsconfig.app.json",
@@ -19,7 +19,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "build": "pnpm run build:client && pnpm run build:server",
-    "build:client": "vite build --configLoader runner",
+    "build:client": "vp build --configLoader runner",
     "build:server": "tsc -p tsconfig.server.json",
     "test": "node --test tooling/pr-screenshot-gallery.test.mjs && node --no-experimental-webstorage ./node_modules/vitest/vitest.mjs run --configLoader runner",
     "test:unit": "node --no-experimental-webstorage ./node_modules/vitest/vitest.mjs run --configLoader runner client/src/hooks client/src/lib client/src/services client/src/features/player server/application server/config server/contracts server/domain server/handlers server/infrastructure server/media server/rpc server/tui",
@@ -86,7 +86,7 @@
     "@types/webtorrent": "3.0.0",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.1.1",
-    "@vitest/coverage-v8": "^5.0.0",
+    "@vitest/coverage-v8": "catalog:",
     "@zip-image-viewer/eslint-config": "workspace:*",
     "concurrently": "^10.0.5",
     "eslint": "^10.10.0",
@@ -97,7 +97,8 @@
     "supertest": "^7.2.2",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2",
-    "vite": "^8.2.2",
-    "vitest": "^5.0.0"
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
   }
 }

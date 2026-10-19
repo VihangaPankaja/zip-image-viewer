@@ -2019,7 +2019,7 @@
           area: "Tooling",
           priority: "P0",
           effort: "M",
-          status: "Proposed",
+          status: "Done",
           title: "Baseline and stage the Vite+ migration",
           summary:
             "Use the latest stable compatible release with exact pins and a rollback point.",
@@ -2027,9 +2027,9 @@
           plan: "At implementation time read official migration/compatibility guidance and registry releases. Record exact compatible versions, baseline timings/checks and rollback. Use the target CLI from the workspace root and review blockers/warnings. Preserve package-manager/test behavior; avoid canary upgrades merely for larger version numbers.",
           done: "A reviewable migration/lockfile passes clean Windows/Linux installation without undocumented globals. Record cold/warm timing on the same host, incompatibilities and rollback instructions.",
           depends: "None",
-          note: "",
+          note: "Implemented in v3.19.1: pinned stable Vite+ 1.3.0, its core alias and Vitest/coverage 5.0.5 after running the workspace migrator. Preserved ESLint, Prettier, test projects, server tsc and every existing quality gate. Clean Windows/Linux install jobs, compatibility findings, cold/warm measurements and rollback are documented in docs/toolchain-baseline.md. B02 and B03 remain separate follow-ups.",
           evidence:
-            "package.json; pnpm-lock.yaml; vite.config.ts; vitest.config.ts; tooling/eslint/index.js; lefthook.yml; .github/workflows/quality.yml; https://viteplus.dev/guide/migrate",
+            "docs/toolchain-baseline.md; package.json; pnpm-lock.yaml; pnpm-workspace.yaml; vite.config.ts; vitest.config.ts; .github/workflows/quality.yml; https://viteplus.dev/guide/migrate",
         },
         {
           id: "B02",

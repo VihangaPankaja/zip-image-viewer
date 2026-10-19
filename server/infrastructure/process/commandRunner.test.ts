@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, test, vi } from "vite-plus/test";
 import { type SpawnOptions } from "node:child_process";
 import {
   mkdtemp,

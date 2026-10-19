@@ -1,7 +1,7 @@
 import { createRef } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type Hls from "hls.js";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import { PlaybackDiagnostics } from "./PlaybackDiagnostics";
 
 it("shows playback measurements and copies a report without media paths", async () => {

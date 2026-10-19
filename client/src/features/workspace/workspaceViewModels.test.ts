@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { getImageNavigationTarget } from "./imageNavigation";
 import { buildWorkspaceProgress } from "./workspaceProgress";
 

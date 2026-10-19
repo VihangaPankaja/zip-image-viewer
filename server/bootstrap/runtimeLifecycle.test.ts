@@ -1,5 +1,5 @@
 import type { Server } from "node:http";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vite-plus/test";
 import type { Session, SessionJob } from "../domain/models.js";
 import {
   CLEANUP_INTERVAL_MS,

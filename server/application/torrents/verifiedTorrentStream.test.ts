@@ -1,7 +1,7 @@
 import { setTimeout as delay } from "node:timers/promises";
 import type { Readable } from "node:stream";
 import type { Torrent } from "webtorrent";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vite-plus/test";
 import { verifiedTorrentStream } from "./verifiedTorrentStream.js";
 
 const readers: Readable[] = [];

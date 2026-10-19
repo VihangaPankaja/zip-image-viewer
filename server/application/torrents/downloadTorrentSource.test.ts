@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { SessionJob } from "../../domain/models.js";
 import { createJobManager } from "../jobs/jobManager.js";
 import { downloadOptionsToSettings } from "../downloads/downloadOptions.js";

@@ -23,7 +23,7 @@ export default defineConfig({
     },
     {
       command:
-        "node node_modules/vite/bin/vite.js --configLoader runner --host 127.0.0.1 --port 5173",
+        "node node_modules/vite-plus/bin/vp dev --configLoader runner --host 127.0.0.1 --port 5173",
       url: "http://127.0.0.1:5173",
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,

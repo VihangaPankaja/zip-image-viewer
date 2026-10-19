@@ -1,7 +1,7 @@
 import path from "node:path";
 import { mkdtemp, mkdir, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { detectSourceKind, validateTorrentFilePath } from "./torrentSource.js";
 import {
   fetchTorrentMetadata,

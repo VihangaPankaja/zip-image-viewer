@@ -1,4 +1,4 @@
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import { inspectTorrentVideo } from "./torrentVideo.js";
 
 function atom(type: string, payload = Buffer.alloc(0)) {

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import {
   startTorrentPlaybackFixture,
   waitForPlayback,

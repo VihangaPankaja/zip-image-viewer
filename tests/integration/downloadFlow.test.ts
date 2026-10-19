@@ -7,7 +7,7 @@ import { path7za } from "7zip-bin";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import type { ContractRouterClient } from "@orpc/contract";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import WebTorrent, { type Torrent } from "webtorrent";
 import { createJobManager } from "../../server/application/jobs/jobManager.js";
 import { createProcessSessionJob } from "../../server/application/jobs/processSessionJob.js";

@@ -1,6 +1,6 @@
 import React, { createRef } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { vi } from "vitest";
+import { vi } from "vite-plus/test";
 import type { VideoPreviewProps } from "../../features/workspace/types";
 import { VideoPreviewContent } from "./VideoPreviewContent";
 import { VideoScrubber } from "./VideoScrubber";

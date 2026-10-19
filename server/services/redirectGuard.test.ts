@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import { downloadWithSegmentedManager } from "./segmentedDownloader.js";
 
 it("rejects private redirects before a payload request reaches the destination", async () => {

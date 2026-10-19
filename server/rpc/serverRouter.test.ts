@@ -2,7 +2,7 @@ import { call, ORPCError } from "@orpc/server";
 import express from "express";
 import request from "supertest";
 import { registerRpc } from "./registerRpc.js";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { ApplicationError } from "../domain/models.js";
 import {
   jobSchema,

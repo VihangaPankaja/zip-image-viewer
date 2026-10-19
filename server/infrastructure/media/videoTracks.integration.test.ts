@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import ffmpegPath from "ffmpeg-static";
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import { startMultilingualFixture } from "../../../tests/fixtures/multilingual.js";
 import { runCommand, runCommandCapture } from "../process/commandRunner.js";
 

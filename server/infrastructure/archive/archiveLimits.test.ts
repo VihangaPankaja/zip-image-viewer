@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import { validateArchiveEntries } from "./archiveLimits.js";
 
 it.each([900, 910])(

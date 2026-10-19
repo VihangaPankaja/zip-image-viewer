@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import { downloadWithSegmentedManager } from "./segmentedDownloader.js";
 
 const disk = vi.hoisted(() => ({ root: "", capacity: 0 }));

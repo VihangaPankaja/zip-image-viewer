@@ -1,7 +1,7 @@
 import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import type { Session, SessionJob } from "../domain/models.js";
 import { createJobManager } from "../application/jobs/jobManager.js";
 import { createSessionJobQueue } from "../application/jobs/sessionJobQueue.js";

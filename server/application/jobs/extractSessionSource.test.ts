@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vite-plus/test";
 import { createJobManager } from "./jobManager.js";
 import { extractSessionSource } from "./extractSessionSource.js";
 import { listExtractedEntries } from "../../infrastructure/archive/listExtractedEntries.js";

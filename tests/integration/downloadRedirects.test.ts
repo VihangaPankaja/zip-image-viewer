@@ -110,4 +110,4 @@ it("bounds redirect loops and refuses private HEAD redirects", async () => {
     vi.unstubAllGlobals();
   }
 });
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";

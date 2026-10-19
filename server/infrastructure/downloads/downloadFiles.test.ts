@@ -8,7 +8,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import { prepareDownloadFiles } from "./downloadFiles.js";
 
 it("unlinks owned junctions without following them and preserves unexpected directories", async () => {

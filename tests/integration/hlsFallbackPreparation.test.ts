@@ -1,6 +1,6 @@
 import { access, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import { startMultilingualFixture } from "../fixtures/multilingual.js";
 
 it("cancels queued startup when its master request is abandoned", async () => {

@@ -9,7 +9,7 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import { createJobManager } from "../jobs/jobManager.js";
 import { listExtractedEntries } from "../../infrastructure/archive/listExtractedEntries.js";
 import { prepareTorrentEntries } from "./prepareTorrentEntries.js";

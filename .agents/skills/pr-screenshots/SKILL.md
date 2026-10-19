@@ -7,7 +7,7 @@ description: Capture and publish repeatable ZIP Image Viewer review screenshots,
 
 Create a review gallery from the actual app using deterministic Playwright fixtures. Keep screenshots out of Git branches. Publish immutable, content-prefixed files to the `pr-review-assets` prerelease and embed their URLs in the PR description. Never create screenshot-only branches. Publishing is part of an authorized PR creation/update request; capture locally without publishing when only a preview was requested.
 
-Run from the repository root. On Windows use `pnpm.cmd` if the PowerShell shim does not execute. Use the pinned Node version in `.nvmrc`.
+Run from the repository root. On Windows use `pnpm.cmd` if the PowerShell shim does not execute. Use the pinned Node version in `.node-version`.
 
 1. Finish implementation, run required checks in `AGENTS.md`, and commit the code. For an authorized PR publish, push the source branch before publishing so GitHub can resolve the source commit if the shared asset release must be created. Captures must match the commit being reviewed. A local preview needs no push.
 2. Install Chromium if needed: `pnpm exec playwright install chromium`.

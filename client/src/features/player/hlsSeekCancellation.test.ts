@@ -1,5 +1,5 @@
 import Hls, { Fragment, PlaylistLevelType } from "hls.js";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 
 type Controller = {
   state: string;

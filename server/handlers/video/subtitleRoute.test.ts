@@ -3,7 +3,7 @@ import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import request from "supertest";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vite-plus/test";
 import type { Session } from "../../domain/models.js";
 import { sanitizeEntryPath } from "../../infrastructure/runtime/runtimePrimitives.js";
 import type { VideoRouteDependencies } from "./types.js";

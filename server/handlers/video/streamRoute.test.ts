@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { spawn } from "node:child_process";
 import type { Express, Request, RequestHandler, Response } from "express";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import type { Session } from "../../domain/models.js";
 import { registerVideoStreamRoute } from "./streamRoute.js";
 import type { VideoRouteDependencies } from "./types.js";

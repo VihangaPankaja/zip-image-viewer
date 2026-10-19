@@ -56,7 +56,7 @@ Both client and server compile against this module. Network JSON remains
 
 ## Delivery
 
-- `.nvmrc` / `packageManager` - Node 26 and pnpm pinning.
+- `.node-version` / `packageManager` - Node 26 and pnpm pinning.
 - `.fallowrc.json` - dead code, dependency, duplicate, and boundary analysis.
 - `lefthook.yml` - local commit/push checks.
 - `.github/workflows/quality.yml` - CI quality and cross-browser E2E.

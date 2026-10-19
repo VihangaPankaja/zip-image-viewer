@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vite-plus/test";
 import type { Session, VideoTranscodeEntry } from "../domain/models.js";
 import { buildTree } from "../domain/explorerTree.js";
 import { createRuntimeMedia } from "./runtimeMedia.js";

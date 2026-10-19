@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { jobPayloadSchema, sessionPayloadSchema } from "./sessionSchemas";
 
 describe("workspace session schemas", () => {

@@ -1,6 +1,6 @@
 import express from "express";
 import request from "supertest";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "vite-plus/test";
 import { applyByteRange } from "./httpUtils.js";
 
 describe("applyByteRange", () => {
