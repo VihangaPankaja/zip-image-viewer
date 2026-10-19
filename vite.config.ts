@@ -505,7 +505,8 @@ export default defineConfig({
     ],
   },
   root: "client",
-  cacheDir: "../.vite-cache",
+  // Dev and tests use different roots; keep their cache inside this checkout.
+  cacheDir: fileURLToPath(new URL("./.vite-cache", import.meta.url)),
   plugins: lazyPlugins(() => [react()]),
   build: {
     outDir: "../dist",

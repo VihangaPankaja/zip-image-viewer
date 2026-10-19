@@ -9,7 +9,7 @@
     "tests/integration/containerBrowserFixture.mjs",
     "tests/integration/containerRetentionSmoke.mjs"
   ],
-  "ignorePatterns": ["build/**", "dist/**", "coverage/**", "node_modules/**"],
+  "ignorePatterns": ["build/**", "dist/**", "coverage/**", "node_modules/**", ".vite-cache/**"],
   "ignoreDependencies": ["7zip-bin", "ffmpeg-static"],
   "rules": {
     "unused-files": "error",

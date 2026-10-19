@@ -27,6 +27,10 @@ Lefthook: prepare installs the dispatcher, pre-commit runs `vp staged`, and
 pre-push runs all TS checks, changed tests against `origin/master`, and Fallow's
 branch audit. Docker disables hook installation with `VP_GIT_HOOKS=0`.
 
+The cache directory is anchored to the config file: dev uses `client/` while
+tests use the repository root. A relative cache path escaped the test checkout
+and shared results between worktrees; the absolute path keeps each cache local.
+
 CI uses official setup-vp with frozen installs, including clean Windows/Linux
 install/typecheck/build jobs. Docker builds with the pinned official Vite+ image,
 installs production dependencies separately, and copies the Node selected by
