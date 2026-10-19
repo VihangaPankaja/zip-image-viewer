@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Media workspace · Product roadmap</title>
+    <title>ZIP Image Viewer · Archive and file roadmap</title>
     <style>
       :root {
         --paper: #f5f3ed;
@@ -707,14 +707,15 @@
         <div class="brand">
           <span class="mark" aria-hidden="true">↗</span>Media workspace
         </div>
-        <p class="edition">Product notes / September 2026</p>
+        <p class="edition">Product notes / October 2026</p>
         <nav aria-label="Page sections">
           <a href="#overview"><span>01</span>The recommendation</a>
           <a href="#baseline"><span>02</span>What exists today</a>
           <a href="#roadmap"><span>03</span>Track the work</a>
-          <a href="#video"><span>04</span>Video, in detail</a>
-          <a href="#delivery"><span>05</span>Build order & stack</a>
-          <a href="#references"><span>06</span>Sources & scope</a>
+          <a href="#discovery"><span>04</span>Discovery feasibility</a
+          ><a href="#video"><span>05</span>Completed media plan</a>
+          <a href="#delivery"><span>06</span>Build order & stack</a>
+          <a href="#references"><span>07</span>Sources & scope</a>
         </nav>
         <div class="aside-progress">
           <p class="eyebrow">Your roadmap progress</p>
@@ -737,28 +738,30 @@
           <div class="hero-top">
             <span class="eyebrow">zip-image-viewer / Improvement roadmap</span
             ><span class="date"
-              >06 September 2026<br />Code reviewed at v3.3.2</span
+              >19 October 2026<br />Code reviewed at v3.19.0</span
             >
           </div>
-          <h1>Less waiting.<br /><em>More control.</em></h1>
+          <h1>Find files.<br /><em>Open what matters.</em></h1>
           <p class="lede">
-            Make video seeking feel immediate. Keep streams playing when
-            bandwidth changes. Download the torrent files you want, then come
-            back for the rest.
+            Put archives and files back at the center. Inspect ZIPs before
+            extracting, find files across linked pages, keep downloads reliable,
+            and make every preview comfortable on every device.
           </p>
           <div class="hero-tags">
             <span>Repository-informed</span><span>Editable progress</span
-            ><span>Works offline</span><span>No new dependencies</span>
+            ><span>Works offline</span><span>Standalone tracker</span>
           </div>
         </header>
         <div class="callout">
-          <div class="eyebrow">My recommendation</div>
+          <div class="eyebrow">Next release direction</div>
           <p>
-            <strong>Keep the stack. Fix the media pipeline first.</strong
-            ><br />React, Express, FFmpeg, hls.js and WebTorrent already cover
-            the core job. Spend the next releases on seek latency, rendition
-            readiness and file-level torrent state. A framework migration would
-            delay those improvements.
+            <strong
+              >Archives first. Reliable transfers. Less interface
+              clutter.</strong
+            ><br />The 28 original video and torrent tasks are complete and
+            remain below as history. The 41 new proposals start unimplemented.
+            Prioritize archive selection, download recovery and compact
+            controls; migrate tooling in a separate, verifiable step.
           </p>
         </div>
         <section class="section" aria-labelledby="first-title">
@@ -769,33 +772,30 @@
           <div class="priority-grid">
             <article class="priority">
               <span class="number">01</span>
-              <h3>Seek without waiting for the whole encode</h3>
+              <h3>Inspect, then extract</h3>
               <p>
-                Serve prepared segments immediately. For an uncached jump,
-                prepare the requested time window before continuing background
-                work.
+                Choose ZIP entries, estimate disk use and keep the original for
+                later.
               </p>
-              <a href="#video">Read the seek plan →</a>
+              <a href="#A01">Open A01 →</a>
             </article>
             <article class="priority">
               <span class="number">02</span>
-              <h3>Make Auto quality dependable</h3>
+              <h3>Discover files in linked pages</h3>
               <p>
-                Let hls.js adapt to bandwidth and buffer health. Give it
-                accurate bitrate metadata and renditions that can serve the
-                current playback position.
+                Review results from a bounded crawl and queue every matching
+                file once.
               </p>
-              <a href="#abr-plan">Read the streaming plan →</a>
+              <a href="#L01">Open L01 →</a>
             </article>
             <article class="priority">
               <span class="number">03</span>
-              <h3>Choose torrent files now or later</h3>
+              <h3>Make previews comfortable</h3>
               <p>
-                Resolve metadata, tick files, show selected size, and start.
-                Keep skipped files visible so they can be added later without
-                restarting the whole torrent.
+                Compact navigation, AMOLED and accent choices, proper audio
+                controls and one video timeline.
               </p>
-              <a href="#torrent-plan">Read the torrent plan →</a>
+              <a href="#N01">Open N01 →</a>
             </article>
           </div>
         </section>
@@ -808,61 +808,67 @@
           </div>
           <div class="baseline">
             <article>
-              <h3>HLS and automatic quality selection</h3>
+              <h3>Archive pipeline</h3>
               <p>
-                fMP4 segments, a master playlist, an ABR-enabled hls.js
-                configuration and manual quality selection exist. The work below
-                improves their behavior.
+                ZIP uses unzipper and other recognized archives use bundled
+                7zip. Extraction validates paths, counts and disk budgets, but
+                currently extracts every ZIP entry and rejects encrypted
+                archives.
               </p>
-              <code>server/media/* · client/src/features/player/*</code>
+              <code>server/application/jobs/extractSessionSource.ts</code>
             </article>
             <article>
-              <h3>Original playback and thumbnail endpoint</h3>
+              <h3>HTTP and torrent downloads</h3>
               <p>
-                Original video supports byte ranges. FFmpeg can generate a frame
-                at a requested timestamp. The player currently uses native video
-                controls.
-              </p>
-              <code>server/handlers/video/* · VideoPreviewContent.tsx</code>
-            </article>
-            <article>
-              <h3>Torrent transfers and a download queue</h3>
-              <p>
-                Magnet links, torrent metadata URLs, peer counts, retry handling
-                and pause/resume paths exist. The adapter currently downloads
-                all files.
-              </p>
-              <code>server/application/torrents/* · DownloadDialog.tsx</code>
-            </article>
-            <article>
-              <h3>A modern client and server</h3>
-              <p>
-                React 19, Vite 8, Express 5, strict TypeScript, Zod, oRPC and
-                TanStack Query are installed. No replacement is needed for this
-                roadmap.
-              </p>
-              <code>package.json · tsconfig.json</code>
-            </article>
-            <article>
-              <h3>Tests and quality gates</h3>
-              <p>
-                Vitest, Playwright, axe, Fallow, Lefthook, linting and build
-                checks are already present. Extend them around the media and
-                torrent flows.
-              </p>
-              <code>package.json · .github/workflows/quality.yml</code>
-            </article>
-            <article>
-              <h3>Temporary sessions</h3>
-              <p>
-                Session and job stores are in memory. The shutdown path removes
-                sessions. Retaining downloads requires an explicit lifecycle
-                change.
+                HTTP supports segmented transfer and retry/resume. Selective
+                torrents have retained SQLite state; HTTP libraries still need a
+                durable lifecycle.
               </p>
               <code
-                >server/repositories/memoryStores.ts ·
-                server/bootstrap/runtimeLifecycle.ts</code
+                >server/services/segmentedDownloader.ts ·
+                server/repositories/retainedTorrents.ts</code
               >
+            </article>
+            <article>
+              <h3>Link discovery is new work</h3>
+              <p>
+                No general HTML link extractor, recursive crawler or
+                authenticated-browser resolver was found in the reviewed paths.
+              </p>
+              <code
+                >server/infrastructure/downloads/ ·
+                server/application/jobs/</code
+              >
+            </article>
+            <article>
+              <h3>Theme and preview gaps</h3>
+              <p>
+                System mode already follows the OS. Dark surfaces are blue-grey,
+                audio uses native controls and video has native controls plus
+                VideoScrubber.
+              </p>
+              <code
+                >client/src/styles/tokens.css ·
+                client/src/components/Preview/</code
+              >
+            </article>
+            <article>
+              <h3>Keep the application stack</h3>
+              <p>
+                React 19, Express 5, strict TypeScript, Zod, oRPC and TanStack
+                Query fit the app. Vite+ should consolidate tooling while
+                preserving behavior.
+              </p>
+              <code>package.json · tooling/eslint/index.js</code>
+            </article>
+            <article>
+              <h3>Preserve verification</h3>
+              <p>
+                Coverage, three Playwright browsers, axe, Fallow, container
+                checks and the gallery already exist. Extend these around
+                archives, discovery and audio.
+              </p>
+              <code>package.json · .github/workflows/quality.yml</code>
             </article>
           </div>
         </section>
@@ -872,10 +878,10 @@
             <span class="small" id="count-label"></span>
           </div>
           <p class="track-intro">
-            Suggested priorities, not commitments. All improvements start as
-            <b>Proposed</b>. Existing capabilities are listed above, so nothing
-            is marked done just because part of it exists. Open an item for its
-            implementation direction, evidence and completion check.
+            41 new proposals are listed first. The 28 completed video/torrent
+            items retain their IDs, notes and history. New proposals do not
+            claim implementation. Open an item for current behavior, direction,
+            dependencies and completion checks.
           </p>
           <p class="small">
             P0 = user-requested core work · P1 = next release · P2 = later.
@@ -887,7 +893,7 @@
               >Search ideas<input
                 id="search"
                 type="search"
-                placeholder="Try scrubbing, subtitles, SQLite…"
+                placeholder="Try ZIP, cookies, AMOLED, Vite+…"
             /></label>
             <label
               >Area<select id="area">
@@ -935,13 +941,67 @@
             No matching ideas. Clear the filters or try another search.
           </p>
         </section>
+        <section class="section" id="discovery">
+          <div class="section-heading">
+            <h2>Which download links can we grab?</h2>
+            <span class="small">Feasibility, not universal support.</span>
+          </div>
+          <div class="baseline">
+            <article>
+              <h3>Direct and linked files</h3>
+              <p>
+                Normal redirects, HTML links and supported landing pages are
+                practical first steps. Review candidates, then use the existing
+                guarded downloader. Bound every crawl by origin, depth, pages,
+                bytes and time.
+              </p>
+              <code>L01–L04 · D01–D03</code>
+            </article>
+            <article>
+              <h3>Signed URLs and cookies</h3>
+              <p>
+                Playwright observes downloads and shares a browser-context
+                cookie jar. A separate browser-assisted resolver is feasible.
+                Some requests also need a method, body, CSRF token or live
+                session. Start with controlled fixtures and supported sites.
+              </p>
+              <code>L05–L06 · D05</code>
+            </article>
+            <article>
+              <h3>The user's browser is separate</h3>
+              <p>
+                A remotely hosted Express server cannot read cookies from an
+                existing personal browser. Offer explicit login in an isolated
+                resolver or an opt-in local extension/helper. Do not scrape
+                browser profiles or export all cookies.
+              </p>
+              <code>Private per-user, per-origin sessions</code>
+            </article>
+            <article>
+              <h3>Some downloads stay manual</h3>
+              <p>
+                DRM, CAPTCHA, device-bound sessions, one-time responses and
+                access restrictions prevent universal support. Explain
+                unsupported cases and retain manual import. A browser-only blob
+                URL is not a reusable server link.
+              </p>
+              <code>A07 · L05</code>
+            </article>
+          </div>
+        </section>
         <section class="section" id="video">
           <div class="section-heading">
-            <h2>What fast video actually needs</h2>
+            <h2>Completed media plan, kept for reference</h2>
             <span class="small"
               >Preparation, delivery, then player behavior.</span
             >
           </div>
+          <p class="track-intro">
+            Historical design notes from the September v3.3.2 review follow.
+            Present-tense descriptions in this section describe that baseline,
+            not v3.19.0. Completed V/T/U/S/Q cards record delivery evidence. New
+            player cleanup and preparation work is in N06 and P01–P02.
+          </p>
           <article class="deep">
             <h3>Scrubbing has two separate jobs</h3>
             <p>
@@ -1122,35 +1182,46 @@
           <div class="sequence">
             <article>
               <span class="eyebrow">Phase 1</span>
-              <h3>Make playback trustworthy</h3>
+              <h3>Fix daily friction</h3>
               <p>
-                V01, V02, V04, V07, Q01. Measure seeks, publish complete
-                segments, align manifests and stop unnecessary player reloads.
+                N01–N06, A01, A05, D01–D02. Compact themed controls, one
+                timeline, truthful extraction progress, archive selection and
+                durable HTTP recovery.
               </p>
             </article>
             <article>
               <span class="eyebrow">Phase 2</span>
-              <h3>Make seeking fast</h3>
+              <h3>Finish file workflows</h3>
               <p>
-                V03, V05, V06, S02. Prepare a low rendition, add safe seek
-                windows and cached thumbnail previews. Bound disk and CPU use.
+                A02–A04, A06–A08, F01–F04, F06. Add archive recovery, nested
+                browsing, export, local import, bounded text and complete audio.
               </p>
             </article>
             <article>
               <span class="eyebrow">Phase 3</span>
-              <h3>Let users choose files</h3>
+              <h3>Discover and batch</h3>
               <p>
-                T01, T02, T03, S01, Q02. Deliver selection with retained
-                metadata, restart recovery and a working Download later action.
+                D03–D06, L01–L04. Bounded crawling, filtered bulk selection and
+                fair scheduling. Prototype L05; require L06 before persisted
+                credentials or shared deployment.
               </p>
             </article>
             <article>
               <span class="eyebrow">Phase 4</span>
-              <h3>Polish daily use</h3>
+              <h3>Consolidate tooling</h3>
               <p>
-                U01–U05, V08–V09, T04–T05, Q03. Add clearer status, mobile
-                controls, resume, subtitles and queue controls as demand
-                warrants.
+                B01–B04 can proceed after a baseline without waiting for every
+                feature. Pin stable compatible releases, prove lint parity, add
+                CSS lint and retain checks.
+              </p>
+            </article>
+            <article>
+              <span class="eyebrow">Phase 5</span>
+              <h3>Prepare and review</h3>
+              <p>
+                P01–P02, F05, N07–N08, B05. Prefer saved renditions, add global
+                search and finish the device audit with deliberate storage
+                limits.
               </p>
             </article>
           </div>
@@ -1161,78 +1232,81 @@
                 <thead>
                   <tr>
                     <th>Keep / change</th>
-                    <th>Recommendation</th>
-                    <th>When to revisit</th>
+                    <th>Reason</th>
+                    <th>Verification</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td>Keep React + Vite + Express</td>
+                    <td>Keep React + Express + typed contracts</td>
                     <td>
-                      The app needs better media scheduling, not server
-                      rendering. Keep current feature boundaries.
+                      Archives and downloads fit existing feature boundaries. No
+                      server-rendering rewrite is needed.
                     </td>
                     <td>
-                      Consider a larger framework only for a concrete routing or
-                      server-rendering need.
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Keep hls.js + FFmpeg</td>
-                    <td>
-                      Use existing ABR. Fix packaging, caching and rendition
-                      readiness before changing players.
-                    </td>
-                    <td>
-                      Add DASH only for a tested device or distribution
-                      requirement. Low-latency live HLS is not the first answer
-                      to VOD scrubbing.
+                      Extend oRPC/Zod contracts and real integration fixtures.
                     </td>
                   </tr>
                   <tr>
-                    <td>Keep WebTorrent</td>
+                    <td>Migrate to Vite+</td>
                     <td>
-                      Extend the current adapter with metadata review and
-                      file-level selection.
+                      Consolidate compatible dev/build/test/lint/format commands
+                      using stable compatible releases.
                     </td>
                     <td>
-                      Evaluate a separate torrent daemon only if long-running
-                      seeding or operating limits outgrow this process.
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Add SQLite for retained state</td>
-                    <td>
-                      Persist jobs, torrent metadata and file choices in
-                      transactions. Keep media files on disk. Evaluate the
-                      deployed Node runtime's SQLite API before choosing a
-                      driver.
-                    </td>
-                    <td>
-                      Postgres becomes useful for multiple app instances or
-                      shared multi-user state, not this first persistence pass.
+                      Preserve server/shared output, container imports, coverage
+                      and all browsers.
                     </td>
                   </tr>
                   <tr>
-                    <td>Keep the quality toolchain</td>
+                    <td>Oxlint/Oxfmt with rule parity</td>
                     <td>
-                      Add real media, restart and selective-download regressions
-                      to existing Vitest and Playwright coverage.
+                      Use supported rules and retain narrow ESLint checks for
+                      useful gaps. Formatting has one owner.
                     </td>
                     <td>
-                      Use a dedicated benchmark worker only when stable timings
-                      cannot be collected locally.
+                      Document strict typed rules and exceptions; test
+                      deliberately invalid fixtures.
                     </td>
                   </tr>
                   <tr>
-                    <td>Defer distributed infrastructure</td>
+                    <td>Add Stylelint</td>
+                    <td>Validate CSS and prevent theme-token regressions.</td>
                     <td>
-                      Start with bounded local encoder jobs, durable state and a
-                      measured cache budget.
+                      Fix the baseline; compare all device/theme screenshots.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Extend SQLite and local workers</td>
+                    <td>
+                      Retain HTTP jobs, archive manifests and metadata without a
+                      distributed queue.
                     </td>
                     <td>
-                      Add a worker service, object storage or CDN when
-                      concurrent use and egress measurements justify them.
+                      Restart, ownership, quota, interruption and deletion
+                      checks.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Optional isolated browser resolver</td>
+                    <td>
+                      Use for supported dynamic/authenticated downloads that
+                      HTTP cannot resolve.
+                    </td>
+                    <td>
+                      Explicit login, session isolation, network sandbox and
+                      redacted diagnostics.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Keep hls.js, FFmpeg and WebTorrent</td>
+                    <td>
+                      Completed work covers playback, caching and selective
+                      torrents.
+                    </td>
+                    <td>
+                      Reuse limits and preparation; replace only for measured
+                      incompatibilities.
                     </td>
                   </tr>
                 </tbody>
@@ -1243,13 +1317,56 @@
         <section class="section sources" id="references">
           <h2>Sources & scope</h2>
           <p>
-            Prepared from the local v3.3.2 checkout on 6 September 2026. This is
-            a code review and product proposal. The app's production playback
-            speed, current CI results and rendered app UI were not audited. UI
-            suggestions are based on component code and the requested workflows.
-            A missing feature means it was not found in the reviewed path.
+            Updated from local v3.19.0 at commit 8b01237 on 19 October 2026.
+            Code inspection covers extraction, downloads, retention, previews,
+            themes, session rail and tooling. The original 28 tasks are complete
+            per their delivery notes and the requested scope. The 41 new tasks
+            are proposals. Reported visual issues are audit targets; this
+            planning pass does not certify production performance or
+            site-specific authenticated downloads.
+          </p>
+          <p>
+            The global Vite+ CLI was installed separately at v1.3.0 during this
+            review. The project's Vite+ migration remains proposed in B01–B04;
+            installing the global command does not migrate project scripts or
+            dependencies.
           </p>
           <ul>
+            <li>
+              <a href="https://viteplus.dev/guide/migrate">Vite+ migration</a>,
+              <a href="https://viteplus.dev/guide/migrate-rules"
+                >migration rules</a
+              >
+              and <a href="https://viteplus.dev/guide/lint">lint guidance</a>.
+              Check compatibility and stable releases when B01 starts.
+            </li>
+            <li>
+              <a href="https://stylelint.io/user-guide/get-started/"
+                >Stylelint setup</a
+              >
+              for CSS linting.
+            </li>
+            <li>
+              <a href="https://playwright.dev/docs/downloads"
+                >Playwright downloads</a
+              >,
+              <a href="https://playwright.dev/docs/network"
+                >network observation</a
+              >
+              and
+              <a href="https://playwright.dev/docs/api/class-apirequestcontext"
+                >cookie context</a
+              >
+              support resolver feasibility.
+            </li>
+            <li>
+              <a
+                href="https://developer.chrome.com/docs/extensions/reference/api/downloads"
+                >Chrome downloads API</a
+              >
+              is a starting point for an optional local helper, not proof that a
+              server can access browser cookies.
+            </li>
             <li>
               <a href="https://ffmpeg.org/ffmpeg-formats.html#hls-2"
                 >FFmpeg HLS muxer documentation</a
@@ -1291,6 +1408,695 @@
     </div>
     <script>
       const ideas = [
+        {
+          id: "A01",
+          area: "Archives",
+          priority: "P0",
+          effort: "L",
+          status: "Proposed",
+          title: "Inspect ZIP contents before extracting",
+          summary:
+            "Choose the files and folders worth extracting, with an honest disk estimate.",
+          now: "extractZip reads the central directory, then extracts every entry. Torrent selection already exists separately.",
+          plan: "Create a validated archive manifest with stable entry IDs, compressed/expanded sizes and a searchable selection dialog. Stream only selected ZIP entries, retain the source for Extract more later and reserve disk for source plus selected output. Explain that solid 7z/RAR may require reading preceding data.",
+          done: "A 10,000-entry ZIP opens without extraction. Selecting two files writes exactly those files with matching hashes. Extract more reuses the source; cancel, duplicate names and disk-full never publish truncated files.",
+          depends: "None",
+          note: "",
+          evidence:
+            "server/application/jobs/extractSessionSource.ts; server/infrastructure/archive/archiveLimits.ts; server/infrastructure/archive/listExtractedEntries.ts",
+        },
+        {
+          id: "A02",
+          area: "Archives",
+          priority: "P1",
+          effort: "M",
+          status: "Proposed",
+          title: "Open password-protected archives safely",
+          summary: "Retry a password without downloading the archive again.",
+          now: "extractSessionSource explicitly rejects encrypted archives. A bundled 7zip adapter already handles other formats.",
+          plan: "Add a password-required job state and retry action. Investigate safe secret transport to 7zip, including process-list exposure. Never interpolate a shell command. Keep passwords transient by default, support encrypted headers and distinguish wrong password from corruption.",
+          done: "Encrypted ZIP and 7z fixtures open with a correct password; wrong passwords remain retryable. Secrets never enter events, logs, persisted source URLs or exports. Restart asks again, and cancel removes partial extraction.",
+          depends: "A01",
+          note: "",
+          evidence:
+            "server/application/jobs/extractSessionSource.ts; server/infrastructure/archive/archiveLimits.ts; server/infrastructure/archive/listExtractedEntries.ts; server/infrastructure/process/commandRunner.ts",
+        },
+        {
+          id: "A03",
+          area: "Archives",
+          priority: "P1",
+          effort: "L",
+          status: "Proposed",
+          title: "Browse nested archives on demand",
+          summary:
+            "Open an archive inside an archive without unpacking the whole chain.",
+          now: "Extracted entries become a file tree; the reviewed path has no nested archive navigation.",
+          plan: "Add Open archive, parent breadcrumbs and separately owned child manifests. Extract only selected child content. Apply cumulative expanded-byte, depth, entry, disk and time budgets across the entire chain; cache child indexes under their parent session.",
+          done: "ZIP → 7z → text opens with working Back navigation. Archive bombs and symlink escapes stop within cumulative limits. Deleting a parent cleans its owned child data.",
+          depends: "A01",
+          note: "",
+          evidence:
+            "server/application/jobs/extractSessionSource.ts; server/infrastructure/archive/archiveLimits.ts; server/infrastructure/archive/listExtractedEntries.ts; client/src/components/Preview/BinaryPreviewContent.tsx",
+        },
+        {
+          id: "A04",
+          area: "Archives",
+          priority: "P1",
+          effort: "M",
+          status: "Proposed",
+          title: "Make format and multipart support explicit",
+          summary:
+            "Show which archive formats actually work in the shipped container.",
+          now: "Archive detection and the 7zip fallback exist, but format names alone do not establish tested support.",
+          plan: "Publish a read/extract capability matrix for ZIP, ZIP64, 7z, RAR and TAR based on shipped binaries. Group .7z.001 and .part01.rar sources; ask for missing volumes before extraction. Preserve Unicode/timestamps and detect case collisions on Windows.",
+          done: "Production-container fixtures cover every advertised format, multipart and ZIP64. Missing volumes, unsupported compression and case collisions get actionable errors without silent overwrites.",
+          depends: "A01",
+          note: "",
+          evidence:
+            "server/application/jobs/extractSessionSource.ts; server/infrastructure/archive/archiveLimits.ts; server/infrastructure/archive/listExtractedEntries.ts; server/infrastructure/runtime/mediaClassification.ts; Dockerfile",
+        },
+        {
+          id: "A05",
+          area: "Archives",
+          priority: "P0",
+          effort: "M",
+          status: "Proposed",
+          title: "Show truthful extraction progress and recovery",
+          summary:
+            "Separate indexing, checking and extraction so a large archive never looks frozen.",
+          now: "createProgress derives both completed and total counts from the growing extracted entries array.",
+          plan: "Use manifest totals and expanded bytes. Report current entry, completed entries and cancel state. Extract to staging and publish atomically. Retain a verified source on recoverable failure; retry safely and expose partial entries only if explicitly marked.",
+          done: "A throttled ZIP reports monotonic progress against a fixed total and never claims early completion. Cancel is prompt; disk-full and interrupted-worker retries cannot expose truncated files as ready.",
+          depends: "A01",
+          note: "",
+          evidence:
+            "server/application/jobs/extractSessionSource.ts; server/infrastructure/archive/archiveLimits.ts; server/infrastructure/archive/listExtractedEntries.ts; server/application/jobs/processSessionJob.ts",
+        },
+        {
+          id: "A06",
+          area: "Archives",
+          priority: "P1",
+          effort: "M",
+          status: "Proposed",
+          title: "Export selected files and folders as a ZIP",
+          summary: "Download a useful subset with its folder structure.",
+          now: "Explorer and per-file download routes exist; no selected-file bundle workflow was found.",
+          plan: "Add multiselect and Download selection. Stream a ZIP with backpressure and cancellation instead of buffering it in memory. Preserve relative paths, define collision handling and avoid recompressing already compressed media by default. Confirm large exports.",
+          done: "Selected files round-trip with identical hashes and paths. Disconnect stops work. Concurrent exports stay within memory/CPU budgets; traversal, deleted sessions and unavailable torrent entries are rejected.",
+          depends: "A01",
+          note: "",
+          evidence:
+            "client/src/components/TreeExplorer.tsx; client/src/components/ExplorerTablePanel.tsx; client/src/features/workspace/; server/handlers/fileRoutes.ts",
+        },
+        {
+          id: "A07",
+          area: "Archives",
+          priority: "P1",
+          effort: "M",
+          status: "Proposed",
+          title: "Import local files and archives",
+          summary:
+            "Drop a device ZIP or open a file without finding a public URL.",
+          now: "Source jobs are URL-oriented; the extraction layer already accepts a local disk path.",
+          plan: "Add accessible drag/drop and file picker with streamed uploads, storage admission and separate upload/extraction progress. Reuse detection and archive validation. Allow cancellation and document browser limits for directory uploads; never buffer a large upload in browser memory.",
+          done: "Desktop drop and mobile file picker import ZIP/image/text/audio. Oversized uploads cannot exhaust disk, interrupted uploads are cleaned up and retries do not duplicate sessions.",
+          depends: "A01",
+          note: "",
+          evidence:
+            "server/application/jobs/extractSessionSource.ts; server/infrastructure/archive/archiveLimits.ts; server/infrastructure/archive/listExtractedEntries.ts; server/handlers/sessionJobs.ts",
+        },
+        {
+          id: "A08",
+          area: "Archives",
+          priority: "P1",
+          effort: "M",
+          status: "Proposed",
+          title: "Verify integrity and explain archive failures",
+          summary:
+            "Distinguish incomplete transfer, CRC failure, wrong password and unsupported format.",
+          now: "Path, count and disk protections exist, but archive repair is not a complete user workflow.",
+          plan: "Add optional bounded archive testing, checksum verification and structured error codes. Keep originals until validation succeeds. Offer retry download, password entry, missing-volume collection or explicitly marked verified partial content. Retain actual streamed-byte and expansion protections.",
+          done: "Truncated ZIP, CRC, hostile metadata and wrong-password fixtures produce different recovery actions. Partial results are never silently counted as a complete library.",
+          depends: "A01, A02",
+          note: "",
+          evidence:
+            "server/application/jobs/extractSessionSource.ts; server/infrastructure/archive/archiveLimits.ts; server/infrastructure/archive/listExtractedEntries.ts",
+        },
+        {
+          id: "D01",
+          area: "Downloads",
+          priority: "P0",
+          effort: "L",
+          status: "Proposed",
+          title: "Retain HTTP downloads across restart",
+          summary:
+            "Give ordinary downloads the durable lifecycle already available to torrents.",
+          now: "SQLite retains torrents; HTTP sessions remain temporary. Segmented transfer and resume helpers already exist.",
+          plan: "Persist original/resolved source metadata, validators, partial-file maps and ownership atomically. Reconcile files at startup. Use If-Range with strong ETag or valid Last-Modified before reusing bytes; restart safely when source identity changes. Preserve pause and oversize confirmation.",
+          done: "Kill/restart during transfer and segment assembly; final hashes match and reused bytes are counted once. Changed origins never mix payload versions. A verified source survives interrupted extraction; deletion removes only owned files.",
+          depends: "None",
+          note: "",
+          evidence:
+            "server/application/jobs/downloadSessionSource.ts; server/services/segmentedDownloader.ts; server/infrastructure/downloads/remoteMetadata.ts; server/infrastructure/downloads/publicDownload.ts; server/repositories/retainedTorrents.ts; server/infrastructure/downloads/downloadFiles.ts",
+        },
+        {
+          id: "D02",
+          area: "Downloads",
+          priority: "P0",
+          effort: "M",
+          status: "Proposed",
+          title: "Handle unreliable origins without corruption",
+          summary:
+            "Recover from broken HEAD, misleading ranges and expiring links.",
+          now: "Remote metadata uses HEAD and returns empty metadata on failure; range/encoding guards already exist.",
+          plan: "Use a bounded ranged GET probe when HEAD is unsupported. Validate Content-Range, length, encoding and validators on resumed segments. Fall back to one stream safely. Honor Retry-After, cap exponential delay with jitter and classify permanent/auth/HTML-login failures separately.",
+          done: "Fixtures cover HEAD 405, ignored Range, malformed 206, 416, gzip, chunked bodies, dropped connections, changed ETag, 429 and expired signed URLs. Success always matches expected hashes; retry remains bounded and cancelable.",
+          depends: "D01",
+          note: "",
+          evidence:
+            "server/application/jobs/downloadSessionSource.ts; server/services/segmentedDownloader.ts; server/infrastructure/downloads/remoteMetadata.ts; server/infrastructure/downloads/publicDownload.ts; server/services/downloadRetryStorage.test.ts; server/services/redirectGuard.test.ts",
+        },
+        {
+          id: "D03",
+          area: "Downloads",
+          priority: "P1",
+          effort: "M",
+          status: "Proposed",
+          title: "Schedule fairly across hosts and job stages",
+          summary:
+            "Keep bulk transfers from starving previews or overloading one host.",
+          now: "Session queues, HTTP threads, torrent limits and media limits exist separately.",
+          plan: "Add global/per-host caps, fair queueing and priority with reserved interactive capacity. Bound transfer, extraction, indexing and browser resolution independently. Add pause all, resume selected and retry failed batch actions. Show waiting-for-host versus active work.",
+          done: "A 100-link batch respects host caps after redirects while previews remain usable. Pause/reprioritize preserves selections and creates no duplicate work. Resolver-created jobs share the same limits.",
+          depends: "D01",
+          note: "",
+          evidence:
+            "server/application/jobs/downloadSessionSource.ts; server/services/segmentedDownloader.ts; server/infrastructure/downloads/remoteMetadata.ts; server/infrastructure/downloads/publicDownload.ts; server/application/jobs/sessionJobQueue.ts; server/infrastructure/runtime/resourceLimits.ts",
+        },
+        {
+          id: "D04",
+          area: "Downloads",
+          priority: "P1",
+          effort: "M",
+          status: "Proposed",
+          title: "Track provenance, duplicates and checksums",
+          summary:
+            "Know where a file came from and avoid downloading identical payloads twice.",
+          now: "Jobs retain source URLs and metadata; a general duplicate-content workflow was not found.",
+          plan: "Store source page, batch, final URL, safe filename and optional expected checksum. Canonicalize conservatively; never strip signed query parameters blindly. Compare size/content hash after transfer and offer reuse/keep both/replace with explicit ownership. Redact query tokens and credentials.",
+          done: "Identical bytes from different URLs can reuse verified content without shared-deletion bugs. Same filename/different bytes remains distinct. Checksum mismatch blocks publication; exported provenance contains no secrets.",
+          depends: "D01",
+          note: "",
+          evidence:
+            "server/application/jobs/downloadSessionSource.ts; server/services/segmentedDownloader.ts; server/infrastructure/downloads/remoteMetadata.ts; server/infrastructure/downloads/publicDownload.ts; server/domain/models.ts; server/application/sessions/sessionStorage.ts",
+        },
+        {
+          id: "D05",
+          area: "Downloads",
+          priority: "P1",
+          effort: "M",
+          status: "Proposed",
+          title: "Refresh expired sources and alternate mirrors",
+          summary:
+            "Replace a dead source while retaining only trustworthy partial work.",
+          now: "The retry loop retries the current URL; source refresh and mirror identity are not complete user flows.",
+          plan: "Add Replace source and a resolver refresh hook. Store mirror candidates with identity/checksum information. Reuse partial data only when identity is verified; otherwise restart with an explanation. Distinguish replayable GET from one-time POST and browser-only downloads.",
+          done: "A refreshed signed link finishes the same payload. Different bytes with the same length never inherit old segments. Cancel stops resolution/transfer; authentication-required pauses never retry indefinitely.",
+          depends: "D01, D02, L04",
+          note: "",
+          evidence:
+            "server/application/jobs/downloadSessionSource.ts; server/services/segmentedDownloader.ts; server/infrastructure/downloads/remoteMetadata.ts; server/infrastructure/downloads/publicDownload.ts",
+        },
+        {
+          id: "D06",
+          area: "Downloads",
+          priority: "P1",
+          effort: "M",
+          status: "Proposed",
+          title: "Explain transfer and storage totals",
+          summary:
+            "Show useful throughput and disk forecasts without fake precision.",
+          now: "Speed, ETA, size confirmation and storage admission exist; new bulk/archive stages need whole-flow totals.",
+          plan: "Separate source bytes, selected expanded bytes, originals, derived media and reserved disk. Use unknown when totals are missing. Separate network ETA from extraction/preparation. Add batch totals and a redacted failure report; preserve visible actions with long titles.",
+          done: "Unknown-size and stalled jobs never show fabricated percentage/ETA. At 360px long names do not hide status/actions. Disk estimates include source, extraction and configured derived media.",
+          depends: "A01, D03",
+          note: "",
+          evidence:
+            "server/application/jobs/downloadSessionSource.ts; server/services/segmentedDownloader.ts; server/infrastructure/downloads/remoteMetadata.ts; server/infrastructure/downloads/publicDownload.ts; client/src/features/workspace/workspaceProgress.ts",
+        },
+        {
+          id: "L01",
+          area: "Discovery",
+          priority: "P0",
+          effort: "M",
+          status: "Proposed",
+          title: "Extract downloadable links from a page",
+          summary:
+            "Paste a page URL and review file candidates before queueing anything.",
+          now: "No general HTML link extractor or crawler was found in the reviewed API/client paths.",
+          plan: "Fetch bounded HTML through the public-URL guard. Use an HTML parser for anchors, relative/base URLs and download hints. Classify files versus pages; show name, type, source page, confidence and unknown sizes. Offer one Add selected action and keep direct entry fast.",
+          done: "A local page with relative links, duplicates, redirects and extensionless files produces correct candidates. Nothing downloads before confirmation. Oversized/malformed HTML and unsafe URLs fail cleanly.",
+          depends: "None",
+          note: "",
+          evidence:
+            "server/infrastructure/downloads/publicDownload.ts; server/application/jobs/sessionJobQueue.ts; client/src/features/workspace/useWorkspaceQueue.ts",
+        },
+        {
+          id: "L02",
+          area: "Discovery",
+          priority: "P0",
+          effort: "L",
+          status: "Proposed",
+          title: "Crawl sublinks with explicit limits",
+          summary:
+            "Find files several pages deep without crawling an entire site.",
+          now: "No recursive crawl was found in the reviewed source paths.",
+          plan: "Use breadth-first crawling with depth/page/time/byte budgets and per-host rate limits. Default to same origin; honor robots policy and Retry-After. Detect visited URLs, loops and calendar traps without breaking signed links. Allow cancel/pause and explicit additional-host allowlists.",
+          done: "A fixture site with pagination, loops, cross-host links and infinite query variants stops at its budgets. Every fetch, redirect and DNS resolution obeys SSRF safeguards including private IPs and rebinding.",
+          depends: "L01, D03",
+          note: "",
+          evidence:
+            "server/infrastructure/downloads/publicDownload.ts; server/application/jobs/sessionJobQueue.ts; client/src/features/workspace/useWorkspaceQueue.ts; server/services/redirectGuard.test.ts",
+        },
+        {
+          id: "L03",
+          area: "Discovery",
+          priority: "P0",
+          effort: "M",
+          status: "Proposed",
+          title: "Filter and download all matching files",
+          summary: "Turn nested pages into one reviewable file batch.",
+          now: "Torrent file selection offers a reusable interaction pattern; no discovery result list exists.",
+          plan: "Add MIME/extension, filename/path wildcard, size and include/exclude filters. Group by source page, deduplicate and support Select all matching across pagination with explicit totals. Freeze the reviewed batch before enqueueing. Add retry failed and URL-list export/import.",
+          done: "Crawl three levels, find PDFs/ZIPs, select every matching result and download exact bytes once. Unknown sizes remain visible; newly found results never silently change a confirmed selection.",
+          depends: "L01, L02, D03",
+          note: "",
+          evidence:
+            "server/infrastructure/downloads/publicDownload.ts; server/application/jobs/sessionJobQueue.ts; client/src/features/workspace/useWorkspaceQueue.ts; client/src/components/ExplorerTablePanel.tsx",
+        },
+        {
+          id: "L04",
+          area: "Discovery",
+          priority: "P1",
+          effort: "M",
+          status: "Proposed",
+          title: "Resolve supported download landing pages",
+          summary:
+            "Handle redirects and signed links through small tested resolvers.",
+          now: "Public redirect validation exists; no host-specific resolver layer was found.",
+          plan: "Try normal HTTP redirects and supported metadata before a browser. Define resolver output with expiry, headers, filename and refresh behavior. Add adapters only for documented/tested site behavior. Explain unsupported hosts rather than guessing at arbitrary network responses.",
+          done: "A supported landing page resolves an expiring signed URL and refreshes it. Unknown sites give useful feedback. Redirects remain bounded and never forward secrets to unrelated origins.",
+          depends: "L01, D02",
+          note: "",
+          evidence:
+            "server/infrastructure/downloads/publicDownload.ts; server/application/jobs/sessionJobQueue.ts; client/src/features/workspace/useWorkspaceQueue.ts",
+        },
+        {
+          id: "L05",
+          area: "Discovery",
+          priority: "P1",
+          effort: "L",
+          status: "Proposed",
+          title: "Prototype cookie and dynamic download capture",
+          summary:
+            "Use an authorized browser session when a download exists only after a click.",
+          now: "Feasible for supported sites, not universal. Playwright observes download/network events and shares a browser-context cookie jar; the server currently has no such flow.",
+          plan: "Add an optional isolated browser resolver. Let the user sign in and initiate a supported download. Capture only required method/body/headers, cookie scope and expiry. Stream browser-only responses to admitted storage. For remote hosting evaluate an opt-in local extension/helper; server JS cannot read the user's existing browser cookies.",
+          done: "Fixtures cover JS-signed GET, cookie-only GET, CSRF POST, blob download, expiry and logout. Cancel/refresh work; secrets stay out of logs/exports. Browser network access and CPU/time are bounded. CAPTCHA, DRM, paywalls and device-bound sessions remain explicit unsupported/manual cases.",
+          depends: "L04, D01, D05",
+          note: "",
+          evidence:
+            "server/infrastructure/downloads/publicDownload.ts; server/application/jobs/sessionJobQueue.ts; client/src/features/workspace/useWorkspaceQueue.ts; Dockerfile; https://playwright.dev/docs/downloads; https://playwright.dev/docs/api/class-apirequestcontext",
+        },
+        {
+          id: "L06",
+          area: "Discovery",
+          priority: "P1",
+          effort: "M",
+          status: "Proposed",
+          title: "Protect resolver credentials and browser sessions",
+          summary:
+            "Avoid turning authenticated resolution into a cookie exporter.",
+          now: "Authenticated resolution adds secrets and browser execution beyond the public downloader.",
+          plan: "Default to ephemeral per-user/per-origin sessions and explicit disconnect. Gate persisted state behind encryption using a deployment secret and documented expiry. Do not accept arbitrary browser profiles, shell commands or unrestricted headers. Require API authentication/authorization before shared deployment.",
+          done: "Users cannot access one another's sessions. Logout deletes state. Browser subresource/redirect tests block localhost/private services and metadata endpoints. Diagnostics contain no Cookie, Authorization, query token or POST secret.",
+          depends: "L05",
+          note: "",
+          evidence:
+            "server/infrastructure/downloads/publicDownload.ts; server/application/jobs/sessionJobQueue.ts; client/src/features/workspace/useWorkspaceQueue.ts; server/bootstrap/; server/contracts/",
+        },
+        {
+          id: "F01",
+          area: "Files",
+          priority: "P1",
+          effort: "M",
+          status: "Proposed",
+          title: "Preview documents with explicit limits",
+          summary: "Read PDFs within the archive workspace.",
+          now: "Preview components cover image, text, audio, video and a binary fallback; no PDF viewer was found.",
+          plan: "Start with a lazy-loaded PDF viewer with pages, zoom, search and original download. Keep unsupported Office formats explicit; evaluate isolated conversion separately. Cap page count, memory, embedded content and conversion time. Never send user files to third-party conversion implicitly.",
+          done: "Multi-page/password PDFs have usable phone/desktop states. Embedded scripts/external content do not execute. Unsupported documents retain a working download instead of a blank preview.",
+          depends: "None",
+          note: "",
+          evidence:
+            "client/src/components/Preview/; server/handlers/fileRoutes.ts; client/src/features/workspace/textPreviewLoader.ts",
+        },
+        {
+          id: "F02",
+          area: "Files",
+          priority: "P1",
+          effort: "M",
+          status: "Proposed",
+          title: "Read large text, code and tables safely",
+          summary:
+            "Preview logs, JSON, CSV and source without freezing the tab.",
+          now: "loadTextPreview calls response.text and retains the full string in a Map.",
+          plan: "Use bounded byte-range loading, encoding/BOM detection, virtualized lines, wrap and copy. Add optional safe highlighting, JSON formatting and CSV/TSV table mode with escaping/row limits. Label truncation and binary content; bound cached bytes with eviction.",
+          done: "A 200 MB log opens a bounded responsive preview. UTF-16, malformed JSON, quoted CSV and long lines behave predictably. HTML stays escaped; search explains whether it covers a chunk or the full file.",
+          depends: "None",
+          note: "",
+          evidence:
+            "client/src/components/Preview/; server/handlers/fileRoutes.ts; client/src/features/workspace/textPreviewLoader.ts",
+        },
+        {
+          id: "F03",
+          area: "Files",
+          priority: "P1",
+          effort: "M",
+          status: "Proposed",
+          title: "Build image album and comic reading flows",
+          summary: "Extend the app's original image browsing strength.",
+          now: "Image preview, navigation and slideshow exist; collection reading can reuse them.",
+          plan: "Add natural filename order, fit width/height, reading direction, thumbnails and remembered page. Recognize CBZ as ZIP and evaluate CBR through tested RAR support. Load nearby pages only; handle EXIF rotation and animated images.",
+          done: "page2 precedes page10. Touch/keyboard navigation preserves input focus. Large albums use bounded thumbnails, resume correctly and recover from failed images without losing the collection.",
+          depends: "A01",
+          note: "",
+          evidence:
+            "client/src/components/Preview/; server/handlers/fileRoutes.ts; client/src/features/workspace/textPreviewLoader.ts; client/src/features/workspace/imageNavigation.ts; server/infrastructure/media/imagePreviews.ts",
+        },
+        {
+          id: "F04",
+          area: "Files",
+          priority: "P0",
+          effort: "L",
+          status: "Proposed",
+          title: "Create a complete responsive audio player",
+          summary:
+            "Give music, speech and playlists a proper listening experience.",
+          now: "AudioPreviewContent uses a native audio element styled with video-player plus size/timestamp text.",
+          plan: "Add accessible play/pause, one seek bar, elapsed/duration, volume, speed, skip and track navigation. Add queue/repeat/shuffle, supported metadata/artwork and optional bounded waveform generation. Use Media Session where supported and a compact persistent phone player. Keep a native fallback.",
+          done: "360px/tablet/desktop touch and keyboard flows work with visible focus. OS media controls work where supported; deliberate queue state survives track changes. Missing duration/codecs/artwork have useful fallbacks and first open never autoplays.",
+          depends: "N03",
+          note: "",
+          evidence:
+            "client/src/components/Preview/; server/handlers/fileRoutes.ts; client/src/features/workspace/textPreviewLoader.ts; client/src/components/Preview/AudioPreviewContent.tsx",
+        },
+        {
+          id: "F05",
+          area: "Files",
+          priority: "P1",
+          effort: "M",
+          status: "Proposed",
+          title: "Search across retained file libraries",
+          summary: "Find files without opening every session.",
+          now: "Explorer filters and large-folder handling exist, but navigation remains session-oriented.",
+          plan: "Index name/path/type/date/size with stable IDs in the existing SQLite store. Add global metadata search, favorites and recent files. Start with metadata; add bounded opt-in text indexing later. Reconcile deleted/expired paths and open only available previews.",
+          done: "Search 100,000 metadata rows with measured latency and bounded memory. Results open the right file after restart. Deleted, unavailable and expired temporary files never remain as ready ghost results.",
+          depends: "D01, N05",
+          note: "",
+          evidence:
+            "client/src/components/TreeExplorer.tsx; client/src/components/ExplorerTablePanel.tsx; client/src/features/workspace/; server/repositories/retainedTorrents.ts",
+        },
+        {
+          id: "F06",
+          area: "Files",
+          priority: "P1",
+          effort: "M",
+          status: "Proposed",
+          title: "Keep ZIP libraries deliberately",
+          summary:
+            "Separate retention of originals, extracted content and preview caches.",
+          now: "Retained torrents and explicit storage deletion exist; HTTP-created sessions are temporary.",
+          plan: "Add Keep library, pin, rename and expiry for HTTP/imported archives and direct files. Retain source/extracted content independently with clear costs. Reuse storage ownership and cache eviction; document metadata-plus-payload backup/restore and startup reconciliation.",
+          done: "A pinned ZIP survives restart and viewer close. Clearing previews preserves originals. Expiry cannot remove pinned/active files; deletion cleans only owned metadata and payload.",
+          depends: "D01, A01",
+          note: "",
+          evidence:
+            "server/application/jobs/extractSessionSource.ts; server/infrastructure/archive/archiveLimits.ts; server/infrastructure/archive/listExtractedEntries.ts; server/application/sessions/sessionStorage.ts; server/repositories/retainedTorrents.ts",
+        },
+        {
+          id: "N01",
+          area: "Interface",
+          priority: "P0",
+          effort: "M",
+          status: "Proposed",
+          title: "Add AMOLED and neutral charcoal dark themes",
+          summary:
+            "Replace blue-grey surfaces with deliberate black and neutral-grey choices.",
+          now: "tokens.css uses blue-grey values such as #10171d/#1b2630. System/light/dark mode already exists.",
+          plan: "Define semantic surface/elevated/border/text/focus tokens. Offer AMOLED near #050505 and charcoal near #111214 with distinguishable layers. Remove component hard-coded colors and review disabled/error/success states. Final values must pass contrast checks.",
+          done: "All app screens and portals use the chosen dark subtheme without unreadable states or invisible focus/borders. Check AA text contrast across four device sizes, forced colors and reduced motion; preserve light mode.",
+          depends: "None",
+          note: "",
+          evidence:
+            "client/src/styles/; client/src/components/GlobalSettingsSheet.tsx; client/src/components/Common/CustomDropdown.tsx; client/src/styles/tokens.css",
+        },
+        {
+          id: "N02",
+          area: "Interface",
+          priority: "P0",
+          effort: "M",
+          status: "Proposed",
+          title: "Choose accents independently of theme mode",
+          summary:
+            "Apply an accent to light and dark; keep System mode working.",
+          now: "AppearanceConfiguration/useLocalStorageSettings already offer System/Light/Dark and listen to OS changes. Accent and dark-subtheme choices are missing.",
+          plan: "Save mode, dark surface and accent separately. Add curated teal/blue/violet/amber/rose presets with theme-specific hover/text/focus colors. Preserve status color meaning. Apply saved choice before first paint, migrate settings and tolerate blocked storage. Verify the existing auto mode rather than duplicating it.",
+          done: "Accent updates buttons/links/selection/focus in both themes. System reacts live to OS changes while explicit mode does not. No bright reload flash; every preset passes contrast checks.",
+          depends: "N01",
+          note: "",
+          evidence:
+            "client/src/styles/; client/src/components/GlobalSettingsSheet.tsx; client/src/components/Common/CustomDropdown.tsx; client/src/components/AppearanceConfiguration.tsx; client/src/hooks/useLocalStorageSettings.ts; tests/e2e/settings-theme.spec.ts",
+        },
+        {
+          id: "N03",
+          area: "Interface",
+          priority: "P0",
+          effort: "M",
+          status: "Proposed",
+          title: "Standardize compact controls and styled menus",
+          summary:
+            "Fix oversized mobile buttons and inconsistent toggles/dropdowns.",
+          now: "Shared controls/CustomDropdown exist; preview/settings screens mix native and custom controls. The global control-height token is 44px.",
+          plan: "Inventory buttons/selects/switches/radios/fields. Standardize compact rows, padding and icon sizes; preserve practical 44px touch targets with compact visuals. Prefer styled native semantics where appropriate; custom menus require full keyboard/focus behavior. Remove one-off dimensions and accidental default browser styles.",
+          done: "At 360/390/820/1440/2560px and 200% zoom, long labels fit and actions remain visible. Touch/pointer/keyboard plus disabled/loading/error states behave consistently. Smaller visuals do not make hit targets unusable.",
+          depends: "N01",
+          note: "",
+          evidence:
+            "client/src/styles/; client/src/components/GlobalSettingsSheet.tsx; client/src/components/Common/CustomDropdown.tsx; client/src/styles/controls.css; tests/e2e/mobile-workspace.spec.ts",
+        },
+        {
+          id: "N04",
+          area: "Interface",
+          priority: "P0",
+          effort: "M",
+          status: "Proposed",
+          title: "Make the file tree dense and scannable",
+          summary:
+            "Replace oversized chip-like navigation with compact file rows.",
+          now: "TreeExplorer, windowing and table views already exist; improve density without rebuilding them.",
+          plan: "Align icon/name/action columns, tighten indentation/gaps and truncate to one line with full-name access. Offer compact/comfortable density and bounded resizable sidebar width. Show secondary badges on hover/focus/selection without requiring hover for touch. Keep multiselect and tree keyboard semantics.",
+          done: "A 10,000-file tree stays responsive; deep/long paths never cover actions. Phone navigation uses a usable drawer and gives space back to the preview after selection.",
+          depends: "N03",
+          note: "",
+          evidence:
+            "client/src/components/TreeExplorer.tsx; client/src/components/ExplorerTablePanel.tsx; client/src/features/workspace/; client/src/components/useTreeWindow.ts; client/src/styles/explorer.css",
+        },
+        {
+          id: "N05",
+          area: "Interface",
+          priority: "P0",
+          effort: "M",
+          status: "Proposed",
+          title: "Show only usable previews in the session rail",
+          summary:
+            "Keep active transfers in Downloads unless a file can actually preview.",
+          now: "buildWorkspaceRailItems maps every job, including downloading/errors, then appends sessions.",
+          plan: "Filter by available ready files or validated live-torrent preview capability. Deduplicate job/session aliases by stable ownership ID. Keep transfer actions in Downloads with a clear link, and give Preview a useful empty state.",
+          done: "Queued/paused/failed HTTP and extraction-only jobs do not appear as openable previews. Ready ZIPs and playable partial torrents do. Availability loss has recovery; job-to-session transition/restart never duplicates cards.",
+          depends: "None",
+          note: "",
+          evidence:
+            "client/src/features/workspace/workspaceRail.ts; client/src/components/Workspace/SessionRail.tsx; client/src/features/workspace/workspaceViewModels.test.ts",
+        },
+        {
+          id: "N06",
+          area: "Interface",
+          priority: "P0",
+          effort: "L",
+          status: "Proposed",
+          title: "Use one video timeline and hide advanced controls",
+          summary:
+            "Give the picture space; open advanced controls only when needed.",
+          now: "VideoPreviewContent renders native video controls plus VideoScrubber and always mounts subtitles/audio sections and explanatory copy.",
+          plan: "Choose one control owner. Either provide a complete accessible custom bar with thumbnail seeking and native failure fallback, or retain native controls and remove the duplicate timeline. Put quality/tracks/subtitle offset/style/diagnostics in Settings. Hide irrelevant sections and show actionable errors in context.",
+          done: "Exactly one usable timeline appears in normal/fullscreen playback. Seek, volume, captions, tracks, keyboard/touch and recovery still work. Gallery shows loaded video, seek preview and committed position at all device sizes. Check iOS native fullscreen separately.",
+          depends: "N03",
+          note: "",
+          evidence:
+            "client/src/components/Preview/VideoPreviewContent.tsx; client/src/components/Preview/VideoScrubber.tsx; client/src/components/Preview/VideoSubtitles.tsx; client/src/components/Preview/VideoAudioTracks.tsx; client/src/styles/player.css",
+        },
+        {
+          id: "N07",
+          area: "Interface",
+          priority: "P0",
+          effort: "M",
+          status: "Proposed",
+          title: "Audit whole-app layouts and audio UX",
+          summary:
+            "Check every device and meaningful state instead of isolated screenshots.",
+          now: "The gallery is extensive but heavily focused on video/torrents. The reported oversized controls and dead subtitle space need a fresh audit.",
+          plan: "Review Downloads/add source/discovery/explorer/image/text/audio/video/settings/storage at phone/tablet/desktop/ultrawide in both themes. Remove repeated subtitles and static explanations that do not support decisions. Check safe areas, landscape, short screens, sticky controls, focus return, scrolling and empty/loading/error states.",
+          done: "Record defects with expected behavior, fix and recapture. No clipped actions or traps at 320px/200% zoom. Verify pointer/touch/keyboard, audio transitions and long names, plus axe and manual focus checks.",
+          depends: "N02, N03, N04, N05, N06, F04",
+          note: "",
+          evidence:
+            "client/src/styles/; client/src/components/GlobalSettingsSheet.tsx; client/src/components/Common/CustomDropdown.tsx; tests/review/; tests/e2e/dialog-accessibility.spec.ts; tests/e2e/mobile-workspace.spec.ts",
+        },
+        {
+          id: "N08",
+          area: "Interface",
+          priority: "P1",
+          effort: "M",
+          status: "Proposed",
+          title: "Make navigation and recovery consistent",
+          summary:
+            "Keep Back, dialogs and failed previews predictable across file types.",
+          now: "Workspace state, dialogs and settings are spread across existing hooks/components.",
+          plan: "Persist selected file/session and filters in stable route state where useful. Define Back from nested archives, discovery and preview. Add concise shortcuts/help and consistent retry/download-original actions. Separate device preferences from server policy; settings reset must never delete files.",
+          done: "Back/forward restores the right file/filters without duplicate work. Menu close restores focus. Failed previews can retry or download; reset settings leaves user content intact.",
+          depends: "N03, A03",
+          note: "",
+          evidence:
+            "client/src/components/TreeExplorer.tsx; client/src/components/ExplorerTablePanel.tsx; client/src/features/workspace/; client/src/features/workspace/workspaceUrls.ts; client/src/hooks/useKeyboardShortcuts.ts",
+        },
+        {
+          id: "P01",
+          area: "Media preparation",
+          priority: "P0",
+          effort: "L",
+          status: "Proposed",
+          title: "Choose automatic post-download video quality",
+          summary:
+            "Prepare a chosen quality once and prefer it over live encoding.",
+          now: "RetainedVideoPreparation already prepares the lowest rendition for retained sessions, but has no complete user quality policy across HTTP/import/torrent completion.",
+          plan: "Add opt-in Off/Auto/chosen-supported-quality with source scope. Trigger only for verified complete videos. Auto uses a documented device/codec-aware target without upscaling. Queue at background priority with progress/cancel/retry, keep originals and key output by source identity, encoding settings, tracks and tool version.",
+          done: "ZIP and selected-torrent videos prepare the chosen quality. After restart, playback/seek uses saved output without another encoder. Off starts no background conversion; failure leaves originals usable and interactive work has priority.",
+          depends: "D01, F06",
+          note: "",
+          evidence:
+            "server/infrastructure/media/prepareRetainedVideo.ts; server/infrastructure/media/prepareRetainedSession.ts; server/media/hlsManifest.ts; client/src/components/GlobalSettingsSheet.tsx",
+        },
+        {
+          id: "P02",
+          area: "Media preparation",
+          priority: "P1",
+          effort: "M",
+          status: "Proposed",
+          title: "Prefer prepared outputs without breaking Auto",
+          summary: "Explain prepared, preparing and live choices honestly.",
+          now: "Direct/remux/adaptive options and caches exist; persistent preparation must fit them.",
+          plan: "Use completed output for explicitly selected prepared quality. In Auto, prefer complete compatible prepared renditions and document when live fallback is permitted. Keep Original and Prepare missing quality actions. Separate durable chosen outputs from evictable seek/storyboard caches and invalidate changed sources/tracks.",
+          done: "Repeated prepared playback and seeks spawn zero encoders for that quality. Missing output follows the selected fallback policy. Track changes cannot reuse mismatched audio/subtitles; deleting derived media preserves originals.",
+          depends: "P01, N06",
+          note: "",
+          evidence:
+            "server/infrastructure/media/derivedMediaCache.ts; server/infrastructure/media/prepareRetainedVideo.ts; client/src/features/player/",
+        },
+        {
+          id: "B01",
+          area: "Tooling",
+          priority: "P0",
+          effort: "M",
+          status: "Proposed",
+          title: "Baseline and stage the Vite+ migration",
+          summary:
+            "Use the latest stable compatible release with exact pins and a rollback point.",
+          now: "The app already has Node 26/pnpm 12/Vite 8/Vitest 5/TypeScript 7/ESLint 10/Prettier 3. Vite+ is tool consolidation.",
+          plan: "At implementation time read official migration/compatibility guidance and registry releases. Record exact compatible versions, baseline timings/checks and rollback. Use the target CLI from the workspace root and review blockers/warnings. Preserve package-manager/test behavior; avoid canary upgrades merely for larger version numbers.",
+          done: "A reviewable migration/lockfile passes clean Windows/Linux installation without undocumented globals. Record cold/warm timing on the same host, incompatibilities and rollback instructions.",
+          depends: "None",
+          note: "",
+          evidence:
+            "package.json; pnpm-lock.yaml; vite.config.ts; vitest.config.ts; tooling/eslint/index.js; lefthook.yml; .github/workflows/quality.yml; https://viteplus.dev/guide/migrate",
+        },
+        {
+          id: "B02",
+          area: "Tooling",
+          priority: "P0",
+          effort: "L",
+          status: "Proposed",
+          title: "Adopt Vite+ without losing server builds",
+          summary:
+            "Consolidate compatible dev/build/test/lint/format configuration.",
+          now: "Vite builds client/; tsc emits ESM server/shared output. Scripts have runner-loader and webstorage workarounds.",
+          plan: "Use supported vite-plus config/test entry points. Preserve React plugin, aliases, root/outDir, proxy, all three TS projects, jsdom/unit separation and coverage. Keep server tsc/full Docker build tree until an alternative proves identical. Update scripts/editor/hooks/CI/docs and remove workarounds only after validating their purpose.",
+          done: "vp check/test/build and compatibility pnpm scripts pass. All browser/gallery/coverage/Fallow/benchmark gates remain. The built container starts, serves the client and resolves shared server imports without new skips or lower thresholds.",
+          depends: "B01",
+          note: "",
+          evidence:
+            "package.json; pnpm-lock.yaml; vite.config.ts; vitest.config.ts; tooling/eslint/index.js; lefthook.yml; .github/workflows/quality.yml; Dockerfile; tsconfig.server.json; https://viteplus.dev/guide/migrate-rules",
+        },
+        {
+          id: "B03",
+          area: "Tooling",
+          priority: "P0",
+          effort: "M",
+          status: "Proposed",
+          title: "Map lint rules and preserve useful typed checks",
+          summary: "Choose rules by defects caught, with explicit parity.",
+          now: "Shared ESLint uses strictTypeChecked, no-explicit-any, hooks, max-lines 350 and max-lines-per-function 80 plus exceptions.",
+          plan: "Map existing rules to supported Oxlint/type-aware equivalents. Preserve floating/misused-promise, unsafe-any, exhaustive-union, unused-code and hook correctness checks. Add applicable accessibility/test rules. Keep a narrow ESLint pass for useful unsupported plugins. Review size rules and set-state-in-effect exception with examples; document exceptions.",
+          done: "A kept/replaced/removed rule table gives reasons. Deliberately invalid fixtures prove typed async/hooks rules fail. Fix violations or justify narrowly; warnings stay fatal and formatting has one owner.",
+          depends: "B01, B02",
+          note: "",
+          evidence:
+            "package.json; pnpm-lock.yaml; vite.config.ts; vitest.config.ts; tooling/eslint/index.js; lefthook.yml; .github/workflows/quality.yml; https://viteplus.dev/guide/lint",
+        },
+        {
+          id: "B04",
+          area: "Tooling",
+          priority: "P0",
+          effort: "M",
+          status: "Proposed",
+          title: "Add CSS lint and enforce theme tokens",
+          summary:
+            "Catch CSS mistakes and prevent one-off colors from undoing theming.",
+          now: "Styles are split into tokens/foundation/controls/explorer/player/preview/workspace. No Stylelint config was found.",
+          plan: "Add stable compatible Stylelint/standard config for actual CSS syntax. Enable invalid/unknown properties, selectors and at-rules, duplicate declarations and useful specificity checks. Use targeted exceptions for intentional cascades/fallbacks. Enforce app color tokens with supported rules or a small scoped check. Let one formatter own layout.",
+          done: "lint:css runs locally/in hooks/CI. Invalid CSS and raw component colors fail. Fix baseline defects without blanket disables and compare all themes/devices. Inline roadmap CSS requires proper HTML syntax support before linting it.",
+          depends: "N01, B03",
+          note: "",
+          evidence:
+            "package.json; pnpm-lock.yaml; vite.config.ts; vitest.config.ts; tooling/eslint/index.js; lefthook.yml; .github/workflows/quality.yml; client/src/styles/; https://stylelint.io/user-guide/get-started/",
+        },
+        {
+          id: "B05",
+          area: "Tooling",
+          priority: "P1",
+          effort: "M",
+          status: "Proposed",
+          title: "Improve dependency and release maintenance",
+          summary:
+            "Extend working tools rather than replacing the stack without evidence.",
+          now: "React/Express/oRPC/Zod/TanStack/SQLite/FFmpeg/hls.js/WebTorrent and broad CI gates already cover their roles.",
+          plan: "Keep these absent a measured problem. Add grouped scheduled dependency updates, lockfile review, runtime/image vulnerability triage, container provenance and license inventory. Extend real HTTP/archive/crawl/contract fixtures and production-image checks. Publish durable screenshots in PR descriptions without asset branches; keep noisy timing benchmarks informational until stable.",
+          done: "Updates pass existing coverage/browsers/container gates. Each dependency has a purpose. Screenshot publishing creates no remote branch; historical PR links remain reachable through archived immutable commits or migrated assets.",
+          depends: "B02, B03, B04",
+          note: "",
+          evidence:
+            "package.json; pnpm-lock.yaml; vite.config.ts; vitest.config.ts; tooling/eslint/index.js; lefthook.yml; .github/workflows/quality.yml; tooling/publish-pr-screenshots.mjs; .agents/skills/pr-screenshots/SKILL.md",
+        },
         {
           id: "V01",
           area: "Video",
