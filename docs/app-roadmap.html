@@ -35,6 +35,10 @@
       select,
       textarea {
         font: inherit;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--white);
+        color: var(--ink);
       }
       a {
         color: var(--green);
@@ -50,17 +54,6 @@
       }
       button {
         cursor: pointer;
-      }
-      button,
-      select,
-      input,
-      textarea {
-        border: 1px solid var(--line);
-        border-radius: 6px;
-        background: var(--white);
-        color: var(--ink);
-      }
-      button {
         padding: 9px 16px;
       }
       button:hover {
@@ -202,6 +195,9 @@
       .callout .eyebrow {
         color: var(--accent);
       }
+      p {
+        margin: 10px 0;
+      }
       .callout p {
         margin: 0;
       }
@@ -230,9 +226,6 @@
         font-size: 19px;
         line-height: 1.35;
         margin: 9px 0 12px;
-      }
-      p {
-        margin: 10px 0;
       }
       .small {
         font-size: 13px;
@@ -418,6 +411,7 @@
         margin-top: auto;
         padding-top: 18px;
       }
+      /* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */
       .card-foot label {
         font-size: 12px;
         color: var(--muted);
@@ -472,7 +466,7 @@
       [hidden] {
         display: none !important;
       }
-      @media (max-width: 1100px) {
+      @media (width <= 1100px) {
         main {
           padding: 32px;
         }
@@ -492,7 +486,7 @@
           margin-top: 0;
         }
       }
-      @media (max-width: 760px) {
+      @media (width <= 760px) {
         .shell {
           display: block;
         }
@@ -583,12 +577,10 @@
         }
         .card {
           break-inside: avoid;
+          margin: 12px 0;
         }
         .cards {
           display: block;
-        }
-        .card {
-          margin: 12px 0;
         }
         .card details {
           display: block;
@@ -1546,16 +1538,16 @@
           area: "Tooling",
           priority: "P0",
           effort: "M",
-          status: "Proposed",
+          status: "Done",
           title: "Add CSS lint and enforce theme tokens",
           summary: "Catch CSS mistakes and prevent one-off colors from undoing theming.",
-          now: "Styles are split into tokens/foundation/controls/explorer/player/preview/workspace. No Stylelint config was found.",
+          now: "Stylelint checks app CSS and HTML-parsed roadmap styles locally, in hooks and on Windows/Linux CI. Component colors use shared tokens; Oxfmt owns formatting.",
           plan: "Add stable compatible Stylelint/standard config for actual CSS syntax. Enable invalid/unknown properties, selectors and at-rules, duplicate declarations and useful specificity checks. Use targeted exceptions for intentional cascades/fallbacks. Enforce app color tokens with supported rules or a small scoped check. Let one formatter own layout.",
           done: "lint:css runs locally/in hooks/CI. Invalid CSS and raw component colors fail. Fix baseline defects without blanket disables and compare all themes/devices. Inline roadmap CSS requires proper HTML syntax support before linting it.",
           depends: "N01, B03",
           note: "",
           evidence:
-            "package.json; pnpm-lock.yaml; vite.config.ts; .vite-hooks/; docs/development/README.md; .github/workflows/quality.yml; client/src/styles/; https://stylelint.io/user-guide/get-started/",
+            "package.json; pnpm-lock.yaml; vite.config.ts; .vite-hooks/; docs/development/README.md; .github/workflows/quality.yml; stylelint.config.mjs; tests/integration/cssLint.test.ts; client/src/styles/; https://stylelint.io/user-guide/get-started/",
         },
         {
           id: "B05",

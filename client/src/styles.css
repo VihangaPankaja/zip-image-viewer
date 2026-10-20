@@ -1,9 +1,9 @@
 @layer reset, tokens, base, components, utilities;
 
-@import "./styles/tokens.css" layer(tokens);
-@import "./styles/foundation.css" layer(base);
-@import "./styles/controls.css" layer(components);
-@import "./styles/workspace.css" layer(components);
-@import "./styles/explorer.css" layer(components);
-@import "./styles/preview.css" layer(components);
-@import "./styles/player.css" layer(components);
+@import url("./styles/tokens.css") layer(tokens);
+@import url("./styles/foundation.css") layer(base);
+@import url("./styles/controls.css") layer(components);
+@import url("./styles/workspace.css") layer(components);
+@import url("./styles/explorer.css") layer(components);
+@import url("./styles/preview.css") layer(components);
+@import url("./styles/player.css") layer(components);

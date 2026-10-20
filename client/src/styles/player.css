@@ -6,7 +6,7 @@
 .media-frame {
   position: relative;
   min-height: clamp(280px, 54vh, 720px);
-  background: #050808;
+  background: var(--media-backdrop);
 }
 
 .video-player {
@@ -16,7 +16,7 @@
   height: 100%;
   max-height: 72vh;
   border: 0;
-  background: #050808;
+  background: var(--media-backdrop);
   object-fit: contain;
 }
 
@@ -53,7 +53,7 @@ audio.video-player {
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: #050808;
+  background: var(--media-backdrop);
 }
 
 .video-scrubber-preview img {
@@ -68,8 +68,8 @@ audio.video-player {
   bottom: var(--space-2);
   padding: 2px 6px;
   border-radius: var(--radius-sm);
-  background: rgb(0 0 0 / 75%);
-  color: white;
+  background: var(--media-caption-bg);
+  color: var(--media-caption-text);
   font-variant-numeric: tabular-nums;
 }
 
@@ -89,7 +89,7 @@ audio.video-player {
   cursor: pointer;
 }
 
-@media (max-width: 760px), (max-width: 960px) and (max-height: 500px) {
+@media (width <= 760px), (width <= 960px) and (height <= 500px) {
   .media-frame {
     width: 100%;
     min-height: 0;

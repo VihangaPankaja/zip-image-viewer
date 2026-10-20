@@ -44,6 +44,15 @@
   background: var(--accent-strong);
 }
 
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+}
+
 .ghost-button:hover:not(:disabled),
 .icon-button:hover:not(:disabled),
 .nav-button:hover:not(:disabled),
@@ -59,15 +68,6 @@ button:disabled {
 
 .compact-button {
   min-height: var(--control-height);
-}
-
-.icon-button {
-  display: inline-grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 44px;
-  min-height: 44px;
-  padding: 0;
 }
 
 .input-shell,
@@ -348,6 +348,7 @@ button:disabled {
   outline-offset: 2px;
 }
 
+/* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */
 .theme-option input {
   position: absolute;
   width: 1px;
@@ -364,6 +365,7 @@ button:disabled {
   color: var(--text-muted);
 }
 
+/* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */
 .toggle-row input {
   width: 18px;
   height: 18px;
@@ -372,7 +374,7 @@ button:disabled {
   accent-color: var(--accent);
 }
 
-@media (max-width: 600px) {
+@media (width <= 600px) {
   .settings-dialog {
     width: 100%;
     height: 100dvh;

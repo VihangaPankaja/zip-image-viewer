@@ -1,13 +1,14 @@
 {
   "name": "zip-image-viewer",
-  "version": "3.20.0",
+  "version": "3.20.1",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vp exec concurrently \"vpr dev:server\" \"vpr dev:client\"",
     "dev:server": "vp exec tsx watch server/index.ts",
     "dev:client": "vp dev",
-    "lint": "vp lint",
+    "lint": "vp lint && vpr lint:css",
+    "lint:css": "vp exec stylelint \"client/src/**/*.css\" docs/app-roadmap.html --max-warnings 0",
     "typecheck": "vp check --no-fmt --no-lint && vpr typecheck:client && vpr typecheck:server && vpr typecheck:tests",
     "typecheck:client": "vp exec tsc --noEmit -p tsconfig.app.json",
     "typecheck:server": "vp exec tsc --noEmit -p tsconfig.server.json",
@@ -41,9 +42,9 @@
     "fallow:coverage-gaps": "vp exec fallow health --coverage-gaps --report-only",
     "fallow:targets": "vp exec fallow health --targets --report-only",
     "fallow:fix:dry-run": "vp exec fallow fix --dry-run",
-    "quality": "vp check && vpr typecheck && vpr test:coverage && vpr fallow:dead && vpr fallow:duplicates && vpr fallow:health && vpr build",
+    "quality": "vp check && vpr lint:css && vpr typecheck && vpr test:coverage && vpr fallow:dead && vpr fallow:duplicates && vpr fallow:health && vpr build",
     "prepare": "vp config --no-agent",
-    "check": "vp check",
+    "check": "vp check && vpr lint:css",
     "test:lint": "vp test tests/integration/toolchainLint.test.ts"
   },
   "dependencies": {
@@ -89,6 +90,9 @@
     "concurrently": "^10.0.5",
     "fallow": "^3.22.0",
     "jsdom": "^30.0.1",
+    "postcss-html": "2.0.0",
+    "stylelint": "17.16.0",
+    "stylelint-config-standard": "40.0.0",
     "supertest": "^7.2.2",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2",

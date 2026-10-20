@@ -1,6 +1,47 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig, lazyPlugins } from "vite-plus";
 import react from "@vitejs/plugin-react";
+import type { Config as StylelintConfig } from "stylelint";
+import htmlCssSyntax from "postcss-html";
+
+// Stylelint's adapter reads this alongside the other project checks.
+export const cssLintConfig: StylelintConfig = {
+  extends: [fileURLToPath(import.meta.resolve("stylelint-config-standard"))],
+  reportNeedlessDisables: true,
+  rules: {
+    "at-rule-no-unknown": true,
+    // Oxfmt owns whitespace and wrapping.
+    "at-rule-empty-line-before": null,
+    "comment-empty-line-before": null,
+    "custom-property-empty-line-before": null,
+    "declaration-empty-line-before": null,
+    "rule-empty-line-before": null,
+    "declaration-block-single-line-max-declarations": null,
+    "selector-max-id": 0,
+  },
+  overrides: [
+    {
+      files: ["client/src/**/*.css"],
+      rules: {
+        "color-no-hex": true,
+        "color-named": "never",
+        "function-disallowed-list": [
+          "/^(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|device-cmyk)$/i",
+        ],
+      },
+    },
+    {
+      files: ["client/src/styles/tokens.css"],
+      rules: { "color-no-hex": null, "color-named": null, "function-disallowed-list": null },
+    },
+    {
+      files: ["docs/app-roadmap.html"],
+      customSyntax: htmlCssSyntax,
+      // The standalone tracker uses IDs for its controls and print layout.
+      rules: { "selector-max-id": 1 },
+    },
+  ],
+};
 
 export default defineConfig({
   test: {
@@ -64,7 +105,12 @@ export default defineConfig({
     },
   },
 
-  staged: { "*": "vp check --fix" },
+  staged: {
+    "*": "vp check --fix",
+    "*.css": "vp exec stylelint --max-warnings 0",
+    "docs/app-roadmap.html": "vp exec stylelint --max-warnings 0",
+    "{vite.config.ts,stylelint.config.mjs}": () => "vpr lint:css",
+  },
   lint: {
     plugins: ["oxc", "typescript", "unicorn", "react", "jsx-a11y", "vitest"],
     categories: {

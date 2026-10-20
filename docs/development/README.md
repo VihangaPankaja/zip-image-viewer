@@ -9,6 +9,7 @@ Run commands from the repository root.
 | --------------- | ------------------------------------------------------ |
 | `vpr dev`       | Start the API and client with reload.                  |
 | `vpr check`     | Check formatting, typed lint and types.                |
+| `vpr lint:css`  | Check app CSS, theme tokens and roadmap styles.        |
 | `vpr format`    | Format the repository.                                 |
 | `vpr typecheck` | Check the client, server and test TypeScript projects. |
 | `vpr test`      | Run unit, component and integration tests.             |
@@ -24,6 +25,12 @@ only the client.
 `vite.config.ts` owns client builds, tests, coverage, lint, formatting and staged
 checks. Separate TypeScript projects check client, server and test code.
 Playwright and Fallow have their own configuration files.
+
+CSS rules also live in `vite.config.ts`; `stylelint.config.mjs` adapts them for
+Stylelint. `vpr lint`, `vpr check`, `vpr quality`, commit/push hooks and CI run
+the CSS check. The roadmap uses `postcss-html` to lint its embedded styles.
+Oxfmt owns formatting; Stylelint checks CSS validity, duplicate declarations
+and selector specificity. Intentional cascades have local, explained exceptions.
 
 `.node-version` selects Node; `package.json` selects the package manager and
 `pnpm-workspace.yaml` holds shared dependency pins. Update those files rather

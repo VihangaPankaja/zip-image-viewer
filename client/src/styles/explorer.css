@@ -12,10 +12,6 @@
   padding: 3px 3px var(--space-3);
 }
 
-.explorer-header .panel-chip {
-  margin-left: auto;
-}
-
 .panel-chip {
   display: inline-grid;
   min-width: 26px;
@@ -26,6 +22,10 @@
   background: var(--bg-inset);
   color: var(--text-muted);
   font-size: 0.75rem;
+}
+
+.explorer-header .panel-chip {
+  margin-left: auto;
 }
 
 .explorer-table-wrap {
@@ -167,7 +167,7 @@
   font-size: 0.72rem;
 }
 
-@media (max-width: 760px) {
+@media (width <= 760px) {
   .explorer-table {
     min-width: 620px;
   }
@@ -249,7 +249,7 @@
   font-size: 0.8125rem;
 }
 
-@media (max-width: 480px) {
+@media (width <= 480px) {
   .torrent-file-pagination {
     padding-inline: 14px;
   }
