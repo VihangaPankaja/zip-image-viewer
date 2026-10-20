@@ -128,14 +128,7 @@
     ],
     "coverage": {
       "requireAllFiles": true,
-      "allowUnmatched": [
-        "**/*.test.*",
-        "client/src/test/**",
-        "docs/**",
-        "tests/**",
-        "tooling/**",
-        "*.config.*"
-      ]
+      "allowUnmatched": ["**/*.test.*", "docs/**", "tests/**", "tooling/**", "*.config.*"]
     }
   }
 }

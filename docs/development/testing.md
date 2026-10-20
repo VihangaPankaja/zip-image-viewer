@@ -8,6 +8,14 @@ build. Lint warnings fail the check.
 
 Use `vpr test` for the full Vitest suite or `vpr test:watch` while editing.
 Focused scripts are `test:unit`, `test:component`, `test:integration` and `test:ui`.
+Tests mirror production paths under `tests/unit/{client,server}/`,
+`tests/component/client/`, `tests/integration/{client,server}/` and `tests/ui/client/`.
+Classify by behavior: pure functions belong in unit, rendered React hooks and
+components in component, and real filesystem, HTTP, archive or process work in
+integration. App composition belongs in UI. Shared fixtures stay in
+`tests/fixtures/`; DOM setup lives in `tests/component/client/setup.ts`.
+The client test project uses jsdom and the server/tooling project uses Node.
+Production TypeScript projects exclude tests and their fixtures.
 Pass a file to the runner for a single test, for example:
 
 ```sh
@@ -24,6 +32,7 @@ vpr test:e2e
 ```
 
 For one browser, run `vp exec playwright test --project=chromium`.
+E2E uses two workers locally and in CI; override with `--workers=1` when debugging.
 The suite covers workspace flows, keyboard and touch input, responsive layouts
 and Axe accessibility checks. Use a real browser for changed user flows and
 inspect screenshots as well as overflow assertions.
@@ -31,6 +40,10 @@ inspect screenshots as well as overflow assertions.
 The [screenshot skill](../../.agents/skills/pr-screenshots/SKILL.md) owns PR gallery
 capture, inspection and publishing. Its HTTP and torrent progress is simulated;
 real transfer integration tests run separately.
+Gallery capture also uses two workers, each running a device's scenes in order
+with isolated fixture servers. Workers write separate manifests that are merged
+after capture. Publishing still requires every scene in both themes on all four
+devices. Use `vpr screenshots:pr --workers=1` for a serial comparison.
 
 ## Coverage and code health
 
@@ -68,4 +81,6 @@ PRs run clean Windows/Linux install and build checks, the non-browser quality
 gate, each test suite, Chromium/Firefox/WebKit E2E, media benchmarks, the roadmap
 check, and the device/theme gallery. Docker checks load the production image,
 verify health and retained-data restart, decode HLS, and play and seek in Chromium.
+Gallery capture and media benchmarks run in separate jobs. Benchmarks stay
+sequential on their runner so competing encoders do not distort measurements.
 See `.github/workflows/` for exact steps and retained artifacts.

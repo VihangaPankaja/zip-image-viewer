@@ -1,0 +1,562 @@
+import { describe, expect, it, vi } from "vite-plus/test";
+import type { SessionJob } from "../../../../../server/domain/models.js";
+import { createSessionJobQueue } from "../../../../../server/application/jobs/sessionJobQueue.js";
+
+function createJob(id: string): SessionJob {
+  return {
+    id,
+    url: `https://example.com/${id}.zip`,
+    sourceKind: "http",
+    torrentFiles: [],
+    sourcePreference: "auto",
+    status: "queued",
+    phase: "queued",
+    percent: null,
+    downloadedBytes: 0,
+    reportedSize: 0,
+    extractedEntries: 0,
+    totalEntries: 0,
+    downloadSpeedBytesPerSec: 0,
+    averageSpeedBytesPerSec: 0,
+    etaSeconds: null,
+    isStalled: false,
+    stallDurationMs: 0,
+    retryCount: 0,
+    maxRetries: 3,
+    canResume: true,
+    canPause: true,
+    queuePosition: 0,
+    pauseRequested: false,
+    threadMode: "auto",
+    threadCount: 2,
+    peerCount: 0,
+    verifiedBytes: 0,
+    uploadedBytes: 0,
+    uploadSpeedBytesPerSec: 0,
+    enableMultithread: true,
+    enableResume: true,
+    message: "Queued",
+    error: "",
+    transcodedEntries: 0,
+    totalTranscodeEntries: 0,
+    videoQuality: "720p",
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    zipPath: "",
+    workspaceDir: "",
+    sessionId: "",
+    requiresConfirmation: false,
+    cleanupAt: 0,
+    abortController: null,
+    extractDir: "",
+    downloadOptions: {
+      transport: { mode: "auto", threads: 2, multithread: true, resume: true },
+      retry: { maxRetries: 3, timeoutMs: 30_000 },
+      media: { videoQuality: "720p" },
+      extraction: { enabled: true },
+      request: { headers: {} },
+    },
+    subscribers: new Set(),
+    socketSubscribers: new Set(),
+  };
+}
+
+function queueDependencies(maxActiveSessionJobs: number) {
+  let active = 0;
+  return {
+    pendingSessionJobs: [],
+    getActiveSessionJobCount: () => active,
+    incrementActiveSessionJobCount: () => {
+      active += 1;
+    },
+    decrementActiveSessionJobCount: () => {
+      active -= 1;
+    },
+    maxActiveSessionJobs,
+    processSessionJob: vi.fn(() => Promise.resolve()),
+    logEvent: vi.fn(),
+  };
+}
+
+describe("createSessionJobQueue", () => {
+  it("registers restored jobs without starting them and drains only active work on shutdown", async () => {
+    const restored = createJob("restored");
+    restored.status = "paused";
+    const active = createJob("active");
+    active.abortController = new AbortController();
+    let finish: (() => void) | undefined;
+    const dependencies = queueDependencies(1);
+    dependencies.processSessionJob.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const queue = createSessionJobQueue({
+      ...dependencies,
+      initialJobs: [restored],
+    });
+    expect(queue.getOrderedJobs()).toEqual([restored]);
+    expect(dependencies.processSessionJob).not.toHaveBeenCalled();
+    queue.enqueueSessionJob(active, false);
+    queue.enqueueSessionJob(createJob("pending"), false);
+    const stopped = queue.stopSessionJobs();
+    expect(active.abortController.signal.aborted).toBe(true);
+    expect(active.pauseRequested).toBe(true);
+    finish?.();
+    await stopped;
+    expect(dependencies.processSessionJob).toHaveBeenCalledTimes(1);
+    expect(queue.getSchedulerState().activeCount).toBe(0);
+    expect(queue.getOrderedJobs()).toHaveLength(3);
+  });
+  it.each([0, 9, 1.5, Number.NaN])("rejects worker limit %s", (limit) => {
+    expect(() => createSessionJobQueue(queueDependencies(limit))).toThrow(
+      "Session job concurrency must be between one and eight.",
+    );
+  });
+
+  it.each([1, 2, 8])("accepts worker limit %s", (limit) => {
+    expect(() => createSessionJobQueue(queueDependencies(limit))).not.toThrow();
+  });
+
+  it("holds the third job until one of two active workers completes", async () => {
+    let active = 0;
+    let peak = 0;
+    const releases: Array<() => void> = [];
+    const dependencies = {
+      pendingSessionJobs: [] as Array<{
+        job: SessionJob;
+        confirmOversize: boolean;
+      }>,
+      getActiveSessionJobCount: () => active,
+      incrementActiveSessionJobCount: () => {
+        active += 1;
+        peak = Math.max(peak, active);
+      },
+      decrementActiveSessionJobCount: () => {
+        active -= 1;
+      },
+      maxActiveSessionJobs: 2,
+      processSessionJob: vi.fn(() => new Promise<void>((resolve) => releases.push(resolve))),
+      logEvent: vi.fn(),
+    };
+    const queue = createSessionJobQueue(dependencies);
+
+    queue.enqueueSessionJob(createJob("one"), false);
+    queue.enqueueSessionJob(createJob("two"), false);
+    queue.enqueueSessionJob(createJob("three"), false);
+
+    expect(dependencies.processSessionJob).toHaveBeenCalledTimes(2);
+    releases.shift()?.();
+    await vi.waitFor(() => expect(dependencies.processSessionJob).toHaveBeenCalledTimes(3));
+    releases.splice(0).forEach((release) => release());
+    await vi.waitFor(() => expect(active).toBe(0));
+    expect(peak).toBe(2);
+  });
+
+  it("requeues one confirmed run after the awaiting worker releases its slot", async () => {
+    let active = 0;
+    let peak = 0;
+    let releaseAwaiting: (() => void) | undefined;
+    const job = createJob("oversized");
+    const dependencies = {
+      pendingSessionJobs: [] as Array<{
+        job: SessionJob;
+        confirmOversize: boolean;
+      }>,
+      getActiveSessionJobCount: () => active,
+      incrementActiveSessionJobCount: () => {
+        active += 1;
+        peak = Math.max(peak, active);
+      },
+      decrementActiveSessionJobCount: () => {
+        active -= 1;
+      },
+      maxActiveSessionJobs: 2,
+      processSessionJob: vi.fn((activeJob: SessionJob, confirmOversize: boolean) => {
+        if (confirmOversize) return Promise.resolve();
+        Object.assign(activeJob, {
+          status: "awaiting_confirmation",
+          phase: "confirm",
+          requiresConfirmation: true,
+        });
+        return new Promise<void>((resolve) => (releaseAwaiting = resolve));
+      }),
+      logEvent: vi.fn(),
+    };
+    const queue = createSessionJobQueue(dependencies);
+    queue.enqueueSessionJob(job, false);
+
+    expect(queue.confirmSessionJob(job.id)).toMatchObject({
+      status: "queued",
+      phase: "queued",
+      requiresConfirmation: false,
+      cleanupAt: 0,
+      message: "Confirmation accepted. Waiting to start.",
+    });
+    expect(dependencies.processSessionJob).toHaveBeenCalledTimes(1);
+    expect(active).toBe(1);
+    expect(() => queue.confirmSessionJob(job.id)).toThrow("Job is not awaiting confirmation.");
+    expect(() => queue.confirmSessionJob("missing")).toThrow("Job not found.");
+
+    releaseAwaiting?.();
+    await vi.waitFor(() => expect(dependencies.processSessionJob).toHaveBeenCalledTimes(2));
+    expect(dependencies.processSessionJob).toHaveBeenLastCalledWith(job, true);
+    await vi.waitFor(() => expect(active).toBe(0));
+    expect(peak).toBe(1);
+  });
+
+  it("validates selected IDs and safely requeues a still-active metadata worker", async () => {
+    const deps = queueDependencies(1);
+    let release: (() => void) | undefined;
+    deps.processSessionJob.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
+    const queue = createSessionJobQueue(deps);
+    const job = createJob("torrent");
+    job.sourceKind = "torrent";
+    job.torrentFiles = ["0", "1", "2"].map((id) => ({
+      id,
+      path: `${id}.txt`,
+      size: 10,
+      selected: false,
+      complete: false,
+      downloadedBytes: 0,
+    }));
+    queue.enqueueSessionJob(job, false);
+    job.status = "awaiting_selection";
+    for (const ids of [[], ["bad"], ["1", "1"]]) {
+      expect(() => queue.selectTorrentFiles(job.id, ids)).toThrow("Choose one or more known");
+    }
+    expect(() => queue.selectTorrentFiles("missing", ["1"])).toThrow("Job not found.");
+    queue.selectTorrentFiles(job.id, ["1"]);
+    expect(job.torrentFiles.map((file) => file.selected)).toEqual([false, true, false]);
+    expect(job.reportedSize).toBe(10);
+    expect(deps.processSessionJob).toHaveBeenCalledTimes(1);
+    expect(() => queue.selectTorrentFiles(job.id, ["0"])).toThrow("not awaiting file selection");
+    release?.();
+    await vi.waitFor(() => expect(deps.processSessionJob).toHaveBeenCalledTimes(2));
+  });
+
+  it("starts a selection after metadata released its worker and emits the accepted state", async () => {
+    const emitJob = vi.fn();
+    const deps = { ...queueDependencies(1), emitJob };
+    const queue = createSessionJobQueue(deps);
+    const job = createJob("torrent");
+    job.sourceKind = "torrent";
+    job.torrentFiles = [
+      {
+        id: "0",
+        path: "zero.txt",
+        size: 0,
+        selected: false,
+        complete: false,
+        downloadedBytes: 0,
+      },
+    ];
+    queue.enqueueSessionJob(job, false);
+    await vi.waitFor(() => expect(queue.getSchedulerState().activeCount).toBe(0));
+    job.status = "awaiting_selection";
+    queue.selectTorrentFiles(job.id, ["0"]);
+    expect(emitJob).toHaveBeenCalledWith(job, {});
+    expect(deps.processSessionJob).toHaveBeenCalledTimes(2);
+  });
+
+  it("adds skipped files to a completed torrent without dropping earlier selections", async () => {
+    const deps = queueDependencies(1);
+    const queue = createSessionJobQueue(deps);
+    const job = createJob("torrent");
+    job.sourceKind = "torrent";
+    job.torrentFiles = ["0", "1"].map((id) => ({
+      id,
+      path: `${id}.bin`,
+      size: 10,
+      selected: id === "0",
+      complete: id === "0",
+      downloadedBytes: id === "0" ? 10 : 0,
+    }));
+    queue.enqueueSessionJob(job, false);
+    await vi.waitFor(() => expect(queue.getSchedulerState().activeCount).toBe(0));
+    job.status = "ready";
+    for (const ids of [[], ["missing"], ["1", "1"]])
+      expect(() => queue.selectTorrentFiles(job.id, ids)).toThrow("Choose one or more known");
+    queue.selectTorrentFiles(job.id, ["1"]);
+    expect(job.torrentFiles.map(({ selected }) => selected)).toEqual([true, true]);
+    expect(job.torrentFiles[0].complete).toBe(true);
+    expect(job.reportedSize).toBe(20);
+    expect(deps.processSessionJob).toHaveBeenCalledTimes(2);
+  });
+
+  it("starts waiting work when concurrency increases", async () => {
+    let active = 0;
+    const releases: Array<() => void> = [];
+    const dependencies = {
+      pendingSessionJobs: [] as Array<{
+        job: SessionJob;
+        confirmOversize: boolean;
+      }>,
+      getActiveSessionJobCount: () => active,
+      incrementActiveSessionJobCount: () => {
+        active += 1;
+      },
+      decrementActiveSessionJobCount: () => {
+        active -= 1;
+      },
+      maxActiveSessionJobs: 1,
+      processSessionJob: vi.fn(() => new Promise<void>((resolve) => releases.push(resolve))),
+      logEvent: vi.fn(),
+    };
+    const queue = createSessionJobQueue(dependencies);
+
+    queue.enqueueSessionJob(createJob("one"), false);
+    queue.enqueueSessionJob(createJob("two"), false);
+    expect(dependencies.processSessionJob).toHaveBeenCalledTimes(1);
+
+    queue.setMaxActiveSessionJobs(2);
+    expect(dependencies.processSessionJob).toHaveBeenCalledTimes(2);
+    expect(queue.getSchedulerState()).toEqual({
+      activeCount: 2,
+      maxConcurrent: 2,
+    });
+
+    releases.splice(0).forEach((release) => release());
+    await vi.waitFor(() => expect(active).toBe(0));
+  });
+
+  it("uses authoritative order when choosing the next waiting job", async () => {
+    let active = 0;
+    const releases: Array<() => void> = [];
+    const dependencies = {
+      pendingSessionJobs: [] as Array<{
+        job: SessionJob;
+        confirmOversize: boolean;
+      }>,
+      getActiveSessionJobCount: () => active,
+      incrementActiveSessionJobCount: () => {
+        active += 1;
+      },
+      decrementActiveSessionJobCount: () => {
+        active -= 1;
+      },
+      maxActiveSessionJobs: 1,
+      processSessionJob: vi.fn(() => new Promise<void>((resolve) => releases.push(resolve))),
+      logEvent: vi.fn(),
+    };
+    const queue = createSessionJobQueue(dependencies);
+    queue.enqueueSessionJob(createJob("one"), false);
+    queue.enqueueSessionJob(createJob("two"), false);
+    queue.enqueueSessionJob(createJob("three"), false);
+
+    queue.reorderSessionJobs(["one", "three", "two"]);
+    releases.shift()?.();
+    await vi.waitFor(() => expect(dependencies.processSessionJob).toHaveBeenCalledTimes(2));
+    expect(dependencies.processSessionJob).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ id: "three" }),
+      false,
+    );
+
+    releases.shift()?.();
+    await vi.waitFor(() => expect(dependencies.processSessionJob).toHaveBeenCalledTimes(3));
+    releases.shift()?.();
+    await vi.waitFor(() => expect(active).toBe(0));
+  });
+
+  it("rejects an order that omits or invents jobs", () => {
+    const dependencies = queueDependencies(1);
+    const queue = createSessionJobQueue(dependencies);
+    queue.enqueueSessionJob(createJob("one"), false);
+    queue.enqueueSessionJob(createJob("two"), false);
+
+    expect(() => queue.reorderSessionJobs(["one"])).toThrow(
+      "Job order must contain every job exactly once.",
+    );
+    expect(() => queue.reorderSessionJobs(["one", "two", "unknown"])).toThrow(
+      "Job order must contain every job exactly once.",
+    );
+  });
+
+  it("preempts the lowest-priority resumable job", async () => {
+    let active = 0;
+    const releases = new Map<string, () => void>();
+    const first = createJob("one");
+    const second = createJob("two");
+    const dependencies = {
+      pendingSessionJobs: [] as Array<{
+        job: SessionJob;
+        confirmOversize: boolean;
+      }>,
+      getActiveSessionJobCount: () => active,
+      incrementActiveSessionJobCount: () => {
+        active += 1;
+      },
+      decrementActiveSessionJobCount: () => {
+        active -= 1;
+      },
+      maxActiveSessionJobs: 1,
+      processSessionJob: vi.fn(
+        (job: SessionJob) =>
+          new Promise<void>((resolve) => {
+            job.status = "downloading";
+            releases.set(job.id, resolve);
+          }),
+      ),
+      pauseJob: vi.fn((job: SessionJob) => {
+        job.status = "paused";
+        releases.get(job.id)?.();
+        return Promise.resolve();
+      }),
+      logEvent: vi.fn(),
+    };
+    const queue = createSessionJobQueue(dependencies);
+    queue.enqueueSessionJob(first, false);
+    queue.enqueueSessionJob(second, false);
+
+    queue.reorderSessionJobs(["two", "one"]);
+
+    await vi.waitFor(() => expect(dependencies.pauseJob).toHaveBeenCalledWith(first));
+    await vi.waitFor(() =>
+      expect(dependencies.processSessionJob).toHaveBeenLastCalledWith(second, false),
+    );
+    second.status = "ready";
+    releases.get(second.id)?.();
+    await vi.waitFor(() => expect(dependencies.processSessionJob).toHaveBeenCalledTimes(3));
+    first.status = "ready";
+    releases.get(first.id)?.();
+    await vi.waitFor(() => expect(active).toBe(0));
+  });
+
+  it("pauses and resumes the same job without losing its order", async () => {
+    let active = 0;
+    let release: (() => void) | undefined;
+    const job = createJob("one");
+    const dependencies = {
+      pendingSessionJobs: [] as Array<{
+        job: SessionJob;
+        confirmOversize: boolean;
+      }>,
+      getActiveSessionJobCount: () => active,
+      incrementActiveSessionJobCount: () => {
+        active += 1;
+      },
+      decrementActiveSessionJobCount: () => {
+        active -= 1;
+      },
+      maxActiveSessionJobs: 1,
+      processSessionJob: vi.fn(() => new Promise<void>((resolve) => (release = resolve))),
+      pauseJob: vi.fn((activeJob: SessionJob) => {
+        activeJob.status = "paused";
+        release?.();
+        return Promise.resolve();
+      }),
+      logEvent: vi.fn(),
+    };
+    const queue = createSessionJobQueue(dependencies);
+    queue.enqueueSessionJob(job, false);
+
+    await queue.pauseSessionJob(job.id);
+    await vi.waitFor(() => expect(active).toBe(0));
+    expect(dependencies.processSessionJob).toHaveBeenCalledTimes(1);
+
+    queue.resumeSessionJob(job.id);
+    expect(dependencies.processSessionJob).toHaveBeenCalledTimes(2);
+    expect(queue.getOrderedJobs()).toEqual([
+      expect.objectContaining({ id: job.id, queuePosition: 0 }),
+    ]);
+    job.status = "ready";
+    release?.();
+    await vi.waitFor(() => expect(active).toBe(0));
+  });
+
+  it("waits for a pausing worker to settle before resuming with a spare slot", async () => {
+    let release: (() => void) | undefined;
+    const dependencies = queueDependencies(2);
+    dependencies.processSessionJob.mockImplementation(
+      () => new Promise<void>((resolve) => (release = resolve)),
+    );
+    const queue = createSessionJobQueue({
+      ...dependencies,
+      pauseJob: (job) => {
+        job.status = "paused";
+        return Promise.resolve();
+      },
+    });
+    const job = createJob("one");
+    queue.enqueueSessionJob(job, false);
+    await queue.pauseSessionJob(job.id);
+    queue.resumeSessionJob(job.id);
+    expect(dependencies.processSessionJob).toHaveBeenCalledTimes(1);
+    release?.();
+    await vi.waitFor(() => expect(dependencies.processSessionJob).toHaveBeenCalledTimes(2));
+    expect(dependencies.getActiveSessionJobCount()).toBe(1);
+    release?.();
+    await vi.waitFor(() => expect(dependencies.getActiveSessionJobCount()).toBe(0));
+  });
+
+  it("cancels waiting work before it can start and removes terminal history", async () => {
+    let release: (() => void) | undefined;
+    const dependencies = queueDependencies(1);
+    dependencies.processSessionJob.mockImplementation(
+      () => new Promise<void>((resolve) => (release = resolve)),
+    );
+    const first = createJob("one");
+    const second = createJob("two");
+    const queue = createSessionJobQueue(dependencies);
+    queue.enqueueSessionJob(first, false);
+    queue.enqueueSessionJob(second, false);
+
+    expect(() => queue.removeSessionJob(second.id)).toThrow("Pause or cancel the download");
+    expect(queue.cancelSessionJob(second.id).status).toBe("cancelled");
+    release?.();
+    await vi.waitFor(() => expect(dependencies.processSessionJob).toHaveBeenCalledTimes(1));
+    queue.removeSessionJob(second.id);
+
+    expect(queue.getOrderedJobs().map(({ id }) => id)).toEqual([first.id]);
+  });
+
+  it("logs rejected jobs and continues draining the queue", async () => {
+    const dependencies = queueDependencies(1);
+    dependencies.processSessionJob
+      .mockRejectedValueOnce(new Error("network failed"))
+      .mockResolvedValueOnce(undefined);
+    const queue = createSessionJobQueue(dependencies);
+
+    queue.enqueueSessionJob(createJob("failed"), false);
+    queue.enqueueSessionJob(createJob("next"), false);
+
+    await vi.waitFor(() => expect(dependencies.processSessionJob).toHaveBeenCalledTimes(2));
+    expect(dependencies.logEvent).toHaveBeenCalledWith(
+      "error",
+      "job.process.unhandled",
+      expect.objectContaining({ jobId: "failed", error: "network failed" }),
+    );
+  });
+
+  it("forwards confirmation and normalizes a non-error rejection", async () => {
+    const dependencies = queueDependencies(1);
+    dependencies.processSessionJob.mockRejectedValueOnce("failed");
+    const queue = createSessionJobQueue(dependencies);
+    queue.enqueueSessionJob(createJob("confirmed"), true);
+    await vi.waitFor(() => expect(dependencies.logEvent).toHaveBeenCalled());
+    expect(dependencies.processSessionJob).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "confirmed" }),
+      true,
+    );
+    expect(dependencies.logEvent).toHaveBeenCalledWith(
+      "error",
+      "job.process.unhandled",
+      expect.objectContaining({ error: "Unknown" }),
+    );
+  });
+
+  it("stops safely if a pending queue becomes inconsistent", () => {
+    const dependencies = queueDependencies(1);
+    dependencies.pendingSessionJobs.shift = () => undefined;
+    const queue = createSessionJobQueue(dependencies);
+    queue.enqueueSessionJob(createJob("ignored"), false);
+    expect(dependencies.processSessionJob).not.toHaveBeenCalled();
+  });
+});

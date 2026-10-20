@@ -1,6 +1,6 @@
 {
   "name": "zip-image-viewer",
-  "version": "3.20.1",
+  "version": "3.20.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -19,10 +19,10 @@
     "build:client": "vp build",
     "build:server": "vp exec tsc -p tsconfig.server.json",
     "test": "vp test",
-    "test:unit": "vp test client/src/hooks client/src/lib client/src/services client/src/features/player server/application server/config server/contracts server/domain server/handlers server/infrastructure server/media server/rpc server/tui tooling",
-    "test:integration": "vp test --project unit-integration server/bootstrap server/services tests/integration",
-    "test:component": "vp test --project component client/src/components client/src/features/workspace",
-    "test:ui": "vp test --project component client/src/pages client/src/App.test.tsx",
+    "test:unit": "vp test tests/unit tooling",
+    "test:integration": "vp test tests/integration",
+    "test:component": "vp test --project component tests/component",
+    "test:ui": "vp test --project component tests/ui",
     "test:watch": "vp test watch",
     "test:coverage": "vp test --coverage",
     "test:related": "vp test related --run",

@@ -1,0 +1,220 @@
+import express from "express";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import request from "supertest";
+import { describe, expect, it, vi } from "vite-plus/test";
+import type {
+  Session,
+  VideoRendition,
+  VideoTranscodeEntry,
+} from "../../../../server/domain/models.js";
+import type { VideoRouteDependencies } from "../../../../server/handlers/videoRoutes.js";
+import { registerVideoHlsRoutes } from "../../../../server/handlers/videoHlsRoutes.js";
+
+describe("HLS routes", () => {
+  it.each([true, false])(
+    "waits for staged output with preparation retries supported: %s",
+    async (retry) => {
+      const workspace = await mkdtemp(path.join(tmpdir(), "ziv-hls-startup-"));
+      const source = path.join(workspace, "source.mp4");
+      const dir = path.join(workspace, "rendition");
+      const playlistPath = path.join(dir, "index.m3u8");
+      await mkdir(dir);
+      await writeFile(source, "source");
+      const rendition = {
+        dir,
+        playlistPath,
+        status: "running",
+      } as VideoRendition;
+      const entry = {
+        width: 640,
+        height: 360,
+        durationSeconds: 20,
+        qualities: [{ id: "360p" }],
+        defaultQuality: "360p",
+      } as VideoTranscodeEntry;
+      const start = vi.fn(() => Promise.resolve());
+      const deps = {
+        ffmpegPath: "ffmpeg",
+        touchSession: () => ({ id: "session", extractDir: workspace }),
+        sanitizeEntryPath: (value: string) => value,
+        ensureVideoTranscodeEntry: () => Promise.resolve(entry),
+        getRenditionState: () => rendition,
+        startRenditionTranscode: start,
+      } as unknown as VideoRouteDependencies;
+      const app = express();
+      registerVideoHlsRoutes(app, deps);
+      const now = Date.now();
+      const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+      try {
+        const response = request(app)
+          .get("/api/sessions/session/video/hls/playlist?path=source.mp4&quality=360p")
+          .set("X-HLS-Preparation-Retry", retry ? "1" : "0")
+          .then((value) => value);
+        await vi.waitFor(() => expect(start).toHaveBeenCalled());
+        expect(
+          await Promise.race([
+            response.then(() => "empty"),
+            new Promise((resolve) => setTimeout(() => resolve("waiting"), 50)),
+          ]),
+        ).toBe("waiting");
+        clock.mockReturnValue(now + 20_000);
+        if (retry) {
+          const preparing = await response;
+          expect(preparing.status).toBe(425);
+          expect(preparing.headers["retry-after"]).toBe("1");
+        } else {
+          expect(
+            await Promise.race([
+              response.then(() => "premature"),
+              new Promise((resolve) => setTimeout(() => resolve("waiting"), 200)),
+            ]),
+          ).toBe("waiting");
+        }
+        await writeFile(
+          playlistPath,
+          '#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXT-X-MAP:URI="init.mp4"\n#EXTINF:4,\nsegment_000000.m4s\n#EXT-X-ENDLIST\n',
+        );
+        rendition.status = "done";
+        const ready = retry
+          ? await request(app).get(
+              "/api/sessions/session/video/hls/playlist?path=source.mp4&quality=360p",
+            )
+          : await response;
+        expect(ready.status).toBe(200);
+        expect(ready.text).toContain("#EXTINF:4,");
+        rendition.status = "error";
+        await rm(playlistPath);
+        await request(app)
+          .get("/api/sessions/session/video/hls/playlist?path=source.mp4&quality=360p")
+          .expect(503);
+      } finally {
+        clock.mockRestore();
+        await rm(workspace, { recursive: true, force: true });
+      }
+    },
+  );
+  it("serves only published segments and validates completed media caches", async () => {
+    const workspace = await mkdtemp(path.join(tmpdir(), "ziv-hls-route-"));
+    const source = path.join(workspace, "source.mp4");
+    const dir = path.join(workspace, "rendition");
+    const playlistPath = path.join(dir, "index.m3u8");
+    await mkdir(dir);
+    await writeFile(source, "source");
+    await writeFile(path.join(dir, "segment_000000.m4s"), "complete segment");
+    const session = { id: "session", extractDir: workspace } as Session;
+    const rendition = {
+      dir,
+      playlistPath,
+      status: "done",
+    } as VideoRendition;
+    const entry = {
+      width: 640,
+      height: 360,
+      qualities: [{ id: "360p", label: "360p", height: 360 }],
+      defaultQuality: "360p",
+    } as VideoTranscodeEntry;
+    const deps = {
+      ffmpegPath: "ffmpeg",
+      touchSession: () => session,
+      sanitizeEntryPath: (value: string) => value,
+      ensureVideoTranscodeEntry: vi.fn(() => Promise.resolve(entry)),
+      getRenditionState: () => rendition,
+      startRenditionTranscode: () => Promise.resolve(),
+    } as unknown as VideoRouteDependencies;
+    const app = express();
+    registerVideoHlsRoutes(app, deps);
+    const resource = "/api/sessions/session/video/hls";
+    const query = "?path=source.mp4&quality=360p";
+
+    try {
+      const cold = await request(app).get(`${resource}/master?path=source.mp4`).expect(200);
+      expect(cold.text).toContain("#EXT-X-STREAM-INF:BANDWIDTH=1020800,RESOLUTION=640x360");
+      expect(cold.text).toContain(
+        "/api/sessions/session/video/hls/playlist?path=source.mp4&quality=360p",
+      );
+      expect(cold.text).not.toContain("CODECS=");
+
+      entry.audioTracks = [
+        {
+          id: "audio-1",
+          index: 1,
+          language: "eng",
+          label: "English",
+          isDefault: true,
+        },
+        {
+          id: "audio-2",
+          index: 2,
+          language: "jpn",
+          label: "Japanese",
+          isDefault: false,
+        },
+      ];
+      const alternate = await request(app).get(`${resource}/master?path=source.mp4`).expect(200);
+      expect(alternate.text).toContain('TYPE=AUDIO,GROUP-ID="audio"');
+      expect(alternate.text).toContain('AUDIO="audio"');
+      expect(alternate.text).toContain("quality=audio-2");
+      const encoding = vi.spyOn(deps, "startRenditionTranscode");
+      for (const route of ["playlist", "init", "segment"]) {
+        const invalid = await request(app)
+          .get(`${resource}/${route}?path=source.mp4&quality=audio-999`)
+          .expect(400);
+        expect(invalid.text).not.toContain(workspace);
+      }
+      expect(encoding).not.toHaveBeenCalled();
+      const audio = await request(app)
+        .get(`${resource}/playlist?path=source.mp4&quality=audio-2`)
+        .expect(503);
+      expect(audio.body).toEqual({ error: "Rendition could not be prepared." });
+
+      await writeFile(
+        path.join(dir, "init.mp4"),
+        Buffer.from("avcC\x01\x4d\x40\x1fmp4a", "latin1"),
+      );
+      const warm = await request(app).get(`${resource}/master?path=source.mp4`).expect(200);
+      expect(warm.text).toContain('CODECS="avc1.4d401f,mp4a.40.2"');
+      expect(warm.text).toContain("quality=360p");
+
+      entry.width = 1280;
+      entry.height = 720;
+      const states = vi
+        .spyOn(deps, "getRenditionState")
+        .mockImplementation((_entry, _session, quality) =>
+          quality === "360p" ? rendition : { ...rendition, dir: path.join(workspace, quality) },
+        );
+      const partial = await request(app).get(`${resource}/master?path=source.mp4`).expect(200);
+      expect(partial.text).toContain("quality=720p");
+      expect(partial.text).not.toContain("CODECS=");
+      states.mockRestore();
+      entry.width = 640;
+      entry.height = 360;
+
+      await request(app).get(`${resource}/segment${query}&index=0`).expect(503);
+      await writeFile(
+        playlistPath,
+        '#EXTM3U\n#EXT-X-TARGETDURATION:5\n#EXT-X-MAP:URI="init.mp4"\n#EXTINF:4.125,\nsegment_000000.m4s\n#EXT-X-ENDLIST\n',
+      );
+      const variant = await request(app).get(`${resource}/playlist${query}`).expect(200);
+      expect(variant.headers["cache-control"]).toContain("no-store");
+      expect(variant.text).toContain("#EXTINF:4.125,");
+      expect(variant.text).toContain("index=0");
+
+      const media = await request(app).get(`${resource}/segment${query}&index=0`).expect(200);
+      expect(media.headers["cache-control"]).toContain("immutable");
+      expect(media.headers.etag).toBeTruthy();
+      await request(app)
+        .get(`${resource}/segment${query}&index=0`)
+        .set("If-None-Match", media.headers.etag)
+        .expect(304);
+      session.availablePaths = new Set();
+      vi.mocked(deps.ensureVideoTranscodeEntry).mockClear();
+      for (const route of ["master", "playlist", "init", "segment"])
+        await request(app).get(`${resource}/${route}${query}&index=0`).expect(404);
+      expect(deps.ensureVideoTranscodeEntry).not.toHaveBeenCalled();
+    } finally {
+      await rm(workspace, { recursive: true, force: true });
+    }
+  });
+});
