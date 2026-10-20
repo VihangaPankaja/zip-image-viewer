@@ -215,7 +215,7 @@
   padding: 0;
   overflow: hidden;
   border: 0;
-  background: #050808;
+  background: var(--media-backdrop);
   color: var(--text);
 }
 
@@ -330,7 +330,7 @@
   display: none;
 }
 
-@media (max-width: 760px), (max-width: 960px) and (max-height: 500px) {
+@media (width <= 760px), (width <= 960px) and (height <= 500px) {
   .preview-panel {
     min-height: 0;
   }

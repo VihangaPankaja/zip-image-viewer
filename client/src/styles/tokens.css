@@ -10,10 +10,14 @@
   --bg-panel: #1b2630;
   --bg-panel-strong: #22303b;
   --bg-overlay: rgb(5 12 18 / 72%);
+  --media-backdrop: #050808;
+  --media-black: #000;
+  --media-caption-bg: rgb(0 0 0 / 75%);
+  --media-caption-text: #fff;
   --border: #354551;
   --border-strong: #6b8292;
-  --font-body: Aptos, "Segoe UI Variable", "Segoe UI", sans-serif;
-  --font-display: "Aptos Display", Aptos, "Segoe UI Variable", sans-serif;
+  --font-body: aptos, "Segoe UI Variable", "Segoe UI", sans-serif;
+  --font-display: "Aptos Display", aptos, "Segoe UI Variable", sans-serif;
   --radius-lg: 16px;
   --radius-md: 12px;
   --radius-sm: 8px;

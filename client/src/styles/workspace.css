@@ -178,6 +178,7 @@
   margin: 0;
 }
 
+/* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */
 .workspace-metadata-panel dl > div {
   display: grid;
   gap: 3px;
@@ -317,6 +318,7 @@
 }
 
 .download-manager-header p:last-child,
+/* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */
 .download-empty p {
   max-width: 68ch;
   margin: 0;
@@ -394,9 +396,8 @@
   min-width: 0;
   max-width: 220px;
   align-items: start;
-  align-content: start;
+  place-content: start end;
   flex-wrap: wrap;
-  justify-content: end;
 }
 
 .download-confirm-error {
@@ -480,6 +481,7 @@
   margin: 0;
 }
 
+/* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */
 .download-telemetry div {
   display: grid;
   gap: 2px;
@@ -530,6 +532,7 @@
   font-weight: 650;
 }
 
+/* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */
 .download-empty p {
   max-width: 44ch;
 }
@@ -566,6 +569,7 @@
   align-items: center;
   gap: 12px;
 }
+/* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */
 .storage-dialog-content p {
   margin: 0;
   overflow-wrap: anywhere;
@@ -575,6 +579,7 @@
   display: grid;
   gap: 12px;
 }
+/* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */
 .storage-totals > div {
   display: flex;
   justify-content: space-between;
@@ -590,6 +595,7 @@
   gap: 10px;
   min-height: 44px;
 }
+/* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */
 .storage-dialog-content button {
   min-height: 44px;
 }
@@ -686,6 +692,7 @@
 }
 
 .download-draft > label input,
+/* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */
 .draft-settings input,
 .draft-settings select {
   min-width: 0;
@@ -851,7 +858,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: currentColor;
+  background: currentcolor;
   content: "";
 }
 
@@ -875,21 +882,20 @@
   display: none;
 }
 
-@media (max-width: 1180px) {
+@media (width <= 1180px) {
   .unified-workspace-metadata {
     display: none;
   }
 }
 
-@media (max-width: 760px), (max-width: 960px) and (max-height: 500px) {
+@media (width <= 760px), (width <= 960px) and (height <= 500px) {
   .unified-workspace {
     display: grid;
     grid-template-rows: auto auto;
     align-content: start;
     min-height: 100dvh;
     gap: var(--space-2);
-    padding-block-start: env(safe-area-inset-top);
-    padding-block-end: calc(76px + env(safe-area-inset-bottom));
+    padding-block: env(safe-area-inset-top) calc(76px + env(safe-area-inset-bottom));
     padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
   }
 
@@ -904,6 +910,7 @@
     display: none !important;
   }
 
+  /* stylelint-disable selector-max-id -- These IDs connect the native pane radios to their panels. */
   .unified-workspace:has(#workspace-pane-sessions:checked)
     .workspace-panel-group
     > [data-panel]:has(.unified-workspace-sessions),
@@ -915,6 +922,7 @@
     > [data-panel]:has(.unified-workspace-preview) {
     display: flex !important;
   }
+  /* stylelint-enable selector-max-id */
 
   .workspace-appbar {
     grid-template-columns: minmax(0, 1fr) auto;
@@ -997,6 +1005,7 @@
     color: var(--text);
   }
 
+  /* stylelint-disable-next-line no-descending-specificity -- Focus outlines intentionally follow the selected-pane background. */
   .workspace-pane-control:focus-visible + label {
     outline: 2px solid var(--accent-strong);
     outline-offset: 2px;
@@ -1111,6 +1120,7 @@
     grid-template-columns: 1fr;
   }
 
+  /* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */
   .download-draft > label,
   .download-draft > details,
   .download-draft > .ghost-button {
@@ -1161,6 +1171,7 @@
   margin-block: 12px;
   font-size: 1rem;
 }
+/* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */
 .torrent-early-video p {
   font-size: 0.8125rem;
   line-height: 1.5;
@@ -1169,7 +1180,7 @@
   display: block;
   width: 100%;
   max-height: 40dvh;
-  background: #000;
+  background: var(--media-black);
   border-radius: var(--radius-sm);
 }
 .torrent-early-video-actions {
@@ -1185,7 +1196,9 @@
 .torrent-file-feedback {
   padding: 12px var(--space-6);
 }
+/* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */
 .torrent-file-tools p,
+/* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */
 .torrent-file-feedback p {
   margin: 0 0 8px;
   font-size: 0.8125rem;
@@ -1196,6 +1209,7 @@
   gap: 6px;
   font-size: 0.8125rem;
 }
+/* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */
 .torrent-file-tools input {
   min-width: 0;
   min-height: 44px;
@@ -1212,6 +1226,7 @@
   gap: 8px;
   margin-top: 8px;
 }
+/* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */
 .torrent-file-bulk span {
   font-size: 0.75rem;
   color: var(--text-muted);
@@ -1254,12 +1269,14 @@
 .torrent-file-group > legend.torrent-file-choice:hover {
   background: transparent;
 }
+/* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */
 .torrent-file-choice input {
   flex-shrink: 0;
   width: 20px;
   height: 20px;
   accent-color: var(--accent);
 }
+/* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */
 .torrent-file-choice span {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -1300,7 +1317,7 @@
   justify-content: end;
   padding-block: 12px;
 }
-@media (max-width: 480px) {
+@media (width <= 480px) {
   .torrent-file-sheet > header,
   .torrent-file-tools,
   .torrent-file-feedback,

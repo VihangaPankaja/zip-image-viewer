@@ -12,6 +12,7 @@ html {
 }
 
 body,
+/* stylelint-disable-next-line selector-max-id -- React mounts into this single document root. */
 #root {
   min-width: 0;
   min-height: 100%;
@@ -24,7 +25,7 @@ body {
   font-family: var(--font-body);
   font-size: 15px;
   line-height: 1.5;
-  text-rendering: optimizeLegibility;
+  text-rendering: optimizelegibility;
 }
 
 button,

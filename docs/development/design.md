@@ -9,6 +9,12 @@ content, transfer status and controls take priority over decoration.
 such as `--bg-panel`, `--text` and `--accent`; do not repeat palette values in
 components. `styles.css` imports the shared styles.
 
+`vpr lint:css` rejects raw hex, named and functional colors in app styles outside
+`tokens.css`, including shadows and local custom properties. Use `color-mix()`
+with tokens when needed. `transparent`, `currentcolor` and system colors remain
+available for transparency, inherited borders and forced-color accessibility.
+Media backdrop and caption tokens keep their colors in both themes.
+
 - Keep both light and dark themes readable. System appearance follows the OS.
 - Pair status color with text. Use a visible focus outline.
 - Use the existing spacing scale, borders and radii.
