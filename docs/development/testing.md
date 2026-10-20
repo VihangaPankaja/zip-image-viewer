@@ -33,6 +33,8 @@ vpr test:e2e
 
 For one browser, run `vp exec playwright test --project=chromium`.
 E2E uses two workers locally and in CI; override with `--workers=1` when debugging.
+E2E artifacts stay in `test-results/e2e-run/` so the runner's cleanup preserves
+the PR gallery and other verification evidence.
 The suite covers workspace flows, keyboard and touch input, responsive layouts
 and Axe accessibility checks. Use a real browser for changed user flows and
 inspect screenshots as well as overflow assertions.
