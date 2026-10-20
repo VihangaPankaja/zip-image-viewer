@@ -2,24 +2,8 @@ import path from "node:path";
 import mime from "mime-types";
 import type { FileTypeResult } from "file-type";
 
-const ARCHIVE_EXTENSIONS = new Set([
-  "zip",
-  "rar",
-  "7z",
-  "tar",
-  "gz",
-  "tgz",
-  "bz2",
-  "xz",
-]);
-export const VIDEO_EXTENSIONS = new Set([
-  "mp4",
-  "webm",
-  "mov",
-  "m4v",
-  "ogv",
-  "mkv",
-]);
+const ARCHIVE_EXTENSIONS = new Set(["zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz"]);
+export const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v", "ogv", "mkv"]);
 const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "ogg", "aac", "m4a", "flac"]);
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -30,10 +14,7 @@ export function errorFromUnknown(error: unknown): Error {
   return error instanceof Error ? error : new Error("Unexpected error");
 }
 
-export function sleepWithSignal(
-  milliseconds: number,
-  signal: AbortSignal,
-): Promise<void> {
+export function sleepWithSignal(milliseconds: number, signal: AbortSignal): Promise<void> {
   if (!Number.isFinite(milliseconds) || milliseconds <= 0) {
     return Promise.resolve();
   }
@@ -64,9 +45,7 @@ export function classifyDetectedType(
   const extension = path.extname(filePath).slice(1).toLowerCase();
   if (
     isArchiveByName(filePath) ||
-    ["zip", "rar", "7z", "tar", "compressed"].some((part) =>
-      mimeType.includes(part),
-    )
+    ["zip", "rar", "7z", "tar", "compressed"].some((part) => mimeType.includes(part))
   )
     return "archive";
   if (mimeType.startsWith("video/") || VIDEO_EXTENSIONS.has(extension)) {
@@ -82,9 +61,7 @@ export function classifyDetectedType(
   return "binary";
 }
 
-export function classifyMimeType(
-  contentType: string,
-): "image" | "text" | "binary" {
+export function classifyMimeType(contentType: string): "image" | "text" | "binary" {
   if (contentType.startsWith("image/")) return "image";
   if (contentType.startsWith("text/") || contentType === "application/json") {
     return "text";
@@ -98,8 +75,6 @@ export function shouldPreserveOriginalPreview(contentType: string): boolean {
 
 export function parseSeekSeconds(value: unknown): number {
   const parsed =
-    typeof value === "number"
-      ? value
-      : Number.parseFloat(typeof value === "string" ? value : "0");
+    typeof value === "number" ? value : Number.parseFloat(typeof value === "string" ? value : "0");
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 }

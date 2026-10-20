@@ -22,18 +22,14 @@ test("plays and seeks a real incomplete torrent, reconnects a missing seek, and 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(fixture.origin);
     const id = await fixture.enqueue();
-    await page
-      .getByRole("button", { name: "Review files", exact: true })
-      .click();
+    await page.getByRole("button", { name: "Review files", exact: true }).click();
     const choose = page.getByRole("dialog", {
       name: "Choose files",
       exact: true,
     });
     await expect(choose).toBeVisible();
     expect(fixture.requests).toEqual([]);
-    await choose
-      .getByRole("button", { name: "Start selected download", exact: true })
-      .click();
+    await choose.getByRole("button", { name: "Start selected download", exact: true }).click();
     await expect(choose).toHaveCount(0);
     const open = page.getByRole("button", { name: "View files", exact: true });
     await open.focus();
@@ -49,15 +45,11 @@ test("plays and seeks a real incomplete torrent, reconnects a missing seek, and 
     const close = dialog.getByRole("button", { name: "Close", exact: true });
     await close.focus();
     await page.keyboard.press("Shift+Tab");
-    await expect(
-      dialog.getByRole("button", { name: "Download first", exact: true }),
-    ).toBeFocused();
+    await expect(dialog.getByRole("button", { name: "Download first", exact: true })).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(close).toBeFocused();
     const codec = await page.evaluate(() =>
-      document
-        .createElement("video")
-        .canPlayType('video/mp4; codecs="avc1.42E01E"'),
+      document.createElement("video").canPlayType('video/mp4; codecs="avc1.42E01E"'),
     );
     if (codec) {
       await expect(video).toBeVisible();
@@ -70,9 +62,7 @@ test("plays and seeks a real incomplete torrent, reconnects a missing seek, and 
           () =>
             video.evaluate((element: HTMLVideoElement) => ({
               ready: element.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA,
-              aspect: Math.round(
-                (element.videoWidth / element.videoHeight) * 1000,
-              ),
+              aspect: Math.round((element.videoWidth / element.videoHeight) * 1000),
             })),
           { timeout: 20_000 },
         )
@@ -96,9 +86,7 @@ test("plays and seeks a real incomplete torrent, reconnects a missing seek, and 
           }),
         )
         .toBe(true);
-      const firstFrame = (await fixture.client.jobs.list()).items.find(
-        (job) => job.id === id,
-      );
+      const firstFrame = (await fixture.client.jobs.list()).items.find((job) => job.id === id);
       expect(firstFrame?.torrentFiles[0].complete).toBe(false);
       await video.evaluate((element: HTMLVideoElement) => element.pause());
       await fixture.disconnect();
@@ -134,9 +122,7 @@ test("plays and seeks a real incomplete torrent, reconnects a missing seek, and 
         await element.play();
       });
       await expect
-        .poll(() =>
-          video.evaluate((element: HTMLVideoElement) => element.currentTime),
-        )
+        .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
         .toBeGreaterThan(32.1);
       await video.evaluate((element: HTMLVideoElement) => element.pause());
       await testInfo.attach("real-torrent-decoded-and-seeked", {
@@ -153,37 +139,25 @@ test("plays and seeks a real incomplete torrent, reconnects a missing seek, and 
       ).toBeVisible();
     }
     // Both are real remuxed media files; their metadata is not replaced by route fixtures.
-    await tapVisibleTarget(
-      dialog.getByRole("button", { name: "Download first", exact: true }),
-    );
+    await tapVisibleTarget(dialog.getByRole("button", { name: "Download first", exact: true }));
     for (const index of [1, 2]) {
       await tapVisibleTarget(play.nth(index));
-      await expect(
-        dialog.getByText(/^Download first\. Early playback requires/),
-      ).toBeVisible();
+      await expect(dialog.getByText(/^Download first\. Early playback requires/)).toBeVisible();
       await expect(video).toHaveCount(0);
       if (index === 1)
-        await tapVisibleTarget(
-          dialog.getByRole("button", { name: "Back to files", exact: true }),
-        );
+        await tapVisibleTarget(dialog.getByRole("button", { name: "Back to files", exact: true }));
     }
     expect(
       await page.evaluate(
-        () =>
-          document.documentElement.scrollWidth <=
-          document.documentElement.clientWidth,
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
       ),
     ).toBe(true);
     await page.keyboard.press("Escape");
-    await expect(
-      dialog.getByRole("button", { name: "Back to files", exact: true }),
-    ).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: "Back to files", exact: true })).toHaveCount(0);
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
     await expect(open).toBeFocused();
-    expect((await fixture.client.jobs.list()).items[0].status).not.toBe(
-      "error",
-    );
+    expect((await fixture.client.jobs.list()).items[0].status).not.toBe("error");
   } finally {
     if (fixture && testInfo.status !== testInfo.expectedStatus)
       await testInfo.attach("torrent-server-output", {

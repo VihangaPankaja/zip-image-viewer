@@ -92,20 +92,17 @@ jobs:
             --mount type=bind,source="$PWD/tests/integration/containerHlsSmoke.mjs",target=/app/tests/integration/containerHlsSmoke.mjs,readonly \
             ${{ env.IMAGE_NAME }}:latest /app/tests/integration/containerHlsSmoke.mjs
 
-      - name: Set up browser smoke dependencies
+      - name: Set up Vite+ for browser smoke checks
         if: github.event_name == 'pull_request'
-        uses: pnpm/setup@v2
+        uses: voidzero-dev/setup-vp@v1.21.2
         with:
           cache: true
-          install: false
+          run-install: false
+          node-version-file: .node-version
       - if: github.event_name == 'pull_request'
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
+        run: vp install --frozen-lockfile
       - if: github.event_name == 'pull_request'
-        run: pnpm install --frozen-lockfile
-      - if: github.event_name == 'pull_request'
-        run: pnpm exec playwright install --with-deps chromium
+        run: vp exec playwright install --with-deps chromium
 
       - name: Play HLS through the production image in Chromium
         if: github.event_name == 'pull_request'

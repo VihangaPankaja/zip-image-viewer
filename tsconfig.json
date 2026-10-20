@@ -1,9 +1,15 @@
 {
   "files": [],
   "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.server.json" },
-    { "path": "./tsconfig.tests.json" }
+    {
+      "path": "./tsconfig.app.json"
+    },
+    {
+      "path": "./tsconfig.server.json"
+    },
+    {
+      "path": "./tsconfig.tests.json"
+    }
   ],
   "compilerOptions": {
     "target": "ES2022",
@@ -16,6 +22,6 @@
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
-    "types": ["vite/client", "vitest/globals"]
+    "types": ["vite-plus/client", "vite-plus/test/globals"]
   }
 }

@@ -17,10 +17,7 @@ function CaptionSettings(subtitles: ReturnType<typeof useVideoSubtitles>) {
       </button>
       <label>
         Caption size
-        <select
-          value={subtitles.size}
-          onChange={(event) => subtitles.setSize(event.target.value)}
-        >
+        <select value={subtitles.size} onChange={(event) => subtitles.setSize(event.target.value)}>
           <option value="small">Small</option>
           <option value="medium">Medium</option>
           <option value="large">Large</option>
@@ -36,8 +33,7 @@ function CaptionSettings(subtitles: ReturnType<typeof useVideoSubtitles>) {
           value={subtitles.offset}
           onChange={(event) => {
             const value = event.target.valueAsNumber;
-            if (Number.isFinite(value))
-              subtitles.setOffset(Math.max(-60, Math.min(60, value)));
+            if (Number.isFinite(value)) subtitles.setOffset(Math.max(-60, Math.min(60, value)));
           }}
         />
       </label>
@@ -57,8 +53,8 @@ function SubtitleNotice(subtitles: ReturnType<typeof useVideoSubtitles>) {
         </p>
       ) : subtitles.file ? (
         <p className="video-subtitle-note" role="status">
-          {subtitles.ready ? subtitles.file.name : "Loading subtitles…"} ·
-          Positive offset delays captions.
+          {subtitles.ready ? subtitles.file.name : "Loading subtitles…"} · Positive offset delays
+          captions.
         </p>
       ) : (
         <p className="video-subtitle-note">
@@ -96,9 +92,7 @@ export function VideoSubtitles({
             <select
               value={subtitles.embeddedTrackId}
               onChange={(event) => {
-                const track = embeddedTracks.find(
-                  ({ id }) => id === event.target.value,
-                );
+                const track = embeddedTracks.find(({ id }) => id === event.target.value);
                 if (track) void subtitles.loadEmbedded(track, sessionId, path);
                 else subtitles.remove();
               }}
@@ -124,11 +118,7 @@ export function VideoSubtitles({
             if (selected) void subtitles.load(selected);
           }}
         />
-        <button
-          className="ghost-button"
-          type="button"
-          onClick={() => inputRef.current?.click()}
-        >
+        <button className="ghost-button" type="button" onClick={() => inputRef.current?.click()}>
           Load subtitles
         </button>
         {subtitles.file && <CaptionSettings {...subtitles} />}

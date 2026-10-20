@@ -3,7 +3,7 @@ import request from "supertest";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vite-plus/test";
 import { createJobManager } from "../application/jobs/jobManager.js";
 import { registerTorrentVideoRoutes } from "./torrentVideoRoutes.js";
 import type { SessionJob } from "../domain/models.js";
@@ -11,9 +11,7 @@ import type { SessionJob } from "../domain/models.js";
 const directories: string[] = [];
 afterEach(async () => {
   await Promise.all(
-    directories
-      .splice(0)
-      .map((directory) => rm(directory, { recursive: true, force: true })),
+    directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
   );
 });
 

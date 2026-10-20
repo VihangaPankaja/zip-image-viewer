@@ -20,8 +20,7 @@ export function registerTorrentVideoRoutes(
     const controller = new AbortController();
     const disconnect = () => controller.abort();
     res.once("close", disconnect);
-    let file:
-      ReturnType<NonNullable<TorrentAdapter["openVideoFile"]>> | undefined;
+    let file: ReturnType<NonNullable<TorrentAdapter["openVideoFile"]>> | undefined;
     try {
       file = await resolveTorrentVideo(req, jobs, adapter);
       const range =
@@ -53,22 +52,18 @@ export function registerTorrentVideoRoutes(
         return;
       }
       const signal = controller.signal;
-      await pipeline(
-        file.stream(selectedRange ?? { start: 0, end: file.size - 1 }, signal),
-        res,
-        { signal },
-      );
+      await pipeline(file.stream(selectedRange ?? { start: 0, end: file.size - 1 }, signal), res, {
+        signal,
+      });
     } catch (error) {
       if (res.headersSent) res.destroy();
       else if (!controller.signal.aborted)
-        res
-          .status(error instanceof ApplicationError ? error.status : 503)
-          .json({
-            error:
-              error instanceof ApplicationError
-                ? error.message
-                : "Waiting for verified torrent pieces timed out or playback stopped. Check peers, resume the download and retry, or download first.",
-          });
+        res.status(error instanceof ApplicationError ? error.status : 503).json({
+          error:
+            error instanceof ApplicationError
+              ? error.message
+              : "Waiting for verified torrent pieces timed out or playback stopped. Check peers, resume the download and retry, or download first.",
+        });
     } finally {
       res.removeListener("close", disconnect);
       controller.abort();
@@ -77,21 +72,15 @@ export function registerTorrentVideoRoutes(
   });
 }
 
-function resolveTorrentVideo(
-  req: Request,
-  jobs: Map<string, SessionJob>,
-  adapter: TorrentAdapter,
-) {
+function resolveTorrentVideo(req: Request, jobs: Map<string, SessionJob>, adapter: TorrentAdapter) {
   const job = jobs.get(typeof req.params.id === "string" ? req.params.id : "");
   if (!job) throw new ApplicationError("NOT_FOUND", "Job not found.", 404);
   const fileId = typeof req.query.fileId === "string" ? req.query.fileId : "";
   const selected = job.torrentFiles.find(({ id }) => id === fileId);
-  if (!selected)
-    throw new ApplicationError("NOT_FOUND", "Torrent file not found.", 404);
+  if (!selected) throw new ApplicationError("NOT_FOUND", "Torrent file not found.", 404);
   if (
     job.sourceKind === "torrent" &&
-    (job.status === "ready" ||
-      (job.status === "downloading" && job.phase === "indexing")) &&
+    (job.status === "ready" || (job.status === "downloading" && job.phase === "indexing")) &&
     selected.selected &&
     selected.complete
   )

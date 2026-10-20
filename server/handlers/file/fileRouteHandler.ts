@@ -45,10 +45,7 @@ export type FileRouteDependencies = {
     _targetPath: string,
     _quality: string,
   ) => Promise<string>;
-  parseRangeHeader: (
-    _header: string | undefined,
-    _size: number,
-  ) => ByteRange | "invalid" | null;
+  parseRangeHeader: (_header: string | undefined, _size: number) => ByteRange | "invalid" | null;
 };
 
 async function resolveFileContext(
@@ -209,9 +206,7 @@ function serveFile(
   createReadStream(context.targetPath, range).pipe(res);
 }
 
-export function createFileRouteHandler(
-  deps: FileRouteDependencies,
-): RequestHandler {
+export function createFileRouteHandler(deps: FileRouteDependencies): RequestHandler {
   return async (req, res) => {
     const context = await resolveFileContext(req, res, deps);
     if (!context) return;

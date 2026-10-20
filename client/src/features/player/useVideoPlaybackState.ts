@@ -6,13 +6,11 @@ export function useVideoPlaybackState() {
   const [videoPlaybackRate, setVideoPlaybackRate] = useState(1);
   const [videoVolume, setVideoVolume] = useState(0.9);
   const [videoPlaybackError, setVideoPlaybackError] = useState("");
-  const [videoPlaybackStatus, setVideoPlaybackStatus] = useState<
-    "loading" | "buffering" | "ready"
-  >("loading");
+  const [videoPlaybackStatus, setVideoPlaybackStatus] = useState<"loading" | "buffering" | "ready">(
+    "loading",
+  );
   const [videoHeight, setVideoHeight] = useState<number | null>(null);
-  const [videoQualityOptions, setVideoQualityOptions] = useState<
-    VideoQualityOption[]
-  >([]);
+  const [videoQualityOptions, setVideoQualityOptions] = useState<VideoQualityOption[]>([]);
   const [selectedVideoQuality, setSelectedVideoQuality] = useState("source");
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);

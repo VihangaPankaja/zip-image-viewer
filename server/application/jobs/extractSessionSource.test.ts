@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vite-plus/test";
 import { createJobManager } from "./jobManager.js";
 import { extractSessionSource } from "./extractSessionSource.js";
 import { listExtractedEntries } from "../../infrastructure/archive/listExtractedEntries.js";
@@ -9,9 +9,7 @@ import { listExtractedEntries } from "../../infrastructure/archive/listExtracted
 const workspaces: string[] = [];
 afterEach(async () => {
   await Promise.all(
-    workspaces
-      .splice(0)
-      .map((directory) => rm(directory, { recursive: true, force: true })),
+    workspaces.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
   );
 });
 
@@ -74,9 +72,7 @@ it.each([
     await mkdir(output);
     const archive = path.join(directory, "fixture.zip");
     await writeFile(archive, zip(entries));
-    const job = createJobManager(new Map(), vi.fn()).createJob(
-      "https://example.com/fixture.zip",
-    );
+    const job = createJobManager(new Map(), vi.fn()).createJob("https://example.com/fixture.zip");
     await expect(
       extractSessionSource(job, archive, output, {
         emitJob: vi.fn(),

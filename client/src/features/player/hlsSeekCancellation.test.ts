@@ -1,5 +1,5 @@
 import Hls, { Fragment, PlaylistLevelType } from "hls.js";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 
 type Controller = {
   state: string;
@@ -13,14 +13,10 @@ it.each([true, false])(
   "handles init cancellation after the fragment changes: %s",
   async (changed) => {
     const player = new Hls({ enableWorker: false });
-    const controller = (player as unknown as { streamController: Controller })
-      .streamController;
+    const controller = (player as unknown as { streamController: Controller }).streamController;
     const previous = new Fragment(PlaylistLevelType.MAIN, "http://localhost/");
     previous.sn = 4;
-    previous.initSegment = new Fragment(
-      PlaylistLevelType.MAIN,
-      "http://localhost/",
-    );
+    previous.initSegment = new Fragment(PlaylistLevelType.MAIN, "http://localhost/");
     previous.initSegment.sn = "initSegment";
     const current = new Fragment(PlaylistLevelType.MAIN, "http://localhost/");
     current.sn = 16;

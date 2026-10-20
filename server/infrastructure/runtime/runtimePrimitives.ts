@@ -22,14 +22,8 @@ function detailId(details: Record<string, unknown>, key: string): string {
 
 function writeLogLine(entry: LogEntry): void {
   const logger =
-    entry.level === "error"
-      ? console.error
-      : entry.level === "warn"
-        ? console.warn
-        : console.log;
-  const payload = Object.keys(entry.details).length
-    ? ` ${JSON.stringify(entry.details)}`
-    : "";
+    entry.level === "error" ? console.error : entry.level === "warn" ? console.warn : console.log;
+  const payload = Object.keys(entry.details).length ? ` ${JSON.stringify(entry.details)}` : "";
   logger(
     `[${new Date(entry.timestamp).toISOString()}] [${entry.level.toUpperCase()}] ${entry.event}${payload}`,
   );
@@ -58,9 +52,7 @@ export function getLogEntries(): readonly LogEntry[] {
   return [...logEntries];
 }
 
-export function subscribeLogEvents(
-  subscriber: (_entry: LogEntry) => void,
-): () => void {
+export function subscribeLogEvents(subscriber: (_entry: LogEntry) => void): () => void {
   logSubscribers.add(subscriber);
   return () => logSubscribers.delete(subscriber);
 }
@@ -75,25 +67,17 @@ export function formatBytes(bytes: number) {
   }
 
   const units = ["B", "KB", "MB", "GB", "TB"];
-  const exponent = Math.min(
-    Math.floor(Math.log(bytes) / Math.log(1024)),
-    units.length - 1,
-  );
+  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
   const value = bytes / 1024 ** exponent;
   return `${value >= 10 || exponent === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[exponent]}`;
 }
 
-export function parseRangeHeader(
-  rangeHeader: string | undefined,
-  size: number,
-) {
+export function parseRangeHeader(rangeHeader: string | undefined, size: number) {
   if (!rangeHeader || !rangeHeader.startsWith("bytes=")) {
     return null;
   }
 
-  const [rawStart = "", rawEnd = ""] = rangeHeader
-    .replace("bytes=", "")
-    .split("-");
+  const [rawStart = "", rawEnd = ""] = rangeHeader.replace("bytes=", "").split("-");
   if (rawStart.includes(",") || rawEnd.includes(",")) {
     return null;
   }
@@ -133,12 +117,7 @@ export function sanitizeEntryPath(entryPath: string) {
   const normalized = path.posix.normalize(entryPath.replace(/\\/g, "/"));
   const cleaned = normalized.replace(/^\/+/, "").replace(/\/+$/, "");
 
-  if (
-    !cleaned ||
-    cleaned === "." ||
-    cleaned.startsWith("../") ||
-    cleaned.includes("/../")
-  ) {
+  if (!cleaned || cleaned === "." || cleaned.startsWith("../") || cleaned.includes("/../")) {
     throw new Error(`Unsafe entry path: ${entryPath}`);
   }
 

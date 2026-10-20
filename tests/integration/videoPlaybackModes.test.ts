@@ -4,11 +4,8 @@ import path from "node:path";
 import express from "express";
 import ffmpegPath from "ffmpeg-static";
 import request from "supertest";
-import { afterEach, expect, it } from "vitest";
-import type {
-  Session,
-  VideoTranscodeEntry,
-} from "../../server/domain/models.js";
+import { afterEach, expect, it } from "vite-plus/test";
+import type { Session, VideoTranscodeEntry } from "../../server/domain/models.js";
 import { registerVideoPlaybackRoutes } from "../../server/handlers/video/playbackRoutes.js";
 import { registerVideoHlsRoutes } from "../../server/handlers/videoHlsRoutes.js";
 import { getVideoQualities } from "../../server/handlers/video/metadataRoutes.js";
@@ -91,15 +88,9 @@ it("serves MP4 ranges without encoding, remuxes without changing packets, and tr
     transcodes,
     logEvent: () => undefined,
   });
-  expect((await runtime.getVideoMetadata(mp4, session)).playbackMode).toBe(
-    "direct",
-  );
-  expect((await runtime.getVideoMetadata(mkv, session)).playbackMode).toBe(
-    "remux",
-  );
-  expect(
-    (await runtime.getVideoMetadata(unsupported, session)).playbackMode,
-  ).toBe("transcode");
+  expect((await runtime.getVideoMetadata(mp4, session)).playbackMode).toBe("direct");
+  expect((await runtime.getVideoMetadata(mkv, session)).playbackMode).toBe("remux");
+  expect((await runtime.getVideoMetadata(unsupported, session)).playbackMode).toBe("transcode");
 
   const app = express();
   const deps = {
@@ -128,10 +119,7 @@ it("serves MP4 ranges without encoding, remuxes without changing packets, and tr
   expect(direct.headers["x-video-source"]).toBe("direct");
   expect(direct.headers["content-type"]).toMatch(/^video\/mp4/);
   expect(
-    await getVideoQualities(
-      { sessionId: session.id, path: "direct.mp4" },
-      deps,
-    ),
+    await getVideoQualities({ sessionId: session.id, path: "direct.mp4" }, deps),
   ).toMatchObject({
     defaultQuality: "source",
     options: [{ id: "source", label: "Direct play" }, { id: "auto" }],
@@ -189,17 +177,12 @@ it("serves MP4 ranges without encoding, remuxes without changing packets, and tr
         "-",
       ])
     ).stdout;
-  expect(
-    await packetHash(
-      runtime.getSessionQualityOutputPath(session, "remux.mkv", "remux"),
-    ),
-  ).toBe(await packetHash(mkv));
+  expect(await packetHash(runtime.getSessionQualityOutputPath(session, "remux.mkv", "remux"))).toBe(
+    await packetHash(mkv),
+  );
   expect(transcodes.size).toBe(0);
   expect(
-    await getVideoQualities(
-      { sessionId: session.id, path: "unsupported.mp4" },
-      deps,
-    ),
+    await getVideoQualities({ sessionId: session.id, path: "unsupported.mp4" }, deps),
   ).toMatchObject({
     defaultQuality: "auto",
     options: [{ id: "source" }, { id: "auto" }],
@@ -222,11 +205,7 @@ it("serves MP4 ranges without encoding, remuxes without changing packets, and tr
     .get(`${hls}/segment`)
     .query({ path: "unsupported.mp4", quality: "source", index: 0 })
     .expect(200);
-  const entry = await runtime.ensureVideoTranscodeEntry(
-    session,
-    "unsupported.mp4",
-    unsupported,
-  );
+  const entry = await runtime.ensureVideoTranscodeEntry(session, "unsupported.mp4", unsupported);
   const rendition = runtime.getRenditionState(entry, session, "source");
   const init = await readFile(path.join(rendition.dir, "init.mp4"));
   expect(init.includes("avcC")).toBe(true);

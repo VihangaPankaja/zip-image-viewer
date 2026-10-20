@@ -1,13 +1,11 @@
-# Server Agent Scope
+# Server changes
 
-For backend/API changes under `server/`, inherit root guidance from `../AGENTS.md` and apply these specifics:
+- Keep HTTP handlers thin. Put workflow rules in `application/` and file,
+  network and process operations in `infrastructure/`.
+- Validate requests through shared contracts. Check resolved paths against
+  their session root before reading or writing files.
+- Preserve retained torrent data during shutdown, viewer close and expiry.
+  Explicit deletion must release readers and media jobs first.
+- Cover changes to downloads, archives or media with real fixtures.
 
-- Stack: Express + TypeScript
-- Primary checks:
-  - `npm run lint`
-  - `npm run typecheck`
-  - `npm run build`
-- When backend changes affect frontend contracts, also run:
-  - `npm run test`
-  - `npm run test:e2e`
-- Preserve path safety and session boundary checks for file operations.
+Root verification and PR instructions apply.

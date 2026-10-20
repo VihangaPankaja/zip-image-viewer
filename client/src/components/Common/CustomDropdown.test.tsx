@@ -26,9 +26,7 @@ describe("CustomDropdown", () => {
     expect(listbox).toHaveAttribute("popover", "auto");
     expect(listbox).toHaveAttribute("aria-label", "Quality");
 
-    await user.click(
-      screen.getByRole("option", { name: "1080p", hidden: true }),
-    );
+    await user.click(screen.getByRole("option", { name: "1080p", hidden: true }));
     expect(onChange).toHaveBeenCalledWith("1080p");
   });
 });

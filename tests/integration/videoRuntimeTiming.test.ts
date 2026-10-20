@@ -2,21 +2,17 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import ffmpegPath from "ffmpeg-static";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { createVideoRuntime } from "../../server/infrastructure/media/videoRuntime.js";
 import { runCommand } from "../../server/infrastructure/process/commandRunner.js";
-import type {
-  Session,
-  VideoTranscodeEntry,
-} from "../../server/domain/models.js";
+import type { Session, VideoTranscodeEntry } from "../../server/domain/models.js";
 
 describe("video runtime timing", () => {
   it("records encoder queue and execution time for a completed rendition", async () => {
     if (!ffmpegPath) throw new Error("ffmpeg-static is unavailable.");
     const workspaceDir = await mkdtemp(path.join(tmpdir(), "ziv-timing-"));
     const sourcePath = path.join(workspaceDir, "source.mp4");
-    const events: Array<{ event: string; details?: Record<string, unknown> }> =
-      [];
+    const events: Array<{ event: string; details?: Record<string, unknown> }> = [];
     const session: Session = {
       id: "timing-session",
       workspaceDir,
@@ -67,11 +63,7 @@ describe("video runtime timing", () => {
         transcodes: new Map<string, VideoTranscodeEntry>(),
         logEvent: (_level, event, details) => events.push({ event, details }),
       });
-      const entry = await runtime.ensureVideoTranscodeEntry(
-        session,
-        "source.mp4",
-        sourcePath,
-      );
+      const entry = await runtime.ensureVideoTranscodeEntry(session, "source.mp4", sourcePath);
       const rendition = runtime.getRenditionState(entry, session, "360p");
 
       await runtime.startRenditionTranscode(entry, session, rendition);
@@ -80,14 +72,8 @@ describe("video runtime timing", () => {
       });
 
       expect(
-        events
-          .map(({ event }) => event)
-          .filter((event) => event.startsWith("video.transcode.")),
-      ).toEqual([
-        "video.transcode.queued",
-        "video.transcode.started",
-        "video.transcode.completed",
-      ]);
+        events.map(({ event }) => event).filter((event) => event.startsWith("video.transcode.")),
+      ).toEqual(["video.transcode.queued", "video.transcode.started", "video.transcode.completed"]);
       expect(events.at(-1)?.details).toMatchObject({
         sessionId: session.id,
         path: "source.mp4",

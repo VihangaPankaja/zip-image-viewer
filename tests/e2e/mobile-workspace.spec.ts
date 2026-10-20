@@ -51,38 +51,26 @@ test("mobile file selection opens preview and retains it across queue visits and
   );
   await page.goto("/");
   await page.getByRole("tab", { name: "Explore" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Sessions", exact: true }),
-  ).toBeHidden();
-  const sessionsToggle = await page
-    .getByRole("button", { name: "Show sessions" })
-    .boundingBox();
+  await expect(page.getByRole("heading", { name: "Sessions", exact: true })).toBeHidden();
+  const sessionsToggle = await page.getByRole("button", { name: "Show sessions" }).boundingBox();
   expect(sessionsToggle?.height).toBeGreaterThanOrEqual(44);
   expect(sessionsToggle?.height).toBeLessThanOrEqual(60);
   await page.getByRole("button", { name: "Show sessions" }).click();
-  await page
-    .getByRole("button", { name: `Open ${filename}`, exact: true })
-    .click();
+  await page.getByRole("button", { name: `Open ${filename}`, exact: true }).click();
   await page.getByRole("button", { name: "Hide sessions" }).click();
   await page.getByRole("treeitem").click();
   await expect(page.getByRole("radio", { name: "Preview" })).toBeChecked();
-  await expect(
-    page.getByText("Mobile preview fixture", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText("Mobile preview fixture", { exact: true })).toBeVisible();
   for (const viewport of [
     { width: 360, height: 800 },
     { width: 800, height: 360 },
   ]) {
     await page.setViewportSize(viewport);
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth + 1,
-      ),
-    ).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
+      true,
+    );
     await page.getByRole("tab", { name: "Downloads" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Downloads", exact: true }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Downloads", exact: true })).toBeVisible();
     await page.getByRole("tab", { name: "Explore" }).click();
     await expect(page.getByRole("radio", { name: "Preview" })).toBeChecked();
     await page.getByRole("button", { name: "Back to files" }).focus();
@@ -98,34 +86,24 @@ test("mobile file selection opens preview and retains it across queue visits and
       preview.locator(".panel-actions"),
       preview.locator("pre"),
     ]) {
-      const [outer, inner] = await Promise.all([
-        preview.boundingBox(),
-        child.boundingBox(),
-      ]);
+      const [outer, inner] = await Promise.all([preview.boundingBox(), child.boundingBox()]);
       expect(outer).not.toBeNull();
       expect(inner).not.toBeNull();
       if (!outer || !inner) throw new Error("Preview bounds unavailable");
       expect(inner.x).toBeGreaterThanOrEqual(outer.x);
       expect(inner.x + inner.width).toBeLessThanOrEqual(outer.x + outer.width);
-      expect(inner.y + inner.height).toBeLessThanOrEqual(
-        outer.y + outer.height,
-      );
+      expect(inner.y + inner.height).toBeLessThanOrEqual(outer.y + outer.height);
     }
     const content = preview.locator("pre");
-    await content.evaluate((element) =>
-      element.scrollIntoView({ block: "center" }),
-    );
+    await content.evaluate((element) => element.scrollIntoView({ block: "center" }));
     await expect(content).toBeInViewport({ ratio: 0.99 });
     const [contentBounds, navBounds] = await Promise.all([
       content.boundingBox(),
       page.getByRole("navigation", { name: "Workspace views" }).boundingBox(),
     ]);
-    if (!contentBounds || !navBounds)
-      throw new Error("Navigation bounds unavailable");
+    if (!contentBounds || !navBounds) throw new Error("Navigation bounds unavailable");
     expect(contentBounds.y).toBeGreaterThanOrEqual(0);
-    expect(contentBounds.y + contentBounds.height).toBeLessThanOrEqual(
-      navBounds.y,
-    );
+    expect(contentBounds.y + contentBounds.height).toBeLessThanOrEqual(navBounds.y);
     await page.screenshot({
       path: testInfo.outputPath(`workspace-${viewport.width}.png`),
       fullPage: true,
@@ -146,27 +124,19 @@ audioTest(
     for (const time of [0.25, 0.5, 0.75, 1]) {
       await page.keyboard.press("ArrowRight");
       await expect
-        .poll(() =>
-          video.evaluate((element: HTMLVideoElement) => element.currentTime),
-        )
+        .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
         .toBeCloseTo(time, 1);
     }
     await expect
-      .poll(() =>
-        video.evaluate((element: HTMLVideoElement) => element.currentTime),
-      )
+      .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
       .toBeCloseTo(1, 1);
     await page.getByRole("tab", { name: "Downloads" }).click();
     await expect(page.locator(".download-row").first()).toContainText("62%");
     await expect(page.getByLabel("Video preview")).toBeHidden();
     await page.getByRole("tab", { name: "Explore" }).click();
-    await expect(
-      page.getByRole("radio", { name: "Preview", exact: true }),
-    ).toBeChecked();
+    await expect(page.getByRole("radio", { name: "Preview", exact: true })).toBeChecked();
     await expect
-      .poll(() =>
-        video.evaluate((element: HTMLVideoElement) => element.currentTime),
-      )
+      .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
       .toBeCloseTo(1, 1);
     await expect(video).toHaveJSProperty("paused", true);
     await page.screenshot({
@@ -186,17 +156,11 @@ audioTest(
         .getByRole("navigation", { name: "Workspace views" })
         .getByRole("button", { name: "Downloads", exact: true }),
     );
-    await expect(
-      page.getByRole("heading", { name: "Downloads", exact: true }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Downloads", exact: true })).toBeVisible();
     await expect(video).toHaveJSProperty("paused", false);
-    const hiddenTime = await video.evaluate(
-      (element: HTMLVideoElement) => element.currentTime,
-    );
+    const hiddenTime = await video.evaluate((element: HTMLVideoElement) => element.currentTime);
     await expect
-      .poll(() =>
-        video.evaluate((element: HTMLVideoElement) => element.currentTime),
-      )
+      .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
       .toBeGreaterThan(Math.max(1.25, hiddenTime + 0.25));
     await page.getByRole("tab", { name: "Explore" }).click();
     await expect(video).toHaveJSProperty("paused", false);
@@ -243,40 +207,29 @@ test("mobile playback keeps Downloads within one tap in portrait and landscape",
     const target = await downloads.boundingBox();
     expect(target?.height).toBeGreaterThanOrEqual(44);
     expect(target?.width).toBeGreaterThanOrEqual(44);
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth + 1,
-      ),
-    ).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
+      true,
+    );
     await page.screenshot({
       path: testInfo.outputPath(`mobile-video-${viewport.width}.png`),
       fullPage: true,
     });
     await tapVisibleTarget(downloads);
-    await expect(
-      page.getByRole("heading", { name: "Downloads", exact: true }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Downloads", exact: true })).toBeVisible();
     await expect(page.locator(".download-row").first()).toContainText("62%");
     await expect(
-      page
-        .locator(".download-row")
-        .first()
-        .getByRole("button", { name: "Pause", exact: true }),
+      page.locator(".download-row").first().getByRole("button", { name: "Pause", exact: true }),
     ).toBeEnabled();
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth + 1,
-      ),
-    ).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
+      true,
+    );
     await page.screenshot({
       path: testInfo.outputPath(`mobile-active-queue-${viewport.width}.png`),
       fullPage: true,
     });
     await page.getByRole("tab", { name: "Explore" }).focus();
     await page.keyboard.press("Enter");
-    await expect(
-      page.getByRole("radio", { name: "Preview", exact: true }),
-    ).toBeChecked();
+    await expect(page.getByRole("radio", { name: "Preview", exact: true })).toBeChecked();
   }
 });
 
@@ -308,9 +261,7 @@ async function openMobileVideo(page: Page, appOrigin: string) {
     }),
   );
   // Serve MP4 over HTTP with range support for native media in every browser.
-  await page.route("**/api/sessions/*/video/play?*", (route) =>
-    route.continue(),
-  );
+  await page.route("**/api/sessions/*/video/play?*", (route) => route.continue());
   await page.goto(appOrigin);
   await tapVisibleTarget(page.getByRole("tab", { name: "Explore" }));
   await tapVisibleTarget(page.getByRole("button", { name: "Show sessions" }));
@@ -318,23 +269,13 @@ async function openMobileVideo(page: Page, appOrigin: string) {
     page.getByRole("button", { name: "Open Coastal collection", exact: true }),
   );
   await tapVisibleTarget(page.getByRole("button", { name: "Hide sessions" }));
-  await tapVisibleTarget(
-    page.getByRole("treeitem", { name: filename, exact: true }),
-  );
-  await expect(
-    page.getByRole("radio", { name: "Preview", exact: true }),
-  ).toBeChecked();
-  await expect(
-    page.getByRole("heading", { name: filename, exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("slider", { name: "Seek video" }),
-  ).toHaveAttribute("max", "8");
+  await tapVisibleTarget(page.getByRole("treeitem", { name: filename, exact: true }));
+  await expect(page.getByRole("radio", { name: "Preview", exact: true })).toBeChecked();
+  await expect(page.getByRole("heading", { name: filename, exact: true })).toBeVisible();
+  await expect(page.getByRole("slider", { name: "Seek video" })).toHaveAttribute("max", "8");
   await expect
     .poll(() =>
-      page
-        .getByLabel("Video preview")
-        .evaluate((element: HTMLVideoElement) => element.readyState),
+      page.getByLabel("Video preview").evaluate((element: HTMLVideoElement) => element.readyState),
     )
     .toBeGreaterThanOrEqual(2);
 }
@@ -363,9 +304,7 @@ test("landscape phone can show the entire loaded player above navigation", async
     expect(videoBounds.y + videoBounds.height).toBeLessThanOrEqual(
       playerBounds.y + playerBounds.height,
     );
-    expect(playerBounds.y + playerBounds.height).toBeLessThanOrEqual(
-      navigationBounds.y,
-    );
+    expect(playerBounds.y + playerBounds.height).toBeLessThanOrEqual(navigationBounds.y);
     expect(playerBounds.width).toBeGreaterThan(600);
     await page.screenshot({
       path: testInfo.outputPath(`landscape-player-${viewport.width}.png`),
@@ -379,10 +318,7 @@ test("phone safe areas keep the header and navigation clear of screen cutouts", 
   context,
   browserName,
 }, testInfo) => {
-  test.skip(
-    browserName !== "chromium",
-    "Chromium CDP provides safe-area emulation.",
-  );
+  test.skip(browserName !== "chromium", "Chromium CDP provides safe-area emulation.");
   await page.setViewportSize({ width: 360, height: 800 });
   const client = await context.newCDPSession(page);
   await client.send("Emulation.setSafeAreaInsetsOverride", {
@@ -402,11 +338,9 @@ test("phone safe areas keep the header and navigation clear of screen cutouts", 
   expect(navigation.x).toBeGreaterThanOrEqual(20);
   expect(navigation.x + navigation.width).toBeLessThanOrEqual(340);
   expect(navigation.y + navigation.height).toBeLessThanOrEqual(768);
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth + 1,
-    ),
-  ).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
+    true,
+  );
   await page.screenshot({
     path: testInfo.outputPath("mobile-safe-areas.png"),
     fullPage: false,
@@ -421,31 +355,15 @@ test("queue keyboard navigation cannot change the hidden media selection", async
   await openMobileVideo(page, appOrigin);
   const title = await page.locator(".preview-panel h2").textContent();
   await page.getByRole("tab", { name: "Downloads" }).click();
-  await page
-    .getByRole("heading", { name: "Downloads", exact: true })
-    .evaluate((heading) => {
-      heading.setAttribute("tabindex", "-1");
-      heading.focus();
-    });
-  for (const key of [
-    "ArrowRight",
-    "ArrowLeft",
-    "Home",
-    "End",
-    "Space",
-    "ArrowUp",
-    "]",
-  ]) {
+  await page.getByRole("heading", { name: "Downloads", exact: true }).evaluate((heading) => {
+    heading.setAttribute("tabindex", "-1");
+    heading.focus();
+  });
+  for (const key of ["ArrowRight", "ArrowLeft", "Home", "End", "Space", "ArrowUp", "]"]) {
     await page.keyboard.press(key);
     await expect(page.locator(".preview-panel h2")).toHaveText(title ?? "");
     await expect(page.getByLabel("Video preview")).toHaveCount(1);
-    await expect(page.getByLabel("Video preview")).toHaveJSProperty(
-      "paused",
-      true,
-    );
-    await expect(page.getByLabel("Video preview")).toHaveJSProperty(
-      "playbackRate",
-      1,
-    );
+    await expect(page.getByLabel("Video preview")).toHaveJSProperty("paused", true);
+    await expect(page.getByLabel("Video preview")).toHaveJSProperty("playbackRate", 1);
   }
 });

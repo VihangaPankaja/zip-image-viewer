@@ -20,9 +20,7 @@ export const filenames = [
   "06-film.mkv",
 ];
 const mediaDirectory = path.join(tmpdir(), `ziv-review-media-${process.pid}`);
-process.on("exit", () =>
-  rmSync(mediaDirectory, { recursive: true, force: true }),
-);
+process.on("exit", () => rmSync(mediaDirectory, { recursive: true, force: true }));
 
 export async function prepareMedia() {
   await mkdir(mediaDirectory, { recursive: true });
@@ -265,8 +263,7 @@ export function reviewActiveTorrentJob(): Job {
       ...file,
       selected: index !== 3,
       complete: index === 0,
-      downloadedBytes:
-        index === 0 ? file.size : index === 3 ? 0 : Math.floor(file.size / 2),
+      downloadedBytes: index === 0 ? file.size : index === 3 ? 0 : Math.floor(file.size / 2),
     })),
   };
 }
@@ -296,8 +293,7 @@ export async function installReviewFixtures(page: Page) {
   await page.clock.setFixedTime(new Date(timestamp));
   await page.route("**/rpc/**", (route) => {
     const endpoint = new URL(route.request().url()).pathname;
-    if (endpoint.endsWith("storage/get"))
-      return route.fulfill({ json: { json: state.storage } });
+    if (endpoint.endsWith("storage/get")) return route.fulfill({ json: { json: state.storage } });
     if (endpoint.endsWith("storage/pin")) {
       const payload = route.request().postDataJSON() as {
         json: { pinned: boolean };
@@ -310,10 +306,7 @@ export async function installReviewFixtures(page: Page) {
       state.storage.transcodesBytes = 0;
       return route.fulfill({ json: { json: null } });
     }
-    if (
-      endpoint.endsWith("torrentLimits/get") ||
-      endpoint.endsWith("torrentLimits/update")
-    ) {
+    if (endpoint.endsWith("torrentLimits/get") || endpoint.endsWith("torrentLimits/update")) {
       if (endpoint.endsWith("torrentLimits/update")) {
         const payload = route.request().postDataJSON() as {
           json: { downloadBytesPerSec: number; uploadBytesPerSec: number };
@@ -336,14 +329,10 @@ export async function installReviewFixtures(page: Page) {
       const updated = jobSchema.parse({
         ...job,
         torrentFiles: job.torrentFiles.map((file) =>
-          file.id === fileId
-            ? { ...file, priority: payload.json.priority }
-            : file,
+          file.id === fileId ? { ...file, priority: payload.json.priority } : file,
         ),
       });
-      state.jobs = state.jobs.map((item) =>
-        item.id === jobId ? updated : item,
-      );
+      state.jobs = state.jobs.map((item) => (item.id === jobId ? updated : item));
       return route.fulfill({ json: { json: updated } });
     }
     if (endpoint.endsWith("video/qualities")) {
@@ -363,9 +352,7 @@ export async function installReviewFixtures(page: Page) {
                 label: remux ? "Original" : "Direct play",
                 height: 540,
               },
-              ...(remux
-                ? [{ id: "remux", label: "Remuxed MP4", height: 540 }]
-                : []),
+              ...(remux ? [{ id: "remux", label: "Remuxed MP4", height: 540 }] : []),
               { id: "auto", label: "Auto", height: null },
               { id: "540p", label: "540p", height: 540 },
             ],
@@ -384,8 +371,7 @@ export async function installReviewFixtures(page: Page) {
       };
       state.selectedFileIds = payload.json.fileIds;
       const job = jobSchema.parse(
-        state.jobs.find(({ id }) => id === payload.json.id) ??
-          reviewTorrentJob(),
+        state.jobs.find(({ id }) => id === payload.json.id) ?? reviewTorrentJob(),
       );
       const files = job.torrentFiles.map((file) => ({
         ...file,
@@ -429,16 +415,12 @@ export async function installReviewFixtures(page: Page) {
   });
   await page.route("**/api/**", async (route) => {
     const url = new URL(route.request().url());
-    if (
-      url.pathname.startsWith("/api/session-jobs/") &&
-      url.pathname.endsWith("/video/info")
-    ) {
+    if (url.pathname.startsWith("/api/session-jobs/") && url.pathname.endsWith("/video/info")) {
       if (state.earlyVideo === "error")
         return route.fulfill({
           status: 503,
           json: {
-            message:
-              "No peers have the requested verified pieces yet. Try again.",
+            message: "No peers have the requested verified pieces yet. Try again.",
           },
         });
       return route.fulfill({
@@ -461,9 +443,7 @@ export async function installReviewFixtures(page: Page) {
       if (!/^(index\.m3u8|init\.mp4|segment_\d{6}\.m4s)$/.test(filename))
         return route.fulfill({ status: 404 });
       return route.fulfill({
-        contentType: filename.endsWith(".m3u8")
-          ? "application/vnd.apple.mpegurl"
-          : "video/mp4",
+        contentType: filename.endsWith(".m3u8") ? "application/vnd.apple.mpegurl" : "video/mp4",
         body: await readFile(path.join(mediaDirectory, "hls", filename)),
       });
     }
@@ -515,9 +495,7 @@ export async function installReviewFixtures(page: Page) {
           body: "Thumbnail outside fixture duration",
         });
       return route.fulfill({
-        body: await readFile(
-          path.join(mediaDirectory, `thumbnail-${time}.jpg`),
-        ),
+        body: await readFile(path.join(mediaDirectory, `thumbnail-${time}.jpg`)),
         contentType: "image/jpeg",
       });
     }
@@ -541,13 +519,10 @@ export async function installReviewFixtures(page: Page) {
             : ["sample.mp4", "video/mp4"];
       const body = await readFile(path.join(mediaDirectory, file));
       const headers = route.request().headers();
-      const range =
-        "range" in headers ? headers.range.match(/^bytes=(\d+)-(\d*)$/) : null;
+      const range = "range" in headers ? headers.range.match(/^bytes=(\d+)-(\d*)$/) : null;
       if (range) {
         const start = Number(range[1]);
-        const end = range[2]
-          ? Math.min(Number(range[2]), body.length - 1)
-          : body.length - 1;
+        const end = range[2] ? Math.min(Number(range[2]), body.length - 1) : body.length - 1;
         return route.fulfill({
           status: 206,
           headers: {

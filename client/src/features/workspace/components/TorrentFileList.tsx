@@ -1,10 +1,4 @@
-import {
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-} from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import type { Job, TorrentFile } from "../../../../../shared/contracts";
 import type { Selection } from "./TorrentFileDialog";
 import { FileGroup, FileStatusGroup } from "./TorrentFileGroups";
@@ -14,9 +8,7 @@ const filesPerPage = 200;
 function groupFiles(files: TorrentFile[]) {
   const groups = new Map<string, TorrentFile[]>();
   for (const file of files) {
-    const folder = file.path.includes("/")
-      ? file.path.slice(0, file.path.lastIndexOf("/"))
-      : "";
+    const folder = file.path.includes("/") ? file.path.slice(0, file.path.lastIndexOf("/")) : "";
     const group = groups.get(folder) ?? [];
     group.push(file);
     groups.set(folder, group);
@@ -26,23 +18,15 @@ function groupFiles(files: TorrentFile[]) {
 
 function useFilePages(selection: Selection) {
   const { visible } = selection;
-  const filterKey = JSON.stringify([
-    selection.search,
-    selection.mediaType,
-    selection.status,
-  ]);
+  const filterKey = JSON.stringify([selection.search, selection.mediaType, selection.status]);
   const [position, setPosition] = useState({ filterKey, page: 0 });
   const pageCount = Math.ceil(visible.length / filesPerPage);
   const page =
-    position.filterKey === filterKey
-      ? Math.min(position.page, Math.max(0, pageCount - 1))
-      : 0;
+    position.filterKey === filterKey ? Math.min(position.page, Math.max(0, pageCount - 1)) : 0;
   const listRef = useRef<HTMLDivElement>(null);
   const pendingFocus = useRef<"first" | "last" | null>(null);
   const matchingGroups = useMemo(() => groupFiles(visible), [visible]);
-  const groups = groupFiles(
-    visible.slice(page * filesPerPage, (page + 1) * filesPerPage),
-  );
+  const groups = groupFiles(visible.slice(page * filesPerPage, (page + 1) * filesPerPage));
   function controls() {
     return [
       ...(listRef.current?.querySelectorAll<HTMLInputElement>(
@@ -51,8 +35,7 @@ function useFilePages(selection: Selection) {
     ];
   }
   function rove(target: HTMLInputElement) {
-    for (const control of controls())
-      control.tabIndex = control === target ? 0 : -1;
+    for (const control of controls()) control.tabIndex = control === target ? 0 : -1;
   }
   useLayoutEffect(() => {
     const inputs = controls();
@@ -87,11 +70,7 @@ function navigateFileChoices(
   pageCount: number,
   goToPage: (page: number, focus?: "first" | "last") => void,
 ) {
-  if (
-    !(event.target instanceof HTMLInputElement) ||
-    event.target.type !== "checkbox"
-  )
-    return;
+  if (!(event.target instanceof HTMLInputElement) || event.target.type !== "checkbox") return;
   const index = inputs.indexOf(event.target);
   if (event.key === "Home" || event.key === "End") {
     event.preventDefault();
@@ -102,8 +81,7 @@ function navigateFileChoices(
   } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     event.preventDefault();
     const direction = event.key === "ArrowDown" ? 1 : -1;
-    const target =
-      index + direction >= 0 ? inputs.at(index + direction) : undefined;
+    const target = index + direction >= 0 ? inputs.at(index + direction) : undefined;
     if (target) target.focus();
     else if (page + direction >= 0 && page + direction < pageCount)
       goToPage(page + direction, direction > 0 ? "first" : "last");
@@ -134,8 +112,7 @@ function FilePagination({
         Previous files
       </button>
       <span>
-        Files {page * filesPerPage + 1}–
-        {Math.min(total, (page + 1) * filesPerPage)} of {total}
+        Files {page * filesPerPage + 1}–{Math.min(total, (page + 1) * filesPerPage)} of {total}
       </span>
       <button
         type="button"
@@ -149,17 +126,10 @@ function FilePagination({
   ) : null;
 }
 
-export function FileList({
-  job,
-  selection,
-}: {
-  job: Job;
-  selection: Selection;
-}) {
+export function FileList({ job, selection }: { job: Job; selection: Selection }) {
   const { selecting, submitting, selected, change, visible } = selection;
   const pages = useFilePages(selection);
-  const { listRef, page, pageCount, groups, matchingGroups, goToPage, rove } =
-    pages;
+  const { listRef, page, pageCount, groups, matchingGroups, goToPage, rove } = pages;
   return (
     <div className="torrent-file-results">
       <FilePagination
@@ -178,19 +148,10 @@ export function FileList({
         aria-describedby={selecting ? "torrent-keyboard-help" : undefined}
         tabIndex={selecting ? undefined : 0}
         onKeyDown={(event) =>
-          navigateFileChoices(
-            event,
-            pages.controls(),
-            page,
-            pageCount,
-            goToPage,
-          )
+          navigateFileChoices(event, pages.controls(), page, pageCount, goToPage)
         }
         onFocusCapture={(event) => {
-          if (
-            event.target instanceof HTMLInputElement &&
-            event.target.type === "checkbox"
-          )
+          if (event.target instanceof HTMLInputElement && event.target.type === "checkbox")
             rove(event.target);
         }}
       >

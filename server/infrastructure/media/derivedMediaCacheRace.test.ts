@@ -1,4 +1,4 @@
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -33,16 +33,10 @@ vi.mock("node:fs/promises", async (importOriginal) => {
 });
 
 it("serializes queued cache clears and keeps media waiting until the last removal ends", async () => {
-  const workspaceDir = await mkdtemp(
-    path.join(os.tmpdir(), "cache-clear-race-"),
-  );
+  const workspaceDir = await mkdtemp(path.join(os.tmpdir(), "cache-clear-race-"));
   const finishes: (() => void)[] = [];
   const session = { id: "clear-race", workspaceDir } as Session;
-  const cache = createDerivedMediaCache(
-    new Map([[session.id, session]]),
-    new Map(),
-    1_000,
-  );
+  const cache = createDerivedMediaCache(new Map([[session.id, session]]), new Map(), 1_000);
   let started = 0;
   removal.target = path.join(workspaceDir, "thumbnails");
   removal.started = () => {

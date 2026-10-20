@@ -1,12 +1,10 @@
-packages:
-  - tooling/*
+packages: []
 # Keep the project lockfile readable by GitHub's dependency graph until it supports pnpm 12 environment documents.
 pmOnFail: ignore
 resolvePeersFromWorkspaceRoot: false
 onlyBuiltDependencies:
   - esbuild
   - ffmpeg-static
-  - lefthook
   - msw
   - sharp
 minimumReleaseAge: 0
@@ -15,7 +13,6 @@ allowBuilds:
   esbuild: true
   ffmpeg-static: true
   ip-set: true
-  lefthook: true
   msw: true
   node-datachannel: true
   sharp: true
@@ -23,3 +20,29 @@ allowBuilds:
   utp-native: false
 patchedDependencies:
   hls.js@1.7.2: patches/hls.js@1.7.2.patch
+catalog:
+  vite: npm:@voidzero-dev/vite-plus-core@1.3.0
+  vitest: 5.0.5
+  vite-plus: 1.3.0
+  "@vitest/coverage-v8": 5.0.5
+overrides:
+  vite@*: "catalog:"
+  vitest@*: "catalog:"
+peerDependencyRules:
+  allowAny:
+    - vite
+    - vitest
+  allowedVersions:
+    vite: "*"
+    vitest: "*"
+minimumReleaseAgeExclude:
+  - vite-plus
+  - "@voidzero-dev/*"
+  - oxlint
+  - "@oxlint/*"
+  - oxlint-tsgolint
+  - "@oxlint-tsgolint/*"
+  - oxfmt
+  - "@oxfmt/*"
+  - vitest
+  - "@vitest/*"

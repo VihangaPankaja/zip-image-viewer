@@ -1,5 +1,5 @@
 import type { Response } from "express";
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import type { VideoTranscodeEntry } from "../../domain/models.js";
 import type { VideoRouteDependencies } from "./types.js";
 import type { VideoContext } from "./routeContext.js";

@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile, readFile, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import request from "supertest";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vite-plus/test";
 import type { Session } from "../domain/models.js";
 import {
   formatBytes,
@@ -18,11 +18,7 @@ import { registerFileRoutes } from "./fileRoutes.js";
 
 const workspaces: string[] = [];
 afterEach(async () => {
-  await Promise.all(
-    workspaces
-      .splice(0)
-      .map((dir) => rm(dir, { force: true, recursive: true })),
-  );
+  await Promise.all(workspaces.splice(0).map((dir) => rm(dir, { force: true, recursive: true })));
 });
 
 async function setup() {
@@ -34,9 +30,7 @@ async function setup() {
   await writeFile(path.join(dir, "preview.jpg"), "converted image");
   const session = { id: "session", extractDir: dir } as Session;
   const deps = {
-    touchSession: vi.fn((id: string) =>
-      id === "session" ? session : undefined,
-    ),
+    touchSession: vi.fn((id: string) => (id === "session" ? session : undefined)),
     logEvent: vi.fn(),
     sanitizeEntryPath,
     formatBytes,
@@ -44,12 +38,8 @@ async function setup() {
     classifyMimeType,
     shouldPreserveOriginalPreview,
     readPreviewChunk: vi.fn((targetPath: string) => readFile(targetPath)),
-    ensureThumbnail: vi.fn(() =>
-      Promise.resolve(path.join(dir, "preview.jpg")),
-    ),
-    ensureImagePreview: vi.fn(() =>
-      Promise.resolve(path.join(dir, "preview.jpg")),
-    ),
+    ensureThumbnail: vi.fn(() => Promise.resolve(path.join(dir, "preview.jpg"))),
+    ensureImagePreview: vi.fn(() => Promise.resolve(path.join(dir, "preview.jpg"))),
   };
   const app = express();
   registerFileRoutes(app, deps);
@@ -69,10 +59,7 @@ it.each(["", ".", "../outside.txt", "missing.txt"])(
 
 it("does not expose files from an expired session", async () => {
   const { app } = await setup();
-  await request(app)
-    .get("/api/sessions/expired/file")
-    .query({ path: "caption.txt" })
-    .expect(404);
+  await request(app).get("/api/sessions/expired/file").query({ path: "caption.txt" }).expect(404);
 });
 
 it("rejects a retained path linked into another session", async () => {
@@ -83,22 +70,15 @@ it("rejects a retained path linked into another session", async () => {
   const owner = deps.touchSession("session");
   if (!owner) throw new Error("Missing owner session");
   await symlink(other, path.join(owner.extractDir, "linked"), "junction");
-  const response = await request(app)
-    .get(endpoint)
-    .query({ path: "linked/private.txt" });
+  const response = await request(app).get(endpoint).query({ path: "linked/private.txt" });
   expect(response.status).toBe(400);
   expect(response.text).not.toContain("other session contents");
-  expect(await readFile(path.join(other, "private.txt"), "utf8")).toBe(
-    "other session contents",
-  );
+  expect(await readFile(path.join(other, "private.txt"), "utf8")).toBe("other session contents");
 });
 
 it("serves complete files, previews and bounded byte ranges", async () => {
   const { app, endpoint } = await setup();
-  const full = await request(app)
-    .get(endpoint)
-    .query({ path: "caption.txt" })
-    .expect(200);
+  const full = await request(app).get(endpoint).query({ path: "caption.txt" }).expect(200);
   expect(full.text).toBe("hello world");
   expect(full.headers["cache-control"]).toBe("no-store");
   const partial = await request(app)

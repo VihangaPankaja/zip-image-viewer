@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   buildMasterPlaylist,
   buildVariantPlaylist,
@@ -58,9 +58,7 @@ describe("adaptive HLS manifests", () => {
         () => "/audio",
       ),
     ).not.toContain("EXT-X-MEDIA");
-    expect(buildMasterPlaylist([], () => "/video", tracks)).not.toContain(
-      "EXT-X-MEDIA",
-    );
+    expect(buildMasterPlaylist([], () => "/video", tracks)).not.toContain("EXT-X-MEDIA");
     const rendition = {
       ...calculateRenditions({ width: 640, height: 360 })[0],
       codecs: "avc1.4d401f",
@@ -116,9 +114,7 @@ describe("adaptive HLS manifests", () => {
       (rendition) => `variants/${rendition.id}/index.m3u8`,
     );
 
-    expect(playlist).toContain(
-      "#EXT-X-STREAM-INF:BANDWIDTH=1020800,RESOLUTION=640x360",
-    );
+    expect(playlist).toContain("#EXT-X-STREAM-INF:BANDWIDTH=1020800,RESOLUTION=640x360");
     expect(playlist).toContain("variants/720p/index.m3u8");
     expect(playlist).not.toContain("CODECS=");
   });

@@ -23,10 +23,7 @@ const LADDER = [
 export const AUDIO_BITRATE = 128_000;
 
 export function videoBitrateForHeight(height: number): number {
-  return (
-    [...LADDER].reverse().find((level) => height >= level.height)
-      ?.videoBitrate ?? 800_000
-  );
+  return [...LADDER].reverse().find((level) => height >= level.height)?.videoBitrate ?? 800_000;
 }
 
 function advertisedBandwidth(height: number): number {
@@ -45,19 +42,17 @@ function evenWidth(dimensions: VideoDimensions, targetHeight: number): number {
   return Math.max(2, Math.round((ratio * targetHeight) / 2) * 2);
 }
 
-export function calculateRenditions(
-  dimensions: VideoDimensions,
-): HlsRendition[] {
+export function calculateRenditions(dimensions: VideoDimensions): HlsRendition[] {
   if (dimensions.width <= 0 || dimensions.height <= 0) return [];
 
-  const renditions = LADDER.filter(
-    ({ height }) => height <= dimensions.height,
-  ).map(({ height }) => ({
-    id: `${String(height)}p`,
-    width: evenWidth(dimensions, height),
-    height,
-    bandwidth: advertisedBandwidth(height),
-  }));
+  const renditions = LADDER.filter(({ height }) => height <= dimensions.height).map(
+    ({ height }) => ({
+      id: `${String(height)}p`,
+      width: evenWidth(dimensions, height),
+      height,
+      bandwidth: advertisedBandwidth(height),
+    }),
+  );
 
   if (renditions.length > 0) return renditions;
   return [
@@ -79,8 +74,7 @@ export function buildMasterPlaylist(
   const lines = ["#EXTM3U", "#EXT-X-VERSION:7"];
   const alternateAudio = audioTracks.length > 1 && getAudioUri;
   if (alternateAudio) {
-    const defaultTrack =
-      audioTracks.find((track) => track.isDefault) ?? audioTracks[0];
+    const defaultTrack = audioTracks.find((track) => track.isDefault) ?? audioTracks[0];
     const attribute = (value: string) => value.replace(/[\p{Cc}"\\]/gu, "");
     for (const track of audioTracks) {
       const name =
@@ -106,9 +100,7 @@ export function buildMasterPlaylist(
 }
 
 export function publishedSegments(playlist: string): number[] {
-  const lines = playlist
-    .slice(0, playlist.lastIndexOf("\n") + 1)
-    .split(/\r?\n/);
+  const lines = playlist.slice(0, playlist.lastIndexOf("\n") + 1).split(/\r?\n/);
   const segments: number[] = [];
   for (let i = 0; i < lines.length - 1; i += 1) {
     if (!/^#EXTINF:\d+(?:\.\d+)?,/.test(lines[i])) continue;
@@ -128,7 +120,7 @@ export function buildVariantPlaylist(
   const output: string[] = [];
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
-    if (/^#EXTINF:/.test(line)) {
+    if (line.startsWith("#EXTINF:")) {
       const match = /^segment_(\d+)\.m4s$/.exec(lines[i + 1]);
       if (match && /^#EXTINF:\d+(?:\.\d+)?,/.test(line)) {
         output.push(line, segmentUri(Number(match[1])));

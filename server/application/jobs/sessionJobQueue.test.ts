@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { SessionJob } from "../../domain/models.js";
 import { createSessionJobQueue } from "./sessionJobQueue.js";
 
@@ -137,9 +137,7 @@ describe("createSessionJobQueue", () => {
         active -= 1;
       },
       maxActiveSessionJobs: 2,
-      processSessionJob: vi.fn(
-        () => new Promise<void>((resolve) => releases.push(resolve)),
-      ),
+      processSessionJob: vi.fn(() => new Promise<void>((resolve) => releases.push(resolve))),
       logEvent: vi.fn(),
     };
     const queue = createSessionJobQueue(dependencies);
@@ -150,9 +148,7 @@ describe("createSessionJobQueue", () => {
 
     expect(dependencies.processSessionJob).toHaveBeenCalledTimes(2);
     releases.shift()?.();
-    await vi.waitFor(() =>
-      expect(dependencies.processSessionJob).toHaveBeenCalledTimes(3),
-    );
+    await vi.waitFor(() => expect(dependencies.processSessionJob).toHaveBeenCalledTimes(3));
     releases.splice(0).forEach((release) => release());
     await vi.waitFor(() => expect(active).toBe(0));
     expect(peak).toBe(2);
@@ -177,17 +173,15 @@ describe("createSessionJobQueue", () => {
         active -= 1;
       },
       maxActiveSessionJobs: 2,
-      processSessionJob: vi.fn(
-        (activeJob: SessionJob, confirmOversize: boolean) => {
-          if (confirmOversize) return Promise.resolve();
-          Object.assign(activeJob, {
-            status: "awaiting_confirmation",
-            phase: "confirm",
-            requiresConfirmation: true,
-          });
-          return new Promise<void>((resolve) => (releaseAwaiting = resolve));
-        },
-      ),
+      processSessionJob: vi.fn((activeJob: SessionJob, confirmOversize: boolean) => {
+        if (confirmOversize) return Promise.resolve();
+        Object.assign(activeJob, {
+          status: "awaiting_confirmation",
+          phase: "confirm",
+          requiresConfirmation: true,
+        });
+        return new Promise<void>((resolve) => (releaseAwaiting = resolve));
+      }),
       logEvent: vi.fn(),
     };
     const queue = createSessionJobQueue(dependencies);
@@ -202,15 +196,11 @@ describe("createSessionJobQueue", () => {
     });
     expect(dependencies.processSessionJob).toHaveBeenCalledTimes(1);
     expect(active).toBe(1);
-    expect(() => queue.confirmSessionJob(job.id)).toThrow(
-      "Job is not awaiting confirmation.",
-    );
+    expect(() => queue.confirmSessionJob(job.id)).toThrow("Job is not awaiting confirmation.");
     expect(() => queue.confirmSessionJob("missing")).toThrow("Job not found.");
 
     releaseAwaiting?.();
-    await vi.waitFor(() =>
-      expect(dependencies.processSessionJob).toHaveBeenCalledTimes(2),
-    );
+    await vi.waitFor(() => expect(dependencies.processSessionJob).toHaveBeenCalledTimes(2));
     expect(dependencies.processSessionJob).toHaveBeenLastCalledWith(job, true);
     await vi.waitFor(() => expect(active).toBe(0));
     expect(peak).toBe(1);
@@ -239,28 +229,16 @@ describe("createSessionJobQueue", () => {
     queue.enqueueSessionJob(job, false);
     job.status = "awaiting_selection";
     for (const ids of [[], ["bad"], ["1", "1"]]) {
-      expect(() => queue.selectTorrentFiles(job.id, ids)).toThrow(
-        "Choose one or more known",
-      );
+      expect(() => queue.selectTorrentFiles(job.id, ids)).toThrow("Choose one or more known");
     }
-    expect(() => queue.selectTorrentFiles("missing", ["1"])).toThrow(
-      "Job not found.",
-    );
+    expect(() => queue.selectTorrentFiles("missing", ["1"])).toThrow("Job not found.");
     queue.selectTorrentFiles(job.id, ["1"]);
-    expect(job.torrentFiles.map((file) => file.selected)).toEqual([
-      false,
-      true,
-      false,
-    ]);
+    expect(job.torrentFiles.map((file) => file.selected)).toEqual([false, true, false]);
     expect(job.reportedSize).toBe(10);
     expect(deps.processSessionJob).toHaveBeenCalledTimes(1);
-    expect(() => queue.selectTorrentFiles(job.id, ["0"])).toThrow(
-      "not awaiting file selection",
-    );
+    expect(() => queue.selectTorrentFiles(job.id, ["0"])).toThrow("not awaiting file selection");
     release?.();
-    await vi.waitFor(() =>
-      expect(deps.processSessionJob).toHaveBeenCalledTimes(2),
-    );
+    await vi.waitFor(() => expect(deps.processSessionJob).toHaveBeenCalledTimes(2));
   });
 
   it("starts a selection after metadata released its worker and emits the accepted state", async () => {
@@ -280,9 +258,7 @@ describe("createSessionJobQueue", () => {
       },
     ];
     queue.enqueueSessionJob(job, false);
-    await vi.waitFor(() =>
-      expect(queue.getSchedulerState().activeCount).toBe(0),
-    );
+    await vi.waitFor(() => expect(queue.getSchedulerState().activeCount).toBe(0));
     job.status = "awaiting_selection";
     queue.selectTorrentFiles(job.id, ["0"]);
     expect(emitJob).toHaveBeenCalledWith(job, {});
@@ -303,19 +279,12 @@ describe("createSessionJobQueue", () => {
       downloadedBytes: id === "0" ? 10 : 0,
     }));
     queue.enqueueSessionJob(job, false);
-    await vi.waitFor(() =>
-      expect(queue.getSchedulerState().activeCount).toBe(0),
-    );
+    await vi.waitFor(() => expect(queue.getSchedulerState().activeCount).toBe(0));
     job.status = "ready";
     for (const ids of [[], ["missing"], ["1", "1"]])
-      expect(() => queue.selectTorrentFiles(job.id, ids)).toThrow(
-        "Choose one or more known",
-      );
+      expect(() => queue.selectTorrentFiles(job.id, ids)).toThrow("Choose one or more known");
     queue.selectTorrentFiles(job.id, ["1"]);
-    expect(job.torrentFiles.map(({ selected }) => selected)).toEqual([
-      true,
-      true,
-    ]);
+    expect(job.torrentFiles.map(({ selected }) => selected)).toEqual([true, true]);
     expect(job.torrentFiles[0].complete).toBe(true);
     expect(job.reportedSize).toBe(20);
     expect(deps.processSessionJob).toHaveBeenCalledTimes(2);
@@ -337,9 +306,7 @@ describe("createSessionJobQueue", () => {
         active -= 1;
       },
       maxActiveSessionJobs: 1,
-      processSessionJob: vi.fn(
-        () => new Promise<void>((resolve) => releases.push(resolve)),
-      ),
+      processSessionJob: vi.fn(() => new Promise<void>((resolve) => releases.push(resolve))),
       logEvent: vi.fn(),
     };
     const queue = createSessionJobQueue(dependencies);
@@ -375,9 +342,7 @@ describe("createSessionJobQueue", () => {
         active -= 1;
       },
       maxActiveSessionJobs: 1,
-      processSessionJob: vi.fn(
-        () => new Promise<void>((resolve) => releases.push(resolve)),
-      ),
+      processSessionJob: vi.fn(() => new Promise<void>((resolve) => releases.push(resolve))),
       logEvent: vi.fn(),
     };
     const queue = createSessionJobQueue(dependencies);
@@ -387,9 +352,7 @@ describe("createSessionJobQueue", () => {
 
     queue.reorderSessionJobs(["one", "three", "two"]);
     releases.shift()?.();
-    await vi.waitFor(() =>
-      expect(dependencies.processSessionJob).toHaveBeenCalledTimes(2),
-    );
+    await vi.waitFor(() => expect(dependencies.processSessionJob).toHaveBeenCalledTimes(2));
     expect(dependencies.processSessionJob).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ id: "three" }),
@@ -397,9 +360,7 @@ describe("createSessionJobQueue", () => {
     );
 
     releases.shift()?.();
-    await vi.waitFor(() =>
-      expect(dependencies.processSessionJob).toHaveBeenCalledTimes(3),
-    );
+    await vi.waitFor(() => expect(dependencies.processSessionJob).toHaveBeenCalledTimes(3));
     releases.shift()?.();
     await vi.waitFor(() => expect(active).toBe(0));
   });
@@ -456,20 +417,13 @@ describe("createSessionJobQueue", () => {
 
     queue.reorderSessionJobs(["two", "one"]);
 
+    await vi.waitFor(() => expect(dependencies.pauseJob).toHaveBeenCalledWith(first));
     await vi.waitFor(() =>
-      expect(dependencies.pauseJob).toHaveBeenCalledWith(first),
-    );
-    await vi.waitFor(() =>
-      expect(dependencies.processSessionJob).toHaveBeenLastCalledWith(
-        second,
-        false,
-      ),
+      expect(dependencies.processSessionJob).toHaveBeenLastCalledWith(second, false),
     );
     second.status = "ready";
     releases.get(second.id)?.();
-    await vi.waitFor(() =>
-      expect(dependencies.processSessionJob).toHaveBeenCalledTimes(3),
-    );
+    await vi.waitFor(() => expect(dependencies.processSessionJob).toHaveBeenCalledTimes(3));
     first.status = "ready";
     releases.get(first.id)?.();
     await vi.waitFor(() => expect(active).toBe(0));
@@ -492,9 +446,7 @@ describe("createSessionJobQueue", () => {
         active -= 1;
       },
       maxActiveSessionJobs: 1,
-      processSessionJob: vi.fn(
-        () => new Promise<void>((resolve) => (release = resolve)),
-      ),
+      processSessionJob: vi.fn(() => new Promise<void>((resolve) => (release = resolve))),
       pauseJob: vi.fn((activeJob: SessionJob) => {
         activeJob.status = "paused";
         release?.();
@@ -538,14 +490,10 @@ describe("createSessionJobQueue", () => {
     queue.resumeSessionJob(job.id);
     expect(dependencies.processSessionJob).toHaveBeenCalledTimes(1);
     release?.();
-    await vi.waitFor(() =>
-      expect(dependencies.processSessionJob).toHaveBeenCalledTimes(2),
-    );
+    await vi.waitFor(() => expect(dependencies.processSessionJob).toHaveBeenCalledTimes(2));
     expect(dependencies.getActiveSessionJobCount()).toBe(1);
     release?.();
-    await vi.waitFor(() =>
-      expect(dependencies.getActiveSessionJobCount()).toBe(0),
-    );
+    await vi.waitFor(() => expect(dependencies.getActiveSessionJobCount()).toBe(0));
   });
 
   it("cancels waiting work before it can start and removes terminal history", async () => {
@@ -560,14 +508,10 @@ describe("createSessionJobQueue", () => {
     queue.enqueueSessionJob(first, false);
     queue.enqueueSessionJob(second, false);
 
-    expect(() => queue.removeSessionJob(second.id)).toThrow(
-      "Pause or cancel the download",
-    );
+    expect(() => queue.removeSessionJob(second.id)).toThrow("Pause or cancel the download");
     expect(queue.cancelSessionJob(second.id).status).toBe("cancelled");
     release?.();
-    await vi.waitFor(() =>
-      expect(dependencies.processSessionJob).toHaveBeenCalledTimes(1),
-    );
+    await vi.waitFor(() => expect(dependencies.processSessionJob).toHaveBeenCalledTimes(1));
     queue.removeSessionJob(second.id);
 
     expect(queue.getOrderedJobs().map(({ id }) => id)).toEqual([first.id]);
@@ -583,9 +527,7 @@ describe("createSessionJobQueue", () => {
     queue.enqueueSessionJob(createJob("failed"), false);
     queue.enqueueSessionJob(createJob("next"), false);
 
-    await vi.waitFor(() =>
-      expect(dependencies.processSessionJob).toHaveBeenCalledTimes(2),
-    );
+    await vi.waitFor(() => expect(dependencies.processSessionJob).toHaveBeenCalledTimes(2));
     expect(dependencies.logEvent).toHaveBeenCalledWith(
       "error",
       "job.process.unhandled",

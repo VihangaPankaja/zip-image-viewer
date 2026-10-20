@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   classifyDetectedType,
   classifyMimeType,
@@ -54,8 +54,6 @@ describe("media classification", () => {
     await expect(sleepWithSignal(10, controller.signal)).rejects.toMatchObject({
       name: "AbortError",
     });
-    await expect(
-      sleepWithSignal(0, new AbortController().signal),
-    ).resolves.toBe(undefined);
+    await expect(sleepWithSignal(0, new AbortController().signal)).resolves.toBe(undefined);
   });
 });

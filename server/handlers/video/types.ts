@@ -27,25 +27,11 @@ export type VideoRouteDependencies = {
   ) => Promise<Result>;
   touchSession: (_sessionId: string) => Session | undefined;
   sanitizeEntryPath: (_path: string) => string;
-  getSessionQualityOutputPath: (
-    _session: Session,
-    _path: string,
-    _quality: string,
-  ) => string;
-  prepareVideoRemux: (
-    _session: Session,
-    _path: string,
-    _targetPath: string,
-  ) => Promise<string>;
-  parseRangeHeader: (
-    _header: string | undefined,
-    _size: number,
-  ) => ByteRange | "invalid" | null;
+  getSessionQualityOutputPath: (_session: Session, _path: string, _quality: string) => string;
+  prepareVideoRemux: (_session: Session, _path: string, _targetPath: string) => Promise<string>;
+  parseRangeHeader: (_header: string | undefined, _size: number) => ByteRange | "invalid" | null;
   VIDEO_EXTENSIONS: ReadonlySet<string>;
-  getVideoMetadata: (
-    _path: string,
-    _session?: Session,
-  ) => Promise<VideoMetadata>;
+  getVideoMetadata: (_path: string, _session?: Session) => Promise<VideoMetadata>;
   buildVideoQualityOptions: (_height: number) => {
     options: VideoQualityOption[];
     defaultQuality: string;
@@ -76,18 +62,11 @@ export type VideoRouteDependencies = {
   ) => Promise<void>;
   refreshRenditionAvailability: (_rendition: VideoRendition) => Promise<number>;
   DEFAULT_VIDEO_SEGMENT_SECONDS: number;
-  runCommand: (
-    _command: string,
-    _args: string[],
-    _session?: Session,
-  ) => Promise<void>;
+  runCommand: (_command: string, _args: string[], _session?: Session) => Promise<void>;
   waitForFile: (_path: string, _timeoutMs: number) => Promise<boolean>;
   getVideoTranscodeKey: (_sessionId: string, _path: string) => string;
   videoTranscodeStore: ReadonlyMap<string, VideoTranscodeEntry>;
-  getVideoDimensions: (
-    _path: string,
-    _session?: Session,
-  ) => Promise<{ height: number }>;
+  getVideoDimensions: (_path: string, _session?: Session) => Promise<{ height: number }>;
   logEvent: (
     _level: "info" | "warn" | "error",
     _event: string,

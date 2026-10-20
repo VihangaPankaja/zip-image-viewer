@@ -1,10 +1,4 @@
-import React, {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ExplorerNode } from "./TreeExplorer";
 
 export type FlatTreeItem = {
@@ -42,16 +36,7 @@ function flattenVisible(
 
   if (hasChildren && expanded.has(id)) {
     for (const [index, child] of children.entries()) {
-      rows.push(
-        ...flattenVisible(
-          child,
-          expanded,
-          depth + 1,
-          id,
-          index + 1,
-          children.length,
-        ),
-      );
+      rows.push(...flattenVisible(child, expanded, depth + 1, id, index + 1, children.length));
     }
   }
 
@@ -112,9 +97,7 @@ function handleHierarchyKey(
     navigation.toggleExpanded(current.id);
     return true;
   }
-  const parentIndex = navigation.rows.findIndex(
-    (item) => item.id === current.parentId,
-  );
+  const parentIndex = navigation.rows.findIndex((item) => item.id === current.parentId);
   if (current.parentId && parentIndex >= 0) {
     focusRow(navigation, parentIndex);
   }
@@ -126,10 +109,7 @@ export function handleTreeKeyDown(
   navigation: TreeNavigation,
 ) {
   if (!navigation.rows.length || handlePositionKey(event, navigation)) return;
-  const index = Math.max(
-    0,
-    Math.min(navigation.rows.length - 1, navigation.activeIndex),
-  );
+  const index = Math.max(0, Math.min(navigation.rows.length - 1, navigation.activeIndex));
   const current = navigation.rows[index];
   if (handleHierarchyKey(event, current, navigation)) return;
   if (event.key !== "Enter" && event.key !== " ") return;
@@ -148,13 +128,9 @@ export function useTreeNavigation(
   revealMatches: boolean,
 ): TreeNavigation {
   const rootPath = rootNode?.path ?? null;
-  const [expanded, setExpanded] = useState<Set<string>>(
-    () => new Set([rootPath || "."]),
-  );
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set([rootPath || "."]));
   const [activeIndex, setActiveIndex] = useState(0);
-  const [searchCollapsed, setSearchCollapsed] = useState<Set<string>>(
-    () => new Set(),
-  );
+  const [searchCollapsed, setSearchCollapsed] = useState<Set<string>>(() => new Set());
   const visibleExpanded = useMemo(() => {
     if (!revealMatches || !rootNode) return expanded;
     const matches = expandedDirectories(rootNode);
@@ -216,10 +192,7 @@ export function useTreeNavigation(
   };
 }
 
-function expandedDirectories(
-  node: ExplorerNode,
-  result = new Set<string>(),
-): Set<string> {
+function expandedDirectories(node: ExplorerNode, result = new Set<string>()): Set<string> {
   if (node.type === "directory") {
     result.add(node.path);
     for (const child of node.children ?? []) expandedDirectories(child, result);

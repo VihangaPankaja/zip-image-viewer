@@ -36,10 +36,7 @@ function validateMagnet(value: string): void {
   }
 }
 
-export function detectSourceKind(
-  value: string,
-  preference: SourcePreference,
-): SourceKind {
+export function detectSourceKind(value: string, preference: SourcePreference): SourceKind {
   if (value.startsWith("magnet:")) {
     validateMagnet(value);
     if (preference === "http") {
@@ -55,10 +52,7 @@ export function detectSourceKind(
   return url.pathname.toLowerCase().endsWith(".torrent") ? "torrent" : "http";
 }
 
-export function validateTorrentFilePath(
-  root: string,
-  relativePath: string,
-): string {
+export function validateTorrentFilePath(root: string, relativePath: string): string {
   const normalized = relativePath.replaceAll("\\", "/");
   const target = path.resolve(root, normalized);
   const resolvedRoot = path.resolve(root);
@@ -77,10 +71,7 @@ export function validateTorrentFilePath(
     while (!existsSync(existing)) existing = path.dirname(existing);
     const realRoot = realpathSync(resolvedRoot);
     const realExisting = realpathSync(existing);
-    if (
-      realExisting !== realRoot &&
-      !realExisting.startsWith(`${realRoot}${path.sep}`)
-    )
+    if (realExisting !== realRoot && !realExisting.startsWith(`${realRoot}${path.sep}`))
       throw resourceLimitError("Torrent contains an unsafe file path.");
   }
   return target;

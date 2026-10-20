@@ -26,32 +26,21 @@ function useStorageActions({ id, onClose, onDeleted }: Props) {
       await client.invalidateQueries();
       setMessage(success);
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Could not update storage.",
-      );
+      setError(cause instanceof Error ? cause.message : "Could not update storage.");
     }
   }
   return {
-    busy:
-      pendingPin !== null ||
-      clear.isPending ||
-      pin.isPending ||
-      remove.isPending,
+    busy: pendingPin !== null || clear.isPending || pin.isPending || remove.isPending,
     pendingPin,
     message,
     error,
     clear: () =>
-      void perform(
-        () => clear.mutateAsync({ id }),
-        "Cache cleared. Original files kept.",
-      ),
+      void perform(() => clear.mutateAsync({ id }), "Cache cleared. Original files kept."),
     pin: (pinned: boolean) => {
       setPendingPin(pinned);
       void perform(
         () => pin.mutateAsync({ id, pinned }),
-        pinned
-          ? "Session kept until the server stops."
-          : "Session is temporary again.",
+        pinned ? "Session kept until the server stops." : "Session is temporary again.",
       ).finally(() => setPendingPin(null));
     },
     remove: () =>
@@ -67,9 +56,7 @@ type Actions = ReturnType<typeof useStorageActions>;
 export function SessionStorageDialog({ id, onClose, onDeleted }: Props) {
   const dialog = useModalDialog();
   const actions = useStorageActions({ id, onClose, onDeleted });
-  const storage = useQuery(
-    workspaceRpc.storage.get.queryOptions({ input: { id }, retry: false }),
-  );
+  const storage = useQuery(workspaceRpc.storage.get.queryOptions({ input: { id }, retry: false }));
   const data = storage.data;
   return (
     <dialog
@@ -84,12 +71,7 @@ export function SessionStorageDialog({ id, onClose, onDeleted }: Props) {
       <div className="storage-dialog-content">
         <header>
           <h2 id="storage-title">Session storage</h2>
-          <button
-            className="ghost-button"
-            type="button"
-            onClick={onClose}
-            disabled={actions.busy}
-          >
+          <button className="ghost-button" type="button" onClick={onClose} disabled={actions.busy}>
             Close
           </button>
         </header>
@@ -121,8 +103,8 @@ export function SessionStorageDialog({ id, onClose, onDeleted }: Props) {
               Clear preview & transcode cache
             </button>
             <p>
-              Deletes generated media only. Originals stay available and
-              previews regenerate when needed. Close playback before clearing.
+              Deletes generated media only. Originals stay available and previews regenerate when
+              needed. Close playback before clearing.
             </p>
             <StorageDeletion retained={data.retained} actions={actions} />
           </>
@@ -134,18 +116,12 @@ export function SessionStorageDialog({ id, onClose, onDeleted }: Props) {
   );
 }
 
-function StorageRetention({
-  data,
-  actions,
-}: {
-  data: SessionStorage;
-  actions: Actions;
-}) {
+function StorageRetention({ data, actions }: { data: SessionStorage; actions: Actions }) {
   if (data.retained)
     return (
       <p>
-        Retained torrent. Files survive viewer close, expiry and server restart
-        until you delete them.
+        Retained torrent. Files survive viewer close, expiry and server restart until you delete
+        them.
       </p>
     );
   return (
@@ -168,13 +144,7 @@ function StorageRetention({
   );
 }
 
-function StorageDeletion({
-  retained,
-  actions,
-}: {
-  retained: boolean;
-  actions: Actions;
-}) {
+function StorageDeletion({ retained, actions }: { retained: boolean; actions: Actions }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   if (!confirmDelete)
     return (

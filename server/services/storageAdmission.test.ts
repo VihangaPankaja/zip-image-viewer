@@ -4,14 +4,13 @@ import { once } from "node:events";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vite-plus/test";
 import WebTorrent, { type Torrent } from "webtorrent";
 import { downloadWithSegmentedManager } from "./segmentedDownloader.js";
 import { createWebTorrentAdapter } from "../application/torrents/torrentDownloader.js";
 
 vi.mock("webtorrent", async (importOriginal) => {
-  const { default: WebTorrent } =
-    await importOriginal<typeof import("webtorrent")>();
+  const { default: WebTorrent } = await importOriginal<typeof import("webtorrent")>();
   return {
     default: class extends WebTorrent {
       constructor(options: ConstructorParameters<typeof WebTorrent>[0]) {
@@ -37,9 +36,7 @@ const workspaces: string[] = [];
 afterEach(async () => {
   disk.free = 64 * 1024 ** 2 + 120;
   await Promise.all(
-    workspaces
-      .splice(0)
-      .map((directory) => rm(directory, { recursive: true, force: true })),
+    workspaces.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
   );
 });
 
@@ -49,12 +46,7 @@ async function workspace() {
   return directory;
 }
 
-function transfer(
-  url: string,
-  targetPath: string,
-  size = 80,
-  enableResume = false,
-) {
+function transfer(url: string, targetPath: string, size = 80, enableResume = false) {
   return downloadWithSegmentedManager({
     url,
     targetPath,
@@ -95,9 +87,7 @@ it.each([false, true])(
         response.end(body);
       }
     });
-    await new Promise<void>((resolve) =>
-      server.listen(0, "127.0.0.1", resolve),
-    );
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("No TCP port");
     const url = `http://127.0.0.1:${String(address.port)}`;
@@ -107,11 +97,7 @@ it.each([false, true])(
     try {
       await ready;
       await expect(
-        transfer(
-          `${url}/unknown`,
-          path.join(directory, "rejected.bin"),
-          encoded ? body.length : 0,
-        ),
+        transfer(`${url}/unknown`, path.join(directory, "rejected.bin"), encoded ? body.length : 0),
       ).rejects.toMatchObject({
         code: "DOWNLOAD_FATAL",
         message: "Insufficient storage for this download or extraction.",
@@ -123,15 +109,9 @@ it.each([false, true])(
         path.join(directory, "unknown.bin"),
         encoded ? body.length : 0,
       );
-      expect(await readFile(path.join(directory, "known.bin"))).toEqual(
-        payload,
-      );
-      expect(await readFile(path.join(directory, "unknown.bin"))).toEqual(
-        payload,
-      );
-      expect(await readFile(path.join(directory, "retained.bin"), "utf8")).toBe(
-        "retained bytes",
-      );
+      expect(await readFile(path.join(directory, "known.bin"))).toEqual(payload);
+      expect(await readFile(path.join(directory, "unknown.bin"))).toEqual(payload);
+      expect(await readFile(path.join(directory, "retained.bin"), "utf8")).toBe("retained bytes");
     } finally {
       finish();
       await known.catch(() => undefined);
@@ -168,20 +148,14 @@ it("reserves storage across active HTTP jobs and releases it without changing re
   try {
     active = transfer(url, path.join(directory, "first.bin"));
     await ready;
-    await expect(
-      transfer(url, path.join(directory, "second.bin")),
-    ).rejects.toThrow("storage");
+    await expect(transfer(url, path.join(directory, "second.bin"))).rejects.toThrow("storage");
     finish();
     await active;
     const resumed = transfer(url, path.join(directory, "second.bin"));
     await resumed;
     expect(await readFile(retained, "utf8")).toBe("retained bytes");
-    expect(await readFile(path.join(directory, "first.bin"))).toEqual(
-      Buffer.alloc(80, 7),
-    );
-    expect(await readFile(path.join(directory, "second.bin"))).toEqual(
-      Buffer.alloc(80, 7),
-    );
+    expect(await readFile(path.join(directory, "first.bin"))).toEqual(Buffer.alloc(80, 7));
+    expect(await readFile(path.join(directory, "second.bin"))).toEqual(Buffer.alloc(80, 7));
   } finally {
     finish();
     await active?.catch(() => undefined);
@@ -193,11 +167,7 @@ it("reserves storage across active HTTP jobs and releases it without changing re
 it("rejects a confirmed HTTP payload above the hard transfer limit", async () => {
   const directory = await workspace();
   await expect(
-    transfer(
-      "http://127.0.0.1:1/file",
-      path.join(directory, "large.bin"),
-      10 * 1024 ** 3 + 1,
-    ),
+    transfer("http://127.0.0.1:1/file", path.join(directory, "large.bin"), 10 * 1024 ** 3 + 1),
   ).rejects.toThrow("10 GiB");
 });
 
@@ -235,9 +205,9 @@ it("rejects an exhausted torrent selection before transfer and preserves retaine
         onNoPeers: () => undefined,
       }),
     ).rejects.toThrow("storage");
-    expect(
-      await readFile(path.join(downloadDirectory, "other.bin"), "utf8"),
-    ).toBe("retained bytes");
+    expect(await readFile(path.join(downloadDirectory, "other.bin"), "utf8")).toBe(
+      "retained bytes",
+    );
   } finally {
     clearTimeout(timer);
     await adapter.close();
@@ -249,8 +219,7 @@ it("rejects oversized torrent file tables before offering selection", async () =
   const directory = await workspace();
   const files = Array.from(
     { length: 10_001 },
-    (_, index) =>
-      `d6:lengthi1e4:pathl${String(String(index).length)}:${String(index)}ee`,
+    (_, index) => `d6:lengthi1e4:pathl${String(String(index).length)}:${String(index)}ee`,
   ).join("");
   const source = Buffer.from(
     `d4:infod5:filesl${files}e4:name7:fixture12:piece lengthi16384e6:pieces20:${"a".repeat(20)}ee`,

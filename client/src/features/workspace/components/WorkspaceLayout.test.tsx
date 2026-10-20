@@ -21,21 +21,18 @@ describe("WorkspaceLayout", () => {
 
     await user.click(screen.getByRole("radio", { name: "Files" }));
 
-    expect(
-      screen.getByRole("navigation", { name: "Workspace views" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Workspace views" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "Files" })).toBeChecked();
-    expect(
-      screen.getByRole("region", { name: "Explorer sidebar" }),
-    ).toHaveTextContent("Sessions paneFiles pane");
-    expect(
-      screen.queryByRole("radio", { name: "Sessions" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Explorer sidebar" })).toHaveTextContent(
+      "Sessions paneFiles pane",
+    );
+    expect(screen.queryByRole("radio", { name: "Sessions" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Back to files" }));
     expect(onMobilePaneChange).toHaveBeenCalledWith("files");
     await user.click(screen.getByRole("button", { name: "Show sessions" }));
-    expect(
-      screen.getByRole("button", { name: "Hide sessions" }),
-    ).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Hide sessions" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
   });
 });

@@ -1,10 +1,6 @@
 import { lstat, readdir, rm } from "node:fs/promises";
 import path from "node:path";
-import type {
-  Session,
-  VideoRendition,
-  VideoTranscodeEntry,
-} from "../../domain/models.js";
+import type { Session, VideoRendition, VideoTranscodeEntry } from "../../domain/models.js";
 import { ApplicationError } from "../../domain/models.js";
 
 const DERIVED_DIRS = [
@@ -48,10 +44,7 @@ async function diskUsage(
   return { size, modifiedAt };
 }
 
-function protectSession(
-  active: Map<string, number>,
-  sessionId: string,
-): () => void {
+function protectSession(active: Map<string, number>, sessionId: string): () => void {
   active.set(sessionId, (active.get(sessionId) ?? 0) + 1);
   let released = false;
   return () => {
@@ -113,19 +106,14 @@ class DerivedMediaCache {
     candidates.sort((a, b) => a.modifiedAt - b.modifiedAt);
     for (const candidate of candidates) {
       if (total <= this.budgetBytes) break;
-      if (this.sessions.get(candidate.session.id) !== candidate.session)
-        continue;
+      if (this.sessions.get(candidate.session.id) !== candidate.session) continue;
       if (this.active.has(candidate.session.id)) continue;
       if (this.evicting.has(candidate.session.id)) continue;
       const rendition = candidate.isTranscode
         ? findRendition(this.transcodes, candidate.path)
         : undefined;
-      if (rendition?.status === "queued" || rendition?.status === "running")
-        continue;
-      if (
-        rendition?.lastAccessedAt &&
-        Date.now() - rendition.lastAccessedAt < ACTIVE_PLAYBACK_MS
-      )
+      if (rendition?.status === "queued" || rendition?.status === "running") continue;
+      if (rendition?.lastAccessedAt && Date.now() - rendition.lastAccessedAt < ACTIVE_PLAYBACK_MS)
         continue;
       const eviction = rm(candidate.path, {
         recursive: true,
@@ -160,14 +148,9 @@ class DerivedMediaCache {
     let previewsBytes = 0;
     let transcodesBytes = 0;
     for (const name of await readdir(session.workspaceDir)) {
-      const { size } = await diskUsage(
-        path.join(session.workspaceDir, name),
-        seen,
-      );
-      if (name === "video-transcodes" || name === "video-quality")
-        transcodesBytes += size;
-      else if (DERIVED_DIRS.some((directory) => directory === name))
-        previewsBytes += size;
+      const { size } = await diskUsage(path.join(session.workspaceDir, name), seen);
+      if (name === "video-transcodes" || name === "video-quality") transcodesBytes += size;
+      else if (DERIVED_DIRS.some((directory) => directory === name)) previewsBytes += size;
       else originalsBytes += size;
     }
     return { originalsBytes, previewsBytes, transcodesBytes };
@@ -176,9 +159,7 @@ class DerivedMediaCache {
   clear = async (session: Session, onCleared?: () => void): Promise<void> => {
     await this.pending;
     while (this.evicting.has(session.id)) await this.evicting.get(session.id);
-    const entries = [...this.transcodes.values()].filter(
-      (entry) => entry.sessionId === session.id,
-    );
+    const entries = [...this.transcodes.values()].filter((entry) => entry.sessionId === session.id);
     if (
       this.active.has(session.id) ||
       this.preparing.has(session.id) ||
@@ -219,8 +200,7 @@ class DerivedMediaCache {
 
   protectSession = (sessionId: string, allowEviction = false) =>
     protectSession(allowEviction ? this.preparing : this.active, sessionId);
-  waitForEviction = (sessionId: string) =>
-    this.evicting.get(sessionId) ?? Promise.resolve();
+  waitForEviction = (sessionId: string) => this.evicting.get(sessionId) ?? Promise.resolve();
 }
 
 export function createDerivedMediaCache(

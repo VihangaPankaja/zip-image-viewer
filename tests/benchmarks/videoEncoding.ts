@@ -1,13 +1,5 @@
 import assert from "node:assert/strict";
-import {
-  mkdtemp,
-  mkdir,
-  readFile,
-  readdir,
-  rm,
-  stat,
-  writeFile,
-} from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { cpus, platform, tmpdir } from "node:os";
 import path from "node:path";
 import ffmpegPath from "ffmpeg-static";
@@ -16,10 +8,7 @@ import {
   runCommand,
   runCommandCapture,
 } from "../../server/infrastructure/process/commandRunner.js";
-import {
-  codecsFromInit,
-  publishedSegments,
-} from "../../server/media/hlsManifest.js";
+import { codecsFromInit, publishedSegments } from "../../server/media/hlsManifest.js";
 import type { HlsEncoderPreference } from "../../server/config/runtimeConstants.js";
 
 assert.ok(ffmpegPath, "The bundled FFmpeg binary is required.");
@@ -54,10 +43,8 @@ try {
     "h264_nvenc",
   ] as const satisfies readonly HlsEncoderPreference[]) {
     const events: { event: string; details?: Record<string, unknown> }[] = [];
-    const encoder = new HlsEncoder(
-      executable,
-      preference,
-      (_level, event, details) => events.push({ event, details }),
+    const encoder = new HlsEncoder(executable, preference, (_level, event, details) =>
+      events.push({ event, details }),
     );
     const elapsedMs = [];
     let output = "";
@@ -76,9 +63,7 @@ try {
     const text = await readFile(playlist, "utf8");
     assert.equal(publishedSegments(text).length, 3);
     assert.match(text, /#EXT-X-ENDLIST/);
-    const codecs = codecsFromInit(
-      await readFile(path.join(output, "init.mp4")),
-    );
+    const codecs = codecsFromInit(await readFile(path.join(output, "init.mp4")));
     assert.match(codecs ?? "", /^avc1\.4d[0-9a-f]{4},mp4a\.40\.2$/);
     const frame = await runCommandCapture(executable, [
       "-hide_banner",
@@ -98,11 +83,7 @@ try {
       "framehash",
       "-",
     ]);
-    assert.match(
-      frame.stdout,
-      /^0,/m,
-      "A seek into the third segment must decode.",
-    );
+    assert.match(frame.stdout, /^0,/m, "A seek into the third segment must decode.");
     const comparison = await runCommandCapture(executable, [
       "-hide_banner",
       "-i",
@@ -117,10 +98,7 @@ try {
       "-",
     ]);
     const ssim = Number(comparison.stderr.match(/All:([\d.]+)/)?.[1]);
-    assert.ok(
-      ssim > 0 && ssim <= 1,
-      "SSIM must be measured against the same lossless source.",
-    );
+    assert.ok(ssim > 0 && ssim <= 1, "SSIM must be measured against the same lossless source.");
     const windowOutput = path.join(workspace, `${preference}-window`);
     await mkdir(windowOutput);
     await encoder.encode({
@@ -143,19 +121,11 @@ try {
       "framehash",
       "-",
     ]);
-    assert.match(
-      windowFrame.stdout,
-      /^0,/m,
-      "A bounded window must decode independently.",
-    );
+    assert.match(windowFrame.stdout, /^0,/m, "A bounded window must decode independently.");
     const sizes = await Promise.all(
-      (await readdir(output)).map(
-        async (name) => (await stat(path.join(output, name))).size,
-      ),
+      (await readdir(output)).map(async (name) => (await stat(path.join(output, name))).size),
     );
-    const fallback = events.some(
-      ({ event }) => event === "video.encoder.fallback",
-    );
+    const fallback = events.some(({ event }) => event === "video.encoder.fallback");
     rows.push({
       requested: preference,
       actual: preference === "cpu" || fallback ? "libx264" : preference,

@@ -13,8 +13,7 @@ type RouteDependencies = {
 } & SessionJobRouteDependencies;
 
 export function registerBaseRoutes(app: Express, deps: RouteDependencies) {
-  if (deps.playback)
-    registerTorrentVideoRoutes(app, deps.playback.jobs, deps.playback.adapter);
+  if (deps.playback) registerTorrentVideoRoutes(app, deps.playback.jobs, deps.playback.adapter);
   registerSessionJobRoutes(app, {
     getJob: deps.getJob,
     sanitizeJob: deps.sanitizeJob,

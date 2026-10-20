@@ -1,15 +1,7 @@
-import type {
-  Session,
-  VideoRendition,
-  VideoTranscodeEntry,
-} from "../../domain/models.js";
+import type { Session, VideoRendition, VideoTranscodeEntry } from "../../domain/models.js";
 import { calculateRenditions } from "../../media/hlsManifest.js";
 import { getRenditionState } from "../../media/videoRendition.js";
-import {
-  HlsWindows,
-  WINDOW_SEGMENTS,
-  WINDOWED_AFTER_SECONDS,
-} from "./hlsWindows.js";
+import { HlsWindows, WINDOW_SEGMENTS, WINDOWED_AFTER_SECONDS } from "./hlsWindows.js";
 
 async function prepareRetainedVideo(
   entry: VideoTranscodeEntry,
@@ -24,8 +16,7 @@ async function prepareRetainedVideo(
   const rendition = getRenditionState(entry, session, lowest.id);
   const audio =
     (entry.audioTracks?.length ?? 0) > 1
-      ? (entry.audioTracks?.find(({ isDefault }) => isDefault) ??
-        entry.audioTracks?.at(0))
+      ? (entry.audioTracks?.find(({ isDefault }) => isDefault) ?? entry.audioTracks?.at(0))
       : undefined;
   if (entry.durationSeconds <= WINDOWED_AFTER_SECONDS) {
     signal.throwIfAborted();
@@ -38,20 +29,9 @@ async function prepareRetainedVideo(
     }
     return;
   }
-  for (
-    let index = 0;
-    index < entry.expectedSegments;
-    index += WINDOW_SEGMENTS
-  ) {
+  for (let index = 0; index < entry.expectedSegments; index += WINDOW_SEGMENTS) {
     signal.throwIfAborted();
-    await windows.ensure(
-      entry,
-      session,
-      rendition,
-      index,
-      signal,
-      "background",
-    );
+    await windows.ensure(entry, session, rendition, index, signal, "background");
     if (audio)
       await windows.ensure(
         entry,

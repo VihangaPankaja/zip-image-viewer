@@ -33,9 +33,7 @@ function getProgressSnapshot(
 ): { percent: number | null; etaSeconds: number | null } {
   return {
     percent:
-      reportedSize > 0
-        ? Math.min(100, Math.floor((currentBytes / reportedSize) * 100))
-        : null,
+      reportedSize > 0 ? Math.min(100, Math.floor((currentBytes / reportedSize) * 100)) : null,
     etaSeconds:
       reportedSize > 0 && averageSpeed > 0
         ? Math.max(0, Math.ceil((reportedSize - currentBytes) / averageSpeed))
@@ -72,10 +70,7 @@ export function createDownloadProgressMonitor({
       return;
     }
 
-    const instantSpeed = Math.max(
-      0,
-      Math.round((deltaBytes * 1000) / elapsedMs),
-    );
+    const instantSpeed = Math.max(0, Math.round((deltaBytes * 1000) / elapsedMs));
 
     if (deltaBytes > 0) {
       noProgressSince = now;
@@ -88,11 +83,7 @@ export function createDownloadProgressMonitor({
       state.phase() === "downloading" &&
       state.status() === "downloading" &&
       stallDurationMs >= stallThresholdMs;
-    const { percent, etaSeconds } = getProgressSnapshot(
-      currentBytes,
-      reportedSize,
-      averageSpeed,
-    );
+    const { percent, etaSeconds } = getProgressSnapshot(currentBytes, reportedSize, averageSpeed);
 
     emitJob(job, {
       downloadedBytes: currentBytes,

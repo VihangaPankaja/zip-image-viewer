@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { getImageNavigationTarget } from "./imageNavigation";
 import { buildWorkspaceProgress } from "./workspaceProgress";
 
@@ -28,41 +28,19 @@ describe("image keyboard navigation", () => {
   const images = ["one.jpg", "two.jpg", "three.jpg"];
 
   it("selects neighbor and boundary targets", () => {
-    expect(
-      getImageNavigationTarget(
-        "ArrowRight",
-        images,
-        1,
-        "next.jpg",
-        "previous.jpg",
-      ),
-    ).toBe("next.jpg");
-    expect(
-      getImageNavigationTarget(
-        "ArrowLeft",
-        images,
-        1,
-        "next.jpg",
-        "previous.jpg",
-      ),
-    ).toBe("previous.jpg");
-    expect(
-      getImageNavigationTarget("Home", images, 1, "next.jpg", "previous.jpg"),
-    ).toBe("one.jpg");
-    expect(
-      getImageNavigationTarget("End", images, 1, "next.jpg", "previous.jpg"),
-    ).toBe("three.jpg");
+    expect(getImageNavigationTarget("ArrowRight", images, 1, "next.jpg", "previous.jpg")).toBe(
+      "next.jpg",
+    );
+    expect(getImageNavigationTarget("ArrowLeft", images, 1, "next.jpg", "previous.jpg")).toBe(
+      "previous.jpg",
+    );
+    expect(getImageNavigationTarget("Home", images, 1, "next.jpg", "previous.jpg")).toBe("one.jpg");
+    expect(getImageNavigationTarget("End", images, 1, "next.jpg", "previous.jpg")).toBe(
+      "three.jpg",
+    );
   });
 
   it("returns an empty target when no image is selected", () => {
-    expect(
-      getImageNavigationTarget(
-        "ArrowRight",
-        images,
-        -1,
-        "next.jpg",
-        "previous.jpg",
-      ),
-    ).toBe("");
+    expect(getImageNavigationTarget("ArrowRight", images, -1, "next.jpg", "previous.jpg")).toBe("");
   });
 });

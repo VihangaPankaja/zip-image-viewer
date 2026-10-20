@@ -1,8 +1,4 @@
-import type {
-  Job,
-  TorrentFile,
-  TorrentPriority,
-} from "../../../../../shared/contracts";
+import type { Job, TorrentFile, TorrentPriority } from "../../../../../shared/contracts";
 import type { Selection } from "./TorrentFileDialog";
 import { formatTransferBytes } from "../../../lib/formatterUtils";
 import { fileState, fileStates } from "./TorrentFileContents";
@@ -30,12 +26,9 @@ export function FileGroup({
             type="checkbox"
             checked={count === matchingFiles.length}
             ref={(input) => {
-              if (input)
-                input.indeterminate = count > 0 && count < matchingFiles.length;
+              if (input) input.indeterminate = count > 0 && count < matchingFiles.length;
             }}
-            onChange={(event) =>
-              onChange(matchingFiles, event.currentTarget.checked)
-            }
+            onChange={(event) => onChange(matchingFiles, event.currentTarget.checked)}
           />
           <span>{folder || "Top-level files"}</span>
         </label>
@@ -77,9 +70,7 @@ export function FileStatusGroup({
           <li className="torrent-file-status-row" key={file.id}>
             <span>{file.path.slice(folder ? folder.length + 1 : 0)}</span>
             <small>{formatTransferBytes(file.size)}</small>
-            <span className="torrent-file-state">
-              {fileStates[fileState(file, job)]}
-            </span>
+            <span className="torrent-file-state">{fileStates[fileState(file, job)]}</span>
             {file.selected &&
             job.status === "downloading" &&
             job.phase === "downloading" &&
@@ -93,9 +84,7 @@ export function FileStatusGroup({
                 Play now
               </button>
             ) : null}
-            {file.selected &&
-            job.status === "downloading" &&
-            selection.canChangePriority ? (
+            {file.selected && job.status === "downloading" && selection.canChangePriority ? (
               <label>
                 <select
                   aria-label={`Priority for ${file.path}`}

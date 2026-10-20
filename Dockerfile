@@ -1,26 +1,29 @@
-FROM node:26.7.0-bookworm-slim AS build
+FROM ghcr.io/voidzero-dev/vite-plus:1.3.0 AS base
 WORKDIR /app
-RUN npm install --global pnpm@12.1.0
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY tooling/eslint/package.json tooling/eslint/package.json
-COPY patches ./patches
-RUN pnpm install --frozen-lockfile
-COPY . .
-RUN pnpm run build
+ENV VP_GIT_HOOKS=0
+COPY --chown=vp:vp package.json pnpm-lock.yaml pnpm-workspace.yaml .node-version ./
+COPY --chown=vp:vp patches ./patches
 
-FROM node:26.7.0-bookworm-slim AS runtime
+FROM base AS build
+RUN vp install --frozen-lockfile
+COPY --chown=vp:vp . .
+RUN vp run build
+RUN cp "$(vp env which node | head -1)" /tmp/node
+
+FROM base AS production-dependencies
+RUN vp install --prod --frozen-lockfile
+
+FROM debian:bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 RUN apt-get update \
-  && apt-get install --yes --no-install-recommends tini \
+  && apt-get install --yes --no-install-recommends tini ca-certificates libstdc++6 libatomic1 \
   && rm -rf /var/lib/apt/lists/* \
-  && npm install --global pnpm@12.1.0 \
   && groupadd --system app \
   && useradd --system --gid app --home-dir /app app
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY tooling/eslint/package.json tooling/eslint/package.json
-COPY patches ./patches
-RUN pnpm install --prod --frozen-lockfile
+COPY --from=build /tmp/node /usr/local/bin/node
+COPY --from=production-dependencies /app/node_modules ./node_modules
+COPY package.json ./
 COPY --from=build /app/build ./build
 COPY --from=build /app/dist ./dist
 RUN mkdir -p /app/sessions && chown -R app:app /app

@@ -19,11 +19,7 @@ const stateLabels: Record<SessionRailState, string> = {
   ready: "Ready",
 };
 
-export function SessionRail({
-  activeId,
-  onSelect,
-  sessions,
-}: SessionRailProps) {
+export function SessionRail({ activeId, onSelect, sessions }: SessionRailProps) {
   return (
     <section className="session-rail" aria-labelledby="sessions-title">
       <div className="session-rail-heading">

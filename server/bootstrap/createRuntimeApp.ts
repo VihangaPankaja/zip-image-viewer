@@ -27,11 +27,7 @@ type Dependencies = {
   enqueueJob: (_job: SessionJob, _confirmOversize: boolean) => void;
   confirmJob: (_id: string) => SessionJob;
   selectTorrentFiles: (_id: string, _fileIds: string[]) => SessionJob;
-  setTorrentFilePriority: (
-    _id: string,
-    _fileId: string,
-    _priority: TorrentPriority,
-  ) => SessionJob;
+  setTorrentFilePriority: (_id: string, _fileId: string, _priority: TorrentPriority) => SessionJob;
   listOrderedJobs: () => readonly SessionJob[];
   pauseJob: (_id: string) => Promise<SessionJob>;
   resumeJob: (_id: string) => SessionJob;
@@ -62,8 +58,7 @@ function getSessionSummary(sessions: Map<string, Session>, id: string) {
 
 export function createRuntimeApp(deps: Dependencies) {
   const listJobs = () => deps.listOrderedJobs().map(deps.sanitizeJob);
-  const listSessions = () =>
-    Array.from(deps.sessions.values(), summarizeSession);
+  const listSessions = () => Array.from(deps.sessions.values(), summarizeSession);
   return createApp({
     ...deps.metrics,
     distDir: deps.distDir,
@@ -75,10 +70,7 @@ export function createRuntimeApp(deps: Dependencies) {
       listJobs,
       listSessions,
       createJob: (input) => {
-        const job = deps.createJob(
-          input.url,
-          input.downloadOptions ?? input.downloadSettings,
-        );
+        const job = deps.createJob(input.url, input.downloadOptions ?? input.downloadSettings);
         deps.enqueueJob(job, input.confirmOversize);
         return deps.sanitizeJob(job);
       },
@@ -92,26 +84,19 @@ export function createRuntimeApp(deps: Dependencies) {
       removeSession: (id) => deps.removeSession(id, "rpc"),
       cancelJob: (id) => {
         const job = deps.jobs.get(id);
-        if (!job)
-          throw new ApplicationError("NOT_FOUND", "Job not found.", 404);
+        if (!job) throw new ApplicationError("NOT_FOUND", "Job not found.", 404);
         if (isTerminalJobStatus(job.status)) {
-          throw new ApplicationError(
-            "CONFLICT",
-            "Job is already complete.",
-            409,
-          );
+          throw new ApplicationError("CONFLICT", "Job is already complete.", 409);
         }
         return deps.sanitizeJob(deps.cancelJob(job));
       },
       confirmJob: (id) => deps.sanitizeJob(deps.confirmJob(id)),
-      selectFiles: (id, fileIds) =>
-        deps.sanitizeJob(deps.selectTorrentFiles(id, fileIds)),
+      selectFiles: (id, fileIds) => deps.sanitizeJob(deps.selectTorrentFiles(id, fileIds)),
       setFilePriority: (id, fileId, priority) =>
         deps.sanitizeJob(deps.setTorrentFilePriority(id, fileId, priority)),
       retryJob: (id) => {
         const previous = deps.jobs.get(id);
-        if (!previous)
-          throw new ApplicationError("NOT_FOUND", "Job not found.", 404);
+        if (!previous) throw new ApplicationError("NOT_FOUND", "Job not found.", 404);
         if (previous.status !== "error" && previous.status !== "cancelled") {
           throw new ApplicationError(
             "CONFLICT",

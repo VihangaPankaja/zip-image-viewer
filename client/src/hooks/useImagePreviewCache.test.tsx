@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 import { useImagePreviewCache } from "./useImagePreviewCache";
 
 const initial = {
@@ -32,9 +32,7 @@ it("shares pending previews and releases their URLs on unmount", async () => {
     result.current.loadImagePreview("photo.jpg", "balanced"),
   ]);
   expect(previews).toEqual(["blob:preview", "blob:preview"]);
-  expect(await result.current.loadImagePreview("photo.jpg", "balanced")).toBe(
-    "blob:preview",
-  );
+  expect(await result.current.loadImagePreview("photo.jpg", "balanced")).toBe("blob:preview");
   expect(fetch).toHaveBeenCalledTimes(1);
   unmount();
   expect(revokeObjectURL).toHaveBeenCalledWith("blob:preview");
@@ -53,9 +51,7 @@ it("does not recreate an image URL after its session cache is cleared", async ()
   finish(response());
   expect(await pending).toBe("");
   expect(createObjectURL).not.toHaveBeenCalled();
-  expect(await result.current.loadImagePreview("photo.jpg", "balanced")).toBe(
-    "blob:preview",
-  );
+  expect(await result.current.loadImagePreview("photo.jpg", "balanced")).toBe("blob:preview");
 });
 
 it("keeps a replacement request when an older cleared request fails", async () => {
@@ -67,6 +63,7 @@ it("keeps a replacement request when an older cleared request fails", async () =
   );
   const { result } = renderHook(() => useImagePreviewCache(initial));
   const pending = result.current.loadImagePreview("photo.jpg", "balanced");
+  // oxlint-disable-next-line vitest/valid-expect -- Awaited after triggering the pending rejection.
   const failure = expect(pending).rejects.toThrow("offline");
   act(() => result.current.clearImagePreviewCache());
   await result.current.loadImagePreview("photo.jpg", "balanced");
@@ -81,12 +78,8 @@ it("falls back on HTTP failure, then retries instead of caching failure", async 
   const { result } = renderHook(useImagePreviewCache, {
     initialProps: { ...initial, selectedNode: { path: "photo.jpg" } },
   });
-  await waitFor(() =>
-    expect(result.current.selectedImageSrc).toBe("/fallback.jpg"),
-  );
-  expect(await result.current.loadImagePreview("photo.jpg", "balanced")).toBe(
-    "blob:preview",
-  );
+  await waitFor(() => expect(result.current.selectedImageSrc).toBe("/fallback.jpg"));
+  expect(await result.current.loadImagePreview("photo.jpg", "balanced")).toBe("blob:preview");
   act(() => result.current.resetSelectedImageSrc());
   expect(result.current.selectedImageSrc).toBe("");
 });
@@ -95,9 +88,7 @@ it("releases the previous session and resets selection for non-images", async ()
   const { result, rerender } = renderHook(useImagePreviewCache, {
     initialProps: { ...initial, selectedNode: { path: "photo.jpg" } },
   });
-  await waitFor(() =>
-    expect(result.current.selectedImageSrc).toBe("blob:preview"),
-  );
+  await waitFor(() => expect(result.current.selectedImageSrc).toBe("blob:preview"));
   rerender({
     ...initial,
     sessionId: "session-b",
@@ -114,8 +105,6 @@ it("skips requests without a session or path", async () => {
   });
   expect(await result.current.loadImagePreview("", "balanced")).toBe("");
   rerender({ ...initial, sessionId: "" });
-  expect(await result.current.loadImagePreview("photo.jpg", "balanced")).toBe(
-    "",
-  );
+  expect(await result.current.loadImagePreview("photo.jpg", "balanced")).toBe("");
   expect(fetch).not.toHaveBeenCalled();
 });

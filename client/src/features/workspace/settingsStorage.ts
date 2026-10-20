@@ -1,8 +1,5 @@
 import { DEFAULT_DOWNLOAD_OPTIONS } from "../../lib/appConstants";
-import {
-  clampNumber,
-  normalizeDownloadOptions,
-} from "../../lib/downloadOptions";
+import { clampNumber, normalizeDownloadOptions } from "../../lib/downloadOptions";
 import type { DownloadOptions } from "../../types/download";
 
 export type KeyboardSettings = { jumpSeconds: number; rateStep: number };
@@ -40,9 +37,7 @@ function parseStoredValue(raw: string | null): Record<string, unknown> | null {
   if (!raw) return null;
   try {
     const value: unknown = JSON.parse(raw);
-    return value && typeof value === "object"
-      ? (value as Record<string, unknown>)
-      : null;
+    return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
   } catch {
     return null;
   }
@@ -76,7 +71,5 @@ export function readDownloadOptions(): DownloadOptions {
   if (typeof window === "undefined") return DEFAULT_DOWNLOAD_OPTIONS;
   const current = parseStoredValue(readStoredSetting("zip-download-options"));
   const legacy = parseStoredValue(readStoredSetting("zip-download-settings"));
-  return normalizeDownloadOptions(
-    current ?? legacy ?? DEFAULT_DOWNLOAD_OPTIONS,
-  );
+  return normalizeDownloadOptions(current ?? legacy ?? DEFAULT_DOWNLOAD_OPTIONS);
 }

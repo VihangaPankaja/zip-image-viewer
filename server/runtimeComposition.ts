@@ -3,11 +3,7 @@ import ffmpegPath from "ffmpeg-static";
 import path from "node:path";
 import { createStartupServer } from "./bootstrap/startupServer.js";
 import { attachJobWebSocketServer } from "./realtime/jobSocketServer.js";
-import {
-  CLEANUP_INTERVAL_MS,
-  PORT,
-  SESSION_TTL_MS,
-} from "./config/runtimeConstants.js";
+import { CLEANUP_INTERVAL_MS, PORT, SESSION_TTL_MS } from "./config/runtimeConstants.js";
 import {
   decrementActiveSessionJobCount,
   getActiveSessionJobCount,
@@ -42,10 +38,7 @@ import {
   setPlainLoggingEnabled,
   subscribeLogEvents,
 } from "./infrastructure/runtime/runtimePrimitives.js";
-import {
-  createTerminalDashboard,
-  shouldUseTerminalDashboard,
-} from "./tui/dashboard.js";
+import { createTerminalDashboard, shouldUseTerminalDashboard } from "./tui/dashboard.js";
 import {
   VIDEO_EXTENSIONS,
   classifyMimeType,
@@ -63,9 +56,7 @@ import {
 } from "./runtimeAdapters.js";
 
 const distDir = path.resolve(process.cwd(), "dist");
-const retainedTorrents = createRetainedTorrentStore(
-  path.resolve(process.cwd(), "sessions"),
-);
+const retainedTorrents = createRetainedTorrentStore(path.resolve(process.cwd(), "sessions"));
 const container = createServerContainer();
 const { server, setApp } = createStartupServer(() => retainedTorrents.close());
 const {
@@ -92,18 +83,14 @@ const {
 
 const jobManager = createJobManager(jobStore, logEvent, retainedTorrents);
 const { createJob, sanitizeJob, closeJob, emitJob, cleanupJob } = jobManager;
-const { torrentAdapter, ...torrentControls } = createTorrentControls(
-  jobStore,
-  emitJob,
-);
+const { torrentAdapter, ...torrentControls } = createTorrentControls(jobStore, emitJob);
 const processorDependencies = {
   prepareRetainedSession,
   sessionStore,
   emitJob,
   closeJob,
   download: downloadRuntimeSource,
-  detectEncryption: (archivePath: string) =>
-    detectRuntimeArchiveEncryption(path7za, archivePath),
+  detectEncryption: (archivePath: string) => detectRuntimeArchiveEncryption(path7za, archivePath),
   extractWith7zip: (archivePath: string, extractDir: string) =>
     extractRuntimeArchive(path7za, archivePath, extractDir),
   listExtractedEntries,
@@ -114,11 +101,8 @@ const processSessionJob = createProcessSessionJob(processorDependencies);
 
 server.listen(PORT, "0.0.0.0");
 
-await restoreRetainedTorrents(
-  retainedTorrents,
-  jobStore,
-  torrentAdapter,
-  (job) => restoreTorrentSession(job, processorDependencies),
+await restoreRetainedTorrents(retainedTorrents, jobStore, torrentAdapter, (job) =>
+  restoreTorrentSession(job, processorDependencies),
 );
 
 const sessionJobQueue = createSessionJobQueue({
@@ -149,21 +133,16 @@ const sessionJobQueue = createSessionJobQueue({
 });
 const { enqueueSessionJob } = sessionJobQueue;
 
-const {
-  cancelSessionJob,
-  retrySessionJob,
-  removeSessionJob,
-  removeSession,
-  touchSession,
-} = createRuntimeJobActions(
-  jobStore,
-  sessionStore,
-  videoTranscodeStore,
-  jobManager,
-  sessionJobQueue,
-  logEvent,
-  cleanupVideoSession,
-);
+const { cancelSessionJob, retrySessionJob, removeSessionJob, removeSession, touchSession } =
+  createRuntimeJobActions(
+    jobStore,
+    sessionStore,
+    videoTranscodeStore,
+    jobManager,
+    sessionJobQueue,
+    logEvent,
+    cleanupVideoSession,
+  );
 
 const app = createRuntimeApp({
   storage: createSessionStorage(touchSession, { storage, clearMediaCache }),
@@ -200,8 +179,7 @@ const app = createRuntimeApp({
 app.use("/api/sessions/:id", pinMediaRequest);
 
 app.use((req, res, next) => {
-  const isTrackedRequest =
-    req.path === "/health" || req.path.startsWith("/api");
+  const isTrackedRequest = req.path === "/health" || req.path.startsWith("/api");
   if (!isTrackedRequest) {
     next();
     return;
@@ -246,8 +224,7 @@ const dashboard = shouldUseTerminalDashboard({
         resume: sessionJobQueue.resumeSessionJob,
         cancel: (id) => {
           const job = jobStore.get(id);
-          if (!job || isTerminalJobStatus(job.status))
-            throw new Error("Job cannot be cancelled.");
+          if (!job || isTerminalJobStatus(job.status)) throw new Error("Job cannot be cancelled.");
           cancelSessionJob(job);
         },
         retry: (id) => {

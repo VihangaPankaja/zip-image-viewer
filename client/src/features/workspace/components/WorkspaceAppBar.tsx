@@ -27,7 +27,7 @@ export function WorkspaceAppBar({
           <h1>Transfer desk</h1>
         </div>
       </div>
-      <nav className="workspace-tabs" role="tablist" aria-label="Workspace">
+      <div className="workspace-tabs" role="tablist" aria-label="Workspace">
         <button
           className={activeView === "downloads" ? "active" : ""}
           type="button"
@@ -48,7 +48,7 @@ export function WorkspaceAppBar({
           <FolderTree size={16} aria-hidden="true" />
           Explore
         </button>
-      </nav>
+      </div>
       <div className="workspace-appbar-actions">
         {onOpenStorage ? (
           <button

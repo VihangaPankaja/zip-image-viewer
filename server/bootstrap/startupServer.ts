@@ -8,8 +8,7 @@ export function createStartupServer(closeStore: () => void) {
       return;
     }
     const healthy =
-      (req.method === "GET" || req.method === "HEAD") &&
-      req.url?.split("?")[0] === "/health";
+      (req.method === "GET" || req.method === "HEAD") && req.url?.split("?")[0] === "/health";
     res.statusCode = healthy ? 200 : 503;
     res.setHeader("Content-Type", "application/json");
     if (!healthy) res.setHeader("Retry-After", "1");

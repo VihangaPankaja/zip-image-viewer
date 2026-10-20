@@ -1,8 +1,4 @@
-import type {
-  Session,
-  SessionJob,
-  VideoTranscodeEntry,
-} from "../domain/models.js";
+import type { Session, SessionJob, VideoTranscodeEntry } from "../domain/models.js";
 
 export const sessionStore = new Map<string, Session>();
 export const jobStore = new Map<string, SessionJob>();

@@ -3,12 +3,8 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import request from "supertest";
-import { describe, expect, it, vi } from "vitest";
-import type {
-  Session,
-  VideoRendition,
-  VideoTranscodeEntry,
-} from "../domain/models.js";
+import { describe, expect, it, vi } from "vite-plus/test";
+import type { Session, VideoRendition, VideoTranscodeEntry } from "../domain/models.js";
 import type { VideoRouteDependencies } from "./videoRoutes.js";
 import { registerVideoHlsRoutes } from "./videoHlsRoutes.js";
 
@@ -49,9 +45,7 @@ describe("HLS routes", () => {
       const clock = vi.spyOn(Date, "now").mockReturnValue(now);
       try {
         const response = request(app)
-          .get(
-            "/api/sessions/session/video/hls/playlist?path=source.mp4&quality=360p",
-          )
+          .get("/api/sessions/session/video/hls/playlist?path=source.mp4&quality=360p")
           .set("X-HLS-Preparation-Retry", retry ? "1" : "0")
           .then((value) => value);
         await vi.waitFor(() => expect(start).toHaveBeenCalled());
@@ -70,9 +64,7 @@ describe("HLS routes", () => {
           expect(
             await Promise.race([
               response.then(() => "premature"),
-              new Promise((resolve) =>
-                setTimeout(() => resolve("waiting"), 200),
-              ),
+              new Promise((resolve) => setTimeout(() => resolve("waiting"), 200)),
             ]),
           ).toBe("waiting");
         }
@@ -91,9 +83,7 @@ describe("HLS routes", () => {
         rendition.status = "error";
         await rm(playlistPath);
         await request(app)
-          .get(
-            "/api/sessions/session/video/hls/playlist?path=source.mp4&quality=360p",
-          )
+          .get("/api/sessions/session/video/hls/playlist?path=source.mp4&quality=360p")
           .expect(503);
       } finally {
         clock.mockRestore();
@@ -135,12 +125,8 @@ describe("HLS routes", () => {
     const query = "?path=source.mp4&quality=360p";
 
     try {
-      const cold = await request(app)
-        .get(`${resource}/master?path=source.mp4`)
-        .expect(200);
-      expect(cold.text).toContain(
-        "#EXT-X-STREAM-INF:BANDWIDTH=1020800,RESOLUTION=640x360",
-      );
+      const cold = await request(app).get(`${resource}/master?path=source.mp4`).expect(200);
+      expect(cold.text).toContain("#EXT-X-STREAM-INF:BANDWIDTH=1020800,RESOLUTION=640x360");
       expect(cold.text).toContain(
         "/api/sessions/session/video/hls/playlist?path=source.mp4&quality=360p",
       );
@@ -162,9 +148,7 @@ describe("HLS routes", () => {
           isDefault: false,
         },
       ];
-      const alternate = await request(app)
-        .get(`${resource}/master?path=source.mp4`)
-        .expect(200);
+      const alternate = await request(app).get(`${resource}/master?path=source.mp4`).expect(200);
       expect(alternate.text).toContain('TYPE=AUDIO,GROUP-ID="audio"');
       expect(alternate.text).toContain('AUDIO="audio"');
       expect(alternate.text).toContain("quality=audio-2");
@@ -185,9 +169,7 @@ describe("HLS routes", () => {
         path.join(dir, "init.mp4"),
         Buffer.from("avcC\x01\x4d\x40\x1fmp4a", "latin1"),
       );
-      const warm = await request(app)
-        .get(`${resource}/master?path=source.mp4`)
-        .expect(200);
+      const warm = await request(app).get(`${resource}/master?path=source.mp4`).expect(200);
       expect(warm.text).toContain('CODECS="avc1.4d401f,mp4a.40.2"');
       expect(warm.text).toContain("quality=360p");
 
@@ -196,13 +178,9 @@ describe("HLS routes", () => {
       const states = vi
         .spyOn(deps, "getRenditionState")
         .mockImplementation((_entry, _session, quality) =>
-          quality === "360p"
-            ? rendition
-            : { ...rendition, dir: path.join(workspace, quality) },
+          quality === "360p" ? rendition : { ...rendition, dir: path.join(workspace, quality) },
         );
-      const partial = await request(app)
-        .get(`${resource}/master?path=source.mp4`)
-        .expect(200);
+      const partial = await request(app).get(`${resource}/master?path=source.mp4`).expect(200);
       expect(partial.text).toContain("quality=720p");
       expect(partial.text).not.toContain("CODECS=");
       states.mockRestore();
@@ -214,16 +192,12 @@ describe("HLS routes", () => {
         playlistPath,
         '#EXTM3U\n#EXT-X-TARGETDURATION:5\n#EXT-X-MAP:URI="init.mp4"\n#EXTINF:4.125,\nsegment_000000.m4s\n#EXT-X-ENDLIST\n',
       );
-      const variant = await request(app)
-        .get(`${resource}/playlist${query}`)
-        .expect(200);
+      const variant = await request(app).get(`${resource}/playlist${query}`).expect(200);
       expect(variant.headers["cache-control"]).toContain("no-store");
       expect(variant.text).toContain("#EXTINF:4.125,");
       expect(variant.text).toContain("index=0");
 
-      const media = await request(app)
-        .get(`${resource}/segment${query}&index=0`)
-        .expect(200);
+      const media = await request(app).get(`${resource}/segment${query}&index=0`).expect(200);
       expect(media.headers["cache-control"]).toContain("immutable");
       expect(media.headers.etag).toBeTruthy();
       await request(app)
@@ -233,9 +207,7 @@ describe("HLS routes", () => {
       session.availablePaths = new Set();
       vi.mocked(deps.ensureVideoTranscodeEntry).mockClear();
       for (const route of ["master", "playlist", "init", "segment"])
-        await request(app)
-          .get(`${resource}/${route}${query}&index=0`)
-          .expect(404);
+        await request(app).get(`${resource}/${route}${query}&index=0`).expect(404);
       expect(deps.ensureVideoTranscodeEntry).not.toHaveBeenCalled();
     } finally {
       await rm(workspace, { recursive: true, force: true });

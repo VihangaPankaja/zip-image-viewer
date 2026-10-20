@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   buildVideoPlaybackUrls,
   chooseVideoQuality,
@@ -14,10 +14,8 @@ describe("video playback model", () => {
         selectedNode: { type: "file", path: "folder/a&b.mp4" },
       }),
     ).toEqual({
-      hlsUrl:
-        "/api/sessions/session-1/video/hls/master?path=folder%2Fa%26b.mp4",
-      originalUrl:
-        "/api/sessions/session-1/video/play?path=folder%2Fa%26b.mp4&quality=source",
+      hlsUrl: "/api/sessions/session-1/video/hls/master?path=folder%2Fa%26b.mp4",
+      originalUrl: "/api/sessions/session-1/video/play?path=folder%2Fa%26b.mp4&quality=source",
     });
   });
 

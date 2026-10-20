@@ -54,9 +54,7 @@ function useStoryboard(sessionId: string, path: string) {
 const THUMBNAIL_INTERVAL_SECONDS = 5;
 
 function finiteDuration(video: HTMLVideoElement) {
-  return Number.isFinite(video.duration) && video.duration > 0
-    ? video.duration
-    : 0;
+  return Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
 }
 
 function formatTime(seconds: number) {
@@ -90,11 +88,7 @@ function thumbnailUrl(
   return `/api/sessions/${encodeURIComponent(sessionId)}/video/thumbnail?${query.toString()}`;
 }
 
-function useVideoScrubPosition({
-  path,
-  sessionId,
-  videoRef,
-}: VideoScrubberProps) {
+function useVideoScrubPosition({ path, sessionId, videoRef }: VideoScrubberProps) {
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(0);
   const [previewPosition, setPreviewPosition] = useState<number | null>(null);
@@ -171,13 +165,7 @@ function thumbnailProps(
         : undefined,
     src: frame
       ? `/api/sessions/${encodeURIComponent(props.sessionId)}/video/storyboard/sheet?${sheetQuery.toString()}`
-      : thumbnailUrl(
-          props.sessionId,
-          props.path,
-          props.quality,
-          previewPosition,
-          duration,
-        ),
+      : thumbnailUrl(props.sessionId, props.path, props.quality, previewPosition, duration),
   };
 }
 
@@ -199,9 +187,7 @@ export function VideoScrubber(props: VideoScrubberProps) {
             {...thumbnailProps(
               props,
               storyboard,
-              storyboard
-                ? previewPosition
-                : (fallbackPosition ?? previewPosition),
+              storyboard ? previewPosition : (fallbackPosition ?? previewPosition),
               duration,
             )}
             alt={`Preview at ${formatTime(previewPosition)}`}

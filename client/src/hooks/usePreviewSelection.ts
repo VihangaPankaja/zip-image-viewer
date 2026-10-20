@@ -65,8 +65,7 @@ function buildImageItems(
 ) {
   return paths.map((path) => ({
     path,
-    name:
-      flatData?.nodesByPath.get(path)?.name || path.split("/").at(-1) || path,
+    name: flatData?.nodesByPath.get(path)?.name || path.split("/").at(-1) || path,
     url: buildFileUrl(sessionId, path),
     previewUrl: buildFileUrl(sessionId, path, {
       imagePreview: true,
@@ -108,10 +107,7 @@ export function usePreviewSelection({
     return cloneAndSortTree(session.tree, sortMode);
   }, [session, sortMode]);
 
-  const flatData = useMemo(
-    () => (sortedTree ? flattenTree(sortedTree) : null),
-    [sortedTree],
-  );
+  const flatData = useMemo(() => (sortedTree ? flattenTree(sortedTree) : null), [sortedTree]);
 
   const selectedNode = flatData?.nodesByPath.get(selectedPath) || null;
   const selectedKind = classifyNodeKind(selectedNode);
@@ -120,9 +116,7 @@ export function usePreviewSelection({
     ? flatData?.folderImages.get(selectedNode.parentPath || "") || []
     : [];
 
-  const currentImageIndex = selectedNode
-    ? currentFolderImages.indexOf(selectedNode.path)
-    : -1;
+  const currentImageIndex = selectedNode ? currentFolderImages.indexOf(selectedNode.path) : -1;
   const currentFolderPreviewables = selectedNode
     ? flatData?.folderPreviewables.get(selectedNode.parentPath || "") || []
     : [];
@@ -130,12 +124,7 @@ export function usePreviewSelection({
     ? currentFolderPreviewables.indexOf(selectedNode.path)
     : -1;
 
-  const urls = buildPreviewUrls(
-    session?.id || "",
-    selectedNode,
-    selectedKind,
-    previewQuality,
-  );
+  const urls = buildPreviewUrls(session?.id || "", selectedNode, selectedKind, previewQuality);
   const currentFolderImageItems = buildImageItems(
     currentFolderImages,
     flatData,
@@ -143,11 +132,7 @@ export function usePreviewSelection({
     previewQuality,
   );
 
-  const navigation = buildImageNavigation(
-    currentFolderImages,
-    currentImageIndex,
-    flatData,
-  );
+  const navigation = buildImageNavigation(currentFolderImages, currentImageIndex, flatData);
   const previewNavigation = buildImageNavigation(
     currentFolderPreviewables,
     currentPreviewIndex,

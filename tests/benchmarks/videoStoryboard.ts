@@ -7,10 +7,7 @@ import ffmpegPath from "ffmpeg-static";
 import { chromium, type Browser } from "@playwright/test";
 import { build } from "vite";
 import type { VideoStoryboard } from "../../shared/contracts.js";
-import type {
-  Session,
-  VideoTranscodeEntry,
-} from "../../server/domain/models.js";
+import type { Session, VideoTranscodeEntry } from "../../server/domain/models.js";
 import { createVideoRuntime } from "../../server/infrastructure/media/videoRuntime.js";
 import { registerVideoRoutes } from "../../server/handlers/videoRoutes.js";
 import {
@@ -39,8 +36,7 @@ const runtime = createVideoRuntime({
   ffmpegPath,
   transcodes,
   logEvent: (_level, event) => {
-    if (event === "video.process.started")
-      processStarts.push(performance.now());
+    if (event === "video.process.started") processStarts.push(performance.now());
   },
 });
 const app = express();
@@ -88,9 +84,7 @@ app.use(express.static(harnessDirectory));
 const server = createServer(app);
 let browser: Browser | undefined;
 const deadline = setTimeout(() => {
-  process.stderr.write(
-    "Storyboard benchmark exceeded its 120 second deadline.\n",
-  );
+  process.stderr.write("Storyboard benchmark exceeded its 120 second deadline.\n");
   void browser?.close();
 }, 120_000);
 try {
@@ -132,8 +126,7 @@ try {
   ]);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
-  if (!address || typeof address === "string")
-    throw new Error("Server port missing");
+  if (!address || typeof address === "string") throw new Error("Server port missing");
   const origin = `http://127.0.0.1:${String(address.port)}`;
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
@@ -156,8 +149,8 @@ try {
   await page.keyboard.down("ArrowRight");
   await page.waitForFunction(
     () =>
-      document.querySelector<HTMLImageElement>(".video-scrubber-preview img")
-        ?.naturalWidth === 1600,
+      document.querySelector<HTMLImageElement>(".video-scrubber-preview img")?.naturalWidth ===
+      1600,
   );
   const coldStoryboardMs = performance.now() - coldStarted;
   await page.keyboard.up("ArrowRight");
@@ -197,13 +190,11 @@ try {
   const startsBeforeWarm = processStarts.length;
   process.stderr.write("storyboard benchmark: measuring warm responses\n");
   const warmRequests = await page.evaluate(async () => {
-    const index = await fetch(
-      "/api/sessions/benchmark/video/storyboard?path=clip.mp4",
-    ).then((response) => response.json() as Promise<VideoStoryboard>);
+    const index = await fetch("/api/sessions/benchmark/video/storyboard?path=clip.mp4").then(
+      (response) => response.json() as Promise<VideoStoryboard>,
+    );
     const urls = [
-      ...new Set<number>(
-        index.frames.map((frame: { sheet: number }) => frame.sheet),
-      ),
+      ...new Set<number>(index.frames.map((frame: { sheet: number }) => frame.sheet)),
     ].map(
       (sheet) =>
         `/api/sessions/benchmark/video/storyboard/sheet?path=clip.mp4&sheet=${String(sheet)}`,
@@ -228,9 +219,7 @@ try {
     const video = document.querySelector("video");
     if (!video) throw new Error("Video missing");
     await video.play();
-    await new Promise<void>((resolve) =>
-      video.requestVideoFrameCallback(() => resolve()),
-    );
+    await new Promise<void>((resolve) => video.requestVideoFrameCallback(() => resolve()));
     video.pause();
     video.currentTime = 4;
     await new Promise<void>((resolve) =>
@@ -247,12 +236,8 @@ try {
       const start = performance.now();
       requestAnimationFrame(() =>
         requestAnimationFrame(() => {
-          const image = document.querySelector<HTMLImageElement>(
-            ".video-scrubber-preview img",
-          );
-          void image
-            ?.decode()
-            .then(() => measurement.latencies.push(performance.now() - start));
+          const image = document.querySelector<HTMLImageElement>(".video-scrubber-preview img");
+          void image?.decode().then(() => measurement.latencies.push(performance.now() - start));
         }),
       );
     });
@@ -265,10 +250,7 @@ try {
   const dragStart = performance.now();
   let moves = 0;
   while (performance.now() - dragStart < 10_000) {
-    await page.mouse.move(
-      box.x + 10 + ((moves * 17) % (box.width - 20)),
-      box.y + box.height / 2,
-    );
+    await page.mouse.move(box.x + 10 + ((moves * 17) % (box.width - 20)), box.y + box.height / 2);
     moves += 1;
     await page.waitForTimeout(16);
   }
@@ -288,9 +270,7 @@ try {
   const target = Number(await slider.inputValue());
   await page.mouse.up();
   await page.waitForFunction(
-    (time) =>
-      Math.abs((document.querySelector("video")?.currentTime ?? -1) - time) <
-      0.1,
+    (time) => Math.abs((document.querySelector("video")?.currentTime ?? -1) - time) < 0.1,
     target,
   );
   const p95 = (values: number[]) =>
@@ -316,9 +296,7 @@ try {
   };
   const outputFlag = process.argv.indexOf("--output");
   const output = path.resolve(
-    outputFlag >= 0
-      ? process.argv[outputFlag + 1]
-      : "test-results/storyboard-performance.json",
+    outputFlag >= 0 ? process.argv[outputFlag + 1] : "test-results/storyboard-performance.json",
   );
   await mkdir(path.dirname(output), { recursive: true });
   await writeFile(output, JSON.stringify(report, null, 2));
@@ -340,7 +318,6 @@ try {
   await runtime.cleanupVideoSession(session);
   await runtime.cleanupVideoSession(loadSession);
   await load;
-  if (server.listening)
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+  if (server.listening) await new Promise<void>((resolve) => server.close(() => resolve()));
   await rm(workspace, { recursive: true, force: true });
 }

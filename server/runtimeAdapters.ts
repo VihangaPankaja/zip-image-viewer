@@ -34,13 +34,7 @@ export function ensureRuntimeImagePreview(
   targetPath: string,
   profileName: string,
 ): Promise<string> {
-  return generateImagePreview(
-    session,
-    normalizedPath,
-    targetPath,
-    profileName,
-    logEvent,
-  );
+  return generateImagePreview(session, normalizedPath, targetPath, profileName, logEvent);
 }
 
 export function extractRuntimeArchive(

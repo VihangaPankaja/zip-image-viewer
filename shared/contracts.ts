@@ -31,8 +31,7 @@ export const publicHttpUrlSchema = z
     }
     const url = new URL(value);
     const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-    const invalidProtocol =
-      url.protocol !== "http:" && url.protocol !== "https:";
+    const invalidProtocol = url.protocol !== "http:" && url.protocol !== "https:";
     const invalidHost =
       blockedHostnames.has(hostname) ||
       hostname.endsWith(".localhost") ||
@@ -257,10 +256,7 @@ const selectTorrentFilesInputSchema = jobControlInputSchema.extend({
   fileIds: z
     .array(z.string().min(1))
     .min(1)
-    .refine(
-      (ids) => new Set(ids).size === ids.length,
-      "File IDs must be unique.",
-    ),
+    .refine((ids) => new Set(ids).size === ids.length, "File IDs must be unique."),
 });
 const selectTorrentFilesContract = oc
   .route({ method: "POST", path: "/session-jobs/{id}/files" })
@@ -345,9 +341,7 @@ const storageInputSchema = z.object({ id: z.uuid() });
 const storageContract = {
   get: oc.input(storageInputSchema).output(sessionStorageSchema),
   clear: oc.input(storageInputSchema).output(z.void()),
-  pin: oc
-    .input(storageInputSchema.extend({ pinned: z.boolean() }))
-    .output(z.void()),
+  pin: oc.input(storageInputSchema.extend({ pinned: z.boolean() })).output(z.void()),
 };
 
 export const serverContract = {

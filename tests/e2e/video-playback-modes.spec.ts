@@ -6,10 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import ffmpegPath from "ffmpeg-static";
 import { expect, test } from "@playwright/test";
-import type {
-  Session,
-  VideoTranscodeEntry,
-} from "../../server/domain/models.js";
+import type { Session, VideoTranscodeEntry } from "../../server/domain/models.js";
 import { registerVideoPlaybackRoutes } from "../../server/handlers/video/playbackRoutes.js";
 import {
   getVideoQualities,
@@ -31,8 +28,7 @@ test("plays real direct, remux and unsupported inputs and explicitly falls back 
 }, testInfo) => {
   test.skip(browserName !== "chromium");
   test.setTimeout(120_000);
-  if (!ffmpegPath || !baseURL)
-    throw new Error("FFmpeg and app URL are required.");
+  if (!ffmpegPath || !baseURL) throw new Error("FFmpeg and app URL are required.");
   const directory = await mkdtemp(path.join(tmpdir(), "ziv-modes-e2e-"));
   const session = {
     id: "00000000-0000-4000-8000-000000000027",
@@ -140,8 +136,7 @@ test("plays real direct, remux and unsupported inputs and explicitly falls back 
       path.join(directory, "unsupported.mp4"),
     ]);
     const address = server.address();
-    if (!address || typeof address === "string")
-      throw new Error("Media server did not bind.");
+    if (!address || typeof address === "string") throw new Error("Media server did not bind.");
     const origin = `http://127.0.0.1:${address.port}`;
     let currentFile = "direct.mp4";
     await page.route("**/rpc/sessions/list", (route) =>
@@ -178,10 +173,7 @@ test("plays real direct, remux and unsupported inputs and explicitly falls back 
     await page.route("**/rpc/video/qualities", async (route) =>
       route.fulfill({
         json: {
-          json: await getVideoQualities(
-            { sessionId: session.id, path: currentFile },
-            deps,
-          ),
+          json: await getVideoQualities({ sessionId: session.id, path: currentFile }, deps),
         },
       }),
     );
@@ -195,22 +187,16 @@ test("plays real direct, remux and unsupported inputs and explicitly falls back 
       await page.goto(origin);
       await page.getByRole("tab", { name: "Explore" }).click();
       await page.getByRole("button", { name: `Open ${file}` }).click();
-      await expect(
-        page.getByText(`Mode: ${mode}`, { exact: true }),
-      ).toBeVisible();
+      await expect(page.getByText(`Mode: ${mode}`, { exact: true })).toBeVisible();
       const video = page.getByLabel("Video preview");
       await expect
-        .poll(() =>
-          video.evaluate((element: HTMLVideoElement) => element.readyState),
-        )
+        .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState))
         .toBeGreaterThanOrEqual(2);
       await video.evaluate((element: HTMLVideoElement) => {
         void element.play();
       });
       await expect
-        .poll(() =>
-          video.evaluate((element: HTMLVideoElement) => element.currentTime),
-        )
+        .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
         .toBeGreaterThan(0.25);
       await video.evaluate((element: HTMLVideoElement) => element.pause());
       await page.screenshot({
@@ -218,47 +204,31 @@ test("plays real direct, remux and unsupported inputs and explicitly falls back 
         animations: "disabled",
       });
       if (mode !== "Transcode") {
-        expect(
-          transcodes.has(runtime.getVideoTranscodeKey(session.id, file)),
-        ).toBe(false);
+        expect(transcodes.has(runtime.getVideoTranscodeKey(session.id, file))).toBe(false);
         expect(requests.some((url) => url.includes("/hls/master"))).toBe(false);
-        const before = await video.evaluate(
-          (element: HTMLVideoElement) => element.currentTime,
-        );
+        const before = await video.evaluate((element: HTMLVideoElement) => element.currentTime);
         await page.getByRole("button", { name: "Transcode instead" }).click();
-        await expect(
-          page.getByText("Mode: Transcode", { exact: true }),
-        ).toBeVisible();
+        await expect(page.getByText("Mode: Transcode", { exact: true })).toBeVisible();
         await expect
-          .poll(() =>
-            transcodes.has(runtime.getVideoTranscodeKey(session.id, file)),
-          )
+          .poll(() => transcodes.has(runtime.getVideoTranscodeKey(session.id, file)))
           .toBe(true);
         await expect
-          .poll(() =>
-            video.evaluate((element: HTMLVideoElement) => element.readyState),
-          )
+          .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState))
           .toBeGreaterThanOrEqual(2);
         expect(
-          await video.evaluate(
-            (element: HTMLVideoElement) => element.currentTime,
-          ),
+          await video.evaluate((element: HTMLVideoElement) => element.currentTime),
         ).toBeCloseTo(before, 0);
         await video.evaluate((element: HTMLVideoElement) => {
           void element.play();
         });
         await expect
-          .poll(() =>
-            video.evaluate((element: HTMLVideoElement) => element.currentTime),
-          )
+          .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
           .toBeGreaterThan(before + 0.25);
         await video.evaluate((element: HTMLVideoElement) => element.pause());
       } else {
         expect(requests.some((url) => url.includes("/video/play"))).toBe(false);
       }
-      expect(
-        transcodes.has(runtime.getVideoTranscodeKey(session.id, file)),
-      ).toBe(true);
+      expect(transcodes.has(runtime.getVideoTranscodeKey(session.id, file))).toBe(true);
       await page.screenshot({
         path: testInfo.outputPath(`${file}-transcode.png`),
         animations: "disabled",
@@ -266,13 +236,9 @@ test("plays real direct, remux and unsupported inputs and explicitly falls back 
     }
     await page.setViewportSize({ width: 360, height: 800 });
     await page.locator('label[for="workspace-pane-preview"]').click();
-    await expect(
-      page.getByText("Mode: Transcode", { exact: true }),
-    ).toBeVisible();
+    await expect(page.getByText("Mode: Transcode", { exact: true })).toBeVisible();
     expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth + 1,
-      ),
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
     ).toBe(true);
   } finally {
     await page.unrouteAll({ behavior: "wait" });

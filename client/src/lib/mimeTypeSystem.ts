@@ -1,15 +1,6 @@
 import type { FileNodeLike, PreviewKind } from "../types/preview";
 
-const IMAGE_EXTENSIONS = new Set([
-  "jpg",
-  "jpeg",
-  "png",
-  "webp",
-  "gif",
-  "svg",
-  "bmp",
-  "avif",
-]);
+const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif", "svg", "bmp", "avif"]);
 
 const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v", "ogv", "mkv"]);
 const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "ogg", "aac", "m4a", "flac"]);
@@ -39,9 +30,7 @@ const VIDEO_MIME_BY_EXTENSION: Record<string, string> = {
   mkv: "video/x-matroska",
 };
 
-export function classifyExtension(
-  extension: string | undefined | null,
-): PreviewKind {
+export function classifyExtension(extension: string | undefined | null): PreviewKind {
   const ext = (extension || "").toLowerCase();
   if (IMAGE_EXTENSIONS.has(ext)) return "image";
   if (VIDEO_EXTENSIONS.has(ext)) return "video";
@@ -50,9 +39,7 @@ export function classifyExtension(
   return "binary";
 }
 
-export function classifyNodeKind(
-  node: FileNodeLike | null | undefined,
-): PreviewKind {
+export function classifyNodeKind(node: FileNodeLike | null | undefined): PreviewKind {
   if (!node || node.type === "directory") {
     return "directory";
   }

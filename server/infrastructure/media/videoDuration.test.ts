@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import ffmpegPath from "ffmpeg-static";
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import { runCommand } from "../process/commandRunner.js";
 import { videoDuration } from "./videoDuration.js";
 

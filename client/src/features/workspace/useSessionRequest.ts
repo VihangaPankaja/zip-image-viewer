@@ -1,14 +1,5 @@
-import {
-  useCallback,
-  type Dispatch,
-  type SetStateAction,
-  type SubmitEvent,
-} from "react";
-import {
-  jobPayloadSchema,
-  type JobPayload,
-  type OversizePrompt,
-} from "./sessionSchemas";
+import { useCallback, type Dispatch, type SetStateAction, type SubmitEvent } from "react";
+import { jobPayloadSchema, type JobPayload, type OversizePrompt } from "./sessionSchemas";
 import type { JobTransport } from "./useJobTransport";
 
 type SessionRequestContext = Pick<
@@ -54,9 +45,7 @@ async function loadSessionRequest(
     context.setActiveJob(payload);
     context.attachJobEvents(payload.id ?? "", url);
   } catch (error) {
-    context.setError(
-      error instanceof Error ? error.message : "Could not open file URL.",
-    );
+    context.setError(error instanceof Error ? error.message : "Could not open file URL.");
     context.latestJobIdRef.current = "";
     context.setActiveJob(null);
     context.stopJobPolling();
@@ -79,13 +68,9 @@ async function submitSession(
   await loadSession(url, false);
 }
 
-export function useSessionRequest(
-  context: SessionRequestContext,
-  zipUrl: string,
-) {
+export function useSessionRequest(context: SessionRequestContext, zipUrl: string) {
   const loadSession = useCallback(
-    (url: string, confirmOversize = false) =>
-      loadSessionRequest(context, url, confirmOversize),
+    (url: string, confirmOversize = false) => loadSessionRequest(context, url, confirmOversize),
     [context],
   );
   const handleSubmit = useCallback(

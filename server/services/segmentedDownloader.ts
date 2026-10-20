@@ -64,8 +64,7 @@ function buildSegments(totalSize: number, segmentCount: number): Segment[] {
 
   let start = 0;
   for (let i = 0; i < safeCount; i += 1) {
-    const end =
-      i === safeCount - 1 ? totalSize - 1 : start + sizePerSegment - 1;
+    const end = i === safeCount - 1 ? totalSize - 1 : start + sizePerSegment - 1;
     segments.push({ index: i, start, end });
     start = end + 1;
   }
@@ -118,9 +117,7 @@ async function streamSingleRange({
       if (encoded) allowedBytes = MAX_RESOURCE_BYTES;
       responseHeader?.(statusCode, encoded);
     } catch (error) {
-      request.destroy(
-        error instanceof Error ? error : new Error(String(error)),
-      );
+      request.destroy(error instanceof Error ? error : new Error(String(error)));
     }
   });
 
@@ -134,8 +131,7 @@ async function streamSingleRange({
     }),
   );
 
-  if (!responseState.checked)
-    throw new Error("Download failed before response was received.");
+  if (!responseState.checked) throw new Error("Download failed before response was received.");
 }
 
 async function reserveDownloadStorage(
@@ -147,9 +143,7 @@ async function reserveDownloadStorage(
   const existingBytes = await prepareDownloadFiles(targetPath, {
     size: metadata.size,
     resume: settings.enableResume && metadata.acceptRanges && metadata.size > 0,
-    segments: segmented
-      ? buildSegments(metadata.size, settings.threadCount)
-      : undefined,
+    segments: segmented ? buildSegments(metadata.size, settings.threadCount) : undefined,
   });
   return reserveStorage(
     path.dirname(targetPath),
@@ -182,8 +176,7 @@ async function downloadSingleWithResume({
   state.downloadedBytes = existingBytes;
 
   const canRangeResume = metadata.acceptRanges && metadata.size > 0;
-  const shouldRangeResume =
-    settings.enableResume && existingBytes > 0 && canRangeResume;
+  const shouldRangeResume = settings.enableResume && existingBytes > 0 && canRangeResume;
   const start = shouldRangeResume ? existingBytes : 0;
   if (shouldRangeResume && existingBytes === metadata.size) return;
   const end = metadata.size > 0 ? metadata.size - 1 : Number.NaN;
@@ -208,10 +201,7 @@ async function downloadSingleWithResume({
   });
 }
 
-async function mergeSegmentParts(
-  partPaths: string[],
-  targetPath: string,
-): Promise<void> {
+async function mergeSegmentParts(partPaths: string[], targetPath: string): Promise<void> {
   for (const [index, sourcePath] of partPaths.entries()) {
     await pipeline(
       createReadStream(sourcePath),
@@ -281,14 +271,12 @@ async function downloadSegmentWithRetry({
         getErrorProperty(error, "name") === "AbortError" ||
         getErrorProperty(error, "code") === "RANGE_UNSUPPORTED" ||
         getErrorProperty(error, "code") === "DOWNLOAD_FATAL" ||
-        (settings.maxRetries !== UNLIMITED_RETRIES &&
-          attempt >= settings.maxRetries)
+        (settings.maxRetries !== UNLIMITED_RETRIES && attempt >= settings.maxRetries)
       ) {
         throw error;
       }
 
-      const delayMs =
-        RETRY_BASE_DELAY_MS * 2 ** attempt + Math.floor(Math.random() * 500);
+      const delayMs = RETRY_BASE_DELAY_MS * 2 ** attempt + Math.floor(Math.random() * 500);
       await sleepWithSignal(delayMs, signal);
     }
   }
@@ -318,12 +306,7 @@ export async function downloadWithSegmentedManager({
     metadata.acceptRanges &&
     metadata.size > 0;
 
-  const storage = await reserveDownloadStorage(
-    targetPath,
-    metadata,
-    settings,
-    canUseSegments,
-  );
+  const storage = await reserveDownloadStorage(targetPath, metadata, settings, canUseSegments);
   const controller = new AbortController();
   signal = AbortSignal.any([signal, controller.signal]);
   try {
@@ -369,14 +352,11 @@ export async function downloadWithSegmentedManager({
     await mergeSegmentParts(partPaths, targetPath);
 
     await Promise.all(
-      partPaths.map((partPath) =>
-        rm(partPath, { force: true }).catch(() => undefined),
-      ),
+      partPaths.map((partPath) => rm(partPath, { force: true }).catch(() => undefined)),
     );
 
     const finishedStat = await stat(targetPath).catch(() => null);
-    if (!finishedStat?.isFile())
-      throw new Error("Download did not produce a file.");
+    if (!finishedStat?.isFile()) throw new Error("Download did not produce a file.");
 
     state.downloadedBytes = finishedStat.size;
   } finally {

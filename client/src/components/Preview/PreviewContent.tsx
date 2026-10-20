@@ -38,11 +38,7 @@ function PreviewHeader({
   setSlideshowOpen,
 }: Pick<
   PreviewContentProps,
-  | "selectedNode"
-  | "selectedKind"
-  | "selectedFileUrl"
-  | "setExplorerModalOpen"
-  | "setSlideshowOpen"
+  "selectedNode" | "selectedKind" | "selectedFileUrl" | "setExplorerModalOpen" | "setSlideshowOpen"
 > & { selectedFile: PreviewFileNode | null }) {
   return (
     <div className="panel-header">
@@ -71,10 +67,7 @@ function PreviewActions({
   setSlideshowOpen,
 }: Pick<
   PreviewContentProps,
-  | "selectedKind"
-  | "selectedFileUrl"
-  | "setExplorerModalOpen"
-  | "setSlideshowOpen"
+  "selectedKind" | "selectedFileUrl" | "setExplorerModalOpen" | "setSlideshowOpen"
 >) {
   return (
     <div className="panel-actions">
@@ -134,13 +127,7 @@ function SelectedPreview({
   props: PreviewContentProps;
   selectedFile: PreviewFileNode;
 }) {
-  const {
-    selectedKind,
-    selectedFileUrl,
-    formatBytes,
-    formatDate,
-    textPreview,
-  } = props;
+  const { selectedKind, selectedFileUrl, formatBytes, formatDate, textPreview } = props;
   if (selectedKind === "image") {
     return <ImagePreviewContent {...props} selectedNode={selectedFile} />;
   }
@@ -171,9 +158,7 @@ function SelectedPreview({
 }
 
 export function PreviewContent(props: PreviewContentProps) {
-  const selectedFile = isPreviewFileNode(props.selectedNode)
-    ? props.selectedNode
-    : null;
+  const selectedFile = isPreviewFileNode(props.selectedNode) ? props.selectedNode : null;
 
   return (
     <section className="preview-panel">
@@ -185,15 +170,11 @@ export function PreviewContent(props: PreviewContentProps) {
             <FileImage size={28} strokeWidth={1.5} />
           </span>
           <strong>Nothing selected</strong>
-          <p>
-            Choose a file from the sidebar to start previewing its contents.
-          </p>
+          <p>Choose a file from the sidebar to start previewing its contents.</p>
         </div>
       ) : null}
 
-      {selectedFile ? (
-        <SelectedPreview props={props} selectedFile={selectedFile} />
-      ) : null}
+      {selectedFile ? <SelectedPreview props={props} selectedFile={selectedFile} /> : null}
     </section>
   );
 }

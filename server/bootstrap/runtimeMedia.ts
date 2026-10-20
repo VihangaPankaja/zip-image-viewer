@@ -1,13 +1,7 @@
 import type { RequestHandler } from "express";
 import type { Session, VideoTranscodeEntry } from "../domain/models.js";
-import {
-  HLS_ENCODER,
-  MEDIA_CACHE_BUDGET_BYTES,
-} from "../config/runtimeConstants.js";
-import {
-  ensureRuntimeImagePreview,
-  ensureRuntimeThumbnail,
-} from "../runtimeAdapters.js";
+import { HLS_ENCODER, MEDIA_CACHE_BUDGET_BYTES } from "../config/runtimeConstants.js";
+import { ensureRuntimeImagePreview, ensureRuntimeThumbnail } from "../runtimeAdapters.js";
 import { createDerivedMediaCache } from "../infrastructure/media/derivedMediaCache.js";
 import { createVideoRuntime } from "../infrastructure/media/videoRuntime.js";
 import { prepareRetainedSession } from "../infrastructure/media/prepareRetainedSession.js";
@@ -18,9 +12,7 @@ type LogEvent = (
   _details?: Record<string, unknown>,
 ) => void;
 
-function pinMediaRequests(
-  cache: ReturnType<typeof createDerivedMediaCache>,
-): RequestHandler {
+function pinMediaRequests(cache: ReturnType<typeof createDerivedMediaCache>): RequestHandler {
   return async (req, res, next) => {
     const release = cache.protectSession(req.params.id as string);
     res.once("finish", release);
@@ -40,11 +32,7 @@ export function createRuntimeMedia(
   transcodes: Map<string, VideoTranscodeEntry>,
   logEvent: LogEvent,
 ) {
-  const cache = createDerivedMediaCache(
-    sessions,
-    transcodes,
-    MEDIA_CACHE_BUDGET_BYTES,
-  );
+  const cache = createDerivedMediaCache(sessions, transcodes, MEDIA_CACHE_BUDGET_BYTES);
   const enforceMediaBudget = async () => {
     await cache.enforce().catch((error: unknown) => {
       logEvent("warn", "media.cache.cleanup.failed", {
@@ -69,8 +57,7 @@ export function createRuntimeMedia(
     targetPath,
     size,
   ) => {
-    if (sessions.get(session.id) !== session)
-      throw new Error("Session has been removed.");
+    if (sessions.get(session.id) !== session) throw new Error("Session has been removed.");
     const result = await videoRuntime.runVideoTask(session, () =>
       ensureRuntimeThumbnail(session, normalizedPath, targetPath, size),
     );
@@ -83,26 +70,15 @@ export function createRuntimeMedia(
     targetPath,
     profileName,
   ) => {
-    if (sessions.get(session.id) !== session)
-      throw new Error("Session has been removed.");
+    if (sessions.get(session.id) !== session) throw new Error("Session has been removed.");
     const result = await videoRuntime.runVideoTask(session, () =>
-      ensureRuntimeImagePreview(
-        session,
-        normalizedPath,
-        targetPath,
-        profileName,
-      ),
+      ensureRuntimeImagePreview(session, normalizedPath, targetPath, profileName),
     );
     await enforceMediaBudget();
     return result;
   };
   return {
-    prepareRetainedSession: retainedPreparation(
-      videoRuntime,
-      sessions,
-      ffmpegPath,
-      logEvent,
-    ),
+    prepareRetainedSession: retainedPreparation(videoRuntime, sessions, ffmpegPath, logEvent),
     storage: cache.storage,
     clearMediaCache: (session: Session) =>
       cache.clear(session, () => videoRuntime.clearCachedMedia(session)),
@@ -134,12 +110,7 @@ function retainedPreparation(
           session,
           sessions,
           (item, file, target) =>
-            videoRuntime.ensureVideoTranscodeEntry(
-              item,
-              file,
-              target,
-              "background",
-            ),
+            videoRuntime.ensureVideoTranscodeEntry(item, file, target, "background"),
           report,
         ),
         false,

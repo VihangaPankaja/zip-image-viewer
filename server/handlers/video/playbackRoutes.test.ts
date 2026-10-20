@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import express from "express";
 import request from "supertest";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 import type { Session } from "../../domain/models.js";
 import {
   parseRangeHeader,
@@ -39,12 +39,7 @@ function app() {
     prepareVideoRemux,
   } as unknown as VideoRouteDependencies);
   server.use(
-    (
-      error: Error,
-      _req: express.Request,
-      res: express.Response,
-      _next: express.NextFunction,
-    ) => {
+    (error: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
       res.status(500).json({ error: error.message });
     },
   );
@@ -104,10 +99,7 @@ it.each([500, 503])(
     expect(response.status).toBe(status);
     expect(response.headers["x-video-source"]).toBeUndefined();
     expect(response.body).toEqual({
-      error:
-        status === 500
-          ? "Probe failed"
-          : "Video remux failed. Try Auto playback.",
+      error: status === 500 ? "Probe failed" : "Video remux failed. Try Auto playback.",
     });
   },
 );

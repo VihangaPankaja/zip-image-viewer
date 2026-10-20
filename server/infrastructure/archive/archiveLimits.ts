@@ -26,8 +26,7 @@ export function validateArchiveEntries(
       paths.add(parts.slice(0, index).join("/"));
       assertResourceEntryCount(paths.size);
     }
-    if (entry.isLink)
-      throw resourceLimitError("Archive links are not supported.");
+    if (entry.isLink) throw resourceLimitError("Archive links are not supported.");
     assertResourceSize(entry.size);
     bytes += entry.size;
     assertResourceSize(bytes);

@@ -29,7 +29,7 @@ function ThumbnailStrip(props: ImagePreviewProps) {
   }
   return (
     <details className="thumbnail-strip-shell">
-      <summary className="thumbnail-strip-header">
+      <summary className="thumbnail-strip-header" aria-label="Folder thumbnails">
         <span>
           <strong>Folder thumbnails</strong>
           <span className="thumbnail-strip-copy">
@@ -66,8 +66,7 @@ export function ImagePreviewContent(props: ImagePreviewProps) {
       </div>
       <ThumbnailStrip {...props} />
       <div className="navigation-hint">
-        Use left and right arrow keys to move through sibling images in the
-        active sort order.
+        Use left and right arrow keys to move through sibling images in the active sort order.
       </div>
     </div>
   );

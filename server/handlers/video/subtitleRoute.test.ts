@@ -3,7 +3,7 @@ import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import request from "supertest";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vite-plus/test";
 import type { Session } from "../../domain/models.js";
 import { sanitizeEntryPath } from "../../infrastructure/runtime/runtimePrimitives.js";
 import type { VideoRouteDependencies } from "./types.js";
@@ -91,13 +91,7 @@ it("validates available files and text stream IDs before converting through the 
     stdout: "x".repeat(2 * 1024 ** 2 + 1),
     stderr: "",
   });
-  await request(app)
-    .get(url)
-    .query({ path: "clip.mkv", track: "subtitle-3" })
-    .expect(422);
+  await request(app).get(url).query({ path: "clip.mkv", track: "subtitle-3" }).expect(422);
   session.availablePaths = new Set();
-  await request(app)
-    .get(url)
-    .query({ path: "clip.mkv", track: "subtitle-3" })
-    .expect(404);
+  await request(app).get(url).query({ path: "clip.mkv", track: "subtitle-3" }).expect(404);
 });

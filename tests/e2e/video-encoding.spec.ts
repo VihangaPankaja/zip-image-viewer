@@ -6,27 +6,14 @@ test("opt-in playback recovers when staged output outlasts the normal playlist r
   baseURL,
   browserName,
 }) => {
-  test.skip(
-    browserName !== "chromium",
-    "Real H.264/AAC decoding uses Chromium's bundled codecs.",
-  );
+  test.skip(browserName !== "chromium", "Real H.264/AAC decoding uses Chromium's bundled codecs.");
   test.setTimeout(60_000);
   if (!baseURL) throw new Error("App URL is required.");
-  const fixture = await startMultilingualFixture(
-    baseURL,
-    0,
-    20,
-    360,
-    undefined,
-    "h264_nvenc",
-  );
+  const fixture = await startMultilingualFixture(baseURL, 0, 20, 360, undefined, "h264_nvenc");
   let preparing = 0;
   try {
     await page.route("**/video/hls/playlist?*", async (route) => {
-      if (
-        new URL(route.request().url()).searchParams.get("quality") === "360p" &&
-        preparing < 4
-      ) {
+      if (new URL(route.request().url()).searchParams.get("quality") === "360p" && preparing < 4) {
         preparing++;
         expect(route.request().headers()["x-hls-preparation-retry"]).toBe("1");
         await route.fulfill({
@@ -40,10 +27,9 @@ test("opt-in playback recovers when staged output outlasts the normal playlist r
     await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
     const video = page.getByLabel("Video preview");
     await expect
-      .poll(
-        () => video.evaluate((element: HTMLVideoElement) => element.readyState),
-        { timeout: 40_000 },
-      )
+      .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState), {
+        timeout: 40_000,
+      })
       .toBeGreaterThanOrEqual(2);
     expect(preparing).toBe(4);
     await expect(page.getByRole("alert")).toHaveCount(0);
@@ -52,9 +38,7 @@ test("opt-in playback recovers when staged output outlasts the normal playlist r
       await element.play();
     });
     await expect
-      .poll(() =>
-        video.evaluate((element: HTMLVideoElement) => element.currentTime),
-      )
+      .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
       .toBeGreaterThan(1);
   } finally {
     await page.close();
@@ -75,9 +59,7 @@ for (const status of [404, 503]) {
     let attempts = 0;
     try {
       await page.route("**/video/hls/playlist?*", async (route) => {
-        if (
-          new URL(route.request().url()).searchParams.get("quality") !== "360p"
-        )
+        if (new URL(route.request().url()).searchParams.get("quality") !== "360p")
           return route.continue();
         attempts++;
         await route.fulfill({

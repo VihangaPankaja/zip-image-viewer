@@ -16,14 +16,13 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "node --import tsx server/index.ts",
+      command: "vp exec tsx server/index.ts",
       url: "http://127.0.0.1:8080/health",
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
     },
     {
-      command:
-        "node node_modules/vite/bin/vite.js --configLoader runner --host 127.0.0.1 --port 5173",
+      command: "vp dev --host 127.0.0.1 --port 5173",
       url: "http://127.0.0.1:5173",
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,

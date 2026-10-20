@@ -1,6 +1,6 @@
 import React, { createRef } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { vi } from "vitest";
+import { vi } from "vite-plus/test";
 import type { VideoPreviewProps } from "../../features/workspace/types";
 import { VideoPreviewContent } from "./VideoPreviewContent";
 import { VideoScrubber } from "./VideoScrubber";
@@ -40,9 +40,7 @@ describe("VideoPreviewContent", () => {
     expect(video).toHaveAttribute("controls");
     expect(video).toHaveAttribute("playsinline");
     expect(screen.getByText("Auto · 720p playback")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("slider", { name: "Seek video" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("slider", { name: "Seek video" })).not.toBeInTheDocument();
   });
 
   it("previews a thumbnail without seeking until the value is committed", () => {
@@ -88,9 +86,7 @@ describe("VideoPreviewContent", () => {
     fireEvent.input(timeline, { target: { value: "60" } });
 
     expect(video.currentTime).toBe(12);
-    expect(
-      screen.getByRole("img", { name: "Preview at 1:00" }),
-    ).toHaveAttribute(
+    expect(screen.getByRole("img", { name: "Preview at 1:00" })).toHaveAttribute(
       "src",
       "/api/sessions/session%2Fone/video/thumbnail?path=folder%2Fsample+clip.mp4&time=60&quality=720p&width=320",
     );
@@ -163,15 +159,8 @@ describe("VideoPreviewContent", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open downloads" }));
     expect(openDownloads).toHaveBeenCalledOnce();
 
-    rerender(
-      <VideoPreviewContent
-        {...props}
-        videoPlaybackError="Video segment is missing."
-      />,
-    );
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "Video segment is missing.",
-    );
+    rerender(<VideoPreviewContent {...props} videoPlaybackError="Video segment is missing." />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Video segment is missing.");
     fireEvent.click(screen.getByRole("button", { name: "Retry playback" }));
     expect(retry).toHaveBeenCalledOnce();
 
@@ -182,9 +171,7 @@ describe("VideoPreviewContent", () => {
         videoPlaybackError="This browser cannot play Original."
       />,
     );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Try adaptive playback" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Try adaptive playback" }));
     expect(setQuality).toHaveBeenCalledWith("auto");
   });
 
@@ -235,9 +222,7 @@ describe("VideoPreviewContent", () => {
       setSelectedVideoAudioTrack: changeAudio,
     };
     const { rerender } = render(<VideoPreviewContent {...props} />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Switch to adaptive playback" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Switch to adaptive playback" }));
     expect(changeQuality).toHaveBeenCalledWith("auto");
     rerender(
       <VideoPreviewContent
@@ -259,9 +244,7 @@ describe("VideoPreviewContent", () => {
       screen.queryByRole("button", { name: "Switch to adaptive playback" }),
     ).not.toBeInTheDocument();
     rerender(<VideoPreviewContent {...props} selectedVideoQuality="auto" />);
-    expect(
-      screen.getByText(/browser's native audio controls/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/browser's native audio controls/)).toBeInTheDocument();
   });
 });
 
@@ -297,21 +280,18 @@ describe("video scrub preview requests", () => {
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 
-  it.each(["pointerCancel", "blur"] as const)(
-    "cancels an unfinished seek on %s",
-    (event) => {
-      const { video, timeline } = renderScrubber(120);
-      video.currentTime = 12;
-      fireEvent.timeUpdate(video);
-      fireEvent.input(timeline, { target: { value: "60" } });
-      fireEvent[event](timeline);
-      expect(video.currentTime).toBe(12);
-      expect(timeline).toHaveValue("12");
-      expect(screen.queryByRole("img")).not.toBeInTheDocument();
-      fireEvent.pointerUp(timeline);
-      expect(video.currentTime).toBe(12);
-    },
-  );
+  it.each(["pointerCancel", "blur"] as const)("cancels an unfinished seek on %s", (event) => {
+    const { video, timeline } = renderScrubber(120);
+    video.currentTime = 12;
+    fireEvent.timeUpdate(video);
+    fireEvent.input(timeline, { target: { value: "60" } });
+    fireEvent[event](timeline);
+    expect(video.currentTime).toBe(12);
+    expect(timeline).toHaveValue("12");
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    fireEvent.pointerUp(timeline);
+    expect(video.currentTime).toBe(12);
+  });
 
   it("does not seek on release without a preview change", () => {
     const { video, timeline } = renderScrubber(120);
@@ -330,9 +310,7 @@ describe("video scrub preview requests", () => {
       const { video, timeline } = renderScrubber(duration);
       fireEvent.input(timeline, { target: { value: position } });
       const image = screen.getByRole<HTMLImageElement>("img");
-      expect(new URL(image.src).searchParams.get("time")).toBe(
-        expectedThumbnailTime,
-      );
+      expect(new URL(image.src).searchParams.get("time")).toBe(expectedThumbnailTime);
       expect(video.currentTime).toBe(0);
       fireEvent.keyUp(timeline, { key: "End" });
       expect(video.currentTime).toBe(Number(position));
@@ -413,9 +391,7 @@ it("holds one fallback thumbnail while the cold storyboard is pending", () => {
     const first = screen.getByRole("img").getAttribute("src");
     for (const value of [10, 30, 60, 90])
       fireEvent.input(slider, { target: { value: String(value) } });
-    expect(
-      screen.getByRole("img", { name: "Preview at 1:30" }),
-    ).toHaveAttribute("src", first);
+    expect(screen.getByRole("img", { name: "Preview at 1:30" })).toHaveAttribute("src", first);
     expect(video.currentTime).toBe(0);
     expect(fetchIndex).toHaveBeenCalledTimes(1);
   } finally {
@@ -431,24 +407,14 @@ it("does not request a new source storyboard until that source is scrubbed", asy
     Object.defineProperty(video, "duration", { value: 120 });
     const videoRef = { current: video };
     const { rerender } = render(
-      <VideoScrubber
-        path="first.mp4"
-        quality="source"
-        sessionId="session"
-        videoRef={videoRef}
-      />,
+      <VideoScrubber path="first.mp4" quality="source" sessionId="session" videoRef={videoRef} />,
     );
     const slider = screen.getByRole("slider", { name: "Seek video" });
     fireEvent.input(slider, { target: { value: "5" } });
     await waitFor(() => expect(fetchIndex).toHaveBeenCalledTimes(1));
     fireEvent.pointerUp(slider);
     rerender(
-      <VideoScrubber
-        path="second.mp4"
-        quality="source"
-        sessionId="session"
-        videoRef={videoRef}
-      />,
+      <VideoScrubber path="second.mp4" quality="source" sessionId="session" videoRef={videoRef} />,
     );
     expect(fetchIndex).toHaveBeenCalledTimes(1);
     fireEvent.input(screen.getByRole("slider", { name: "Seek video" }), {

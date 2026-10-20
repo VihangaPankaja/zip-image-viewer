@@ -1,8 +1,4 @@
-import {
-  jobStore,
-  sessionStore,
-  videoTranscodeStore,
-} from "../repositories/memoryStores.js";
+import { jobStore, sessionStore, videoTranscodeStore } from "../repositories/memoryStores.js";
 import {
   formatBytes,
   isTerminalJobStatus,

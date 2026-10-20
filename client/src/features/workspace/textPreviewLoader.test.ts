@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { loadTextPreview } from "./textPreviewLoader";
 
 describe("text preview loading", () => {
@@ -41,8 +41,7 @@ describe("text preview loading", () => {
         cache: new Map(),
         cacheKey: "session:file.txt",
         previewUrl: "/preview",
-        request: () =>
-          Promise.resolve({ ok: false, text: () => Promise.resolve("") }),
+        request: () => Promise.resolve({ ok: false, text: () => Promise.resolve("") }),
       }),
     ).rejects.toThrow("Could not read this file.");
   });

@@ -1,13 +1,9 @@
-# Client Agent Scope
+# Client changes
 
-For frontend changes under `client/`, inherit root guidance from `../AGENTS.md` and apply these specifics:
+- Put workspace and player behavior under `src/features/`; keep pages thin.
+- Use existing components and semantic CSS tokens. See the
+  [design guide](../docs/development/design.md).
+- Keep server state in the query layer and validate network responses.
+- Check both themes, keyboard focus, narrow layouts and long filenames.
 
-- Stack: React + Vite + TypeScript
-- Primary checks:
-  - `npm run lint`
-  - `npm run typecheck`
-  - `npm run test`
-  - `npm run build`
-- E2E flow for client UX verification:
-  - `npm run test:e2e`
-- Keep UI changes aligned with existing design system classes in `client/src/styles.css`.
+Root verification and PR instructions apply.

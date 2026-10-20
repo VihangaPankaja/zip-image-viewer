@@ -9,9 +9,7 @@ import type { Selection } from "./TorrentFileDialog";
 import { FileTools } from "./TorrentFileContents";
 import { FileList } from "./TorrentFileList";
 
-export function useTorrentPlayback(
-  dialogRef: RefObject<HTMLDialogElement | null>,
-) {
+export function useTorrentPlayback(dialogRef: RefObject<HTMLDialogElement | null>) {
   const [playingFile, setPlayingFile] = useState<TorrentFile | null>(null);
   const playTrigger = useRef<HTMLButtonElement | null>(null);
   return {
@@ -24,10 +22,7 @@ export function useTorrentPlayback(
       setPlayingFile(null);
       requestAnimationFrame(() => {
         if (playTrigger.current?.isConnected) playTrigger.current.focus();
-        else
-          dialogRef.current
-            ?.querySelector<HTMLButtonElement>("button")
-            ?.focus();
+        else dialogRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
       });
     },
   };
@@ -38,8 +33,7 @@ function stoppedMessage(job: Job) {
     return "Playback stopped: download complete. Open the session to use the full video player.";
   if (job.status === "paused")
     return "Playback stopped: download paused. Resume the download to play again.";
-  if (job.status === "cancelled")
-    return "Playback stopped: download cancelled.";
+  if (job.status === "cancelled") return "Playback stopped: download cancelled.";
   if (job.status === "error")
     return "Playback stopped: the download failed. Retry the download to play again.";
   return "Playback stopped: the download is preparing files.";
@@ -91,39 +85,25 @@ function TorrentEarlyVideo({
   file: TorrentFile;
   onBack: () => void;
 }) {
-  const { active, attempt, state, message, retry, fail } = useTorrentVideo(
-    job,
-    file,
-  );
+  const { active, attempt, state, message, retry, fail } = useTorrentVideo(job, file);
   const backRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     backRef.current?.focus();
   }, []);
   return (
-    <section
-      className="torrent-early-video"
-      aria-labelledby="torrent-video-title"
-    >
-      <button
-        ref={backRef}
-        type="button"
-        className="ghost-button"
-        onClick={onBack}
-      >
+    <section className="torrent-early-video" aria-labelledby="torrent-video-title">
+      <button ref={backRef} type="button" className="ghost-button" onClick={onBack}>
         Back to files
       </button>
       <h3 id="torrent-video-title">{file.path}</h3>
       <p>
-        Play while downloading. Only verified pieces are served; playback and
-        seeking may wait for peers. Early playback supports fast-start MP4 with
-        browser-compatible codecs.
+        Play while downloading. Only verified pieces are served; playback and seeking may wait for
+        peers. Early playback supports fast-start MP4 with browser-compatible codecs.
       </p>
       {!active ? (
         <p role="status">{stoppedMessage(job)}</p>
       ) : state === "loading" ? (
-        <p role="status">
-          Checking video… Waiting for verified pieces or peers.
-        </p>
+        <p role="status">Checking video… Waiting for verified pieces or peers.</p>
       ) : state === "ready" ? (
         <StreamVideo
           key={attempt}
@@ -144,23 +124,15 @@ function TorrentEarlyVideo({
         </button>
       </div>
       <p className="text-muted">
-        Return to the file list to manage this download. Closing the player does
-        not cancel it.
+        Return to the file list to manage this download. Closing the player does not cancel it.
       </p>
     </section>
   );
 }
 
-export function TorrentFileArea({
-  job,
-  selection,
-}: {
-  job: Job;
-  selection: Selection;
-}) {
+export function TorrentFileArea({ job, selection }: { job: Job; selection: Selection }) {
   const file =
-    job.torrentFiles.find(({ id }) => id === selection.playingFile?.id) ??
-    selection.playingFile;
+    job.torrentFiles.find(({ id }) => id === selection.playingFile?.id) ?? selection.playingFile;
   return (
     <>
       {file ? (
@@ -171,10 +143,7 @@ export function TorrentFileArea({
           onBack={selection.stopPlaying}
         />
       ) : null}
-      <div
-        className="torrent-file-browser"
-        hidden={Boolean(selection.playingFile)}
-      >
+      <div className="torrent-file-browser" hidden={Boolean(selection.playingFile)}>
         <FileTools job={selection.displayJob} selection={selection} />
         <FileList job={selection.displayJob} selection={selection} />
       </div>
@@ -187,17 +156,14 @@ function canContinuePlayback(job: Job, file: TorrentFile) {
     file.selected &&
     ((job.status === "downloading" && job.phase === "downloading") ||
       (file.complete &&
-        (job.status === "ready" ||
-          (job.status === "downloading" && job.phase === "indexing"))))
+        (job.status === "ready" || (job.status === "downloading" && job.phase === "indexing"))))
   );
 }
 
 function useTorrentVideo(job: Job, file: TorrentFile) {
   const active = canContinuePlayback(job, file);
   const [attempt, setAttempt] = useState(0);
-  const [state, setState] = useState<
-    "loading" | "ready" | "download-first" | "error"
-  >("loading");
+  const [state, setState] = useState<"loading" | "ready" | "download-first" | "error">("loading");
   const [message, setMessage] = useState("");
   useEffect(() => {
     if (!active) return;
@@ -223,8 +189,7 @@ function useTorrentVideo(job: Job, file: TorrentFile) {
           throw new Error(detail);
         }
         const result = torrentVideoInfoSchema.safeParse(body);
-        if (!result.success)
-          throw new Error("Could not prepare early playback. Try again.");
+        if (!result.success) throw new Error("Could not prepare early playback. Try again.");
         const info = result.data;
         if (!controller.signal.aborted) {
           setMessage(info.message);
@@ -233,9 +198,7 @@ function useTorrentVideo(job: Job, file: TorrentFile) {
       } catch (error) {
         if (!controller.signal.aborted) {
           setMessage(
-            error instanceof Error
-              ? error.message
-              : "Could not prepare early playback. Try again.",
+            error instanceof Error ? error.message : "Could not prepare early playback. Try again.",
           );
           setState("error");
         }
@@ -254,9 +217,7 @@ function useTorrentVideo(job: Job, file: TorrentFile) {
       setAttempt((value) => value + 1);
     },
     fail: () => {
-      setMessage(
-        "Playback could not continue. Retry, or download first to use the full player.",
-      );
+      setMessage("Playback could not continue. Retry, or download first to use the full player.");
       setState("error");
     },
   };

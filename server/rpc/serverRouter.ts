@@ -30,11 +30,7 @@ export type ServerRpcDependencies = {
   cancelJob: (_id: string) => Job | Promise<Job>;
   confirmJob: (_id: string) => Job | Promise<Job>;
   selectFiles: (_id: string, _fileIds: string[]) => Job | Promise<Job>;
-  setFilePriority: (
-    _id: string,
-    _fileId: string,
-    _priority: TorrentPriority,
-  ) => Job | Promise<Job>;
+  setFilePriority: (_id: string, _fileId: string, _priority: TorrentPriority) => Job | Promise<Job>;
   retryJob: (_id: string) => Job | Promise<Job>;
   pauseJob: (_id: string) => Job | Promise<Job>;
   resumeJob: (_id: string) => Job | Promise<Job>;
@@ -57,9 +53,7 @@ export function createServerRpcRouter(deps: ServerRpcDependencies) {
       ),
     },
     sessions: {
-      create: contract.sessions.create.handler(({ input }) =>
-        deps.createJob(input),
-      ),
+      create: contract.sessions.create.handler(({ input }) => deps.createJob(input)),
       get: contract.sessions.get.handler(({ input }) => {
         const session = deps.getSession(input.id);
         if (!session) throw new Error("Session not found.");
@@ -79,33 +73,21 @@ export function createServerRpcRouter(deps: ServerRpcDependencies) {
       enqueue: contract.jobs.enqueue.handler(async ({ input }) => ({
         items: await deps.enqueueJobs(input),
       })),
-      cancel: contract.jobs.cancel.handler(({ input }) =>
-        deps.cancelJob(input.id),
-      ),
-      confirm: contract.jobs.confirm.handler(({ input }) =>
-        deps.confirmJob(input.id),
-      ),
+      cancel: contract.jobs.cancel.handler(({ input }) => deps.cancelJob(input.id)),
+      confirm: contract.jobs.confirm.handler(({ input }) => deps.confirmJob(input.id)),
       selectFiles: contract.jobs.selectFiles.handler(({ input }) =>
         deps.selectFiles(input.id, input.fileIds),
       ),
       setFilePriority: contract.jobs.setFilePriority.handler(({ input }) =>
         deps.setFilePriority(input.id, input.fileId, input.priority),
       ),
-      retry: contract.jobs.retry.handler(({ input }) =>
-        deps.retryJob(input.id),
-      ),
-      pause: contract.jobs.pause.handler(({ input }) =>
-        deps.pauseJob(input.id),
-      ),
-      resume: contract.jobs.resume.handler(({ input }) =>
-        deps.resumeJob(input.id),
-      ),
+      retry: contract.jobs.retry.handler(({ input }) => deps.retryJob(input.id)),
+      pause: contract.jobs.pause.handler(({ input }) => deps.pauseJob(input.id)),
+      resume: contract.jobs.resume.handler(({ input }) => deps.resumeJob(input.id)),
       remove: contract.jobs.remove.handler(({ input }) =>
         applicationResult(() => deps.removeJob(input.id)),
       ),
-      reorder: contract.jobs.reorder.handler(({ input }) =>
-        deps.reorderJobs(input.jobIds),
-      ),
+      reorder: contract.jobs.reorder.handler(({ input }) => deps.reorderJobs(input.jobIds)),
     },
     scheduler: {
       get: contract.scheduler.get.handler(() => deps.getSchedulerSettings()),
@@ -115,9 +97,7 @@ export function createServerRpcRouter(deps: ServerRpcDependencies) {
     },
     torrentLimits: {
       get: contract.torrentLimits.get.handler(() => deps.getTorrentLimits()),
-      update: contract.torrentLimits.update.handler(({ input }) =>
-        deps.updateTorrentLimits(input),
-      ),
+      update: contract.torrentLimits.update.handler(({ input }) => deps.updateTorrentLimits(input)),
     },
   });
 }
@@ -125,12 +105,8 @@ export function createServerRpcRouter(deps: ServerRpcDependencies) {
 function createStorageRouter(deps: ServerRpcDependencies["storage"]) {
   const contract = implement(serverContract.storage);
   return contract.router({
-    get: contract.get.handler(({ input }) =>
-      applicationResult(() => deps.get(input.id)),
-    ),
-    clear: contract.clear.handler(({ input }) =>
-      applicationResult(() => deps.clear(input.id)),
-    ),
+    get: contract.get.handler(({ input }) => applicationResult(() => deps.get(input.id))),
+    clear: contract.clear.handler(({ input }) => applicationResult(() => deps.clear(input.id))),
     pin: contract.pin.handler(({ input }) =>
       applicationResult(() => deps.pin(input.id, input.pinned)),
     ),

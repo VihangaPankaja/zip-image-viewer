@@ -28,20 +28,13 @@ export class HlsEncoder {
   private async detect(signal?: AbortSignal): Promise<HlsVideoEncoder> {
     if (this.selected) return this.selected;
     if (this.preference === "cpu") return "libx264";
-    const probeSignal = AbortSignal.any([
-      AbortSignal.timeout(10_000),
-      ...(signal ? [signal] : []),
-    ]);
+    const probeSignal = AbortSignal.any([AbortSignal.timeout(10_000), ...(signal ? [signal] : [])]);
     try {
-      const { stdout } = await runCommandCapture(
-        this.executable,
-        ["-hide_banner", "-encoders"],
-        { signal: probeSignal },
-      );
+      const { stdout } = await runCommandCapture(this.executable, ["-hide_banner", "-encoders"], {
+        signal: probeSignal,
+      });
       const candidates =
-        this.preference === "auto"
-          ? (["h264_qsv", "h264_nvenc"] as const)
-          : [this.preference];
+        this.preference === "auto" ? (["h264_qsv", "h264_nvenc"] as const) : [this.preference];
       for (const encoder of candidates) {
         if (!new RegExp(`\\b${encoder}\\b`).test(stdout)) continue;
         try {
@@ -91,18 +84,13 @@ export class HlsEncoder {
 
   async encode(input: Fmp4HlsInput, signal?: AbortSignal): Promise<void> {
     signal?.throwIfAborted();
-    const encoder =
-      input.audioStreamIndex === undefined
-        ? await this.detect(signal)
-        : "libx264";
+    const encoder = input.audioStreamIndex === undefined ? await this.detect(signal) : "libx264";
     if (encoder === "libx264") {
       await runCommand(this.executable, buildFmp4HlsArgs(input), { signal });
       return;
     }
     // Publish only after success so a CPU retry cannot mix initialization files.
-    const temporary = await mkdtemp(
-      path.join(input.outputDirectory, ".encode-"),
-    );
+    const temporary = await mkdtemp(path.join(input.outputDirectory, ".encode-"));
     try {
       try {
         await runCommand(
@@ -130,10 +118,7 @@ export class HlsEncoder {
       signal?.throwIfAborted();
       const files = await readdir(temporary);
       for (const name of files.filter((name) => name !== "index.m3u8"))
-        await rename(
-          path.join(temporary, name),
-          path.join(input.outputDirectory, name),
-        );
+        await rename(path.join(temporary, name), path.join(input.outputDirectory, name));
       await rename(
         path.join(temporary, "index.m3u8"),
         path.join(input.outputDirectory, "index.m3u8"),

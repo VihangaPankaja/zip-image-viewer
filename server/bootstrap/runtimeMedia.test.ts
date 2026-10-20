@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import type { Session } from "../domain/models.js";
 import { createRuntimeMedia } from "./runtimeMedia.js";
 
@@ -27,10 +27,7 @@ vi.mock("sharp", async () => {
               source,
               run: () => {
                 images.active -= 1;
-                void writeFile(filename, "rendered image").then(
-                  resolve,
-                  reject,
-                );
+                void writeFile(filename, "rendered image").then(resolve, reject);
               },
             });
           }),
@@ -71,9 +68,11 @@ it.each(["one.jpg", "two.jpg"])(
       while (images.finish.length) images.finish.shift()?.run();
       const output = await Promise.all(jobs);
       expect(images.peak).toBe(2);
-      expect(
-        await Promise.all(output.map((filename) => readFile(filename, "utf8"))),
-      ).toEqual(["rendered image", "rendered image", "rendered image"]);
+      expect(await Promise.all(output.map((filename) => readFile(filename, "utf8")))).toEqual([
+        "rendered image",
+        "rendered image",
+        "rendered image",
+      ]);
     } finally {
       const cleanup = media.videoRuntime.cleanupVideoSession(session);
       while (images.finish.length) images.finish.shift()?.run();

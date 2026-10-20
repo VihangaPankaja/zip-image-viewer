@@ -24,8 +24,6 @@ describe("ImagePreviewContent", () => {
       />,
     );
 
-    expect(
-      screen.getByText("Folder thumbnails").closest("details"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Folder thumbnails").closest("details")).toBeInTheDocument();
   });
 });

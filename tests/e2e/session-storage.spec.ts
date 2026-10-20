@@ -12,62 +12,39 @@ test("storage supports narrow-screen keyboard cleanup, pinning and deliberate de
   state.jobs = reviewJobs();
   const releases: string[] = [];
   page.on("request", (request) => {
-    if (
-      request.method() === "DELETE" &&
-      request.url().includes("/api/session-jobs/")
-    )
+    if (request.method() === "DELETE" && request.url().includes("/api/session-jobs/"))
       releases.push(request.url());
   });
   await page.setViewportSize({ width: 360, height: 844 });
   await page.goto(appOrigin);
   await page.getByRole("tab", { name: "Explore", exact: true }).click();
   await page.getByRole("button", { name: "Show sessions" }).click();
-  await page
-    .getByRole("button", { name: "Open Coastal collection", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
   const storage = page.getByRole("button", { name: "Storage", exact: true });
   await storage.focus();
   await page.keyboard.press("Enter");
   const dialog = page.getByRole("dialog", { name: "Session storage" });
   await expect(dialog).toContainText("50 MB");
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
-  await dialog
-    .getByRole("checkbox", { name: "Keep until the server stops" })
-    .focus();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await dialog.getByRole("checkbox", { name: "Keep until the server stops" }).focus();
   await page.keyboard.press("Space");
-  await expect(dialog.getByRole("status")).toHaveText(
-    "Session kept until the server stops.",
-  );
+  await expect(dialog.getByRole("status")).toHaveText("Session kept until the server stops.");
   expect(state.storage.pinned).toBe(true);
-  await dialog
-    .getByRole("button", { name: "Clear preview & transcode cache" })
-    .focus();
+  await dialog.getByRole("button", { name: "Clear preview & transcode cache" }).focus();
   await page.keyboard.press("Enter");
-  await expect(dialog.getByRole("status")).toHaveText(
-    "Cache cleared. Original files kept.",
-  );
+  await expect(dialog.getByRole("status")).toHaveText("Cache cleared. Original files kept.");
   expect(state.storage.originalsBytes).toBe(52428800);
   await expect(dialog.locator("dd")).toHaveText(["50 MB", "0 B", "0 B"]);
-  const results = await new AxeBuilder({ page })
-    .include(".storage-dialog")
-    .analyze();
+  const results = await new AxeBuilder({ page }).include(".storage-dialog").analyze();
   expect(results.violations).toEqual([]);
   await page.keyboard.press("Escape");
   await expect(storage).toBeFocused();
   state.storage.retained = true;
   await storage.click();
   await dialog.getByRole("button", { name: "Delete session files…" }).click();
-  await expect(dialog).toContainText(
-    "files needed to download skipped items later",
-  );
+  await expect(dialog).toContainText("files needed to download skipped items later");
   await dialog.getByRole("button", { name: "Keep files" }).click();
-  await expect(
-    dialog.getByRole("button", { name: "Delete permanently" }),
-  ).toHaveCount(0);
+  await expect(dialog.getByRole("button", { name: "Delete permanently" })).toHaveCount(0);
   let deleted = false;
   let blocked = true;
   await page.route("**/rpc/sessions/remove", (route) => {
@@ -90,12 +67,8 @@ test("storage supports narrow-screen keyboard cleanup, pinning and deliberate de
   await dialog.getByRole("button", { name: "Delete session files…" }).click();
   expect(deleted).toBe(false);
   await dialog.getByRole("button", { name: "Delete permanently" }).click();
-  await expect(dialog.getByRole("alert")).toContainText(
-    "Pause or cancel the download",
-  );
-  await expect(
-    dialog.getByRole("button", { name: "Keep files" }),
-  ).toBeEnabled();
+  await expect(dialog.getByRole("alert")).toContainText("Pause or cancel the download");
+  await expect(dialog.getByRole("button", { name: "Keep files" })).toBeEnabled();
   expect(deleted).toBe(false);
   blocked = false;
   await dialog.getByRole("button", { name: "Delete permanently" }).click();
@@ -104,9 +77,7 @@ test("storage supports narrow-screen keyboard cleanup, pinning and deliberate de
   await expect(page.locator(".preview-panel")).toContainText("Select a file");
   await expect(storage).toHaveCount(0);
   await page.getByRole("tab", { name: "Downloads", exact: true }).click();
-  await expect(
-    page.getByText("Downloading collection", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText("Downloading collection", { exact: true })).toBeVisible();
   expect(releases).toEqual([]);
 });
 
@@ -122,9 +93,7 @@ test("touch dismissal returns focus and a cleanup conflict keeps storage usable"
   try {
     await installReviewFixtures(page);
     await page.goto(appOrigin);
-    await tapVisibleTarget(
-      page.getByRole("tab", { name: "Explore", exact: true }),
-    );
+    await tapVisibleTarget(page.getByRole("tab", { name: "Explore", exact: true }));
     await tapVisibleTarget(page.getByRole("button", { name: "Show sessions" }));
     await tapVisibleTarget(
       page.getByRole("button", {
@@ -150,14 +119,10 @@ test("touch dismissal returns focus and a cleanup conflict keeps storage usable"
         },
       }),
     );
-    await tapVisibleTarget(
-      dialog.getByRole("button", { name: "Clear preview & transcode cache" }),
-    );
+    await tapVisibleTarget(dialog.getByRole("button", { name: "Clear preview & transcode cache" }));
     await expect(dialog.getByRole("alert")).toContainText("Media is active");
     await expect(dialog.locator("dd")).toHaveText(["50 MB", "2.0 MB", "12 MB"]);
-    await tapVisibleTarget(
-      dialog.getByRole("button", { name: "Close", exact: true }),
-    );
+    await tapVisibleTarget(dialog.getByRole("button", { name: "Close", exact: true }));
     await expect(dialog).toHaveCount(0);
     await expect(storage).toBeFocused();
   } finally {

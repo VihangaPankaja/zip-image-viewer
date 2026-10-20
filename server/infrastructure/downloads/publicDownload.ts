@@ -16,16 +16,11 @@ export function validateDownloadResponse(
       response.rawHeaders[index + 1].trim().toLowerCase() !== "identity",
   );
   if (encoded && hasRange)
-    throw resourceLimitError(
-      "Encoded responses do not support ranged downloads.",
-    );
-  if (statusCode >= 400)
-    throw new Error(`Download failed with HTTP ${String(statusCode)}`);
+    throw resourceLimitError("Encoded responses do not support ranged downloads.");
+  if (statusCode >= 400) throw new Error(`Download failed with HTTP ${String(statusCode)}`);
   if (strictRange && hasRange && statusCode !== 206)
     throw Object.assign(
-      new Error(
-        "Server does not support range requests for segmented download.",
-      ),
+      new Error("Server does not support range requests for segmented download."),
       { code: "RANGE_UNSUPPORTED" },
     );
   return { statusCode, encoded };
@@ -50,15 +45,10 @@ export async function fetchWithValidatedRedirects(
     const location = response.headers.get("location");
     await response.body?.cancel();
     if (!location || redirects >= 10)
-      throw Object.assign(
-        new Error("Download redirect limit or invalid redirect."),
-        {
-          code: "DOWNLOAD_FATAL",
-        },
-      );
-    target = URL.canParse(location, target)
-      ? new URL(location, target).href
-      : "";
+      throw Object.assign(new Error("Download redirect limit or invalid redirect."), {
+        code: "DOWNLOAD_FATAL",
+      });
+    target = URL.canParse(location, target) ? new URL(location, target).href : "";
     assertPublicDownloadUrl(target);
   }
 }

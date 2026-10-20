@@ -23,7 +23,9 @@ pnpm-debug.log*
 Thumbs.db
 
 # IDE files
-.vscode/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 .idea/
 .cursor/
 .sisyphus/
@@ -36,3 +38,5 @@ coverage/
 
 #other
 improvemennt ideas.txt
+.vitest/
+tests/tooling/.lint-fixture-*/

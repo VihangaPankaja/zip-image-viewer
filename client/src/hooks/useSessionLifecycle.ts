@@ -12,10 +12,7 @@ import { useJobSnapshot } from "../features/workspace/useJobSnapshot";
 import { useJobTransport } from "../features/workspace/useJobTransport";
 import { useSessionHydration } from "../features/workspace/useSessionHydration";
 import { useSessionRequest } from "../features/workspace/useSessionRequest";
-export type {
-  JobPayload,
-  SessionPayload,
-} from "../features/workspace/sessionSchemas";
+export type { JobPayload, SessionPayload } from "../features/workspace/sessionSchemas";
 
 type UseSessionLifecycleParams = {
   zipUrl: string;
@@ -62,9 +59,6 @@ export function useSessionLifecycle(params: UseSessionLifecycleParams) {
     handleJobSnapshot,
     startJobPolling,
   });
-  const request = useSessionRequest(
-    { ...params, ...transport, attachJobEvents },
-    params.zipUrl,
-  );
+  const request = useSessionRequest({ ...params, ...transport, attachJobEvents }, params.zipUrl);
   return { clearArchive, ...request };
 }

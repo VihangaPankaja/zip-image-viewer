@@ -21,20 +21,13 @@ export type SessionJobRouteDependencies = {
     _rangeHeader: string | undefined,
     _fileSize: number,
   ) => RangeValue | "invalid" | null;
-  emitJob: (
-    _job: SessionJob,
-    _payload: Partial<SessionJob>,
-    _socketEvent?: string,
-  ) => void;
+  emitJob: (_job: SessionJob, _payload: Partial<SessionJob>, _socketEvent?: string) => void;
   closeJob: (_job: SessionJob, _reason: SessionJob["status"]) => void;
   cleanupJob: (_jobId: string, _reason: string) => Promise<void>;
   removeJob?: (_jobId: string) => Promise<void>;
 };
 
-function registerStateRoutes(
-  app: Express,
-  deps: SessionJobRouteDependencies,
-): void {
+function registerStateRoutes(app: Express, deps: SessionJobRouteDependencies): void {
   app.get("/api/session-jobs/:id", (req, res) => {
     const job = findJob(req.params.id, deps, res);
     if (!job) return;
@@ -62,36 +55,25 @@ function registerStateRoutes(
     const job = findJob(req.params.id, deps, res);
     if (!job) return;
     if (job.status !== "awaiting_confirmation") {
-      return res
-        .status(400)
-        .json({ error: "Job is not awaiting confirmation." });
+      return res.status(400).json({ error: "Job is not awaiting confirmation." });
     }
     if (!job.requiresConfirmation) {
-      return res
-        .status(400)
-        .json({ error: "This job does not need confirmation." });
+      return res.status(400).json({ error: "This job does not need confirmation." });
     }
     return res.json(deps.sanitizeJob(deps.confirmSessionJob(job.id)));
   });
 }
 
-function registerStreamRoute(
-  app: Express,
-  deps: SessionJobRouteDependencies,
-): void {
+function registerStreamRoute(app: Express, deps: SessionJobRouteDependencies): void {
   app.get("/api/session-jobs/:id/stream", async (req, res) => {
     const job = findJob(req.params.id, deps, res);
     if (!job) return;
     if (!job.zipPath) {
-      return res
-        .status(409)
-        .json({ error: "Streaming source is not ready yet." });
+      return res.status(409).json({ error: "Streaming source is not ready yet." });
     }
     const fileStats = await stat(job.zipPath).catch(() => null);
     if (!fileStats?.isFile() || fileStats.size <= 0) {
-      return res
-        .status(409)
-        .json({ error: "No downloaded bytes available yet." });
+      return res.status(409).json({ error: "No downloaded bytes available yet." });
     }
     let contentType = "application/octet-stream";
     try {
@@ -111,10 +93,7 @@ function registerStreamRoute(
   });
 }
 
-function registerCancelRoute(
-  app: Express,
-  deps: SessionJobRouteDependencies,
-): void {
+function registerCancelRoute(app: Express, deps: SessionJobRouteDependencies): void {
   app.delete("/api/session-jobs/:id", async (req, res) => {
     const job = findJob(req.params.id, deps, res);
     if (!job) return;
@@ -155,10 +134,7 @@ async function deleteTorrentJob(
   }
 }
 
-export function registerSessionJobRoutes(
-  app: Express,
-  deps: SessionJobRouteDependencies,
-): void {
+export function registerSessionJobRoutes(app: Express, deps: SessionJobRouteDependencies): void {
   registerStateRoutes(app, deps);
   registerStreamRoute(app, deps);
   registerCancelRoute(app, deps);

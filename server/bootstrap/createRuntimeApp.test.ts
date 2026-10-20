@@ -3,7 +3,7 @@ import { once } from "node:events";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import type { ContractRouterClient } from "@orpc/contract";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { serverContract } from "../../shared/contracts.js";
 import type { Session, SessionJob } from "../domain/models.js";
 import { createJobManager } from "../application/jobs/jobManager.js";

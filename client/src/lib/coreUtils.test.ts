@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   formatProgressMessage,
   getImageCacheKey,
@@ -18,17 +18,8 @@ import {
   formatSpeed,
   formatTransferBytes,
 } from "./formatterUtils";
-import {
-  classifyExtension,
-  classifyNodeKind,
-  getVideoMimeType,
-} from "./mimeTypeSystem";
-import {
-  cloneAndSortTree,
-  compareNodes,
-  flattenTree,
-  getFirstFilePath,
-} from "./treeUtils";
+import { classifyExtension, classifyNodeKind, getVideoMimeType } from "./mimeTypeSystem";
+import { cloneAndSortTree, compareNodes, flattenTree, getFirstFilePath } from "./treeUtils";
 
 describe("download option normalization", () => {
   it("clamps numeric input and falls back for invalid values", () => {
@@ -134,23 +125,14 @@ describe("tree and media helpers", () => {
       "photo2.jpg",
       "photo10.jpg",
     ]);
-    expect(
-      compareNodes(tree.children[0], tree.children[1], "name-desc"),
-    ).toBeGreaterThan(0);
-    expect(
-      compareNodes(tree.children[0], tree.children[1], "date-asc"),
-    ).not.toBe(0);
+    expect(compareNodes(tree.children[0], tree.children[1], "name-desc")).toBeGreaterThan(0);
+    expect(compareNodes(tree.children[0], tree.children[1], "date-asc")).not.toBe(0);
   });
 
   it("flattens image folders and finds the first file recursively", () => {
     const flattened = flattenTree(tree);
-    expect(flattened.nodesByPath.get("notes/readme.md")?.name).toBe(
-      "readme.md",
-    );
-    expect(flattened.folderImages.get(".")).toEqual([
-      "photo10.jpg",
-      "photo2.jpg",
-    ]);
+    expect(flattened.nodesByPath.get("notes/readme.md")?.name).toBe("readme.md");
+    expect(flattened.folderImages.get(".")).toEqual(["photo10.jpg", "photo2.jpg"]);
     expect(flattened.folderPreview.get(".")).toBe("photo10.jpg");
     expect(getFirstFilePath(tree)).toBe("photo10.jpg");
     expect(getFirstFilePath(null)).toBe("");
@@ -197,20 +179,14 @@ describe("display formatting helpers", () => {
         totalEntries: 3,
       }),
     ).toContain("2 of 3");
-    expect(formatProgressMessage({ phase: "queued" })).toBe(
-      "Working on archive...",
-    );
+    expect(formatProgressMessage({ phase: "queued" })).toBe("Working on archive...");
   });
 
   it("selects wrapped image neighbors and terminal states", () => {
     expect(getWrappedPath(["a", "b"], 0, -1)).toBe("b");
     expect(getWrappedPath([], -1, 1)).toBe("");
-    expect(getImageCacheKey("session", "image.jpg", "high")).toBe(
-      "session:image.jpg:high",
-    );
-    expect(["ready", "error", "cancelled"].every(isTerminalJobStatus)).toBe(
-      true,
-    );
+    expect(getImageCacheKey("session", "image.jpg", "high")).toBe("session:image.jpg:high");
+    expect(["ready", "error", "cancelled"].every(isTerminalJobStatus)).toBe(true);
     expect(isTerminalJobStatus("downloading")).toBe(false);
   });
 });

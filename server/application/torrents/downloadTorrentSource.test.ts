@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { SessionJob } from "../../domain/models.js";
 import { createJobManager } from "../jobs/jobManager.js";
 import { downloadOptionsToSettings } from "../downloads/downloadOptions.js";
@@ -58,11 +58,8 @@ describe("downloadTorrentSource", () => {
   });
   it("removes direct hints from persisted magnets before native parsing and forwarding", async () => {
     const { emitJob, job, settings } = setup();
-    job.url +=
-      "&x.pe=127.0.0.1%3A80&x.pe=%5B%3A%3A1%5D%3A80&xs=http%3A%2F%2F127.0.0.1%2Fprivate";
-    const download = vi
-      .fn<TorrentAdapter["download"]>()
-      .mockResolvedValue({ files: [] });
+    job.url += "&x.pe=127.0.0.1%3A80&x.pe=%5B%3A%3A1%5D%3A80&xs=http%3A%2F%2F127.0.0.1%2Fprivate";
+    const download = vi.fn<TorrentAdapter["download"]>().mockResolvedValue({ files: [] });
     await downloadTorrentSource(
       job,
       settings,
@@ -80,9 +77,7 @@ describe("downloadTorrentSource", () => {
     const failure = Object.assign(new Error("SQLITE_FULL"), {
       name: "RetainedTorrentStorageError",
     });
-    const download = vi
-      .fn<TorrentAdapter["download"]>()
-      .mockRejectedValue(failure);
+    const download = vi.fn<TorrentAdapter["download"]>().mockRejectedValue(failure);
     await expect(
       downloadTorrentSource(
         job,
@@ -151,23 +146,18 @@ describe("downloadTorrentSource", () => {
     const torrentFile = new Uint8Array([1, 2]);
     job.torrentMetadata = torrentFile;
     job.url = "https://example.com/fixture.torrent";
-    const download = vi.fn<TorrentAdapter["download"]>(
-      ({ source, onMetadata }) => {
-        expect(source).toBe(torrentFile);
-        expect(
-          onMetadata({
-            files: [
-              file(),
-              { ...file("large.bin", 2 * 1024 ** 3), id: "1", selected: false },
-            ],
-            length: 2 * 1024 ** 3 + 100,
-            name: "fixture",
-            torrentFile,
-          }),
-        ).toEqual(["0"]);
-        return Promise.resolve({ files: ["image.jpg"] });
-      },
-    );
+    const download = vi.fn<TorrentAdapter["download"]>(({ source, onMetadata }) => {
+      expect(source).toBe(torrentFile);
+      expect(
+        onMetadata({
+          files: [file(), { ...file("large.bin", 2 * 1024 ** 3), id: "1", selected: false }],
+          length: 2 * 1024 ** 3 + 100,
+          name: "fixture",
+          torrentFile,
+        }),
+      ).toEqual(["0"]);
+      return Promise.resolve({ files: ["image.jpg"] });
+    });
     await expect(
       downloadTorrentSource(
         job,
@@ -241,9 +231,7 @@ describe("downloadTorrentSource", () => {
     job.pauseRequested = true;
     const download = vi.fn<TorrentAdapter["download"]>((input) => {
       expect(input.retainStoreOnAbort()).toBe(true);
-      return Promise.reject(
-        Object.assign(new Error("Paused"), { name: "AbortError" }),
-      );
+      return Promise.reject(Object.assign(new Error("Paused"), { name: "AbortError" }));
     });
 
     await expect(

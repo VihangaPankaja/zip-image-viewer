@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import ffmpegPath from "ffmpeg-static";
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import type { Session } from "../../domain/models.js";
 import { runCommand, runCommandCapture } from "../process/commandRunner.js";
 import { createVideoRuntime } from "./videoRuntime.js";
@@ -43,19 +43,10 @@ it.each([0, 1, 2])(
         "aac",
         source,
       ]);
-      const entry = await runtime.ensureVideoTranscodeEntry(
-        session,
-        "source.mkv",
-        source,
-      );
+      const entry = await runtime.ensureVideoTranscodeEntry(session, "source.mkv", source);
       const rendition = runtime.getRenditionState(entry, session, "source");
       for (const index of [0, 2, 4]) {
-        await runtime.startPrioritySegmentWindow(
-          entry,
-          session,
-          rendition,
-          index,
-        );
+        await runtime.startPrioritySegmentWindow(entry, session, rendition, index);
         const { stderr } = await runCommandCapture(ffmpegPath, [
           "-hide_banner",
           "-copyts",
@@ -71,9 +62,7 @@ it.each([0, 1, 2])(
           "-",
         ]);
         const packet =
-          /demuxer -> .*?type:video.*?pkt_pts_time:([-\d.]+).*?pkt_dts_time:([-\d.]+)/.exec(
-            stderr,
-          );
+          /demuxer -> .*?type:video.*?pkt_pts_time:([-\d.]+).*?pkt_dts_time:([-\d.]+)/.exec(stderr);
         expect(packet).not.toBeNull();
         // HLS.js uses decode time to initialize each discontinuity. A composition
         // offset would then accumulate in the advertised presentation timeline.

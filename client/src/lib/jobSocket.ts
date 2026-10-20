@@ -35,16 +35,12 @@ export function parseJobSocketPacket(value: string): JobSocketPacket {
   };
 }
 
-export function openJobSocket(
-  jobId: string,
-  handlers: JobSocketHandlers,
-): WebSocket {
+export function openJobSocket(jobId: string, handlers: JobSocketHandlers): WebSocket {
   const socket = new WebSocket(getJobSocketUrl(jobId));
 
   socket.addEventListener("message", (event) => {
     try {
-      if (typeof event.data !== "string")
-        throw new Error("Malformed job update");
+      if (typeof event.data !== "string") throw new Error("Malformed job update");
       const packet = parseJobSocketPacket(event.data);
       if (packet.job == null) {
         return;

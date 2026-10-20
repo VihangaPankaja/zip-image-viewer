@@ -1,5 +1,5 @@
 import { renderHook, waitFor } from "@testing-library/react";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import { workspaceRpc } from "../../services/orpcClient";
 import { useVideoQualities } from "./useVideoQualities";
 
@@ -29,18 +29,14 @@ it("loads typed qualities and falls back to Original when metadata fails", async
     setSelectedQuality: vi.fn(),
   };
   const { rerender } = renderHook(useVideoQualities, { initialProps: params });
-  await waitFor(() =>
-    expect(params.setSelectedQuality).toHaveBeenLastCalledWith("720p"),
-  );
+  await waitFor(() => expect(params.setSelectedQuality).toHaveBeenLastCalledWith("720p"));
   expect(load).toHaveBeenCalledWith({
     sessionId: params.sessionId,
     path: "clip.mp4",
   });
   rerender({ ...params, path: "next.mp4" });
   await waitFor(() =>
-    expect(params.setOptions).toHaveBeenLastCalledWith([
-      { id: "source", label: "Original" },
-    ]),
+    expect(params.setOptions).toHaveBeenLastCalledWith([{ id: "source", label: "Original" }]),
   );
   expect(params.setSelectedQuality).toHaveBeenLastCalledWith("source");
   rerender({ ...params, selectedKind: "image" });

@@ -1,11 +1,5 @@
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
-import { vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { vi } from "vite-plus/test";
 import { VideoSubtitles } from "./VideoSubtitles";
 
 const vtt = "WEBVTT\n\n00:01.000 --> 00:03.000\nHello";
@@ -21,22 +15,16 @@ it("rejects oversized and malformed files and recovers on a later selection", as
   upload("huge.vtt", vtt, 2 * 1024 * 1024 + 1);
   expect(screen.getByRole("alert")).toHaveTextContent("2 MB");
   upload("broken.vtt", "not captions");
-  await waitFor(() =>
-    expect(screen.getByRole("alert")).toHaveTextContent("valid WebVTT"),
-  );
+  await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("valid WebVTT"));
   upload("other.txt");
-  await waitFor(() =>
-    expect(screen.getByRole("alert")).toHaveTextContent(".vtt or .srt"),
-  );
+  await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(".vtt or .srt"));
   expect(video.querySelector("track")).toBeNull();
 });
 
 it("ignores late file reads after changing videos", async () => {
   const video = document.createElement("video");
   const videoRef = { current: video };
-  const { rerender } = render(
-    <VideoSubtitles key="first" videoRef={videoRef} />,
-  );
+  const { rerender } = render(<VideoSubtitles key="first" videoRef={videoRef} />);
   let finish: (value: string) => void = () => {};
   const text = new Promise<string>((resolve) => {
     finish = resolve;
@@ -94,9 +82,7 @@ it("loads embedded captions by language, recovers from failure, and cancels a pe
     const picker = screen.getByLabelText("Embedded subtitles");
     fireEvent.change(picker, { target: { value: "subtitle-3" } });
     await waitFor(() =>
-      expect(screen.getByRole("alert")).toHaveTextContent(
-        "Embedded subtitles could not be loaded",
-      ),
+      expect(screen.getByRole("alert")).toHaveTextContent("Embedded subtitles could not be loaded"),
     );
     expect(fetchSubtitles.mock.calls[0][0]).toBe(
       "/api/sessions/session%2Fone/video/subtitles?path=folder%2Fclip.mkv&track=subtitle-3",
@@ -125,10 +111,7 @@ it("updates native cue times without drift and cleans up track resources", async
   };
   const video = document.createElement("video");
   Object.defineProperty(video, "textTracks", { value: new EventTarget() });
-  const original = Object.getOwnPropertyDescriptor(
-    HTMLTrackElement.prototype,
-    "track",
-  );
+  const original = Object.getOwnPropertyDescriptor(HTMLTrackElement.prototype, "track");
   Object.defineProperty(HTMLTrackElement.prototype, "track", {
     configurable: true,
     get: () => nativeTrack,
@@ -142,9 +125,7 @@ it("updates native cue times without drift and cleans up track resources", async
       revokeObjectURL: revoke,
     }),
   );
-  const fetchSubtitles = vi
-    .fn()
-    .mockResolvedValue({ ok: true, text: () => Promise.resolve(vtt) });
+  const fetchSubtitles = vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(vtt) });
   vi.stubGlobal("fetch", fetchSubtitles);
   try {
     const { unmount } = render(
@@ -224,8 +205,7 @@ it("updates native cue times without drift and cleans up track resources", async
     expect(video.dataset.captionSize).toBeUndefined();
   } finally {
     vi.unstubAllGlobals();
-    if (original)
-      Object.defineProperty(HTMLTrackElement.prototype, "track", original);
+    if (original) Object.defineProperty(HTMLTrackElement.prototype, "track", original);
     else Reflect.deleteProperty(HTMLTrackElement.prototype, "track");
   }
 });

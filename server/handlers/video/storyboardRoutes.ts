@@ -1,17 +1,10 @@
 import path from "node:path";
 import type { Express } from "express";
 import { storyboardDirectory } from "../../media/videoStoryboard.js";
-import {
-  queryText,
-  requireTranscoder,
-  resolveVideoContext,
-} from "./routeContext.js";
+import { queryText, requireTranscoder, resolveVideoContext } from "./routeContext.js";
 import type { VideoRouteDependencies } from "./types.js";
 
-export function registerVideoStoryboardRoutes(
-  app: Express,
-  deps: VideoRouteDependencies,
-): void {
+export function registerVideoStoryboardRoutes(app: Express, deps: VideoRouteDependencies): void {
   app.get("/api/sessions/:id/video/storyboard", async (req, res) => {
     const context = await resolveVideoContext(req, res, deps);
     if (!context || !requireTranscoder(res, deps)) return;
@@ -45,10 +38,7 @@ export function registerVideoStoryboardRoutes(
       .type("image/jpeg")
       .sendFile(
         path.join(
-          storyboardDirectory(
-            context.session.workspaceDir,
-            context.normalizedPath,
-          ),
+          storyboardDirectory(context.session.workspaceDir, context.normalizedPath),
           `sheet-${String(sheet + 1)}.jpg`,
         ),
       );

@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import { downloadWithSegmentedManager } from "./segmentedDownloader.js";
 
 it("rejects private redirects before a payload request reaches the destination", async () => {
@@ -11,8 +11,7 @@ it("rejects private redirects before a payload request reaches the destination",
   const server = createServer((req, res) => {
     if (req.url === "/source") {
       const address = server.address();
-      if (!address || typeof address === "string")
-        throw new Error("Missing address");
+      if (!address || typeof address === "string") throw new Error("Missing address");
       res
         .writeHead(302, {
           location: `http://127.0.0.1:${String(address.port)}/private`,
@@ -26,8 +25,7 @@ it("rejects private redirects before a payload request reaches the destination",
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   try {
     const address = server.address();
-    if (!address || typeof address === "string")
-      throw new Error("Missing address");
+    if (!address || typeof address === "string") throw new Error("Missing address");
     await expect(
       downloadWithSegmentedManager({
         url: `http://127.0.0.1:${String(address.port)}/source`,

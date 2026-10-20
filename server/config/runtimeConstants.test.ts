@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { parseRuntimeEnvironment } from "./runtimeConstants.js";
 
 describe("parseRuntimeEnvironment", () => {
@@ -24,21 +24,14 @@ describe("parseRuntimeEnvironment", () => {
 
   it("accepts a configurable media cache budget and rejects invalid values", () => {
     expect(
-      parseRuntimeEnvironment({ MEDIA_CACHE_BUDGET_BYTES: "4096" })
-        .mediaCacheBudgetBytes,
+      parseRuntimeEnvironment({ MEDIA_CACHE_BUDGET_BYTES: "4096" }).mediaCacheBudgetBytes,
     ).toBe(4096);
-    expect(() =>
-      parseRuntimeEnvironment({ MEDIA_CACHE_BUDGET_BYTES: "-1" }),
-    ).toThrow();
+    expect(() => parseRuntimeEnvironment({ MEDIA_CACHE_BUDGET_BYTES: "-1" })).toThrow();
   });
 
   it("accepts only supported opt-in HLS encoder preferences", () => {
     for (const value of ["cpu", "auto", "h264_qsv", "h264_nvenc"])
-      expect(parseRuntimeEnvironment({ HLS_ENCODER: value }).hlsEncoder).toBe(
-        value,
-      );
-    expect(() =>
-      parseRuntimeEnvironment({ HLS_ENCODER: "arbitrary" }),
-    ).toThrow();
+      expect(parseRuntimeEnvironment({ HLS_ENCODER: value }).hlsEncoder).toBe(value);
+    expect(() => parseRuntimeEnvironment({ HLS_ENCODER: "arbitrary" })).toThrow();
   });
 });

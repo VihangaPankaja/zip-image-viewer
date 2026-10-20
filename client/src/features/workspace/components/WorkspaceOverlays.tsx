@@ -1,9 +1,6 @@
 import { CustomDropdown } from "../../../components/Common/CustomDropdown";
 import { useModalDialog } from "../../../hooks/useModalDialog";
-import {
-  TreeExplorer,
-  type ExplorerNode,
-} from "../../../components/TreeExplorer";
+import { TreeExplorer, type ExplorerNode } from "../../../components/TreeExplorer";
 import type { SelectOption } from "../types";
 
 type ImageNode = { modifiedAt?: number; name: string; size?: number };
@@ -26,9 +23,7 @@ type WorkspaceOverlaysProps = {
   selectedNode: ImageNode | null;
   selectedPath: string;
   setExplorerModalOpen: (value: boolean) => void;
-  setSlideshowChromeHidden: (
-    value: boolean | ((value: boolean) => boolean),
-  ) => void;
+  setSlideshowChromeHidden: (value: boolean | ((value: boolean) => boolean)) => void;
   setSlideshowFitMode: (value: string) => void;
   slideshowChromeHidden: boolean;
   slideshowFitMode: string;
@@ -65,11 +60,7 @@ type SlideshowOverlayProps = SlideshowToolsProps &
 
 type ExplorerOverlayProps = Pick<
   WorkspaceOverlaysProps,
-  | "onCloseExplorer"
-  | "onSelectPath"
-  | "selectedPath"
-  | "setExplorerModalOpen"
-  | "sortedTree"
+  "onCloseExplorer" | "onSelectPath" | "selectedPath" | "setExplorerModalOpen" | "sortedTree"
 >;
 
 export function WorkspaceOverlays(props: WorkspaceOverlaysProps) {
@@ -99,9 +90,7 @@ function SlideshowOverlay(props: SlideshowOverlayProps) {
       <div className="slideshow-viewport">
         <div
           className={`slideshow-stage slideshow-fit-${props.slideshowFitMode}`}
-          onDoubleClick={() =>
-            props.setSlideshowChromeHidden((value) => !value)
-          }
+          onDoubleClick={() => props.setSlideshowChromeHidden((value) => !value)}
         >
           <img src={props.selectedImageUrl} alt={node.name} />
         </div>
@@ -215,9 +204,7 @@ function SlideshowTools({
           <button
             className="ghost-button"
             type="button"
-            onClick={() =>
-              props.onSelectPath(props.currentFolderImages[0] || "")
-            }
+            onClick={() => props.onSelectPath(props.currentFolderImages[0] || "")}
           >
             First
           </button>
@@ -235,11 +222,7 @@ function SlideshowTools({
           >
             Hide UI
           </button>
-          <button
-            className="ghost-button"
-            type="button"
-            onClick={props.onCloseSlideshow}
-          >
+          <button className="ghost-button" type="button" onClick={props.onCloseSlideshow}>
             Close
           </button>
         </div>

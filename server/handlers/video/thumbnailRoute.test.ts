@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import request from "supertest";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { createVideoRuntime } from "../../infrastructure/media/videoRuntime.js";
 import type { Session } from "../../domain/models.js";
 import { registerVideoThumbnailRoute } from "./thumbnailRoute.js";
@@ -19,17 +19,14 @@ const workspaces: string[] = [];
 afterEach(async () => {
   vi.restoreAllMocks();
   await Promise.all(
-    workspaces
-      .splice(0)
-      .map((workspace) => rm(workspace, { recursive: true, force: true })),
+    workspaces.splice(0).map((workspace) => rm(workspace, { recursive: true, force: true })),
   );
 });
 
 async function createThumbnailApp(
   runCommand: VideoRouteDependencies["runCommand"],
   durationSeconds = 60,
-  trackVideoTask: VideoRouteDependencies["trackVideoTask"] = (_session, task) =>
-    task,
+  trackVideoTask: VideoRouteDependencies["trackVideoTask"] = (_session, task) => task,
 ) {
   const workspace = await mkdtemp(path.join(tmpdir(), "ziv-thumbnail-route-"));
   workspaces.push(workspace);
@@ -45,8 +42,7 @@ async function createThumbnailApp(
     touchSession: () => session,
     sanitizeEntryPath: (value: string) => value,
     parseSeekSeconds: (value: unknown) => Number(value),
-    getVideoMetadata: () =>
-      Promise.resolve({ width: 1920, height: 1080, durationSeconds }),
+    getVideoMetadata: () => Promise.resolve({ width: 1920, height: 1080, durationSeconds }),
     buildVideoQualityOptions: () => ({
       options: [{ id: "360p", label: "360p", height: 360 }],
       defaultQuality: "360p",
@@ -89,8 +85,7 @@ describe("video thumbnail route", () => {
       await writeFile(String(args.at(-1)), "complete");
     });
     const app = await createThumbnailApp(runCommand);
-    const resource =
-      "/api/sessions/session/video/thumbnail?path=source.mp4&time=5";
+    const resource = "/api/sessions/session/video/thumbnail?path=source.mp4&time=5";
     const first = request(app)
       .get(resource)
       .then((response) => response);
@@ -109,9 +104,7 @@ describe("video thumbnail route", () => {
       finishGeneration();
       const responses = await Promise.all([first, second]);
       for (const response of responses)
-        expect(
-          Buffer.isBuffer(response.body) ? response.body.toString() : null,
-        ).toBe("complete");
+        expect(Buffer.isBuffer(response.body) ? response.body.toString() : null).toBe("complete");
     }
   });
 
@@ -125,9 +118,7 @@ describe("video thumbnail route", () => {
       });
       const app = await createThumbnailApp(runCommand, 8);
       await request(app)
-        .get(
-          `/api/sessions/session/video/thumbnail?path=source.mp4&time=${time}`,
-        )
+        .get(`/api/sessions/session/video/thumbnail?path=source.mp4&time=${time}`)
         .expect(200);
     },
   );
@@ -180,10 +171,7 @@ it("drains a thumbnail mkdir and publication before removing the session workspa
   );
   const workspace = workspaces.at(-1);
   if (!workspace) throw new Error("Missing test workspace");
-  const native =
-    await vi.importActual<typeof import("node:fs/promises")>(
-      "node:fs/promises",
-    );
+  const native = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
   let release: (() => void) | undefined;
   const gate = new Promise<void>((resolve) => {
     release = resolve;

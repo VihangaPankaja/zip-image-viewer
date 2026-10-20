@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import {
   durationFromOutput,
   dimensionsFromOutput,
@@ -13,12 +13,8 @@ it("keeps media usable when embedded language tags are malformed", () => {
   const tracks = mediaTracksFromOutput(
     "Stream #0:1(en-12): Audio: aac (LC)\nStream #0:2(en-a1): Subtitle: subrip",
   );
-  expect(tracks.audioTracks).toMatchObject([
-    { language: "und", label: "Audio 1" },
-  ]);
-  expect(tracks.subtitleTracks).toMatchObject([
-    { language: "und", label: "Subtitle 1" },
-  ]);
+  expect(tracks.audioTracks).toMatchObject([{ language: "und", label: "Audio 1" }]);
+  expect(tracks.subtitleTracks).toMatchObject([{ language: "und", label: "Subtitle 1" }]);
 });
 it("parses FFmpeg metadata and tolerates absent or malformed video details", () => {
   expect(videoMetadataFromOutput("invalid", "mp4")).toEqual({
@@ -45,14 +41,12 @@ it("parses FFmpeg metadata and tolerates absent or malformed video details", () 
     width: 0,
     height: 0,
   });
-  expect(
-    qualityOptions({ width: 1920, height: 1080, durationSeconds: 1 })
-      .defaultQuality,
-  ).toBe("720p");
-  expect(
-    qualityOptions({ width: 320, height: 180, durationSeconds: 1 })
-      .defaultQuality,
-  ).toBe("auto");
+  expect(qualityOptions({ width: 1920, height: 1080, durationSeconds: 1 }).defaultQuality).toBe(
+    "720p",
+  );
+  expect(qualityOptions({ width: 320, height: 180, durationSeconds: 1 }).defaultQuality).toBe(
+    "auto",
+  );
 });
 
 it("probes stream languages, titles and defaults while excluding bitmap subtitles", () => {
@@ -120,10 +114,7 @@ it("chooses direct MP4, remux, or transcode from the probed streams", () => {
     ),
   ).toBe("direct");
   expect(
-    playbackModeFromOutput(
-      `Input #0, matroska,webm, from 'clip.mkv':\n${streams}`,
-      "mkv",
-    ),
+    playbackModeFromOutput(`Input #0, matroska,webm, from 'clip.mkv':\n${streams}`, "mkv"),
   ).toBe("remux");
   expect(
     playbackModeFromOutput(

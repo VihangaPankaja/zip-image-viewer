@@ -31,12 +31,7 @@ export function createApp(deps: CreateAppDependencies): Express {
     });
   }
 
-  const errorHandler: ErrorRequestHandler = (
-    error,
-    _request,
-    response,
-    _next,
-  ) => {
+  const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => {
     if (error instanceof SyntaxError) {
       response.status(400).json({
         error: {

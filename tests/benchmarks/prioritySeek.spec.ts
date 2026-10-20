@@ -14,14 +14,12 @@ async function presentedSeek(video: Locator, target: number): Promise<number> {
           v.cancelVideoFrameCallback(callback);
           reject(new Error(`No displayed frame at ${String(time)}.`));
         }, 10_000);
-        let callback = v.requestVideoFrameCallback(
-          function frame(_now, metadata) {
-            if (Math.abs(metadata.mediaTime - time) < 0.25) {
-              clearTimeout(timeout);
-              resolve(performance.now() - started);
-            } else callback = v.requestVideoFrameCallback(frame);
-          },
-        );
+        let callback = v.requestVideoFrameCallback(function frame(_now, metadata) {
+          if (Math.abs(metadata.mediaTime - time) < 0.25) {
+            clearTimeout(timeout);
+            resolve(performance.now() - started);
+          } else callback = v.requestVideoFrameCallback(frame);
+        });
         v.currentTime = time;
       }),
     target,
@@ -40,9 +38,7 @@ async function resetPlayer(page: Page) {
   await page.reload();
   await page.getByRole("tab", { name: "Explore" }).click();
   await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
-  await page
-    .getByRole("combobox", { name: "Audio language" })
-    .selectOption({ label: "Spanish" });
+  await page.getByRole("combobox", { name: "Audio language" }).selectOption({ label: "Spanish" });
   const video = page.getByLabel("Video preview");
   await expect
     .poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState), {
@@ -62,11 +58,7 @@ test("cold hour seeks, crosses windows and preserves alternate audio on desktop 
   );
   test.setTimeout(240_000);
   await rm("test-results/priority-seek-metrics.json", { force: true });
-  const fixture = await startMultilingualFixture(
-    "http://127.0.0.1:5173",
-    0,
-    3600,
-  );
+  const fixture = await startMultilingualFixture("http://127.0.0.1:5173", 0, 3600);
   try {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
@@ -90,10 +82,7 @@ test("cold hour seeks, crosses windows and preserves alternate audio on desktop 
     const coldMs = await presentedSeek(video, 2880);
     const coldEntry = fixture.deps.videoTranscodeStore.values().next().value;
     const coldEncoderWaitMs = Object.fromEntries(
-      [...(coldEntry?.renditions ?? [])].map(([id, state]) => [
-        id,
-        state.encoderWaitMs ?? null,
-      ]),
+      [...(coldEntry?.renditions ?? [])].map(([id, state]) => [id, state.encoderWaitMs ?? null]),
     );
     expect(coldMs).toBeLessThan(3000);
     await video.evaluate((v: HTMLVideoElement) => v.play());
@@ -102,10 +91,7 @@ test("cold hour seeks, crosses windows and preserves alternate audio on desktop 
         () =>
           video.evaluate(
             (v: HTMLVideoElement) =>
-              !v.seeking &&
-              v.readyState >= 2 &&
-              v.currentTime >= 2880 &&
-              v.currentTime < 2890,
+              !v.seeking && v.readyState >= 2 && v.currentTime >= 2880 && v.currentTime < 2890,
           ),
         { timeout: 30_000 },
       )
@@ -180,24 +166,16 @@ test("cold hour seeks, crosses windows and preserves alternate audio on desktop 
     expect(percentiles(limited).p95).toBeLessThan(1500);
     await cdp.detach();
     await page.setViewportSize({ width: 360, height: 844 });
-    await page
-      .getByRole("radio", { name: "Preview", exact: true })
-      .check({ force: true });
+    await page.getByRole("radio", { name: "Preview", exact: true }).check({ force: true });
     const seek = page.getByRole("slider", { name: "Seek video" });
     await seek.focus();
     await seek.press("ArrowRight");
     await expect
-      .poll(() =>
-        video.evaluate(
-          (v: HTMLVideoElement) => !v.seeking && v.readyState >= 2,
-        ),
-      )
+      .poll(() => video.evaluate((v: HTMLVideoElement) => !v.seeking && v.readyState >= 2))
       .toBe(true);
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
-      ),
-    ).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
     expect(errors).toEqual([]);
     const report = {
       generated: new Date().toISOString(),
@@ -216,10 +194,7 @@ test("cold hour seeks, crosses windows and preserves alternate audio on desktop 
       lanSamples: prepared,
       limitedSamples: limited,
     };
-    await writeFile(
-      "test-results/priority-seek-metrics.json",
-      JSON.stringify(report, null, 2),
-    );
+    await writeFile("test-results/priority-seek-metrics.json", JSON.stringify(report, null, 2));
     await test.info().attach("prepared-seeks.json", {
       body: JSON.stringify(report),
       contentType: "application/json",

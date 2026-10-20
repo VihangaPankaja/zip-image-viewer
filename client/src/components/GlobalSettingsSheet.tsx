@@ -3,10 +3,7 @@ import { useModalDialog } from "../hooks/useModalDialog";
 import { AppearanceConfiguration } from "./AppearanceConfiguration";
 import type { ThemePreference } from "../hooks/useLocalStorageSettings";
 import type { DownloadSettings } from "../lib/appConstants";
-import type {
-  KeyboardSettings,
-  ExplorerColumns,
-} from "../features/workspace/settingsStorage";
+import type { KeyboardSettings, ExplorerColumns } from "../features/workspace/settingsStorage";
 import { CustomDropdown } from "./Common/CustomDropdown";
 import { TorrentBandwidthSettings } from "./TorrentBandwidthSettings";
 import type { TorrentLimits } from "../../../shared/contracts";
@@ -43,12 +40,7 @@ type GlobalSettingsSheetProps = {
   setExplorerColumns: Dispatch<SetStateAction<ExplorerColumns>>;
   downloadThreadModeOptions: DropdownOption[];
   downloadRetryOptions: DropdownOption[];
-  clampNumber: (
-    value: string,
-    min: number,
-    max: number,
-    fallback: number,
-  ) => number;
+  clampNumber: (value: string, min: number, max: number, fallback: number) => number;
 };
 
 type DownloadUpdateProps = Pick<
@@ -85,18 +77,11 @@ type ToggleConfigurationProps = Pick<
   "explorerColumns" | "setExplorerColumns"
 >;
 
-function updateDownloadSettings(
-  props: DownloadUpdateProps,
-  patch: Record<string, unknown>,
-) {
-  props.setDownloadSettings((current) =>
-    props.normalizeDownloadSettings({ ...current, ...patch }),
-  );
+function updateDownloadSettings(props: DownloadUpdateProps, patch: Record<string, unknown>) {
+  props.setDownloadSettings((current) => props.normalizeDownloadSettings({ ...current, ...patch }));
 }
 
-function SettingsHeader({
-  setSettingsOpen,
-}: Pick<GlobalSettingsSheetProps, "setSettingsOpen">) {
+function SettingsHeader({ setSettingsOpen }: Pick<GlobalSettingsSheetProps, "setSettingsOpen">) {
   return (
     <div className="panel-header">
       <div className="panel-title-group">
@@ -147,9 +132,7 @@ function ConcurrencyConfiguration(
           ))}
         </select>
       </label>
-      <p className="settings-hint">
-        Maximum active transfers across this server.
-      </p>
+      <p className="settings-hint">Maximum active transfers across this server.</p>
       {saveError ? <p role="alert">{saveError}</p> : null}
     </>
   );
@@ -162,17 +145,15 @@ function DownloadConfiguration(props: DownloadConfigurationProps) {
       <legend>Downloads</legend>
       <ConcurrencyConfiguration {...props} />
       <p className="settings-hint">
-        Thread controls below apply to HTTP downloads only. Torrent peers and
-        file priority are managed separately.
+        Thread controls below apply to HTTP downloads only. Torrent peers and file priority are
+        managed separately.
       </p>
       <CustomDropdown
         id="settings-download-thread-mode"
         label="Thread mode"
         value={downloadSettings.threadMode}
         options={props.downloadThreadModeOptions}
-        onChange={(value) =>
-          updateDownloadSettings(props, { threadMode: value })
-        }
+        onChange={(value) => updateDownloadSettings(props, { threadMode: value })}
       />
       <label className="input-shell">
         <span className="input-label">Thread count</span>
@@ -181,10 +162,7 @@ function DownloadConfiguration(props: DownloadConfigurationProps) {
           min="1"
           max="8"
           value={downloadSettings.threadCount}
-          disabled={
-            !downloadSettings.enableMultithread ||
-            downloadSettings.threadMode === "single"
-          }
+          disabled={!downloadSettings.enableMultithread || downloadSettings.threadMode === "single"}
           onChange={(event) =>
             updateDownloadSettings(props, {
               threadCount: event.target.value,
@@ -197,9 +175,7 @@ function DownloadConfiguration(props: DownloadConfigurationProps) {
         label="Max retries"
         value={downloadSettings.maxRetries}
         options={props.downloadRetryOptions}
-        onChange={(value) =>
-          updateDownloadSettings(props, { maxRetries: value })
-        }
+        onChange={(value) => updateDownloadSettings(props, { maxRetries: value })}
       />
       <label className="toggle-row">
         <input

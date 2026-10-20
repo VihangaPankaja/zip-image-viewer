@@ -174,12 +174,7 @@ export class ApplicationError extends Error {
   readonly code: TypedErrorCode;
   readonly status: number;
 
-  constructor(
-    _code: TypedErrorCode,
-    message: string,
-    _status: number,
-    options?: ErrorOptions,
-  ) {
+  constructor(_code: TypedErrorCode, message: string, _status: number, options?: ErrorOptions) {
     super(message, options);
     this.name = "ApplicationError";
     this.code = _code;

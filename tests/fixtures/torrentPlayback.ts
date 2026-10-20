@@ -23,9 +23,7 @@ export async function waitForPlayback<T>(
   let value = await read();
   while (!accept(value)) {
     if (Date.now() >= deadline)
-      throw new Error(
-        `Torrent fixture condition timed out: ${JSON.stringify(value)}`,
-      );
+      throw new Error(`Torrent fixture condition timed out: ${JSON.stringify(value)}`);
     await delay(50);
     value = await read();
   }
@@ -49,8 +47,7 @@ export async function startTorrentPlaybackFixture({
   serveApp = false,
   frontendOrigin,
 }: { serveApp?: boolean; frontendOrigin?: string } = {}) {
-  if (!ffmpegPath)
-    throw new Error("ffmpeg-static is required for torrent playback tests");
+  if (!ffmpegPath) throw new Error("ffmpeg-static is required for torrent playback tests");
   const directory = await mkdtemp(path.join(tmpdir(), "torrent-playback-"));
   const source = path.join(directory, "source");
   await mkdir(source);
@@ -152,9 +149,7 @@ export async function startTorrentPlaybackFixture({
         throw new Error("Reconnect changed the private torrent info hash");
       infoHash = torrent.infoHash;
       magnetURI = torrent.magnetURI;
-      torrent.on("wire", (wire) =>
-        wire.on("request", (piece) => requests.push(piece)),
-      );
+      torrent.on("wire", (wire) => wire.on("request", (piece) => requests.push(piece)));
       child?.send({ peerPort: seedPort });
     };
     await connect();
@@ -165,8 +160,7 @@ export async function startTorrentPlaybackFixture({
     const reservation = createServer().listen(0, "127.0.0.1");
     await once(reservation, "listening");
     const address = reservation.address();
-    if (!address || typeof address === "string")
-      throw new Error("Missing fixture port");
+    if (!address || typeof address === "string") throw new Error("Missing fixture port");
     await new Promise<void>((resolve) => reservation.close(() => resolve()));
     let origin = `http://127.0.0.1:${address.port}`;
     child = spawn(
@@ -218,8 +212,7 @@ export async function startTorrentPlaybackFixture({
         return fetch(`${origin}/health`, { signal: AbortSignal.timeout(1_000) })
           .then(
             async (response) =>
-              response.ok &&
-              ((await response.json()) as { ready?: boolean }).ready === true,
+              response.ok && ((await response.json()) as { ready?: boolean }).ready === true,
           )
           .catch(() => false);
       },
@@ -230,16 +223,15 @@ export async function startTorrentPlaybackFixture({
         cause: error,
       });
     });
-    const client: ContractRouterClient<typeof serverContract> =
-      createORPCClient(new RPCLink({ url: `${origin}/rpc` }));
+    const client: ContractRouterClient<typeof serverContract> = createORPCClient(
+      new RPCLink({ url: `${origin}/rpc` }),
+    );
     if (frontendOrigin) {
       const backendOrigin = origin;
       proxy = createServer((req, res) => {
         const target = new URL(
           req.url ?? "/",
-          /^\/(api|rpc|health)(\/|\?|$)/.test(req.url ?? "/")
-            ? backendOrigin
-            : frontendOrigin,
+          /^\/(api|rpc|health)(\/|\?|$)/.test(req.url ?? "/") ? backendOrigin : frontendOrigin,
         );
         const upstream = request(
           target,
@@ -269,8 +261,7 @@ export async function startTorrentPlaybackFixture({
       const result = await client.jobs.enqueue({ items: [{ url: magnetURI }] });
       const id = result.items[0].id;
       await waitForPlayback(
-        async () =>
-          (await client.jobs.list()).items.find((job) => job.id === id),
+        async () => (await client.jobs.list()).items.find((job) => job.id === id),
         (job) => job?.status === "awaiting_selection",
       );
       return id;
@@ -300,6 +291,4 @@ export async function startTorrentPlaybackFixture({
   }
 }
 
-export type TorrentPlaybackFixture = Awaited<
-  ReturnType<typeof startTorrentPlaybackFixture>
->;
+export type TorrentPlaybackFixture = Awaited<ReturnType<typeof startTorrentPlaybackFixture>>;

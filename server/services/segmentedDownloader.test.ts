@@ -1,18 +1,11 @@
 import { createServer } from "node:http";
 import { gzipSync } from "node:zlib";
-import {
-  mkdir,
-  mkdtemp,
-  readFile,
-  readdir,
-  rm,
-  writeFile,
-} from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { path7za } from "7zip-bin";
 import unzipper from "unzipper";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { runCommand } from "../infrastructure/process/commandRunner.js";
 import { downloadWithSegmentedManager } from "./segmentedDownloader.js";
 
@@ -32,9 +25,7 @@ it("preserves a later segment's HTTP failure after cancelling an earlier segment
     }
   });
   try {
-    await new Promise<void>((resolve) =>
-      server.listen(0, "127.0.0.1", resolve),
-    );
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("No TCP port");
     await expect(
@@ -72,9 +63,7 @@ it("downloads encoded responses using a decoded byte cap instead of the wire con
       .end(compressed),
   );
   try {
-    await new Promise<void>((resolve) =>
-      server.listen(0, "127.0.0.1", resolve),
-    );
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("No TCP port");
     const targetPath = join(workspace, "download.bin");
@@ -161,11 +150,7 @@ describe("downloadWithSegmentedManager", () => {
       );
       expect(await caption?.buffer()).toEqual(Buffer.from("hello download"));
       expect(state.downloadedBytes).toBe(payload.length);
-      expect((await readdir(workspace)).sort()).toEqual([
-        "download.zip",
-        "served.zip",
-        "source",
-      ]);
+      expect((await readdir(workspace)).sort()).toEqual(["download.zip", "served.zip", "source"]);
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
       await rm(workspace, { recursive: true, force: true });
@@ -221,12 +206,9 @@ it.each([
         .end(part);
     });
     try {
-      await new Promise<void>((resolve) =>
-        server.listen(0, "127.0.0.1", resolve),
-      );
+      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
       const address = server.address();
-      if (!address || typeof address === "string")
-        throw new Error("Missing TCP address");
+      if (!address || typeof address === "string") throw new Error("Missing TCP address");
       const state = { downloadedBytes: 0 };
       await downloadWithSegmentedManager({
         url: `http://127.0.0.1:${String(address.port)}/file`,

@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import sharp from "sharp";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import type { Session } from "../domain/models.js";
 import { createRuntimeMedia } from "./runtimeMedia.js";
 import { createSessionStorage } from "../application/sessions/sessionStorage.js";
@@ -23,12 +23,7 @@ it("measures originals, pins the session and regenerates real previews after cac
   const media = createRuntimeMedia(null, sessions, new Map(), vi.fn());
   const storage = createSessionStorage((id) => sessions.get(id), media);
   try {
-    const preview = await media.ensureImagePreview(
-      session,
-      "image.png",
-      original,
-      "low",
-    );
+    const preview = await media.ensureImagePreview(session, "image.png", original, "low");
     const rendered = await readFile(preview);
     const before = await storage.get(session.id);
     expect(before.originalsBytes).toBe(bytes.length);
@@ -42,12 +37,7 @@ it("measures originals, pins the session and regenerates real previews after cac
       transcodesBytes: 0,
     });
     await expect(readFile(preview)).rejects.toMatchObject({ code: "ENOENT" });
-    const regenerated = await media.ensureImagePreview(
-      session,
-      "image.png",
-      original,
-      "low",
-    );
+    const regenerated = await media.ensureImagePreview(session, "image.png", original, "low");
     expect(await readFile(regenerated)).toEqual(rendered);
     expect(await readFile(original)).toEqual(bytes);
     expect(() => storage.pin("missing", true)).toThrow("Session not found");

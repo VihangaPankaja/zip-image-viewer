@@ -9,9 +9,7 @@ import ffmpegPath from "ffmpeg-static";
 // The production build exists only after the CI dead-code check.
 const mediaModule = (name) =>
   pathToFileURL(path.join(process.cwd(), "build/server/media", name)).href;
-const { HlsEncoder } = await import(
-  mediaModule("../infrastructure/media/hlsEncoder.js")
-);
+const { HlsEncoder } = await import(mediaModule("../infrastructure/media/hlsEncoder.js"));
 const { publishedSegments } = await import(mediaModule("hlsManifest.js"));
 
 assert.ok(ffmpegPath, "Production FFmpeg binary is missing");
@@ -46,9 +44,7 @@ try {
   });
   assert.ok(
     events.some(
-      ({ event }) =>
-        event === "video.encoder.selected" ||
-        event === "video.encoder.fallback",
+      ({ event }) => event === "video.encoder.selected" || event === "video.encoder.fallback",
     ),
     "Hardware selection or CPU fallback must be explicit",
   );

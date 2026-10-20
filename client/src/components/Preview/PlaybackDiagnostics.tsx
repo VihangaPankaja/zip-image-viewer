@@ -37,8 +37,7 @@ function readPlayback(props: Props) {
   }
   const rendition =
     props.videoHlsStatus?.renditions.find(
-      ({ quality }) =>
-        quality === `${level}p` || quality === props.selectedVideoQuality,
+      ({ quality }) => quality === `${level}p` || quality === props.selectedVideoQuality,
     ) ??
     props.videoHlsStatus?.renditions.find(
       ({ status }) => status === "queued" || status === "running",
@@ -59,8 +58,7 @@ function readPlayback(props: Props) {
     bufferSeconds: Number(bufferedSeconds.toFixed(1)),
     droppedFrames: video?.getVideoPlaybackQuality().droppedVideoFrames ?? null,
     encoderWaitMs: rendition?.encoderWaitMs ?? null,
-    encoderStatus:
-      rendition?.status ?? props.videoHlsStatus?.status ?? "Unavailable",
+    encoderStatus: rendition?.status ?? props.videoHlsStatus?.status ?? "Unavailable",
     playbackError: Boolean(props.videoPlaybackError),
   };
 }
@@ -93,9 +91,7 @@ export function PlaybackDiagnostics(props: Props) {
         <div>
           <dt>Bandwidth</dt>
           <dd>
-            {snapshot.bandwidthMbps == null
-              ? "Unavailable"
-              : `${snapshot.bandwidthMbps} Mbps`}
+            {snapshot.bandwidthMbps == null ? "Unavailable" : `${snapshot.bandwidthMbps} Mbps`}
           </dd>
         </div>
         <div>
@@ -108,11 +104,7 @@ export function PlaybackDiagnostics(props: Props) {
         </div>
         <div>
           <dt>Encoder wait</dt>
-          <dd>
-            {snapshot.encoderWaitMs == null
-              ? "Unavailable"
-              : `${snapshot.encoderWaitMs} ms`}
-          </dd>
+          <dd>{snapshot.encoderWaitMs == null ? "Unavailable" : `${snapshot.encoderWaitMs} ms`}</dd>
         </div>
         <div>
           <dt>Encoder status</dt>

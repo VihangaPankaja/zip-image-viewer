@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import { listExtractedEntries } from "./listExtractedEntries.js";
 
 it("rejects filesystem links instead of indexing another session's directory", async () => {

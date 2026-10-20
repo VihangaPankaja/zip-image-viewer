@@ -8,18 +8,12 @@ import type {
 import type { DownloadOptions } from "../../types/download";
 import { workspaceRpc } from "../../services/orpcClient";
 
-function useTorrentControls(
-  control: <Result>(promise: Promise<Result>) => Promise<Result>,
-) {
-  const filePriorityMutation = useMutation(
-    workspaceRpc.jobs.setFilePriority.mutationOptions(),
-  );
+function useTorrentControls(control: <Result>(promise: Promise<Result>) => Promise<Result>) {
+  const filePriorityMutation = useMutation(workspaceRpc.jobs.setFilePriority.mutationOptions());
   const torrentLimitsQuery = useQuery(
     workspaceRpc.torrentLimits.get.queryOptions({ refetchInterval: 2_000 }),
   );
-  const torrentLimitsMutation = useMutation(
-    workspaceRpc.torrentLimits.update.mutationOptions(),
-  );
+  const torrentLimitsMutation = useMutation(workspaceRpc.torrentLimits.update.mutationOptions());
   return {
     setFilePriority: (id: string, fileId: string, priority: TorrentPriority) =>
       control(filePriorityMutation.mutateAsync({ id, fileId, priority })),
@@ -27,8 +21,7 @@ function useTorrentControls(
       downloadBytesPerSec: 0,
       uploadBytesPerSec: 0,
     },
-    setTorrentLimits: (limits: TorrentLimits) =>
-      control(torrentLimitsMutation.mutateAsync(limits)),
+    setTorrentLimits: (limits: TorrentLimits) => control(torrentLimitsMutation.mutateAsync(limits)),
   };
 }
 
@@ -46,35 +39,19 @@ export function useWorkspaceQueue() {
       retry: false,
     }),
   );
-  const enqueueMutation = useMutation(
-    workspaceRpc.jobs.enqueue.mutationOptions(),
-  );
+  const enqueueMutation = useMutation(workspaceRpc.jobs.enqueue.mutationOptions());
   const pauseMutation = useMutation(workspaceRpc.jobs.pause.mutationOptions());
-  const resumeMutation = useMutation(
-    workspaceRpc.jobs.resume.mutationOptions(),
-  );
-  const cancelMutation = useMutation(
-    workspaceRpc.jobs.cancel.mutationOptions(),
-  );
-  const confirmMutation = useMutation(
-    workspaceRpc.jobs.confirm.mutationOptions(),
-  );
-  const selectFilesMutation = useMutation(
-    workspaceRpc.jobs.selectFiles.mutationOptions(),
-  );
+  const resumeMutation = useMutation(workspaceRpc.jobs.resume.mutationOptions());
+  const cancelMutation = useMutation(workspaceRpc.jobs.cancel.mutationOptions());
+  const confirmMutation = useMutation(workspaceRpc.jobs.confirm.mutationOptions());
+  const selectFilesMutation = useMutation(workspaceRpc.jobs.selectFiles.mutationOptions());
   const retryMutation = useMutation(workspaceRpc.jobs.retry.mutationOptions());
-  const removeMutation = useMutation(
-    workspaceRpc.jobs.remove.mutationOptions(),
-  );
-  const reorderMutation = useMutation(
-    workspaceRpc.jobs.reorder.mutationOptions(),
-  );
+  const removeMutation = useMutation(workspaceRpc.jobs.remove.mutationOptions());
+  const reorderMutation = useMutation(workspaceRpc.jobs.reorder.mutationOptions());
   const schedulerQuery = useQuery(
     workspaceRpc.scheduler.get.queryOptions({ refetchInterval: 2_000 }),
   );
-  const schedulerMutation = useMutation(
-    workspaceRpc.scheduler.update.mutationOptions(),
-  );
+  const schedulerMutation = useMutation(workspaceRpc.scheduler.update.mutationOptions());
   async function refresh() {
     await queryClient.invalidateQueries();
   }
@@ -103,8 +80,7 @@ export function useWorkspaceQueue() {
     maxConcurrent: schedulerQuery.data?.maxConcurrent ?? 2,
     pause: (id: string) => control(pauseMutation.mutateAsync({ id })),
     remove: (id: string) => control(removeMutation.mutateAsync({ id })),
-    reorder: (jobIds: string[]) =>
-      control(reorderMutation.mutateAsync({ jobIds })),
+    reorder: (jobIds: string[]) => control(reorderMutation.mutateAsync({ jobIds })),
     resume: (id: string) => control(resumeMutation.mutateAsync({ id })),
     retry: (id: string) => control(retryMutation.mutateAsync({ id })),
     setMaxConcurrent: (maxConcurrent: number) =>

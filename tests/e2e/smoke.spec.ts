@@ -1,25 +1,19 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-test("manages downloads and opens the Explore workspace", async ({
-  page,
-}, testInfo) => {
+test("manages downloads and opens the Explore workspace", async ({ page }, testInfo) => {
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
   await page.goto("/");
 
-  await expect(
-    page.getByRole("heading", { name: "Transfer desk" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Transfer desk" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Downloads" })).toHaveAttribute(
     "aria-selected",
     "true",
   );
-  await expect(
-    page.getByRole("heading", { name: "Downloads", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Downloads", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Add downloads" }).click();
   await page
@@ -27,24 +21,14 @@ test("manages downloads and opens the Explore workspace", async ({
     .fill("https://example.com/a.zip\nhttps://example.com/b.zip");
   await page.getByRole("heading", { name: "Add downloads" }).click();
   await expect(page.getByLabel("Download URL", { exact: true })).toHaveCount(2);
-  await expect(page.getByRole("button", { name: "Review links" })).toHaveCount(
-    0,
-  );
+  await expect(page.getByRole("button", { name: "Review links" })).toHaveCount(0);
   await page.getByRole("button", { name: "Close" }).click();
 
   await page.getByRole("tab", { name: "Explore" }).click();
-  await expect(
-    page.getByRole("region", { name: "Explorer sidebar" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("region", { name: "Preview panel" }),
-  ).toBeVisible();
-  const sidebar = await page
-    .getByRole("region", { name: "Explorer sidebar" })
-    .boundingBox();
-  const preview = await page
-    .getByRole("region", { name: "Preview panel" })
-    .boundingBox();
+  await expect(page.getByRole("region", { name: "Explorer sidebar" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Preview panel" })).toBeVisible();
+  const sidebar = await page.getByRole("region", { name: "Explorer sidebar" }).boundingBox();
+  const preview = await page.getByRole("region", { name: "Preview panel" }).boundingBox();
   expect(sidebar?.width ?? 0).toBeGreaterThan(220);
   expect(preview?.width ?? 0).toBeGreaterThan(420);
 
@@ -84,27 +68,19 @@ test("mobile uses a full-screen add sheet and tree-to-preview navigation", async
   ]);
   expect(dialogBoundsAfterInput).not.toBeNull();
   expect(addButtonBounds).not.toBeNull();
-  expect(
-    (addButtonBounds?.x ?? 0) + (addButtonBounds?.width ?? Infinity),
-  ).toBeLessThanOrEqual(
+  expect((addButtonBounds?.x ?? 0) + (addButtonBounds?.width ?? Infinity)).toBeLessThanOrEqual(
     (dialogBoundsAfterInput?.x ?? 0) + (dialogBoundsAfterInput?.width ?? 0) + 1,
   );
   expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth + 1,
-    ),
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
   ).toBe(true);
   await page.getByRole("button", { name: "Close" }).click();
 
   await page.getByRole("tab", { name: "Explore" }).click();
   await expect(page.getByRole("radio", { name: "Files" })).toBeChecked();
-  await expect(
-    page.getByRole("region", { name: "Explorer sidebar" }),
-  ).toBeVisible();
+  await expect(page.getByRole("region", { name: "Explorer sidebar" })).toBeVisible();
   await page.locator('label[for="workspace-pane-preview"]').click();
-  await expect(
-    page.getByRole("region", { name: "Preview panel" }),
-  ).toBeVisible();
+  await expect(page.getByRole("region", { name: "Preview panel" })).toBeVisible();
   await page.getByText("Back to files").click();
   await expect(page.getByRole("radio", { name: "Files" })).toBeChecked();
   await page.screenshot({
@@ -113,9 +89,7 @@ test("mobile uses a full-screen add sheet and tree-to-preview navigation", async
   });
 });
 
-test("blocks duplicate downloads until every URL is unique", async ({
-  page,
-}) => {
+test("blocks duplicate downloads until every URL is unique", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Add downloads" }).click();
   await page
@@ -124,18 +98,11 @@ test("blocks duplicate downloads until every URL is unique", async ({
   await page.getByRole("heading", { name: "Add downloads" }).click();
 
   await expect(page.getByText(/2 duplicates/)).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Add to queue" }),
-  ).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Add to queue" })).toBeDisabled();
 
-  await page
-    .getByLabel("Download URL", { exact: true })
-    .nth(1)
-    .fill("https://example.com/b.zip");
+  await page.getByLabel("Download URL", { exact: true }).nth(1).fill("https://example.com/b.zip");
   await expect(page.getByText(/duplicates/)).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: "Add to queue" }),
-  ).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Add to queue" })).toBeEnabled();
 });
 
 test("persists settings across a page reload", async ({ page }) => {

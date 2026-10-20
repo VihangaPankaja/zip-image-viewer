@@ -1,20 +1,13 @@
 import type { VideoStoryboard } from "../../../shared/contracts.js";
 import { access } from "node:fs/promises";
-import type {
-  Session,
-  VideoRendition,
-  VideoTranscodeEntry,
-} from "../../domain/models.js";
+import type { Session, VideoRendition, VideoTranscodeEntry } from "../../domain/models.js";
 import { startRenditionJob } from "./videoRenditionJob.js";
 import {
   qualityOptions,
   buildVideoQualityOptions,
   type VideoMetadata,
 } from "../../media/videoMetadata.js";
-import {
-  generateStoryboard,
-  storyboardDirectory,
-} from "../../media/videoStoryboard.js";
+import { generateStoryboard, storyboardDirectory } from "../../media/videoStoryboard.js";
 import { ProcessLimiter } from "../../media/processLimiter.js";
 import { getRenditionState } from "../../media/videoRendition.js";
 import { runCommand } from "../process/commandRunner.js";
@@ -87,8 +80,7 @@ class VideoRuntime {
     requestSignal?: AbortSignal,
     priority: "interactive" | "background" = "interactive",
   ): Promise<Result> => {
-    const sessionSignal =
-      session && this.sessionWork(session).controller.signal;
+    const sessionSignal = session && this.sessionWork(session).controller.signal;
     const signal =
       sessionSignal && requestSignal
         ? AbortSignal.any([sessionSignal, requestSignal])
@@ -101,25 +93,16 @@ class VideoRuntime {
       });
       return task(signal);
     };
-    return this.trackVideoTask(
-      session,
-      processLimiter.run(start, signal, priority),
-    );
+    return this.trackVideoTask(session, processLimiter.run(start, signal, priority));
   };
 
-  runCommand = (
-    command: string,
-    args: string[],
-    session?: Session,
-  ): Promise<void> =>
-    this.runVideoTask(session, (signal) =>
-      runCommand(command, args, { signal }),
-    );
+  runCommand = (command: string, args: string[], session?: Session): Promise<void> =>
+    this.runVideoTask(session, (signal) => runCommand(command, args, { signal }));
 
   cleanupVideoSession = async (session: Session): Promise<void> => {
     const work = this.sessionWork(session);
     work.controller.abort();
-    await Promise.allSettled([...work.pending]);
+    await Promise.allSettled(work.pending);
     work.metadata.clear();
     this.clearCachedMedia(session);
   };
@@ -154,9 +137,7 @@ class VideoRuntime {
       })(),
     );
     work.storyboards.set(normalizedPath, generation);
-    void generation
-      .finally(() => work.storyboards.delete(normalizedPath))
-      .catch(() => undefined);
+    void generation.finally(() => work.storyboards.delete(normalizedPath)).catch(() => undefined);
     return generation;
   };
 
@@ -165,22 +146,15 @@ class VideoRuntime {
     private readonly transcodes: Map<string, VideoTranscodeEntry>,
     private readonly logEvent: LogEvent,
     private readonly protectSession: ProtectSession = () => () => undefined,
-    private readonly enforceDerivedMediaBudget: () => Promise<void> = () =>
-      Promise.resolve(),
+    private readonly enforceDerivedMediaBudget: () => Promise<void> = () => Promise.resolve(),
     private readonly waitForEviction: WaitForEviction = () => Promise.resolve(),
     encoderPreference: HlsEncoderPreference = "cpu",
   ) {
-    this.encoder = new HlsEncoder(
-      ffmpegPath ?? "",
-      encoderPreference,
-      logEvent,
-    );
+    this.encoder = new HlsEncoder(ffmpegPath ?? "", encoderPreference, logEvent);
     const windows = new HlsWindows(ffmpegPath, this.runVideoTask, this.encoder);
     const preparationDependencies = {
-      signalFor: (session: Session) =>
-        this.sessionWork(session).controller.signal,
-      track: (session: Session, task: Promise<void>) =>
-        this.trackVideoTask(session, task, false),
+      signalFor: (session: Session) => this.sessionWork(session).controller.signal,
+      track: (session: Session, task: Promise<void>) => this.trackVideoTask(session, task, false),
       enforceBudget: this.enforceDerivedMediaBudget,
       onError: (session: Session, error: unknown) =>
         this.logEvent("warn", "video.prepare.failed", {
@@ -188,10 +162,7 @@ class VideoRuntime {
           error: error instanceof Error ? error.message : String(error),
         }),
     };
-    this.playback = new HlsPlaybackPreparation(
-      windows,
-      preparationDependencies,
-    );
+    this.playback = new HlsPlaybackPreparation(windows, preparationDependencies);
     this.preparation = new RetainedVideoPreparation({
       ...preparationDependencies,
       windows,
@@ -223,8 +194,7 @@ class VideoRuntime {
     priority: "interactive" | "background" = "interactive",
   ): Promise<VideoMetadata> => {
     const executable = this.ffmpegPath;
-    if (!executable)
-      return Promise.resolve({ width: 0, height: 0, durationSeconds: 0 });
+    if (!executable) return Promise.resolve({ width: 0, height: 0, durationSeconds: 0 });
     const cached = session && this.sessionWork(session).metadata;
     const existing = cached && cached.get(videoPath);
     if (existing) return existing;
@@ -250,18 +220,14 @@ class VideoRuntime {
     if (existing) return this.preparation.ensure(existing, session, priority);
     const metadata = await this.getVideoMetadata(targetPath, session, priority);
     const racedEntry = this.transcodes.get(key);
-    if (racedEntry)
-      return this.preparation.ensure(racedEntry, session, priority);
+    if (racedEntry) return this.preparation.ensure(racedEntry, session, priority);
     const qualities = qualityOptions(metadata);
     const entry: VideoTranscodeEntry = {
       sessionId: session.id,
       path: normalizedPath,
       targetPath,
       ...metadata,
-      expectedSegments: Math.max(
-        1,
-        Math.ceil(metadata.durationSeconds / SEGMENT_SECONDS),
-      ),
+      expectedSegments: Math.max(1, Math.ceil(metadata.durationSeconds / SEGMENT_SECONDS)),
       qualities: qualities.options,
       defaultQuality: qualities.defaultQuality,
       renditions: new Map(),
@@ -295,10 +261,7 @@ class VideoRuntime {
       },
       priority,
     );
-  waitForFile = async (
-    filePath: string,
-    timeoutMs = 12_000,
-  ): Promise<boolean> => {
+  waitForFile = async (filePath: string, timeoutMs = 12_000): Promise<boolean> => {
     const started = Date.now();
     while (Date.now() - started < timeoutMs) {
       if (
@@ -325,8 +288,7 @@ class VideoRuntime {
     rendition: VideoRendition,
     index: number,
     signal?: AbortSignal,
-  ): Promise<void> =>
-    this.playback.ensure(entry, session, rendition, index, signal);
+  ): Promise<void> => this.playback.ensure(entry, session, rendition, index, signal);
 
   getSessionQualityOutputPath = getSessionQualityOutputPath;
 }

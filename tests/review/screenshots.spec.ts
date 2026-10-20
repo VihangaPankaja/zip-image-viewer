@@ -38,15 +38,11 @@ async function showEncodingVideo(page: Page, device: (typeof devices)[number]) {
   const video = page.getByLabel("Video preview");
   await video.scrollIntoViewIfNeeded();
   if (device.name === "Mobile")
-    await video.evaluate((element) =>
-      element.scrollIntoView({ block: "center" }),
-    );
+    await video.evaluate((element) => element.scrollIntoView({ block: "center" }));
   const seek = page.getByRole("slider", { name: "Seek video" });
   await seek.scrollIntoViewIfNeeded();
   const navigation =
-    device.name === "Mobile"
-      ? await page.locator(".workspace-mobile-nav").boundingBox()
-      : null;
+    device.name === "Mobile" ? await page.locator(".workspace-mobile-nav").boundingBox() : null;
   const bottom = navigation?.y ?? device.height;
   await seek.evaluate(
     (element, limit) =>
@@ -66,19 +62,14 @@ async function showEncodingVideo(page: Page, device: (typeof devices)[number]) {
 
 for (const device of devices) {
   for (const theme of ["light", "dark"] as const) {
-    test(`${device.name} ${theme} opt-in encoding plays and seeks`, async ({
-      page,
-    }) => {
+    test(`${device.name} ${theme} opt-in encoding plays and seeks`, async ({ page }) => {
       await page.setViewportSize({
         width: device.width,
         height: device.height,
       });
       await page.emulateMedia({ colorScheme: theme });
       await page.goto(optInVideo.origin);
-      await page.evaluate(
-        (value) => localStorage.setItem("zip-image-viewer-theme", value),
-        theme,
-      );
+      await page.evaluate((value) => localStorage.setItem("zip-image-viewer-theme", value), theme);
       await page.reload();
       await page.getByRole("tab", { name: "Explore" }).click();
       if (device.name === "Mobile")
@@ -86,40 +77,31 @@ for (const device of devices) {
       await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
       if (device.name === "Mobile") {
         await page.getByRole("button", { name: "Hide sessions" }).click();
-        await page
-          .getByRole("radio", { name: "Preview", exact: true })
-          .check({ force: true });
+        await page.getByRole("radio", { name: "Preview", exact: true }).check({ force: true });
       }
       const video = page.getByLabel("Video preview");
       await expect
-        .poll(
-          () =>
-            video.evaluate((element: HTMLVideoElement) => element.readyState),
-          { timeout: 30_000 },
-        )
+        .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState), {
+          timeout: 30_000,
+        })
         .toBeGreaterThanOrEqual(2);
       await video.evaluate(async (element: HTMLVideoElement) => {
         element.muted = true;
         await element.play();
       });
       await expect
-        .poll(
-          () =>
-            video.evaluate((element: HTMLVideoElement) => element.currentTime),
-          { timeout: 30_000 },
-        )
+        .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime), {
+          timeout: 30_000,
+        })
         .toBeGreaterThan(0.5);
       await expect
-        .poll(
-          () => video.evaluate((element: HTMLVideoElement) => element.duration),
-          { timeout: 30_000 },
-        )
+        .poll(() => video.evaluate((element: HTMLVideoElement) => element.duration), {
+          timeout: 30_000,
+        })
         .toBeGreaterThan(19);
       expect(
         optInVideo.encoderEvents.some(
-          ({ event }) =>
-            event === "video.encoder.selected" ||
-            event === "video.encoder.fallback",
+          ({ event }) => event === "video.encoder.selected" || event === "video.encoder.fallback",
         ),
       ).toBe(true);
       await video.evaluate((element: HTMLVideoElement) => element.pause());
@@ -127,17 +109,14 @@ for (const device of devices) {
       await save(page, device, theme, "video-opt-in-encoding-playback");
       const seek = page.getByRole("slider", { name: "Seek video" });
       await seek.focus();
-      for (let step = 0; step < 3; step += 1)
-        await page.keyboard.press("PageUp");
+      for (let step = 0; step < 3; step += 1) await page.keyboard.press("PageUp");
       await page.keyboard.press("Enter");
       await expect
         .poll(
           () =>
             video.evaluate(
               (element: HTMLVideoElement) =>
-                !element.seeking &&
-                element.currentTime > 5 &&
-                element.readyState >= 2,
+                !element.seeking && element.currentTime > 5 && element.readyState >= 2,
             ),
           { timeout: 30_000 },
         )
@@ -145,19 +124,14 @@ for (const device of devices) {
       await showEncodingVideo(page, device);
       await save(page, device, theme, "video-opt-in-encoding-seek");
     });
-    test(`${device.name} ${theme} prepared quality fallback`, async ({
-      page,
-    }) => {
+    test(`${device.name} ${theme} prepared quality fallback`, async ({ page }) => {
       await page.setViewportSize({
         width: device.width,
         height: device.height,
       });
       await page.emulateMedia({ colorScheme: theme });
       await page.goto(adaptiveVideo.origin);
-      await page.evaluate(
-        (value) => localStorage.setItem("zip-image-viewer-theme", value),
-        theme,
-      );
+      await page.evaluate((value) => localStorage.setItem("zip-image-viewer-theme", value), theme);
       await page.reload();
       await page.getByRole("tab", { name: "Explore" }).click();
       const network = await page.context().newCDPSession(page);
@@ -173,9 +147,7 @@ for (const device of devices) {
       await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
       if (device.name === "Mobile") {
         await page.getByRole("button", { name: "Hide sessions" }).click();
-        await page
-          .getByRole("radio", { name: "Preview", exact: true })
-          .check({ force: true });
+        await page.getByRole("radio", { name: "Preview", exact: true }).check({ force: true });
       }
       const video = page.getByLabel("Video preview");
       await expect
@@ -198,8 +170,7 @@ for (const device of devices) {
         .poll(
           () =>
             video.evaluate(
-              (v: HTMLVideoElement) =>
-                !v.seeking && v.videoHeight === 480 && v.currentTime > 64.25,
+              (v: HTMLVideoElement) => !v.seeking && v.videoHeight === 480 && v.currentTime > 64.25,
             ),
           { timeout: 30_000 },
         )
@@ -207,15 +178,10 @@ for (const device of devices) {
       await video.evaluate((v: HTMLVideoElement) => v.pause());
       await video.scrollIntoViewIfNeeded();
       if (device.name === "Mobile") {
-        await video.evaluate((element) =>
-          element.scrollIntoView({ block: "center" }),
-        );
+        await video.evaluate((element) => element.scrollIntoView({ block: "center" }));
         const bounds = await video.boundingBox();
-        const navigation = await page
-          .locator(".workspace-mobile-nav")
-          .boundingBox();
-        if (!bounds || !navigation)
-          throw new Error("Mobile player is missing.");
+        const navigation = await page.locator(".workspace-mobile-nav").boundingBox();
+        if (!bounds || !navigation) throw new Error("Mobile player is missing.");
         expect(bounds.y).toBeGreaterThanOrEqual(0);
         expect(bounds.y + bounds.height).toBeLessThanOrEqual(navigation.y);
       }
@@ -254,19 +220,14 @@ for (const device of devices) {
       await save(page, device, theme, "video-warm-fallback-playback");
       await network.detach();
     });
-    test(`${device.name} ${theme} full-duration priority seeking`, async ({
-      page,
-    }) => {
+    test(`${device.name} ${theme} full-duration priority seeking`, async ({ page }) => {
       await page.setViewportSize({
         width: device.width,
         height: device.height,
       });
       await page.emulateMedia({ colorScheme: theme });
       await page.goto(longVideo.origin);
-      await page.evaluate(
-        (value) => localStorage.setItem("zip-image-viewer-theme", value),
-        theme,
-      );
+      await page.evaluate((value) => localStorage.setItem("zip-image-viewer-theme", value), theme);
       await page.reload();
       await page.getByRole("tab", { name: "Explore" }).click();
       if (device.name === "Mobile")
@@ -274,9 +235,7 @@ for (const device of devices) {
       await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
       if (device.name === "Mobile") {
         await page.getByRole("button", { name: "Hide sessions" }).click();
-        await page
-          .getByRole("radio", { name: "Preview", exact: true })
-          .check({ force: true });
+        await page.getByRole("radio", { name: "Preview", exact: true }).check({ force: true });
       }
       const video = page.getByLabel("Video preview");
       await expect
@@ -297,18 +256,14 @@ for (const device of devices) {
       await save(page, device, theme, "video-full-seek-timeline");
       const bounds = await seek.boundingBox();
       if (!bounds) throw new Error("Long-video seek control is missing.");
-      await page.mouse.move(
-        bounds.x + bounds.width * 0.8,
-        bounds.y + bounds.height / 2,
-      );
+      await page.mouse.move(bounds.x + bounds.width * 0.8, bounds.y + bounds.height / 2);
       await page.mouse.down();
       const thumbnail = page.locator(".video-scrubber-preview img");
       await expect(thumbnail).toBeVisible();
       await expect
-        .poll(
-          () => thumbnail.evaluate((img: HTMLImageElement) => img.naturalWidth),
-          { timeout: 30_000 },
-        )
+        .poll(() => thumbnail.evaluate((img: HTMLImageElement) => img.naturalWidth), {
+          timeout: 30_000,
+        })
         .toBeGreaterThan(0);
       await save(page, device, theme, "video-long-seek-preview");
       const target = Number(await seek.inputValue());
@@ -319,9 +274,7 @@ for (const device of devices) {
           () =>
             video.evaluate(
               (v: HTMLVideoElement, time) =>
-                !v.seeking &&
-                v.readyState === 4 &&
-                Math.abs(v.currentTime - time) < 0.5,
+                !v.seeking && v.readyState === 4 && Math.abs(v.currentTime - time) < 0.5,
               target,
             ),
           { timeout: 30_000 },
@@ -337,12 +290,7 @@ test.beforeAll(async () => {
   await prepareMedia();
   multilingual = await startMultilingualFixture("http://127.0.0.1:5174");
   longVideo = await startMultilingualFixture("http://127.0.0.1:5174", 0, 3600);
-  adaptiveVideo = await startMultilingualFixture(
-    "http://127.0.0.1:5174",
-    0,
-    130.25,
-    480,
-  );
+  adaptiveVideo = await startMultilingualFixture("http://127.0.0.1:5174", 0, 130.25, 480);
   optInVideo = await startMultilingualFixture(
     "http://127.0.0.1:5174",
     0,
@@ -376,17 +324,10 @@ test.afterAll(async () => {
   );
 });
 
-async function save(
-  page: Page,
-  device: (typeof devices)[number],
-  theme: string,
-  screen: string,
-) {
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth + 1,
-    ),
-  ).toBe(true);
+async function save(page: Page, device: (typeof devices)[number], theme: string, screen: string) {
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
+    true,
+  );
   const file = `${device.name.toLowerCase()}-${theme}-${screen}.png`;
   await page.screenshot({
     path: path.join(output, file),
@@ -469,18 +410,14 @@ async function captureEarlyTorrentVideo(
   await trigger.click();
   const video = page.getByLabel("Early video preview");
   await expect
-    .poll(() =>
-      video.evaluate((element: HTMLVideoElement) => element.readyState),
-    )
+    .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState))
     .toBeGreaterThanOrEqual(2);
   await video.evaluate(async (element: HTMLVideoElement) => {
     element.muted = true;
     await element.play();
   });
   await expect
-    .poll(() =>
-      video.evaluate((element: HTMLVideoElement) => element.currentTime),
-    )
+    .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
     .toBeGreaterThan(0.25);
   await video.evaluate((element: HTMLVideoElement) => element.pause());
   await save(page, device, theme, "torrent-early-playback");
@@ -491,9 +428,7 @@ async function captureEarlyTorrentVideo(
     .poll(() =>
       video.evaluate(
         (element: HTMLVideoElement) =>
-          !element.seeking &&
-          element.currentTime >= 5 &&
-          element.readyState >= 2,
+          !element.seeking && element.currentTime >= 5 && element.readyState >= 2,
       ),
     )
     .toBe(true);
@@ -509,9 +444,7 @@ async function captureEarlyTorrentVideo(
   ).toBeVisible();
   await expect(video).toHaveCount(0);
   await save(page, device, theme, "torrent-download-first");
-  await page
-    .getByRole("button", { name: "Download first", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Download first", exact: true }).click();
   state.earlyVideo = "error";
   await trigger.click();
   await expect(page.getByRole("alert")).toContainText("No peers");
@@ -519,9 +452,7 @@ async function captureEarlyTorrentVideo(
   state.earlyVideo = "ready";
   await page.getByRole("button", { name: "Retry playback" }).click();
   await expect
-    .poll(() =>
-      video.evaluate((element: HTMLVideoElement) => element.readyState),
-    )
+    .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState))
     .toBeGreaterThanOrEqual(2);
   await page.getByRole("button", { name: "Back to files" }).click();
   await expect(trigger).toBeFocused();
@@ -537,28 +468,18 @@ async function captureStorage(
   const dialog = page.getByRole("dialog", { name: "Session storage" });
   await expect(dialog).toContainText("50 MB");
   await save(page, device, theme, "session-storage-totals");
-  await dialog
-    .getByRole("checkbox", { name: "Keep until the server stops" })
-    .check();
-  await expect(dialog.getByRole("status")).toHaveText(
-    "Session kept until the server stops.",
-  );
+  await dialog.getByRole("checkbox", { name: "Keep until the server stops" }).check();
+  await expect(dialog.getByRole("status")).toHaveText("Session kept until the server stops.");
   await save(page, device, theme, "session-storage-pinned");
-  await dialog
-    .getByRole("button", { name: "Clear preview & transcode cache" })
-    .click();
-  await expect(dialog.getByRole("status")).toHaveText(
-    "Cache cleared. Original files kept.",
-  );
+  await dialog.getByRole("button", { name: "Clear preview & transcode cache" }).click();
+  await expect(dialog.getByRole("status")).toHaveText("Cache cleared. Original files kept.");
   await expect(dialog.locator("dd")).toHaveText(["50 MB", "0 B", "0 B"]);
   await save(page, device, theme, "session-storage-cache-cleared");
   await page.keyboard.press("Escape");
   state.storage.retained = true;
   await page.getByRole("button", { name: "Storage", exact: true }).click();
   await dialog.getByRole("button", { name: "Delete session files…" }).click();
-  await expect(dialog).toContainText(
-    "files needed to download skipped items later",
-  );
+  await expect(dialog).toContainText("files needed to download skipped items later");
   await save(page, device, theme, "session-storage-delete-warning");
   const blockedRemoval: Parameters<Page["route"]>[1] = (route) =>
     route.fulfill({
@@ -575,9 +496,7 @@ async function captureStorage(
     });
   await page.route("**/rpc/sessions/remove", blockedRemoval);
   await dialog.getByRole("button", { name: "Delete permanently" }).click();
-  await expect(dialog.getByRole("alert")).toContainText(
-    "Pause or cancel the download",
-  );
+  await expect(dialog.getByRole("alert")).toContainText("Pause or cancel the download");
   await save(page, device, theme, "session-storage-delete-blocked");
   await page.unroute("**/rpc/sessions/remove", blockedRemoval);
   await page.keyboard.press("Escape");
@@ -609,15 +528,10 @@ async function captureExplorerSearch(
   theme: string,
   mobile: boolean,
 ) {
-  const originalDivider =
-    device.name === "Tablet" ? await widenTabletExplorer(page) : undefined;
+  const originalDivider = device.name === "Tablet" ? await widenTabletExplorer(page) : undefined;
   if (mobile) {
-    await page
-      .getByRole("radio", { name: "Files", exact: true })
-      .check({ force: true });
-    await page
-      .getByRole("button", { name: "Hide sessions", exact: true })
-      .click();
+    await page.getByRole("radio", { name: "Files", exact: true }).check({ force: true });
+    await page.getByRole("button", { name: "Hide sessions", exact: true }).click();
   }
   const search = page.getByRole("searchbox", { name: "Search explorer files" });
   await search.fill("Field notes/");
@@ -635,16 +549,10 @@ async function captureExplorerSearch(
           .evaluate((label) => label.scrollWidth <= label.clientWidth),
       ).toBe(true);
   for (const name of ["Field notes", "north-shore", "south-shore"])
-    await expect(
-      page.getByRole("treeitem", { name, exact: true }),
-    ).toBeVisible();
-  await expect(
-    page.getByRole("treeitem", { name: filenames[0], exact: true }),
-  ).toHaveCount(0);
+    await expect(page.getByRole("treeitem", { name, exact: true })).toBeVisible();
+  await expect(page.getByRole("treeitem", { name: filenames[0], exact: true })).toHaveCount(0);
   if (mobile) {
-    const navigation = await page
-      .locator(".workspace-mobile-nav")
-      .boundingBox();
+    const navigation = await page.locator(".workspace-mobile-nav").boundingBox();
     if (!navigation) throw new Error("Mobile navigation is missing.");
     for (const result of [results.first(), results.last()]) {
       await expect(result).toBeInViewport({ ratio: 1 });
@@ -662,26 +570,18 @@ async function captureExplorerSearch(
   await expect(results.first()).toBeFocused();
   await save(page, device, theme, "explorer-search-keyboard-focused");
   await page.keyboard.press("Enter");
-  await expect(page.locator(".preview-panel h2")).toHaveText(
-    "location-notes.txt",
-  );
+  await expect(page.locator(".preview-panel h2")).toHaveText("location-notes.txt");
   await expect(page.locator("pre")).toContainText("COASTAL COLLECTION");
   await expect(page.locator(".workspace-metadata-panel")).toContainText(
     "Field notes/north-shore/location-notes.txt",
   );
   await expect(results.first()).toHaveAttribute("aria-selected", "true");
   await save(page, device, theme, "explorer-search-keyboard-opened");
-  if (mobile)
-    await page
-      .getByRole("radio", { name: "Files", exact: true })
-      .check({ force: true });
+  if (mobile) await page.getByRole("radio", { name: "Files", exact: true }).check({ force: true });
   await search.clear();
-  await expect(
-    page.getByRole("treeitem", { name: filenames[0], exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("treeitem", { name: filenames[0], exact: true })).toBeVisible();
   await expect(results).toHaveCount(0);
-  if (originalDivider !== undefined)
-    await resizeExplorer(page, originalDivider);
+  if (originalDivider !== undefined) await resizeExplorer(page, originalDivider);
 }
 
 async function captureVideoQueueReturn(
@@ -721,15 +621,11 @@ async function captureVideoQueueReturn(
   await expect(page.locator(".preview-panel h2")).toHaveText(filenames[2]);
   await expect(seek).toHaveValue("7.75");
   if (device.name === "Desktop" || device.name === "Tablet") {
-    await video.evaluate((element) =>
-      element.scrollIntoView({ block: "start" }),
-    );
+    await video.evaluate((element) => element.scrollIntoView({ block: "start" }));
     await expect(video).toBeInViewport({ ratio: 1 });
     await expect(seek).toBeInViewport({ ratio: 1 });
   } else {
-    await seek.evaluate((element) =>
-      element.scrollIntoView({ block: "center" }),
-    );
+    await seek.evaluate((element) => element.scrollIntoView({ block: "center" }));
     if (mobile) await expect(seek).toBeInViewport({ ratio: 1 });
   }
   await save(page, device, theme, "video-return-paused-position");
@@ -748,37 +644,20 @@ async function captureLargeTorrent(
     id: String(index),
     path: `Coastal collection/film-${String(index).padStart(5, "0")}.mp4`,
   }));
-  job.reportedSize = job.torrentFiles.reduce(
-    (size, file) => size + file.size,
-    0,
-  );
+  job.reportedSize = job.torrentFiles.reduce((size, file) => size + file.size, 0);
   state.jobs = [job];
   await page.getByRole("button", { name: "Review files", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Choose files" });
-  await expect(
-    dialog.getByText("Files 1–200 of 10000", { exact: true }),
-  ).toBeVisible();
-  await expect(dialog.getByRole("status")).toContainText(
-    "10000 of 10000 files selected",
-  );
+  await expect(dialog.getByText("Files 1–200 of 10000", { exact: true })).toBeVisible();
+  await expect(dialog.getByRole("status")).toContainText("10000 of 10000 files selected");
   await expect(dialog.getByRole("checkbox")).toHaveCount(201);
   await save(page, device, theme, "torrent-large-folder-page");
-  await dialog
-    .getByRole("button", { name: "Select none", exact: true })
-    .click();
-  await expect(dialog.getByRole("status")).toContainText(
-    "0 of 10000 files selected",
-  );
-  await dialog
-    .getByRole("checkbox", { name: "Coastal collection", exact: true })
-    .check();
-  await expect(dialog.getByRole("status")).toContainText(
-    "10000 of 10000 files selected",
-  );
+  await dialog.getByRole("button", { name: "Select none", exact: true }).click();
+  await expect(dialog.getByRole("status")).toContainText("0 of 10000 files selected");
+  await dialog.getByRole("checkbox", { name: "Coastal collection", exact: true }).check();
+  await expect(dialog.getByRole("status")).toContainText("10000 of 10000 files selected");
   await dialog.getByRole("button", { name: "Next files", exact: true }).click();
-  await expect(
-    dialog.getByText("Files 201–400 of 10000", { exact: true }),
-  ).toBeVisible();
+  await expect(dialog.getByText("Files 201–400 of 10000", { exact: true })).toBeVisible();
   await expect(
     dialog.getByRole("checkbox", {
       name: "Coastal collection/film-00200.mp4",
@@ -788,9 +667,7 @@ async function captureLargeTorrent(
   await expect(
     dialog.getByRole("checkbox", { name: "Coastal collection", exact: true }),
   ).toBeChecked();
-  await expect(dialog.getByRole("status")).toContainText(
-    "10000 of 10000 files selected",
-  );
+  await expect(dialog.getByRole("status")).toContainText("10000 of 10000 files selected");
   await save(page, device, theme, "torrent-large-folder-selection");
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
@@ -850,14 +727,9 @@ async function captureLargeExplorer(
   try {
     await page.reload();
     await page.getByRole("tab", { name: "Explore", exact: true }).click();
-    if (mobile)
-      await page.getByRole("button", { name: "Show sessions" }).click();
-    await page
-      .getByRole("button", { name: "Open Coastal collection", exact: true })
-      .click();
-    await expect(page.locator(".explorer-tree-panel .panel-chip")).toHaveText(
-      "10000",
-    );
+    if (mobile) await page.getByRole("button", { name: "Show sessions" }).click();
+    await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
+    await expect(page.locator(".explorer-tree-panel .panel-chip")).toHaveText("10000");
     if (device.name === "Tablet") await widenTabletExplorer(page);
     const tree = page.getByRole("tree", { name: "Explorer tree" });
     await tree.getByRole("treeitem").first().focus();
@@ -877,13 +749,9 @@ async function captureLargeExplorer(
       ).toBe(true);
     expect(await tree.getByRole("treeitem").count()).toBeLessThan(100);
     if (mobile) {
-      await last.evaluate((element) =>
-        element.scrollIntoView({ block: "center" }),
-      );
+      await last.evaluate((element) => element.scrollIntoView({ block: "center" }));
       const item = await last.boundingBox();
-      const navigation = await page
-        .locator(".workspace-mobile-nav")
-        .boundingBox();
+      const navigation = await page.locator(".workspace-mobile-nav").boundingBox();
       if (!item || !navigation)
         throw new Error("Large collection or mobile navigation is missing.");
       expect(item.y + item.height).toBeLessThanOrEqual(navigation.y);
@@ -893,85 +761,55 @@ async function captureLargeExplorer(
     await page.unroute(treeRoute, treeHandler);
     await page.unroute(sessionsRoute, sessionsHandler);
     await page.reload();
-    await expect(
-      page.getByRole("heading", { name: "Downloads", exact: true }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Downloads", exact: true })).toBeVisible();
   }
 }
 
 async function selectFile(page: Page, name: string, mobile: boolean) {
-  if (mobile)
-    await page
-      .getByRole("radio", { name: "Files", exact: true })
-      .check({ force: true });
+  if (mobile) await page.getByRole("radio", { name: "Files", exact: true }).check({ force: true });
   await page.getByRole("treeitem", { name, exact: true }).click();
   await expect(page.locator(".preview-panel h2")).toHaveText(name);
   if (name.endsWith(".png")) {
     const image = page.locator(".image-frame > img");
     await expect(image).toHaveJSProperty("naturalWidth", 1200);
     if (mobile) {
-      await image.evaluate((element) =>
-        element.scrollIntoView({ block: "center" }),
-      );
+      await image.evaluate((element) => element.scrollIntoView({ block: "center" }));
       const bounds = await image.boundingBox();
-      const navigation = await page
-        .locator(".workspace-mobile-nav")
-        .boundingBox();
-      if (!bounds || !navigation)
-        throw new Error("Mobile image preview is missing.");
+      const navigation = await page.locator(".workspace-mobile-nav").boundingBox();
+      if (!bounds || !navigation) throw new Error("Mobile image preview is missing.");
       expect(bounds.y).toBeGreaterThanOrEqual(0);
       expect(bounds.y + bounds.height).toBeLessThanOrEqual(navigation.y);
     }
   }
-  if (name.endsWith(".txt"))
-    await expect(page.locator("pre")).toContainText("COASTAL COLLECTION");
+  if (name.endsWith(".txt")) await expect(page.locator("pre")).toContainText("COASTAL COLLECTION");
   if (name.endsWith(".mp4") || name.endsWith(".mkv")) {
     await expect
-      .poll(() =>
-        page
-          .locator("video")
-          .evaluate((video: HTMLVideoElement) => video.readyState),
-      )
+      .poll(() => page.locator("video").evaluate((video: HTMLVideoElement) => video.readyState))
       .toBe(4);
     await page.locator("video").evaluate(async (video: HTMLVideoElement) => {
       video.muted = true;
       await video.play();
     });
     await expect
-      .poll(() =>
-        page
-          .locator("video")
-          .evaluate((video: HTMLVideoElement) => video.currentTime),
-      )
+      .poll(() => page.locator("video").evaluate((video: HTMLVideoElement) => video.currentTime))
       .toBeGreaterThan(0.1);
     await page.locator("video").evaluate((video: HTMLVideoElement) => {
       video.pause();
       video.currentTime = 0;
     });
     await expect
-      .poll(() =>
-        page
-          .locator("video")
-          .evaluate((video: HTMLVideoElement) => video.seeking),
-      )
+      .poll(() => page.locator("video").evaluate((video: HTMLVideoElement) => video.seeking))
       .toBe(false);
     await expect
-      .poll(() =>
-        page
-          .locator("video")
-          .evaluate((video: HTMLVideoElement) => video.readyState),
-      )
+      .poll(() => page.locator("video").evaluate((video: HTMLVideoElement) => video.readyState))
       .toBe(4);
     if (mobile) {
       await page
         .getByRole("slider", { name: "Seek video" })
         .evaluate((control) => control.scrollIntoView({ block: "center" }));
       const video = await page.locator("video").boundingBox();
-      const navigation = await page
-        .locator(".workspace-mobile-nav")
-        .boundingBox();
-      if (!video || !navigation)
-        throw new Error("Mobile player or navigation is missing.");
+      const navigation = await page.locator(".workspace-mobile-nav").boundingBox();
+      if (!video || !navigation) throw new Error("Mobile player or navigation is missing.");
       expect(video.y + video.height).toBeLessThanOrEqual(navigation.y);
     }
   }
@@ -987,12 +825,8 @@ async function captureDialogs(
   await save(page, device, theme, "settings");
   await page.getByLabel("Show Path column").scrollIntoViewIfNeeded();
   await save(page, device, theme, "settings-more");
-  await page
-    .getByRole("spinbutton", { name: "Torrent download limit (KiB/s)" })
-    .fill("512");
-  await page
-    .getByRole("spinbutton", { name: "Torrent upload limit (KiB/s)" })
-    .fill("128");
+  await page.getByRole("spinbutton", { name: "Torrent download limit (KiB/s)" }).fill("512");
+  await page.getByRole("spinbutton", { name: "Torrent upload limit (KiB/s)" }).fill("128");
   await page.getByRole("button", { name: "Save torrent limits" }).click();
   await expect
     .poll(() => state.torrentLimits)
@@ -1000,44 +834,32 @@ async function captureDialogs(
       downloadBytesPerSec: 512 * 1024,
       uploadBytesPerSec: 128 * 1024,
     });
-  await expect(
-    page.getByRole("button", { name: "Save torrent limits" }),
-  ).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Save torrent limits" })).toBeEnabled();
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(
     page.getByRole("spinbutton", { name: "Torrent download limit (KiB/s)" }),
   ).toHaveValue("512");
-  await expect(
-    page.getByRole("spinbutton", { name: "Torrent upload limit (KiB/s)" }),
-  ).toHaveValue("128");
-  await page
-    .getByRole("group", { name: "Torrent bandwidth" })
-    .scrollIntoViewIfNeeded();
+  await expect(page.getByRole("spinbutton", { name: "Torrent upload limit (KiB/s)" })).toHaveValue(
+    "128",
+  );
+  await page.getByRole("group", { name: "Torrent bandwidth" }).scrollIntoViewIfNeeded();
   await save(page, device, theme, "torrent-transfer-limits");
   await page.keyboard.press("Escape");
-  await page
-    .getByRole("button", { name: "Add downloads", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Add downloads", exact: true }).click();
   await page
     .getByRole("textbox", { name: "Paste download URLs" })
     .fill(
       "https://downloads.example.com/coastal-collection.zip\nmagnet:?xt=urn:btih:1234567890abcdef1234567890abcdef12345678&dn=Open%20film%20collection",
     );
-  await page
-    .getByRole("heading", { name: "Add downloads", exact: true })
-    .click();
+  await page.getByRole("heading", { name: "Add downloads", exact: true }).click();
   await expect(page.getByLabel("Download URL", { exact: true })).toHaveCount(2);
   await save(page, device, theme, "add-downloads");
   await page.getByRole("button", { name: "Add to queue", exact: true }).focus();
-  await expect(page.getByRole("dialog").getByRole("status")).toHaveText(
-    "2 of 50 ready",
-  );
+  await expect(page.getByRole("dialog").getByRole("status")).toHaveText("2 of 50 ready");
   await save(page, device, theme, "download-keyboard-announcement");
   await page.keyboard.press("Escape");
-  await expect(
-    page.getByRole("button", { name: "Add downloads", exact: true }),
-  ).toBeFocused();
+  await expect(page.getByRole("button", { name: "Add downloads", exact: true })).toBeFocused();
   await save(page, device, theme, "download-focus-returned");
 }
 
@@ -1064,9 +886,9 @@ async function captureResourceRejection(
   ).toBeVisible();
   await save(page, device, theme, "download-storage-rejected");
   state.jobs = jobs;
-  await expect(
-    page.getByText("Insufficient storage for this download or extraction."),
-  ).toHaveCount(0);
+  await expect(page.getByText("Insufficient storage for this download or extraction.")).toHaveCount(
+    0,
+  );
 }
 
 for (const device of devices) {
@@ -1085,12 +907,8 @@ for (const device of devices) {
       await captureResourceRejection(page, device, theme, state);
       await captureDialogs(page, device, theme, state);
       await captureLargeTorrent(page, device, theme, state);
-      await page
-        .getByRole("button", { name: "Review files", exact: true })
-        .click();
-      await page
-        .getByRole("checkbox", { name: "Extras", exact: true })
-        .uncheck();
+      await page.getByRole("button", { name: "Review files", exact: true }).click();
+      await page.getByRole("checkbox", { name: "Extras", exact: true }).uncheck();
       await expect(page.getByRole("dialog").getByRole("status")).toContainText(
         "3 of 4 files selected",
       );
@@ -1115,9 +933,7 @@ for (const device of devices) {
       await save(page, device, theme, "torrent-keyboard-selection");
       await page.keyboard.press("Space");
       await expect(lastTorrentFile).not.toBeChecked();
-      await page
-        .getByRole("combobox", { name: "Media type" })
-        .selectOption("video");
+      await page.getByRole("combobox", { name: "Media type" }).selectOption("video");
       await expect(page.getByText("2 of 4 files shown")).toBeVisible();
       await save(page, device, theme, "torrent-video-filter");
       await page.getByRole("checkbox", { name: "Extras", exact: true }).check();
@@ -1125,18 +941,14 @@ for (const device of devices) {
         "4 of 4 files selected",
       );
       await save(page, device, theme, "torrent-filter-selection");
-      await page
-        .getByRole("button", { name: "Start selected download" })
-        .click();
+      await page.getByRole("button", { name: "Start selected download" }).click();
       await expect(page.getByRole("dialog")).toHaveCount(0);
       await expect(page.locator(".download-status-message")).toContainText(
         "Downloading selected files",
       );
       await save(page, device, theme, "torrent-selection-started");
       state.jobs = [reviewActiveTorrentJob()];
-      await page
-        .getByRole("button", { name: "View files", exact: true })
-        .click();
+      await page.getByRole("button", { name: "View files", exact: true }).click();
       const fileStatus = page.getByRole("combobox", { name: "File status" });
       await expect(page.getByText("4 of 4 files shown")).toBeVisible();
       await expect(page.getByRole("dialog").getByRole("status")).toContainText(
@@ -1152,26 +964,17 @@ for (const device of devices) {
       });
       await priority.selectOption("high");
       await expect
-        .poll(
-          () =>
-            state.jobs[0]?.torrentFiles.find(({ id }) => id === "1")?.priority,
-        )
+        .poll(() => state.jobs[0]?.torrentFiles.find(({ id }) => id === "1")?.priority)
         .toBe("high");
       await expect(priority).toHaveValue("high");
       await save(page, device, theme, "torrent-priority-changed");
       await fileStatus.selectOption("downloading");
-      await page
-        .getByRole("combobox", { name: "Media type" })
-        .selectOption("text");
-      await page
-        .getByRole("searchbox", { name: "Search files" })
-        .fill("location-notes");
+      await page.getByRole("combobox", { name: "Media type" }).selectOption("text");
+      await page.getByRole("searchbox", { name: "Search files" }).fill("location-notes");
       await expect(page.getByText("1 of 4 files shown")).toBeVisible();
       await save(page, device, theme, "torrent-state-filter");
       await page.getByRole("searchbox", { name: "Search files" }).clear();
-      await page
-        .getByRole("combobox", { name: "Media type" })
-        .selectOption("all");
+      await page.getByRole("combobox", { name: "Media type" }).selectOption("all");
       await fileStatus.selectOption("skipped");
       await expect(page.getByText("1 of 4 files shown")).toBeVisible();
       await save(page, device, theme, "torrent-skipped-files");
@@ -1192,9 +995,7 @@ for (const device of devices) {
       await fileStatus.selectOption("available");
       await expect(page.getByText("3 of 4 files shown")).toBeVisible();
       await save(page, device, theme, "torrent-available-files");
-      await page
-        .getByRole("button", { name: "Download skipped files", exact: true })
-        .click();
+      await page.getByRole("button", { name: "Download skipped files", exact: true }).click();
       await expect(
         page.getByRole("checkbox", {
           name: "Extras/Behind the scenes.mp4",
@@ -1205,9 +1006,7 @@ for (const device of devices) {
         "1 of 1 files selected",
       );
       await save(page, device, theme, "torrent-download-skipped-selection");
-      await page
-        .getByRole("button", { name: "Start selected download" })
-        .click();
+      await page.getByRole("button", { name: "Start selected download" }).click();
       await expect(page.getByRole("dialog")).toHaveCount(0);
       await save(page, device, theme, "torrent-download-skipped-started");
       state.jobs = [
@@ -1216,8 +1015,7 @@ for (const device of devices) {
           status: "ready",
           phase: "ready",
           percent: 100,
-          message:
-            "All four retained files are ready. Transfer progress is simulated.",
+          message: "All four retained files are ready. Transfer progress is simulated.",
           torrentFiles: readyJob.torrentFiles.map((file) => ({
             ...file,
             selected: true,
@@ -1226,9 +1024,7 @@ for (const device of devices) {
           })),
         },
       ];
-      await page
-        .getByRole("button", { name: "View files", exact: true })
-        .click();
+      await page.getByRole("button", { name: "View files", exact: true }).click();
       await expect(
         page.locator(".torrent-file-state").filter({ hasText: "Available" }),
       ).toHaveCount(4);
@@ -1238,36 +1034,23 @@ for (const device of devices) {
       await expect(page.locator(".download-row")).toHaveCount(0);
       await page.getByRole("tab", { name: "Explore" }).click();
       const mobile = device.width <= 760;
-      if (mobile)
-        await page.getByRole("button", { name: "Show sessions" }).click();
-      await page
-        .getByRole("button", { name: "Open Coastal collection", exact: true })
-        .click();
-      await expect(
-        page.getByRole("treeitem", { name: filenames[0], exact: true }),
-      ).toBeVisible();
+      if (mobile) await page.getByRole("button", { name: "Show sessions" }).click();
+      await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
+      await expect(page.getByRole("treeitem", { name: filenames[0], exact: true })).toBeVisible();
       await save(page, device, theme, "explorer");
       await captureStorage(page, device, theme, state);
       await captureExplorerSearch(page, device, theme, mobile);
       const mediaFilter = page.getByRole("combobox", { name: "Media type" });
       await mediaFilter.selectOption("text");
-      await expect(
-        page.getByRole("treeitem", { name: filenames[0], exact: true }),
-      ).toHaveCount(0);
-      await expect(
-        page.getByRole("treeitem", { name: filenames[1], exact: true }),
-      ).toBeVisible();
+      await expect(page.getByRole("treeitem", { name: filenames[0], exact: true })).toHaveCount(0);
+      await expect(page.getByRole("treeitem", { name: filenames[1], exact: true })).toBeVisible();
       await save(page, device, theme, "explorer-text-filter");
-      await page
-        .getByRole("treeitem", { name: filenames[1], exact: true })
-        .focus();
+      await page.getByRole("treeitem", { name: filenames[1], exact: true }).focus();
       await page.keyboard.press("Enter");
       await expect(page.locator("pre")).toContainText("COASTAL COLLECTION");
       await save(page, device, theme, "explorer-filter-opened");
       if (mobile)
-        await page
-          .getByRole("radio", { name: "Files", exact: true })
-          .check({ force: true });
+        await page.getByRole("radio", { name: "Files", exact: true }).check({ force: true });
       await mediaFilter.selectOption("all");
       for (const name of filenames) {
         await selectFile(page, name, mobile);
@@ -1275,41 +1058,27 @@ for (const device of devices) {
           page,
           device,
           theme,
-          name.endsWith(".mkv")
-            ? "video-remux-playback"
-            : `preview-${name.split(".").at(-1)}`,
+          name.endsWith(".mkv") ? "video-remux-playback" : `preview-${name.split(".").at(-1)}`,
         );
         if (name.endsWith(".mkv")) {
-          await expect(
-            page.getByText("Mode: Remux", { exact: true }),
-          ).toBeVisible();
+          await expect(page.getByText("Mode: Remux", { exact: true })).toBeVisible();
           await page.getByRole("button", { name: "Transcode instead" }).click();
           await expect
             .poll(() =>
-              page
-                .locator("video")
-                .evaluate((video: HTMLVideoElement) => video.readyState),
+              page.locator("video").evaluate((video: HTMLVideoElement) => video.readyState),
             )
             .toBeGreaterThanOrEqual(3);
-          await page
-            .locator("video")
-            .evaluate(async (video: HTMLVideoElement) => {
-              video.muted = true;
-              await video.play();
-            });
+          await page.locator("video").evaluate(async (video: HTMLVideoElement) => {
+            video.muted = true;
+            await video.play();
+          });
           await expect
             .poll(() =>
-              page
-                .locator("video")
-                .evaluate((video: HTMLVideoElement) => video.currentTime),
+              page.locator("video").evaluate((video: HTMLVideoElement) => video.currentTime),
             )
             .toBeGreaterThan(0.1);
-          await page
-            .locator("video")
-            .evaluate((video: HTMLVideoElement) => video.pause());
-          await expect(
-            page.getByText("Mode: Transcode", { exact: true }),
-          ).toBeVisible();
+          await page.locator("video").evaluate((video: HTMLVideoElement) => video.pause());
+          await expect(page.getByText("Mode: Transcode", { exact: true })).toBeVisible();
           await save(page, device, theme, "video-transcode-fallback");
         }
         if (name.endsWith(".mp4")) {
@@ -1322,43 +1091,27 @@ for (const device of devices) {
           await expect(thumbnail).toHaveJSProperty("naturalWidth", 1600);
           await expect(seek).toHaveValue("7.75");
           if (mobile) {
-            const navigation = await page
-              .locator(".workspace-mobile-nav")
-              .boundingBox();
+            const navigation = await page.locator(".workspace-mobile-nav").boundingBox();
             if (!navigation) throw new Error("Mobile navigation is missing.");
-            for (const control of [
-              seek,
-              page.locator(".video-scrubber-preview"),
-            ]) {
+            for (const control of [seek, page.locator(".video-scrubber-preview")]) {
               const bounds = await control.boundingBox();
               if (!bounds) throw new Error("Video seek evidence is missing.");
               expect(bounds.x).toBeGreaterThanOrEqual(0);
               expect(bounds.y).toBeGreaterThanOrEqual(0);
               expect(bounds.x + bounds.width).toBeLessThanOrEqual(device.width);
-              expect(bounds.y + bounds.height).toBeLessThanOrEqual(
-                navigation.y,
-              );
+              expect(bounds.y + bounds.height).toBeLessThanOrEqual(navigation.y);
             }
           }
-          await expect(page.locator("video")).toHaveJSProperty(
-            "currentTime",
-            0,
-          );
+          await expect(page.locator("video")).toHaveJSProperty("currentTime", 0);
           await save(page, device, theme, "video-seek-preview");
           await page.keyboard.up("ArrowLeft");
           await page.keyboard.up("End");
-          await expect(page.locator("video")).toHaveJSProperty(
-            "currentTime",
-            7.75,
-          );
+          await expect(page.locator("video")).toHaveJSProperty("currentTime", 7.75);
           await expect
             .poll(() =>
               page
                 .locator("video")
-                .evaluate(
-                  (video: HTMLVideoElement) =>
-                    !video.seeking && video.readyState >= 2,
-                ),
+                .evaluate((video: HTMLVideoElement) => !video.seeking && video.readyState >= 2),
             )
             .toBe(true);
           await expect(thumbnail).toHaveCount(0);
@@ -1375,14 +1128,10 @@ for (const device of devices) {
               Array.from(element.textTracks)
                 .filter((track) => track.mode === "showing")
                 .flatMap((track) =>
-                  Array.from(track.activeCues ?? []).map(
-                    (cue) => (cue as VTTCue).text,
-                  ),
+                  Array.from(track.activeCues ?? []).map((cue) => (cue as VTTCue).text),
                 ),
             );
-          await expect
-            .poll(activeText)
-            .toEqual(["Morning light along the coast"]);
+          await expect.poll(activeText).toEqual(["Morning light along the coast"]);
           await page
             .locator(".video-subtitle-note")
             .evaluate((element) => element.scrollIntoView({ block: "end" }));
@@ -1391,9 +1140,7 @@ for (const device of devices) {
             device.name === "Mobile" ? 96 : 32,
           );
           await save(page, device, theme, "video-subtitles-loaded");
-          await page
-            .getByRole("combobox", { name: "Caption size" })
-            .selectOption("large");
+          await page.getByRole("combobox", { name: "Caption size" }).selectOption("large");
           const offset = page.getByRole("spinbutton", {
             name: "Caption offset (seconds)",
           });
@@ -1402,9 +1149,7 @@ for (const device of devices) {
           await video.evaluate((element: HTMLVideoElement) => {
             element.currentTime = 4;
           });
-          await expect
-            .poll(activeText)
-            .toEqual(["Morning light along the coast"]);
+          await expect.poll(activeText).toEqual(["Morning light along the coast"]);
           await page
             .locator(".video-subtitle-note")
             .evaluate((element) => element.scrollIntoView({ block: "end" }));
@@ -1420,18 +1165,12 @@ for (const device of devices) {
           });
           await expect(page.getByRole("alert")).toBeVisible();
           await page.getByRole("alert").scrollIntoViewIfNeeded();
-          await page.evaluate(
-            (offset) => window.scrollBy(0, offset),
-            mobile ? 96 : 32,
-          );
+          await page.evaluate((offset) => window.scrollBy(0, offset), mobile ? 96 : 32);
           await expect(page.getByRole("alert")).toBeInViewport({ ratio: 1 });
           if (mobile) {
             const alert = await page.getByRole("alert").boundingBox();
-            const navigation = await page
-              .locator(".workspace-mobile-nav")
-              .boundingBox();
-            if (!alert || !navigation)
-              throw new Error("Subtitle layout missing.");
+            const navigation = await page.locator(".workspace-mobile-nav").boundingBox();
+            if (!alert || !navigation) throw new Error("Subtitle layout missing.");
             expect(alert.y + alert.height).toBeLessThanOrEqual(navigation.y);
           }
           await save(page, device, theme, "video-subtitles-error");
@@ -1447,9 +1186,7 @@ for (const device of devices) {
             element.currentTime = 4.5;
           });
           await expect
-            .poll(() =>
-              video.evaluate((element: HTMLVideoElement) => !element.seeking),
-            )
+            .poll(() => video.evaluate((element: HTMLVideoElement) => !element.seeking))
             .toBe(true);
           await expect.poll(activeText).toEqual(["Recovered coastal captions"]);
           await video.evaluate(async (element: HTMLVideoElement) => {
@@ -1457,11 +1194,7 @@ for (const device of devices) {
             await element.play();
           });
           await expect
-            .poll(() =>
-              video.evaluate(
-                (element: HTMLVideoElement) => element.currentTime,
-              ),
-            )
+            .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
             .toBeGreaterThan(4.8);
           await video.evaluate((element: HTMLVideoElement) => element.pause());
           await expect.poll(activeText).toEqual(["Recovered coastal captions"]);
@@ -1478,38 +1211,26 @@ for (const device of devices) {
       });
       try {
         if (mobile)
-          await page
-            .getByRole("radio", { name: "Files", exact: true })
-            .check({ force: true });
-        await page
-          .getByRole("treeitem", { name: filenames[2], exact: true })
-          .click();
-        await expect(page.locator(".preview-panel h2")).toHaveText(
-          filenames[2],
-        );
+          await page.getByRole("radio", { name: "Files", exact: true }).check({ force: true });
+        await page.getByRole("treeitem", { name: filenames[2], exact: true }).click();
+        await expect(page.locator(".preview-panel h2")).toHaveText(filenames[2]);
         const video = page.getByLabel("Video preview");
         await expect(video).toHaveJSProperty("paused", true);
         await expect(video).toHaveJSProperty("readyState", 0);
         await expect(video.locator("source")).toHaveCount(0);
         if (mobile)
-          await page
-            .getByRole("radio", { name: "Preview", exact: true })
-            .check({ force: true });
+          await page.getByRole("radio", { name: "Preview", exact: true }).check({ force: true });
         await video.scrollIntoViewIfNeeded();
         await save(page, device, theme, "video-qualities-pending");
         releaseProbe();
-        await expect(
-          page.getByText("Mode: Original file", { exact: true }),
-        ).toBeVisible();
+        await expect(page.getByText("Mode: Original file", { exact: true })).toBeVisible();
         await expect(video).toHaveJSProperty("readyState", 4);
         await video.evaluate(async (element: HTMLVideoElement) => {
           element.muted = true;
           await element.play();
         });
         await expect
-          .poll(() =>
-            video.evaluate((element: HTMLVideoElement) => element.currentTime),
-          )
+          .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
           .toBeGreaterThan(0.1);
         await video.evaluate((element: HTMLVideoElement) => element.pause());
         await save(page, device, theme, "video-probe-fallback");
@@ -1517,28 +1238,18 @@ for (const device of devices) {
         releaseProbe();
       }
       await selectFile(page, filenames[0], mobile);
-      await page
-        .getByRole("button", { name: "Slideshow", exact: true })
-        .click();
+      await page.getByRole("button", { name: "Slideshow", exact: true }).click();
       await expect(page.locator(".slideshow-meta")).toContainText("1 / 1");
-      await expect(page.locator(".slideshow-stage img")).toHaveJSProperty(
-        "naturalWidth",
-        1200,
-      );
+      await expect(page.locator(".slideshow-stage img")).toHaveJSProperty("naturalWidth", 1200);
       await save(page, device, theme, "slideshow");
       await page.keyboard.press("Escape");
-      await page
-        .getByRole("button", { name: "Open explorer", exact: true })
-        .click();
+      await page.getByRole("button", { name: "Open explorer", exact: true }).click();
       await save(page, device, theme, "explorer-dialog");
       await page.keyboard.press("Escape");
       await captureLargeExplorer(page, device, theme, mobile);
       await page.getByRole("tab", { name: "Explore", exact: true }).click();
-      if (mobile)
-        await page.getByRole("button", { name: "Show sessions" }).click();
-      await page
-        .getByRole("button", { name: "Open Coastal collection", exact: true })
-        .click();
+      if (mobile) await page.getByRole("button", { name: "Show sessions" }).click();
+      await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
       await page.getByRole("button", { name: "Storage", exact: true }).click();
       const storageDialog = page.getByRole("dialog", {
         name: "Session storage",
@@ -1549,16 +1260,10 @@ for (const device of devices) {
       await page.route("**/rpc/sessions/list", (route) =>
         route.fulfill({ json: { json: { items: [] } } }),
       );
-      await storageDialog
-        .getByRole("button", { name: "Delete session files…" })
-        .click();
-      await storageDialog
-        .getByRole("button", { name: "Delete permanently" })
-        .click();
+      await storageDialog.getByRole("button", { name: "Delete session files…" }).click();
+      await storageDialog.getByRole("button", { name: "Delete permanently" }).click();
       await expect(storageDialog).toHaveCount(0);
-      await expect(
-        page.getByRole("button", { name: "Storage", exact: true }),
-      ).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Storage", exact: true })).toHaveCount(0);
       await save(page, device, theme, "session-storage-deleted");
     });
   }
@@ -1573,10 +1278,7 @@ for (const device of devices) {
       });
       await page.emulateMedia({ colorScheme: theme });
       await page.goto(multilingual.origin);
-      await page.evaluate(
-        (value) => localStorage.setItem("zip-image-viewer-theme", value),
-        theme,
-      );
+      await page.evaluate((value) => localStorage.setItem("zip-image-viewer-theme", value), theme);
       await page.reload();
       await page.getByRole("tab", { name: "Explore" }).click();
       if (device.name === "Mobile")
@@ -1584,17 +1286,13 @@ for (const device of devices) {
       await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
       if (device.name === "Mobile") {
         await page.getByRole("button", { name: "Hide sessions" }).click();
-        await page
-          .getByRole("radio", { name: "Preview", exact: true })
-          .check({ force: true });
+        await page.getByRole("radio", { name: "Preview", exact: true }).check({ force: true });
       }
       const video = page.getByLabel("Video preview");
       await expect
-        .poll(
-          () =>
-            video.evaluate((element: HTMLVideoElement) => element.readyState),
-          { timeout: 30_000 },
-        )
+        .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState), {
+          timeout: 30_000,
+        })
         .toBeGreaterThanOrEqual(2);
       await video.evaluate(async (element: HTMLVideoElement) => {
         element.muted = true;
@@ -1618,9 +1316,7 @@ for (const device of devices) {
             Array.from(element.textTracks)
               .filter((track) => track.mode === "showing")
               .flatMap((track) =>
-                Array.from(track.activeCues ?? []).map(
-                  (cue) => (cue as VTTCue).text,
-                ),
+                Array.from(track.activeCues ?? []).map((cue) => (cue as VTTCue).text),
               ),
           ),
         )
@@ -1641,18 +1337,13 @@ for (const device of devices) {
             0,
             Math.max(
               0,
-              element.getBoundingClientRect().bottom -
-                navigation.getBoundingClientRect().top +
-                16,
+              element.getBoundingClientRect().bottom - navigation.getBoundingClientRect().top + 16,
             ),
           );
         });
         const bounds = await audio.boundingBox();
-        const navigation = await page
-          .locator(".workspace-mobile-nav")
-          .boundingBox();
-        if (!bounds || !navigation)
-          throw new Error("Mobile audio controls are missing.");
+        const navigation = await page.locator(".workspace-mobile-nav").boundingBox();
+        if (!bounds || !navigation) throw new Error("Mobile audio controls are missing.");
         expect(bounds.y + bounds.height).toBeLessThanOrEqual(navigation.y);
       }
       await save(page, device, theme, "video-embedded-subtitles-error");
@@ -1664,9 +1355,7 @@ for (const device of devices) {
             Array.from(element.textTracks)
               .filter((track) => track.mode === "showing")
               .flatMap((track) =>
-                Array.from(track.activeCues ?? []).map(
-                  (cue) => (cue as VTTCue).text,
-                ),
+                Array.from(track.activeCues ?? []).map((cue) => (cue as VTTCue).text),
               ),
           ),
         )

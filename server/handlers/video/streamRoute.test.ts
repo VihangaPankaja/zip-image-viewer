@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { spawn } from "node:child_process";
 import type { Express, Request, RequestHandler, Response } from "express";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import type { Session } from "../../domain/models.js";
 import { registerVideoStreamRoute } from "./streamRoute.js";
 import type { VideoRouteDependencies } from "./types.js";
@@ -49,11 +49,7 @@ it("aborts the queued stream on disconnect and never spawns an encoder after it"
     },
   } as unknown as VideoRouteDependencies);
   if (!handler) throw new Error("Stream route was not registered");
-  const running = handler(
-    { query: {} } as Request,
-    response as unknown as Response,
-    vi.fn(),
-  );
+  const running = handler({ query: {} } as Request, response as unknown as Response, vi.fn());
   await vi.waitFor(() => expect(release).toBeTypeOf("function"));
   response.destroyed = true;
   response.emit("close");

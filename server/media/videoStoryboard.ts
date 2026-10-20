@@ -4,10 +4,7 @@ import path from "node:path";
 
 import type { VideoStoryboard } from "../../shared/contracts.js";
 
-export function storyboardDirectory(
-  workspace: string,
-  videoPath: string,
-): string {
+export function storyboardDirectory(workspace: string, videoPath: string): string {
   return path.join(
     workspace,
     "video-storyboards",
@@ -20,10 +17,7 @@ export function storyboardIndex(durationSeconds: number): VideoStoryboard {
     throw new Error("Video duration is unavailable.");
   // ponytail: cap at 240 frames; increase only if long-clip preview detail needs it.
   const intervalSeconds = Math.max(5, durationSeconds / 240);
-  const frameCount = Math.min(
-    240,
-    Math.ceil(durationSeconds / intervalSeconds),
-  );
+  const frameCount = Math.min(240, Math.ceil(durationSeconds / intervalSeconds));
   return {
     intervalSeconds,
     width: 320,
@@ -45,10 +39,7 @@ export async function generateStoryboard(
   durationSeconds: number,
   run: (_args: string[]) => Promise<void>,
 ): Promise<VideoStoryboard> {
-  const cached = await readFile(
-    path.join(directory, "index.json"),
-    "utf8",
-  ).catch(() => null);
+  const cached = await readFile(path.join(directory, "index.json"), "utf8").catch(() => null);
   if (cached) return JSON.parse(cached) as VideoStoryboard;
   const index = storyboardIndex(durationSeconds);
   const pending = `${directory}.pending`;
@@ -70,11 +61,7 @@ export async function generateStoryboard(
       "4",
       path.join(pending, "sheet-%d.jpg"),
     ]);
-    for (
-      let sheet = 1;
-      sheet <= Math.ceil(index.frames.length / 25);
-      sheet += 1
-    ) {
+    for (let sheet = 1; sheet <= Math.ceil(index.frames.length / 25); sheet += 1) {
       if (!(await stat(path.join(pending, `sheet-${String(sheet)}.jpg`))).size)
         throw new Error("Storyboard sheet is empty.");
     }

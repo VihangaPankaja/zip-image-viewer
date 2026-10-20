@@ -125,10 +125,7 @@ export function useVideoPlaybackController({
     state.setters.setVideoPlaybackError("");
     state.setters.setVideoPlaybackStatus("loading");
     if (state.hlsRef.current) {
-      if (
-        playback.videoPlaybackError ===
-        "This browser cannot decode this stream."
-      ) {
+      if (playback.videoPlaybackError === "This browser cannot decode this stream.") {
         state.hlsRef.current.recoverMediaError();
       } else {
         state.hlsRef.current.startLoad(-1);

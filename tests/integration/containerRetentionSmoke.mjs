@@ -5,14 +5,11 @@ import process from "node:process";
 import { pathToFileURL } from "node:url";
 const { fetch } = globalThis;
 // The production build exists only after the CI dead-code check.
-const builtModule = (name) =>
-  pathToFileURL(path.join(process.cwd(), "build/server", name)).href;
+const builtModule = (name) => pathToFileURL(path.join(process.cwd(), "build/server", name)).href;
 const { createRetainedTorrentStore } = await import(
   builtModule("repositories/retainedTorrents.js")
 );
-const { createJobManager } = await import(
-  builtModule("application/jobs/jobManager.js")
-);
+const { createJobManager } = await import(builtModule("application/jobs/jobManager.js"));
 
 assert.notEqual(process.getuid(), 0, "The container must run as the app user");
 const directory = path.resolve("sessions");
@@ -23,10 +20,7 @@ if (process.argv[2] === "seed") {
   const job = manager.createJob(`magnet:?xt=urn:btih:${"a".repeat(40)}`);
   manager.emitJob(job, { status: "paused", phase: "paused" });
   await mkdir(job.workspaceDir, { recursive: true });
-  await writeFile(
-    path.join(job.workspaceDir, "payload-marker"),
-    "retained payload",
-  );
+  await writeFile(path.join(job.workspaceDir, "payload-marker"), "retained payload");
   await writeFile(probePath, job.id);
   store.close();
 } else {
@@ -40,8 +34,5 @@ if (process.argv[2] === "seed") {
   assert.equal((await health.json()).ready, true);
   const jobs = await fetch("http://127.0.0.1:8080/api/session-jobs");
   assert.equal(jobs.status, 200);
-  assert.equal(
-    (await jobs.json()).items.find((job) => job.id === id)?.status,
-    "paused",
-  );
+  assert.equal((await jobs.json()).items.find((job) => job.id === id)?.status, "paused");
 }

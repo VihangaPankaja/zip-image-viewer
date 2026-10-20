@@ -18,9 +18,7 @@ export function AudioPreviewContent({
     <div className="preview-stage">
       <div className="preview-toolbar">
         <span>{formatBytes(selectedNode.size ?? 0)}</span>
-        <span>
-          {(selectedNode.extension || "audio").toUpperCase()} stream preview
-        </span>
+        <span>{(selectedNode.extension || "audio").toUpperCase()} stream preview</span>
         <span>{formatDate(selectedNode.modifiedAt ?? 0)}</span>
       </div>
       <div className="image-frame media-frame">

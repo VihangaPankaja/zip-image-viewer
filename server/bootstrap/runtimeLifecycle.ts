@@ -1,9 +1,6 @@
 import type { Server } from "node:http";
 import type { Session, SessionJob } from "../domain/models.js";
-import {
-  CLEANUP_INTERVAL_MS,
-  SESSION_TTL_MS,
-} from "../config/runtimeConstants.js";
+import { CLEANUP_INTERVAL_MS, SESSION_TTL_MS } from "../config/runtimeConstants.js";
 
 type LogEvent = (
   _level: "info" | "warn" | "error",
@@ -21,14 +18,8 @@ type Dependencies = {
   logEvent: LogEvent;
 };
 
-function logFailure(
-  logEvent: LogEvent,
-  event: string,
-  id: string,
-  error: unknown,
-): void {
-  const failure =
-    error instanceof Error ? error : new Error("Unexpected cleanup failure");
+function logFailure(logEvent: LogEvent, event: string, id: string, error: unknown): void {
+  const failure = error instanceof Error ? error : new Error("Unexpected cleanup failure");
   logEvent("error", event, {
     id,
     error: failure.message,
@@ -64,17 +55,13 @@ export function registerRuntimeLifecycle(deps: Dependencies): void {
     });
     const server = deps.getServer();
     await deps.stopWorkers?.();
-    await Promise.all(
-      [...deps.jobs.keys()].map((id) => deps.cleanupJob(id, "shutdown")),
-    );
+    await Promise.all([...deps.jobs.keys()].map((id) => deps.cleanupJob(id, "shutdown")));
     if (server) {
       await new Promise<void>((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()));
       });
     }
-    await Promise.all(
-      [...deps.sessions.keys()].map((id) => deps.removeSession(id, "shutdown")),
-    );
+    await Promise.all([...deps.sessions.keys()].map((id) => deps.removeSession(id, "shutdown")));
     await Promise.all((deps.shutdownServices ?? []).map((close) => close()));
     deps.logEvent("info", "shutdown.complete");
     process.exit(0);

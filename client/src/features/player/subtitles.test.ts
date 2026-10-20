@@ -7,9 +7,7 @@ describe("external subtitle validation", () => {
         "\uFEFF1\r\n00:00:01,250 --> 00:00:03,000\r\n<b>Hello</b>\r\n<script>alert(1)</script>",
         "srt",
       ),
-    ).toBe(
-      "WEBVTT\n\n00:00:01.250 --> 00:00:03.000\n<b>Hello</b>\n<script>alert(1)</script>\n",
-    );
+    ).toBe("WEBVTT\n\n00:00:01.250 --> 00:00:03.000\n<b>Hello</b>\n<script>alert(1)</script>\n");
   });
   it("preserves native VTT cue positioning and comments", () => {
     const vtt =
@@ -28,10 +26,7 @@ describe("external subtitle validation", () => {
   });
   it("rejects excessive cue counts", () => {
     expect(() =>
-      normalizeSubtitles(
-        "WEBVTT\n\n" + "00:01.000 --> 00:03.000\nHello\n\n".repeat(10001),
-        "vtt",
-      ),
+      normalizeSubtitles("WEBVTT\n\n" + "00:01.000 --> 00:03.000\nHello\n\n".repeat(10001), "vtt"),
     ).toThrow(/10,000/);
   });
 });

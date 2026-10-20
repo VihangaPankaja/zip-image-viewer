@@ -47,9 +47,7 @@ export function formatEta(seconds: number): string {
   return `${secs}s`;
 }
 
-export function formatDate(
-  value: Date | number | string | null | undefined,
-): string {
+export function formatDate(value: Date | number | string | null | undefined): string {
   if (!value) {
     return "Date unknown";
   }

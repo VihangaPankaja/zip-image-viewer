@@ -11,10 +11,7 @@ import {
 } from "./routeContext.js";
 import type { VideoRouteDependencies } from "./types.js";
 
-function buildTranscodeArgs(
-  targetPath: string,
-  selectedHeight: number,
-): string[] {
+function buildTranscodeArgs(targetPath: string, selectedHeight: number): string[] {
   const args = ["-hide_banner", "-loglevel", "error", "-i", targetPath];
   if (selectedHeight > 0) {
     args.push("-vf", `scale=-2:${String(selectedHeight)}`);
@@ -72,19 +69,13 @@ function pipeTranscode(
   child.stdout.pipe(res);
 }
 
-export function registerVideoStreamRoute(
-  app: Express,
-  deps: VideoRouteDependencies,
-): void {
+export function registerVideoStreamRoute(app: Express, deps: VideoRouteDependencies): void {
   app.get("/api/sessions/:id/video/stream", async (req, res) => {
     const context = await resolveVideoContext(req, res, deps);
     const ffmpegPath = context && requireTranscoder(res, deps);
     if (!context || !ffmpegPath) return;
     const quality = queryText(req.query.quality, "source").toLowerCase();
-    const sourceDimensions = await deps.getVideoDimensions(
-      context.targetPath,
-      context.session,
-    );
+    const sourceDimensions = await deps.getVideoDimensions(context.targetPath, context.session);
     const { options } = deps.buildVideoQualityOptions(sourceDimensions.height);
     const selected = selectVideoQuality(options, quality);
     res.setHeader("cache-control", "no-store");

@@ -15,8 +15,7 @@ describe("PreviewContent", () => {
   } as unknown as PreviewContentProps;
 
   afterEach(() => {
-    delete (HTMLElement.prototype as { requestFullscreen?: () => void })
-      .requestFullscreen;
+    delete (HTMLElement.prototype as { requestFullscreen?: () => void }).requestFullscreen;
   });
 
   it("maximizes any previewable file", () => {

@@ -11,11 +11,7 @@ import {
 } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
-import type {
-  Session,
-  VideoRendition,
-  VideoTranscodeEntry,
-} from "../../domain/models.js";
+import type { Session, VideoRendition, VideoTranscodeEntry } from "../../domain/models.js";
 import { type Fmp4HlsInput } from "../../media/ffmpegHls.js";
 import { publishedSegments } from "../../media/hlsManifest.js";
 import { HlsEncoder } from "./hlsEncoder.js";
@@ -28,10 +24,7 @@ function windowStart(index: number): number {
   return Math.floor(index / WINDOW_SEGMENTS) * WINDOW_SEGMENTS;
 }
 
-export function windowDirectory(
-  rendition: VideoRendition,
-  index: number,
-): string {
+export function windowDirectory(rendition: VideoRendition, index: number): string {
   return path.join(rendition.dir, `window-${String(windowStart(index))}`);
 }
 
@@ -41,15 +34,12 @@ async function windowAvailability(rendition: VideoRendition): Promise<number> {
     directories
       .filter((name) => /^window-\d+$/.test(name))
       .map(async (name) => {
-        const source = await readFile(
-          path.join(rendition.dir, name, "index.m3u8"),
-          "utf8",
-        ).catch(() => "");
+        const source = await readFile(path.join(rendition.dir, name, "index.m3u8"), "utf8").catch(
+          () => "",
+        );
         const start = Number(name.slice(7));
         return publishedSegments(source).filter(
-          (index) =>
-            index <
-            Math.min(start + WINDOW_SEGMENTS, rendition.expectedSegments),
+          (index) => index < Math.min(start + WINDOW_SEGMENTS, rendition.expectedSegments),
         ).length;
       }),
   );
@@ -57,15 +47,11 @@ async function windowAvailability(rendition: VideoRendition): Promise<number> {
   return rendition.availableSegments;
 }
 
-export async function refreshRenditionAvailability(
-  rendition: VideoRendition,
-): Promise<number> {
+export async function refreshRenditionAvailability(rendition: VideoRendition): Promise<number> {
   if (rendition.durationSeconds > WINDOWED_AFTER_SECONDS) {
     return windowAvailability(rendition);
   }
-  const playlist = await readFile(rendition.playlistPath, "utf8").catch(
-    () => "",
-  );
+  const playlist = await readFile(rendition.playlistPath, "utf8").catch(() => "");
   rendition.availableSegments = publishedSegments(playlist).length;
   return rendition.availableSegments;
 }
@@ -82,11 +68,7 @@ export function buildWindowPlaylist(
     "#EXT-X-MEDIA-SEQUENCE:0",
     "#EXT-X-PLAYLIST-TYPE:VOD",
   ];
-  for (
-    let index = 0;
-    index < Math.ceil(duration / HLS_SEGMENT_SECONDS);
-    index += 1
-  ) {
+  for (let index = 0; index < Math.ceil(duration / HLS_SEGMENT_SECONDS); index += 1) {
     if (index % WINDOW_SEGMENTS === 0) {
       if (index) lines.push("#EXT-X-DISCONTINUITY");
       lines.push(`#EXT-X-MAP:URI="${initUri(index)}"`);
@@ -140,14 +122,8 @@ async function consume(job: Job, signal?: AbortSignal): Promise<void> {
   }
 }
 
-async function cachedWindow(
-  destination: string,
-  index: number,
-): Promise<boolean> {
-  const playlist = await readFile(
-    path.join(destination, "index.m3u8"),
-    "utf8",
-  ).catch(() => "");
+async function cachedWindow(destination: string, index: number): Promise<boolean> {
+  const playlist = await readFile(path.join(destination, "index.m3u8"), "utf8").catch(() => "");
   if (
     !playlist.includes("#EXT-X-ENDLIST") ||
     /#EXTINF:0(?:\.0+)?,/.test(playlist) ||
@@ -178,13 +154,11 @@ async function publishWindow(
   const audioPadding =
     audio &&
     segments.length === expected + 1 &&
-    /#EXTINF:0\.0[0-4]\d*,\r?\nsegment_\d+\.m4s\r?\n#EXT-X-ENDLIST/.test(
-      playlist,
-    );
+    /#EXTINF:0\.0[0-4]\d*,\r?\nsegment_\d+\.m4s\r?\n#EXT-X-ENDLIST/.test(playlist);
   if (
     !playlist.includes("#EXT-X-ENDLIST") ||
-    !Array.from({ length: expected }, (_, offset) => start + offset).every(
-      (segment) => segments.includes(segment),
+    !Array.from({ length: expected }, (_, offset) => start + offset).every((segment) =>
+      segments.includes(segment),
     ) ||
     (segments.length !== expected && !audioPadding)
   )
@@ -196,12 +170,7 @@ async function publishWindow(
     `init-${createHash("sha256").update(init).digest("hex")}.mp4`,
   );
   await link(initPath, sharedInit).catch((error: unknown) => {
-    if (
-      !(error instanceof Error) ||
-      !("code" in error) ||
-      error.code !== "EEXIST"
-    )
-      throw error;
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "EEXIST") throw error;
   });
   await unlink(initPath);
   await link(sharedInit, initPath);
@@ -215,11 +184,7 @@ export class HlsWindows {
   constructor(
     private readonly executable: string | null,
     private readonly runTask: RunTask,
-    private readonly encoder = new HlsEncoder(
-      executable ?? "",
-      "cpu",
-      () => undefined,
-    ),
+    private readonly encoder = new HlsEncoder(executable ?? "", "cpu", () => undefined),
   ) {}
 
   private async encode(
@@ -234,9 +199,7 @@ export class HlsWindows {
     const temporary = await mkdtemp(path.join(rendition.dir, ".window-"));
     try {
       rendition.status = "running";
-      const audio = entry.audioTracks?.find(
-        ({ id }) => id === rendition.qualityId,
-      );
+      const audio = entry.audioTracks?.find(({ id }) => id === rendition.qualityId);
       if (rendition.qualityId.startsWith("audio-") && !audio)
         throw new Error("Unknown audio track.");
       const input: Fmp4HlsInput = {
@@ -315,11 +278,7 @@ export class HlsWindows {
     priority: Priority = "interactive",
   ): Promise<void> {
     signal?.throwIfAborted();
-    if (
-      !Number.isSafeInteger(index) ||
-      index < 0 ||
-      index >= entry.expectedSegments
-    )
+    if (!Number.isSafeInteger(index) || index < 0 || index >= entry.expectedSegments)
       throw new RangeError("Segment index is outside the video.");
     const start = windowStart(index);
     let jobs = this.jobs.get(rendition);
@@ -344,16 +303,10 @@ export class HlsWindows {
           rendition.priorityJobs.delete(start);
           if (!rendition.priorityJobs.size)
             rendition.status =
-              rendition.availableSegments >= entry.expectedSegments
-                ? "done"
-                : "idle";
+              rendition.availableSegments >= entry.expectedSegments ? "done" : "idle";
         })
         .catch(() => undefined);
-    } else if (
-      priority === "interactive" &&
-      job.priority === "background" &&
-      !job.started
-    ) {
+    } else if (priority === "interactive" && job.priority === "background" && !job.started) {
       job.priority = "interactive";
       job.controller.abort();
       job.controller = new AbortController();

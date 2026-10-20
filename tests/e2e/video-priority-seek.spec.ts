@@ -8,10 +8,7 @@ test("retained short video is prepared before opening and plays near its end", a
   page,
   browserName,
 }) => {
-  test.skip(
-    browserName !== "chromium",
-    "Real H.264/AAC decode uses Chromium's bundled codecs.",
-  );
+  test.skip(browserName !== "chromium", "Real H.264/AAC decode uses Chromium's bundled codecs.");
   test.setTimeout(60_000);
   const fixture = await startMultilingualFixture("http://127.0.0.1:5173");
   try {
@@ -22,9 +19,7 @@ test("retained short video is prepared before opening and plays near its end", a
       path.join(fixture.directory, "multilingual.mkv"),
     );
     for (const id of ["360p", "audio-1"])
-      await expect
-        .poll(() => entry.renditions.get(id)?.status, { timeout: 30_000 })
-        .toBe("done");
+      await expect.poll(() => entry.renditions.get(id)?.status, { timeout: 30_000 }).toBe("done");
     await page.goto(fixture.origin);
     await page.getByRole("tab", { name: "Explore" }).click();
     await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
@@ -42,8 +37,7 @@ test("retained short video is prepared before opening and plays near its end", a
     await expect
       .poll(() =>
         video.evaluate(
-          (v: HTMLVideoElement) =>
-            !v.seeking && v.readyState >= 2 && v.currentTime > 16.25,
+          (v: HTMLVideoElement) => !v.seeking && v.readyState >= 2 && v.currentTime > 16.25,
         ),
       )
       .toBe(true);
@@ -57,16 +51,9 @@ test("long video supports two viewers, pointer seeking and narrow touch/keyboard
   page,
   browserName,
 }) => {
-  test.skip(
-    browserName !== "chromium",
-    "Real H.264/AAC decode uses Chromium's bundled codecs.",
-  );
+  test.skip(browserName !== "chromium", "Real H.264/AAC decode uses Chromium's bundled codecs.");
   test.setTimeout(90_000);
-  const fixture = await startMultilingualFixture(
-    "http://127.0.0.1:5173",
-    0,
-    130.25,
-  );
+  const fixture = await startMultilingualFixture("http://127.0.0.1:5173", 0, 130.25);
   const other = await page.context().newPage();
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
@@ -74,17 +61,11 @@ test("long video supports two viewers, pointer seeking and narrow touch/keyboard
     for (const viewer of [page, other]) {
       await viewer.goto(fixture.origin);
       await viewer.getByRole("tab", { name: "Explore" }).click();
-      await viewer
-        .getByRole("button", { name: "Open multilingual.mkv" })
-        .click();
+      await viewer.getByRole("button", { name: "Open multilingual.mkv" }).click();
       await expect
-        .poll(
-          () =>
-            viewer
-              .locator("video")
-              .evaluate((v: HTMLVideoElement) => v.readyState),
-          { timeout: 30_000 },
-        )
+        .poll(() => viewer.locator("video").evaluate((v: HTMLVideoElement) => v.readyState), {
+          timeout: 30_000,
+        })
         .toBeGreaterThanOrEqual(2);
     }
     const seek = page.getByRole("slider", { name: "Seek video" });
@@ -92,10 +73,7 @@ test("long video supports two viewers, pointer seeking and narrow touch/keyboard
     await seek.scrollIntoViewIfNeeded();
     const bounds = await seek.boundingBox();
     if (!bounds) throw new Error("Seek control missing.");
-    await page.mouse.move(
-      bounds.x + bounds.width * 0.8,
-      bounds.y + bounds.height / 2,
-    );
+    await page.mouse.move(bounds.x + bounds.width * 0.8, bounds.y + bounds.height / 2);
     await page.mouse.down();
     await expect(page.locator(".video-scrubber-preview")).toBeVisible();
     const pointerTarget = Number(await seek.inputValue());
@@ -132,16 +110,11 @@ test("long video supports two viewers, pointer seeking and narrow touch/keyboard
     }
     await page.bringToFront();
     await page.setViewportSize({ width: 360, height: 844 });
-    await page
-      .getByRole("radio", { name: "Preview", exact: true })
-      .check({ force: true });
+    await page.getByRole("radio", { name: "Preview", exact: true }).check({ force: true });
     await seek.scrollIntoViewIfNeeded();
     const mobile = await seek.boundingBox();
     if (!mobile) throw new Error("Touch seek control missing.");
-    await page.touchscreen.tap(
-      mobile.x + mobile.width * 0.4,
-      mobile.y + mobile.height / 2,
-    );
+    await page.touchscreen.tap(mobile.x + mobile.width * 0.4, mobile.y + mobile.height / 2);
     await expect
       .poll(
         () =>
@@ -149,10 +122,7 @@ test("long video supports two viewers, pointer seeking and narrow touch/keyboard
             .locator("video")
             .evaluate(
               (v: HTMLVideoElement) =>
-                !v.seeking &&
-                v.readyState >= 2 &&
-                v.currentTime > 50 &&
-                v.currentTime < 54,
+                !v.seeking && v.readyState >= 2 && v.currentTime > 50 && v.currentTime < 54,
             ),
         { timeout: 30_000 },
       )
@@ -167,19 +137,15 @@ test("long video supports two viewers, pointer seeking and narrow touch/keyboard
             .locator("video")
             .evaluate(
               (v: HTMLVideoElement, time) =>
-                !v.seeking &&
-                v.readyState >= 2 &&
-                Math.abs(v.currentTime - time - 0.25) < 0.1,
+                !v.seeking && v.readyState >= 2 && Math.abs(v.currentTime - time - 0.25) < 0.1,
               touchTarget,
             ),
         { timeout: 30_000 },
       )
       .toBe(true);
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
-      ),
-    ).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
     expect(errors).toEqual([]);
   } finally {
     await other.close();

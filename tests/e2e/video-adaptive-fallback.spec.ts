@@ -13,12 +13,7 @@ test("Auto downshifts to a prepared rendition after a mid-video bandwidth drop",
   );
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1440, height: 1000 });
-  const fixture = await startMultilingualFixture(
-    "http://127.0.0.1:5173",
-    0,
-    130.25,
-    480,
-  );
+  const fixture = await startMultilingualFixture("http://127.0.0.1:5173", 0, 130.25, 480);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   try {
@@ -31,16 +26,14 @@ test("Auto downshifts to a prepared rendition after a mid-video bandwidth drop",
         timeout: 30_000,
       })
       .toBeGreaterThanOrEqual(2);
-    await page
-      .getByRole("button", { name: "Maximize preview", exact: true })
-      .click();
+    await page.getByRole("button", { name: "Maximize preview", exact: true }).click();
     await video.evaluate(async (v: HTMLVideoElement) => {
       v.muted = true;
       await v.play();
     });
-    await expect(
-      page.getByText("Auto · 480p playback", { exact: true }),
-    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("Auto · 480p playback", { exact: true })).toBeVisible({
+      timeout: 30_000,
+    });
     await page.getByRole("button", { name: "Quality", exact: true }).click();
     await page.getByRole("option", { name: "480p", exact: true }).click();
     await video.evaluate(async (v: HTMLVideoElement) => {
@@ -52,13 +45,9 @@ test("Auto downshifts to a prepared rendition after a mid-video bandwidth drop",
       timeout: 30_000,
     });
     await expect
-      .poll(
-        () =>
-          video.evaluate(
-            (v: HTMLVideoElement) => !v.seeking && v.currentTime > 64.5,
-          ),
-        { timeout: 30_000 },
-      )
+      .poll(() => video.evaluate((v: HTMLVideoElement) => !v.seeking && v.currentTime > 64.5), {
+        timeout: 30_000,
+      })
       .toBe(true);
     const entry = await fixture.runtime.ensureVideoTranscodeEntry(
       fixture.session,
@@ -70,10 +59,7 @@ test("Auto downshifts to a prepared rendition after a mid-video bandwidth drop",
     const fallbacks: { index: number; cached: boolean }[] = [];
     page.on("request", (request) => {
       const url = new URL(request.url());
-      if (
-        !url.pathname.endsWith("/hls/segment") ||
-        url.searchParams.get("quality") !== "360p"
-      )
+      if (!url.pathname.endsWith("/hls/segment") || url.searchParams.get("quality") !== "360p")
         return;
       const index = Number(url.searchParams.get("index"));
       const record = { index, cached: false };
@@ -101,14 +87,12 @@ test("Auto downshifts to a prepared rendition after a mid-video bandwidth drop",
     });
     await page.getByRole("button", { name: "Quality", exact: true }).click();
     await page.getByRole("option", { name: "Auto", exact: true }).click();
-    await expect
-      .poll(() => fallbacks.length, { timeout: 45_000 })
-      .toBeGreaterThan(0);
+    await expect.poll(() => fallbacks.length, { timeout: 45_000 }).toBeGreaterThan(0);
     expect(fallbacks[0].index).toBeGreaterThan(0);
     await expect.poll(() => fallbacks[0].cached).toBe(true);
-    await expect(
-      page.getByText("Auto · 360p playback", { exact: true }),
-    ).toBeVisible({ timeout: 45_000 });
+    await expect(page.getByText("Auto · 360p playback", { exact: true })).toBeVisible({
+      timeout: 45_000,
+    });
     const before = await video.evaluate((v: HTMLVideoElement) => v.currentTime);
     await expect
       .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime), {

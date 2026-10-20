@@ -1,12 +1,6 @@
 import type { Torrent } from "webtorrent";
-import type {
-  TorrentFile,
-  TorrentPriority,
-} from "../../../shared/contracts.js";
-import type {
-  TorrentDownloadInput,
-  TorrentProgress,
-} from "./torrentDownloader.js";
+import type { TorrentFile, TorrentPriority } from "../../../shared/contracts.js";
+import type { TorrentDownloadInput, TorrentProgress } from "./torrentDownloader.js";
 import { MAX_TORRENT_METADATA_BYTES } from "./torrentSource.js";
 import { validateTorrentFilePath } from "./torrentSource.js";
 import {
@@ -16,10 +10,7 @@ import {
   resourceLimitError,
 } from "../../infrastructure/runtime/resourceLimits.js";
 const webTorrentPriority = { low: 0, normal: 1, high: 2 } as const;
-export function describeTorrentFiles(
-  torrent: Torrent,
-  directory: string,
-): TorrentFile[] {
+export function describeTorrentFiles(torrent: Torrent, directory: string): TorrentFile[] {
   assertResourceEntryCount(torrent.files.length);
   if (torrent.torrentFile.length > MAX_TORRENT_METADATA_BYTES)
     throw resourceLimitError("Torrent metadata exceeds the 10 MiB limit.");
@@ -74,10 +65,7 @@ export function selectedProgress(
   });
   const selected = files.filter((file) => file.selected);
   const total = selected.reduce((sum, file) => sum + file.size, 0);
-  const downloadedBytes = selected.reduce(
-    (sum, file) => sum + file.downloadedBytes,
-    0,
-  );
+  const downloadedBytes = selected.reduce((sum, file) => sum + file.downloadedBytes, 0);
   return {
     files,
     downloadedBytes,
@@ -89,10 +77,7 @@ export function selectedProgress(
   };
 }
 
-export function selectFiles(
-  torrent: Torrent,
-  input: TorrentDownloadInput,
-): Set<string> {
+export function selectFiles(torrent: Torrent, input: TorrentDownloadInput): Set<string> {
   const files = describeTorrentFiles(torrent, input.downloadDir);
   const ids = new Set(
     input.onMetadata({
@@ -102,10 +87,7 @@ export function selectFiles(
       torrentFile: torrent.torrentFile,
     }),
   );
-  if (
-    !ids.size ||
-    [...ids].some((id) => !files.some((file) => file.id === id))
-  ) {
+  if (!ids.size || [...ids].some((id) => !files.some((file) => file.id === id))) {
     throw resourceLimitError("Choose one or more known torrent files.");
   }
   return ids;
@@ -137,8 +119,7 @@ export function applyFilePriorities(
   };
   for (const [start, end] of ranges) {
     for (const selection of scheduler._selections) {
-      if (selection.from === start && selection.to === end && !selection.notify)
-        selection.remove();
+      if (selection.from === start && selection.to === end && !selection.notify) selection.remove();
     }
   }
   scheduler._updateSelections();
@@ -147,14 +128,9 @@ export function applyFilePriorities(
   const pieces = new Uint8Array(torrent.pieces.length);
   torrent.files.forEach((file, index) => {
     if (!selectedIds.has(String(index)) || !file.length) return;
-    const priority =
-      webTorrentPriority[priorities.get(String(index)) ?? "normal"] + 1;
+    const priority = webTorrentPriority[priorities.get(String(index)) ?? "normal"] + 1;
     const end = Math.ceil((file.offset + file.length) / torrent.pieceLength);
-    for (
-      let piece = Math.floor(file.offset / torrent.pieceLength);
-      piece < end;
-      piece += 1
-    )
+    for (let piece = Math.floor(file.offset / torrent.pieceLength); piece < end; piece += 1)
       pieces[piece] = Math.max(pieces[piece], priority);
   });
   if (!pieces.length) return;
@@ -188,10 +164,7 @@ export function reserveTorrentSelection(
   let bytes = 0;
   let missingBytes = 0;
   for (const piece of pieces) {
-    const size = Math.min(
-      torrent.pieceLength,
-      torrent.length - piece * torrent.pieceLength,
-    );
+    const size = Math.min(torrent.pieceLength, torrent.length - piece * torrent.pieceLength);
     bytes += size;
     if (torrent.pieces[piece] !== null) missingBytes += size;
   }

@@ -13,13 +13,8 @@ describe("App bootstrap", () => {
         <App />
       </QueryClientProvider>,
     );
-    expect(screen.getByRole("tab", { name: "Downloads" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    expect(screen.getByRole("tab", { name: "Downloads" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: "Explore" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Add downloads" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add downloads" })).toBeInTheDocument();
   });
 });

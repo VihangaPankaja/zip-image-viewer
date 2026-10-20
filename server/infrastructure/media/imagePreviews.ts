@@ -2,10 +2,7 @@ import { mkdir, open, stat } from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import sharp from "sharp";
-import {
-  MAX_THUMBNAIL_SIZE,
-  TEXT_PREVIEW_LIMIT,
-} from "../../config/runtimeConstants.js";
+import { MAX_THUMBNAIL_SIZE, TEXT_PREVIEW_LIMIT } from "../../config/runtimeConstants.js";
 import type { Session } from "../../domain/models.js";
 
 const PROFILES = {
@@ -46,10 +43,7 @@ export async function ensureThumbnail(
   const requestedSize = numericSize(size);
   const safeSize = Math.max(
     48,
-    Math.min(
-      Number.isFinite(requestedSize) ? requestedSize : 220,
-      MAX_THUMBNAIL_SIZE,
-    ),
+    Math.min(Number.isFinite(requestedSize) ? requestedSize : 220, MAX_THUMBNAIL_SIZE),
   );
   const hash = crypto
     .createHash("sha1")
@@ -86,16 +80,11 @@ export async function ensureImagePreview(
   profileName: string,
   logEvent: LogEvent,
 ): Promise<string> {
-  const safeName =
-    profileName in PROFILES
-      ? (profileName as keyof typeof PROFILES)
-      : "balanced";
+  const safeName = profileName in PROFILES ? (profileName as keyof typeof PROFILES) : "balanced";
   const profile = PROFILES[safeName];
   const hash = crypto
     .createHash("sha1")
-    .update(
-      `${normalizedPath}:${safeName}:${String(profile.size)}:${String(profile.quality)}`,
-    )
+    .update(`${normalizedPath}:${safeName}:${String(profile.size)}:${String(profile.quality)}`)
     .digest("hex");
   const previewDir = path.join(session.workspaceDir, "previews");
   const previewPath = path.join(previewDir, `${hash}.jpg`);

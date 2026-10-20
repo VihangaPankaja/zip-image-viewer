@@ -51,13 +51,10 @@ describe("GlobalSettingsSheet", () => {
       }),
       { target: { value: "256" } },
     );
-    fireEvent.change(
-      screen.getByRole("spinbutton", { name: "Torrent upload limit (KiB/s)" }),
-      { target: { value: "64" } },
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Save torrent limits" }),
-    );
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Torrent upload limit (KiB/s)" }), {
+      target: { value: "64" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save torrent limits" }));
     await waitFor(() =>
       expect(onSetTorrentLimits).toHaveBeenCalledWith({
         downloadBytesPerSec: 262144,
@@ -66,22 +63,15 @@ describe("GlobalSettingsSheet", () => {
     );
     fireEvent.click(screen.getByRole("radio", { name: "Dark" }));
     expect(setTheme).toHaveBeenCalledWith("dark");
-    fireEvent.change(
-      screen.getByRole("combobox", { name: "Concurrent downloads" }),
-      { target: { value: "4" } },
-    );
+    fireEvent.change(screen.getByRole("combobox", { name: "Concurrent downloads" }), {
+      target: { value: "4" },
+    });
     expect(onSetConcurrency).toHaveBeenCalledWith(4);
-    await waitFor(() =>
-      expect(screen.getByRole("alert")).toHaveTextContent("Could not update"),
-    );
-    expect(
-      screen.getByRole("combobox", { name: "Concurrent downloads" }),
-    ).toBeEnabled();
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Could not update"));
+    expect(screen.getByRole("combobox", { name: "Concurrent downloads" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Default sort" })).toBeVisible();
     expect(screen.getByRole("dialog")).toHaveProperty("tagName", "DIALOG");
     expect(screen.getByRole("group", { name: "Downloads" })).toBeVisible();
-    expect(
-      screen.getByRole("group", { name: "Preview and explorer" }),
-    ).toBeVisible();
+    expect(screen.getByRole("group", { name: "Preview and explorer" })).toBeVisible();
   });
 });

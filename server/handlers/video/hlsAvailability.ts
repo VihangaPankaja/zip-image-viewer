@@ -5,9 +5,7 @@ import { publishedSegments } from "../../media/hlsManifest.js";
 
 type Availability = "ready" | "preparing" | "failed" | "cancelled";
 
-export async function readRenditionPlaylist(
-  rendition: VideoRendition,
-): Promise<string> {
+export async function readRenditionPlaylist(rendition: VideoRendition): Promise<string> {
   return readFile(rendition.playlistPath, "utf8").catch(() => "");
 }
 
@@ -20,12 +18,8 @@ export async function waitForPublishedSegment(
   const deadline = Date.now() + timeoutMs;
   do {
     if (response.destroyed) return "cancelled";
-    const finished =
-      rendition.status === "error" || rendition.status === "done";
-    if (
-      publishedSegments(await readRenditionPlaylist(rendition)).includes(index)
-    )
-      return "ready";
+    const finished = rendition.status === "error" || rendition.status === "done";
+    if (publishedSegments(await readRenditionPlaylist(rendition)).includes(index)) return "ready";
     if (finished) return "failed";
     await new Promise<void>((resolve) => setTimeout(resolve, 160));
   } while (Date.now() < deadline);
@@ -43,8 +37,6 @@ export function sendPreparationStatus(
   response.set("Cache-Control", "private, no-store");
   if (preparing) response.set("Retry-After", "1");
   return response.status(preparing ? 425 : 503).json({
-    error: preparing
-      ? "Rendition is being prepared."
-      : "Rendition could not be prepared.",
+    error: preparing ? "Rendition is being prepared." : "Rendition could not be prepared.",
   });
 }
