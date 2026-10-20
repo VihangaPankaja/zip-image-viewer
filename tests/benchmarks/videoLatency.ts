@@ -217,7 +217,7 @@ async function main(): Promise<void> {
   if (!ffmpegPath) throw new Error("ffmpeg-static is unavailable.");
   const sampleCount = positiveInteger("--samples", 5);
   const durationSeconds = positiveInteger("--duration", 24);
-  const outputPath = path.resolve(argument("--output", "docs/video-latency-baseline.md"));
+  const outputPath = path.resolve(argument("--output", "test-results/video-latency.md"));
   const root = await mkdtemp(path.join(tmpdir(), "ziv-video-benchmark-"));
   const sourceDir = path.join(root, "source");
   const sourcePath = path.join(sourceDir, "fixture.mp4");

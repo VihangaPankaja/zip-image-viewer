@@ -43,7 +43,7 @@ try {
   ]) {
     assert.equal(await page.getByLabel(`${id} status`, { exact: true }).inputValue(), "Done");
   }
-  assert.match(await page.locator("#note-V01").inputValue(), /baseline report/i);
+  assert.match(await page.locator("#note-V01").inputValue(), /vpr benchmark:video/);
   assert.equal(await page.locator("#percent").textContent(), "44%");
   await page.getByLabel("V01 status", { exact: true }).selectOption("In progress");
   await page.locator("#V01 summary").click();
