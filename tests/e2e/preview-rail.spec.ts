@@ -15,16 +15,22 @@ test("preview rail filters transfers, opens verified video, recovers and dedupli
   // WebKit's native media loader needs a real HTTP range response.
   await page.route("**/api/session-jobs/*/video/stream?*", (route) => route.continue());
   const sessionId = "00000000-0000-4000-8000-000000000008";
-  let sessions: { id: string; firstFilePath: string; fileCount: number; lastAccessedAt: number }[] =
-    [];
+  let sessions: {
+    id: string;
+    jobId?: string;
+    firstFilePath: string;
+    fileCount: number;
+    lastAccessedAt: number;
+  }[] = [];
+  let sessionsUnavailable = false;
   await page.route("**/rpc/sessions/list", (route) =>
-    route.fulfill({ json: { json: { items: sessions } } }),
+    route.fulfill(sessionsUnavailable ? { status: 503 } : { json: { json: { items: sessions } } }),
   );
   state.jobs = reviewJobs();
   await page.goto(appOrigin);
   await page.getByRole("tab", { name: "Explore" }).click();
   await page.getByRole("button", { name: "Show sessions" }).click();
-  const rail = page.getByRole("region", { name: "Sessions", exact: true });
+  const rail = page.getByRole("region", { name: "Sessions", exact: true, includeHidden: true });
   await expect(rail.getByRole("button", { name: /^Open / })).toHaveCount(0);
   await rail.getByRole("button", { name: "View downloads" }).focus();
   await page.keyboard.press("Enter");
@@ -47,6 +53,10 @@ test("preview rail filters transfers, opens verified video, recovers and dedupli
   await expect
     .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState))
     .toBeGreaterThanOrEqual(2);
+  state.jobs = [{ ...torrent, phase: "indexing" }];
+  for (let index = 0; index < 2; index += 1)
+    await page.waitForResponse((response) => response.url().endsWith("/rpc/jobs/list"));
+  await expect(video).toBeVisible();
   state.jobs = [{ ...torrent, status: "paused" }];
   await expect(
     page.getByText("This live preview is no longer available.", { exact: true }),
@@ -63,11 +73,20 @@ test("preview rail filters transfers, opens verified video, recovers and dedupli
   await page.getByRole("radio", { name: "Files", exact: true }).check({ force: true });
   await expect(open).toBeVisible({ timeout: 20_000 });
   await tapVisibleTarget(open);
-  state.jobs = [{ ...torrent, status: "ready", phase: "ready", sessionId }];
   sessions = [
-    { id: sessionId, firstFilePath: "Coastal collection", fileCount: 6, lastAccessedAt: 0 },
+    {
+      id: sessionId,
+      jobId: torrent.id,
+      firstFilePath: "Coastal collection",
+      fileCount: 6,
+      lastAccessedAt: 0,
+    },
   ];
+  // The Sessions response arrives while Jobs still has the live torrent without a session ID.
+  await expect(page.getByRole("button", { name: "Open ready files" })).toBeVisible();
+  await expect(rail.getByRole("button", { name: /^Open /, includeHidden: true })).toHaveCount(1);
   await page.getByRole("button", { name: "Open ready files" }).click();
+  state.jobs = [{ ...torrent, status: "ready", phase: "ready", sessionId }];
   await expect(page.getByLabel("Early video preview")).toHaveCount(0);
   await page.getByRole("radio", { name: "Files", exact: true }).check({ force: true });
   await expect(rail.getByRole("button", { name: /^Open / })).toHaveCount(1);
@@ -78,6 +97,15 @@ test("preview rail filters transfers, opens verified video, recovers and dedupli
   await rail.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
   await page.getByRole("radio", { name: "Preview", exact: true }).check({ force: true });
   sessions = [];
+  await expect(
+    page.getByText("This session is no longer available.", { exact: true }),
+  ).toBeVisible();
+  sessionsUnavailable = true;
+  // Observe a second failed refresh after React has processed the first one.
+  for (let index = 0; index < 2; index += 1)
+    await page.waitForResponse(
+      (response) => response.url().endsWith("/rpc/sessions/list") && response.status() === 503,
+    );
   await expect(
     page.getByText("This session is no longer available.", { exact: true }),
   ).toBeVisible();

@@ -1,13 +1,14 @@
 import type { Job, SessionSummary } from "../../../../shared/contracts";
 import type { SessionRailItem } from "../../components/Workspace/SessionRail";
 import { buildWorkspaceProgress } from "./workspaceProgress";
+import { canContinueTorrentPlayback } from "./torrentPlaybackAvailability";
 
 export type LivePreview = { jobId: string; fileId: string };
 
 export function livePreviewFiles(job: Job) {
-  return job.sourceKind === "torrent" && job.status === "downloading" && job.phase === "downloading"
-    ? job.torrentFiles.filter((file) => file.selected && /\.(mp4|m4v)$/i.test(file.path))
-    : [];
+  return job.torrentFiles.filter(
+    (file) => canContinueTorrentPlayback(job, file) && /\.(mp4|m4v)$/i.test(file.path),
+  );
 }
 
 export function buildWorkspaceRailItems(
@@ -16,8 +17,10 @@ export function buildWorkspaceRailItems(
   livePreviews: readonly LivePreview[],
 ): SessionRailItem[] {
   const items = new Map<string, SessionRailItem>();
+  const owners = new Map<string, string>();
   for (const session of sessions) {
     if (!session.fileCount) continue;
+    if (session.jobId) owners.set(session.jobId, session.id);
     items.set(session.id, {
       detail: `${session.fileCount} files`,
       id: session.id,
@@ -29,7 +32,7 @@ export function buildWorkspaceRailItems(
     const job = jobs.find(({ id }) => id === preview.jobId);
     if (!job) continue;
     const file = livePreviewFiles(job).find(({ id }) => id === preview.fileId);
-    const id = job.sessionId || job.id;
+    const id = owners.get(job.id) || job.sessionId || job.id;
     if (!file || items.has(id)) continue;
     const progress = buildWorkspaceProgress({
       percent: job.percent,

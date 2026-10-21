@@ -45,6 +45,7 @@ type Dependencies = {
 function summarizeSession(session: Session) {
   return {
     id: session.id,
+    jobId: session.jobId,
     firstFilePath: session.firstFilePath,
     fileCount: session.stats.fileCount,
     lastAccessedAt: session.lastAccessedAt,

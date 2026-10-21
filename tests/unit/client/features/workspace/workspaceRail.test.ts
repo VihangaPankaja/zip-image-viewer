@@ -67,6 +67,20 @@ describe("preview rail availability", () => {
     ]);
     expect(buildWorkspaceRailItems([], [session], [])).toEqual(items);
   });
+  it.each(["indexing", "ready"] as const)(
+    "keeps verified completed torrent video available during %s",
+    (phase) => {
+      const complete = {
+        ...torrent,
+        status: phase === "ready" ? ("ready" as const) : ("downloading" as const),
+        phase,
+        torrentFiles: [{ ...file, complete: true }],
+      };
+      expect(buildWorkspaceRailItems([complete], [], [live])).toEqual([
+        expect.objectContaining({ id: job.id, livePreview: live }),
+      ]);
+    },
+  );
   it("excludes empty sessions and unknown files/jobs", () => {
     expect(
       buildWorkspaceRailItems(
@@ -78,5 +92,10 @@ describe("preview rail availability", () => {
         ],
       ),
     ).toEqual([]);
+  });
+  it("deduplicates when the session snapshot arrives before the job's session ID", () => {
+    expect(buildWorkspaceRailItems([torrent], [{ ...session, jobId: torrent.id }], [live])).toEqual(
+      [{ id: session.id, label: session.firstFilePath, detail: "2 files", state: "ready" }],
+    );
   });
 });

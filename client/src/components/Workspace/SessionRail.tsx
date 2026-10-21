@@ -18,7 +18,7 @@ type SessionRailProps = {
 };
 
 const stateLabels: Record<SessionRailState, string> = {
-  downloading: "Play while downloading",
+  downloading: "Video available",
   ready: "Ready",
 };
 

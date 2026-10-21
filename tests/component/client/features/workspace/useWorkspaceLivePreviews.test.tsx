@@ -49,7 +49,7 @@ it("finds a validated second video after an invalid first response and revokes f
     .mockResolvedValueOnce(Response.json({ state: "ready", message: "Verified" }));
   vi.stubGlobal("fetch", fetchMock);
   const { wrapper, client } = setup();
-  const { result, unmount } = renderHook(() => useWorkspaceLivePreviews([job]), { wrapper });
+  const { result, unmount } = renderHook(() => useWorkspaceLivePreviews([job], []), { wrapper });
   await waitFor(() => expect(result.current).toEqual([{ jobId: job.id, fileId: "second" }]));
   fetchMock.mockResolvedValue(Response.json({ state: "download-first", message: "Unavailable" }));
   await client.invalidateQueries();
@@ -71,7 +71,7 @@ it("aborts capability reads when a torrent pauses and requires fresh validation 
   const { wrapper, client } = setup();
   const { result, rerender, unmount } = renderHook(
     ({ paused }) =>
-      useWorkspaceLivePreviews([{ ...job, status: paused ? "paused" : "downloading" }]),
+      useWorkspaceLivePreviews([{ ...job, status: paused ? "paused" : "downloading" }], []),
     { wrapper, initialProps: { paused: false } },
   );
   await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
@@ -82,6 +82,27 @@ it("aborts capability reads when a torrent pauses and requires fresh validation 
   rerender({ paused: false });
   await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   expect(result.current).toEqual([]);
+  unmount();
+  client.clear();
+});
+
+it("does not probe video for a job already represented by ready session files", () => {
+  const fetchMock = vi.fn();
+  vi.stubGlobal("fetch", fetchMock);
+  const session = {
+    id: "00000000-0000-4000-8000-000000000008",
+    fileCount: 1,
+    firstFilePath: "movie.mp4",
+    jobId: reviewActiveTorrentJob().id,
+    lastAccessedAt: 0,
+  };
+  const job = reviewActiveTorrentJob();
+  const { wrapper, client } = setup();
+  const { result, unmount } = renderHook(() => useWorkspaceLivePreviews([job], [session]), {
+    wrapper,
+  });
+  expect(result.current).toEqual([]);
+  expect(fetchMock).not.toHaveBeenCalled();
   unmount();
   client.clear();
 });

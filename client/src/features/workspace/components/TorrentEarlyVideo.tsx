@@ -8,6 +8,7 @@ import {
 import type { Selection } from "./TorrentFileDialog";
 import { FileTools } from "./TorrentFileContents";
 import { FileList } from "./TorrentFileList";
+import { canContinueTorrentPlayback } from "../torrentPlaybackAvailability";
 
 export function useTorrentPlayback(dialogRef: RefObject<HTMLDialogElement | null>) {
   const [playingFile, setPlayingFile] = useState<TorrentFile | null>(null);
@@ -140,7 +141,7 @@ export function TorrentFileArea({ job, selection }: { job: Job; selection: Selec
     <>
       {file ? (
         <TorrentEarlyVideo
-          key={`${file.id}:${canContinuePlayback(job, file)}`}
+          key={`${file.id}:${canContinueTorrentPlayback(job, file)}`}
           job={job}
           file={file}
           onBack={selection.stopPlaying}
@@ -154,17 +155,8 @@ export function TorrentFileArea({ job, selection }: { job: Job; selection: Selec
   );
 }
 
-function canContinuePlayback(job: Job, file: TorrentFile) {
-  return (
-    file.selected &&
-    ((job.status === "downloading" && job.phase === "downloading") ||
-      (file.complete &&
-        (job.status === "ready" || (job.status === "downloading" && job.phase === "indexing"))))
-  );
-}
-
 function useTorrentVideo(job: Job, file: TorrentFile) {
-  const active = canContinuePlayback(job, file);
+  const active = canContinueTorrentPlayback(job, file);
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<"loading" | "ready" | "download-first" | "error">("loading");
   const [message, setMessage] = useState("");

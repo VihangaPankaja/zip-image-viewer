@@ -153,6 +153,7 @@ export const jobSchema = z.object({
 
 const sessionSchema = z.object({
   id: z.uuid(),
+  jobId: z.uuid().optional(),
   firstFilePath: safeRelativePathSchema.or(z.literal("")),
   fileCount: z.number().int().nonnegative(),
   lastAccessedAt: z.number().int().nonnegative(),

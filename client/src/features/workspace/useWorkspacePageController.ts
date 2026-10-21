@@ -106,7 +106,7 @@ export function useWorkspacePageController() {
   const queue = useWorkspaceQueue();
   useWorkspacePageEffects(state, media.selection, media.image.loadImagePreview);
   useWorkspaceKeyboard(state, settings, media);
-  const livePreviews = useWorkspaceLivePreviews(queue.jobs);
+  const livePreviews = useWorkspaceLivePreviews(queue.jobs, queue.sessions);
   const railItems = buildWorkspaceRailItems(queue.jobs, queue.sessions, livePreviews);
   const actions = useWorkspacePreviewNavigation(state, railItems);
   return {

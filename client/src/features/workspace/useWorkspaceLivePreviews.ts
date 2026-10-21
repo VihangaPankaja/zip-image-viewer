@@ -1,9 +1,24 @@
 import { useQueries } from "@tanstack/react-query";
-import { torrentVideoInfoSchema, type Job } from "../../../../shared/contracts";
+import {
+  torrentVideoInfoSchema,
+  type Job,
+  type SessionSummary,
+} from "../../../../shared/contracts";
 import { livePreviewFiles, type LivePreview } from "./workspaceRail";
 
-export function useWorkspaceLivePreviews(jobs: readonly Job[]): LivePreview[] {
-  const candidates = jobs.filter((job) => livePreviewFiles(job).length > 0);
+export function useWorkspaceLivePreviews(
+  jobs: readonly Job[],
+  sessions: readonly SessionSummary[],
+): LivePreview[] {
+  const ready = sessions.filter(({ fileCount }) => fileCount > 0);
+  const readySessions = new Set(ready.map(({ id }) => id));
+  const readyJobs = new Set(ready.map(({ jobId }) => jobId));
+  const candidates = jobs.filter(
+    (job) =>
+      !readyJobs.has(job.id) &&
+      !readySessions.has(job.sessionId) &&
+      livePreviewFiles(job).length > 0,
+  );
   const results = useQueries({
     queries: candidates.map((job) => ({
       queryKey: ["workspace-live-preview", job.id, livePreviewFiles(job).map(({ id }) => id)],

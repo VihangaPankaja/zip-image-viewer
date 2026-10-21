@@ -120,7 +120,10 @@ function WorkspaceSessions({ controller }: ViewProps) {
     <SessionRail
       activeId={
         actions.livePreview
-          ? controller.queue.jobs.find(({ id }) => id === actions.livePreview?.jobId)?.sessionId ||
+          ? controller.queue.sessions.find(
+              ({ jobId, fileCount }) => fileCount > 0 && jobId === actions.livePreview?.jobId,
+            )?.id ||
+            controller.queue.jobs.find(({ id }) => id === actions.livePreview?.jobId)?.sessionId ||
             actions.livePreview.jobId
           : state.session?.id || ""
       }
@@ -178,7 +181,9 @@ function WorkspacePreview({ controller }: ViewProps) {
   if (
     state.session?.id &&
     controller.queue.sessionsLoaded &&
-    !controller.railItems.some(({ id }) => id === state.session?.id)
+    !controller.railItems.some(
+      ({ id, state: availability }) => id === state.session?.id && availability === "ready",
+    )
   )
     return (
       <WorkspacePreviewRecovery

@@ -98,6 +98,7 @@ function completeSession(
   message: string,
   deps: ProcessorDependencies,
 ): void {
+  session.jobId = job.id;
   deps.sessionStore.set(session.id, session);
   if (job.sourceKind === "http")
     Object.assign(job, { workspaceDir: "", extractDir: "", zipPath: "" });
@@ -192,6 +193,7 @@ export async function restoreTorrentSession(
     prepared.entries,
   );
   session.id = job.sessionId || session.id;
+  session.jobId = job.id;
   session.availablePaths = new Set(
     prepared.entries.filter((entry) => entry.type === "file").map((entry) => entry.relativePath),
   );

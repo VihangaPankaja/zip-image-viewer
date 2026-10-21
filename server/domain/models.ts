@@ -39,6 +39,7 @@ export type ExplorerNode = {
 };
 
 export type Session = {
+  jobId?: string;
   retained?: boolean;
   pinned?: boolean;
   availablePaths?: Set<string>;

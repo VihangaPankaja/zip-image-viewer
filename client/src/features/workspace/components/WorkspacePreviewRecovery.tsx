@@ -42,8 +42,10 @@ export function WorkspaceLivePreview({ controller }: { controller: WorkspacePage
     (item) => item.livePreview?.jobId === job?.id && item.livePreview?.fileId === file?.id,
   );
   if (!available || !job || !file) {
-    const readySessionId = controller.railItems.find(
-      (item) => item.state === "ready" && item.id === job?.sessionId,
+    const readySessionId = controller.queue.sessions.find(
+      (session) =>
+        session.fileCount > 0 &&
+        (session.id === job?.sessionId || session.jobId === selected?.jobId),
     )?.id;
     return (
       <WorkspacePreviewRecovery
