@@ -5,6 +5,64 @@ import { tapVisibleTarget } from "./touch";
 
 test.use({ hasTouch: true });
 
+test("a newly opened ready session stays usable while the sessions list catches up", async ({
+  page,
+  appOrigin,
+}) => {
+  const state = await installReviewFixtures(page);
+  const sessionId = "00000000-0000-4000-8000-000000000008";
+  const torrent = reviewActiveTorrentJob();
+  state.jobs = [{ ...torrent, status: "ready", phase: "ready", sessionId }];
+  let requests = 0;
+  let releaseStaleResponse = () => {};
+  const staleResponse = new Promise<void>((resolve) => {
+    releaseStaleResponse = resolve;
+  });
+  let listed = false;
+  await page.route("**/rpc/sessions/list", async (route) => {
+    requests += 1;
+    if (requests === 2) {
+      await staleResponse;
+      return route.fulfill({ json: { json: { items: [] } } });
+    }
+    return route.fulfill({
+      json: {
+        json: {
+          items: listed
+            ? [
+                {
+                  id: sessionId,
+                  jobId: torrent.id,
+                  firstFilePath: "Coastal collection",
+                  fileCount: 6,
+                  lastAccessedAt: 0,
+                },
+              ]
+            : [],
+        },
+      },
+    });
+  });
+  await page.goto(appOrigin);
+  await expect.poll(() => requests).toBe(2);
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "01-coast.png", exact: true })).toBeVisible();
+  await expect(page.getByText("This session is no longer available.", { exact: true })).toHaveCount(
+    0,
+  );
+  await expect(page.getByRole("treeitem", { name: /01-coast.png/ })).toBeVisible();
+  listed = true;
+  releaseStaleResponse();
+  await expect.poll(() => requests).toBeGreaterThan(2);
+  await expect(page.getByRole("heading", { name: "01-coast.png", exact: true })).toBeVisible();
+  const rail = page.getByRole("region", { name: "Sessions", exact: true });
+  await expect(rail.getByRole("button", { name: /^Open / })).toHaveCount(1);
+  listed = false;
+  await expect(
+    page.getByText("This session is no longer available.", { exact: true }),
+  ).toBeVisible();
+});
+
 test("preview rail filters transfers, opens verified video, recovers and deduplicates completion after restart", async ({
   page,
   appOrigin,

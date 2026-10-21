@@ -926,6 +926,18 @@ async function capturePreviewRail(
   ).toBeVisible();
   await save(page, device, theme, "preview-rail-empty");
   const torrent = reviewActiveTorrentJob();
+  state.jobs = [{ ...torrent, status: "ready", phase: "ready", sessionId }];
+  await page.getByRole("tab", { name: "Downloads" }).click();
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  if (mobile)
+    await page.getByRole("radio", { name: "Preview", exact: true }).check({ force: true });
+  await expect(page.locator(".preview-panel h2")).toHaveText(filenames[0]);
+  await expect(page.locator(".image-frame > img")).toHaveJSProperty("naturalWidth", 1200);
+  await save(page, device, theme, "preview-rail-newly-opened");
+  state.jobs = [];
+  await page.reload();
+  await page.getByRole("tab", { name: "Explore" }).click();
+  if (mobile) await page.getByRole("button", { name: "Show sessions" }).click();
   state.jobs = [torrent];
   const open = rail.getByRole("button", {
     name: `Open ${torrent.torrentFiles[0].path}`,
