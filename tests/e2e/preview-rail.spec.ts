@@ -1,9 +1,61 @@
 import { expect } from "@playwright/test";
-import { test } from "./media-fixture";
+import { audioTest, test } from "./media-fixture";
 import { installReviewFixtures, reviewActiveTorrentJob, reviewJobs } from "../review/fixtures";
 import { tapVisibleTarget } from "./touch";
 
 test.use({ hasTouch: true });
+
+audioTest(
+  "closing a live preview stops audio while workspace tabs preserve playback",
+  async ({ page, appOrigin, browserName }) => {
+    test.setTimeout(60_000);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const state = await installReviewFixtures(page);
+    const torrent = reviewActiveTorrentJob();
+    state.jobs = [torrent];
+    await page.route("**/rpc/sessions/list", (route) =>
+      route.fulfill({ json: { json: { items: [] } } }),
+    );
+    await page.route("**/api/session-jobs/*/video/stream?*", (route) => route.continue());
+    await page.goto(appOrigin);
+    await page.getByRole("tab", { name: "Explore" }).click();
+    await page.getByRole("button", { name: "Show sessions" }).click();
+    for (const backLabel of ["Back to downloads", "Download first"]) {
+      await page.getByRole("radio", { name: "Files", exact: true }).check({ force: true });
+      await tapVisibleTarget(
+        page.getByRole("button", { name: `Open ${torrent.torrentFiles[0].path}`, exact: true }),
+      );
+      const video = page.getByLabel("Early video preview", { exact: true });
+      await expect
+        .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState))
+        .toBeGreaterThanOrEqual(2);
+      await expect(video).toHaveJSProperty("muted", false);
+      if (browserName === "webkit") await tapVisibleTarget(video);
+      else {
+        await video.focus();
+        await page.keyboard.press("Space");
+      }
+      await expect(video).toHaveJSProperty("paused", false);
+      const player = await video.elementHandle();
+      await page.getByRole("tab", { name: "Downloads" }).click();
+      await expect(video).toHaveJSProperty("paused", false);
+      await page.getByRole("tab", { name: "Explore" }).click();
+      await tapVisibleTarget(page.getByRole("button", { name: backLabel, exact: true }));
+      await expect(page.getByRole("heading", { name: "Downloads", exact: true })).toBeVisible();
+      await expect(video).toHaveCount(0);
+      await expect
+        .poll(() =>
+          player.evaluate(
+            (element: HTMLVideoElement) => element.paused && !element.getAttribute("src"),
+          ),
+        )
+        .toBe(true);
+      await page.getByRole("tab", { name: "Explore" }).click();
+      await expect(video).toHaveCount(0);
+      await player.dispose();
+    }
+  },
+);
 
 test("a newly opened ready session stays usable while the sessions list catches up", async ({
   page,

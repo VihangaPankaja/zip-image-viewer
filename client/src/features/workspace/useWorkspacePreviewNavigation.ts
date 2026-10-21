@@ -39,21 +39,14 @@ export function useWorkspacePreviewNavigation(state: WorkspacePageState, items: 
         const fileCount = [...flattenTree(parsed.data.tree).nodesByPath.values()].filter(
           (node) => node.type === "file",
         ).length;
-        queryClient.setQueryData<{ items: SessionSummary[] }>(queryKey, (current) => {
-          const existing = current?.items.find(({ id }) => id === sessionId);
-          return {
-            items: [
-              ...(current?.items ?? []).filter(({ id }) => id !== sessionId),
-              {
-                ...existing,
-                id: sessionId,
-                firstFilePath: existing?.firstFilePath ?? parsed.data.firstFilePath ?? "",
-                fileCount,
-                lastAccessedAt: Date.now(),
-              },
-            ],
-          };
-        });
+        queryClient.setQueryData<{ items: SessionSummary[] }>(queryKey, (current) => ({
+          items: withOpenedSession(
+            current?.items ?? [],
+            sessionId,
+            parsed.data.firstFilePath ?? "",
+            fileCount,
+          ),
+        }));
         state.setActiveJob(null);
         state.setSession(parsed.data);
         state.setSelectedPath(parsed.data.firstFilePath || parsed.data.tree.path);
@@ -87,5 +80,28 @@ export function useWorkspacePreviewNavigation(state: WorkspacePageState, items: 
     setLivePreview(item.livePreview);
     state.setMobilePane("preview");
   };
-  return { openSession, selectPreview, livePreview, error };
+  const closeLivePreview = () => {
+    setLivePreview(null);
+    state.setActiveView("downloads");
+  };
+  return { openSession, selectPreview, closeLivePreview, livePreview, error };
+}
+
+function withOpenedSession(
+  items: SessionSummary[],
+  sessionId: string,
+  firstFilePath: string,
+  fileCount: number,
+): SessionSummary[] {
+  const existing = items.find(({ id }) => id === sessionId);
+  return [
+    ...items.filter(({ id }) => id !== sessionId),
+    {
+      ...existing,
+      id: sessionId,
+      firstFilePath: existing?.firstFilePath ?? firstFilePath,
+      fileCount,
+      lastAccessedAt: Date.now(),
+    },
+  ];
 }

@@ -65,7 +65,7 @@ export function WorkspaceLivePreview({ controller }: { controller: WorkspacePage
       job={job}
       file={file}
       backLabel="Back to downloads"
-      onBack={() => controller.state.setActiveView("downloads")}
+      onBack={controller.actions.closeLivePreview}
     />
   );
 }
