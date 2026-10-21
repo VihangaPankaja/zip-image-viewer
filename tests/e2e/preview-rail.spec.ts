@@ -221,6 +221,65 @@ test("preview rail filters transfers, opens verified video, recovers and dedupli
   ).toBeVisible();
 });
 
+test("a failed session switch clears files, metadata and storage ownership", async ({
+  page,
+  appOrigin,
+}) => {
+  await page.setViewportSize({ width: 1360, height: 900 });
+  const state = await installReviewFixtures(page);
+  state.jobs = [];
+  const sessionId = "00000000-0000-4000-8000-000000000009";
+  await page.route("**/rpc/sessions/list", (route) =>
+    route.fulfill({
+      json: {
+        json: {
+          items: [
+            {
+              id: "00000000-0000-4000-8000-000000000008",
+              firstFilePath: "Coastal collection",
+              fileCount: 6,
+              lastAccessedAt: 0,
+            },
+            {
+              id: sessionId,
+              firstFilePath: "Unavailable collection",
+              fileCount: 1,
+              lastAccessedAt: 0,
+            },
+          ],
+        },
+      },
+    }),
+  );
+  let invalid = false;
+  await page.route(`**/api/sessions/${sessionId}/tree`, (route) =>
+    route.fulfill(
+      invalid ? { json: { id: sessionId, tree: { type: "invalid" } } } : { status: 404 },
+    ),
+  );
+  await page.goto(appOrigin);
+  await page.getByRole("tab", { name: "Explore" }).click();
+  const rail = page.getByRole("region", { name: "Sessions", exact: true });
+  for (const malformed of [false, true]) {
+    invalid = malformed;
+    await rail.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
+    await expect(page.getByRole("treeitem", { name: /01-coast.png/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Storage", exact: true })).toBeVisible();
+    await rail.getByRole("button", { name: "Open Unavailable collection", exact: true }).click();
+    await expect(page.getByRole("status")).toHaveText(
+      malformed
+        ? "This session returned invalid data. Check Downloads or try again."
+        : "This preview is no longer available. Check Downloads or choose another session.",
+    );
+    await expect(page.getByRole("treeitem")).toHaveCount(0);
+    await expect(page.getByText("No file selected", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Storage", exact: true })).toHaveCount(0);
+  }
+  await rail.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "01-coast.png", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Storage", exact: true })).toBeVisible();
+});
+
 test("invalid video capability and failed session loads offer recovery without openable transfer cards", async ({
   page,
 }) => {

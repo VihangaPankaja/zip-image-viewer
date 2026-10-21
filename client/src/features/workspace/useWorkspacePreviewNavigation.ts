@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { workspaceRpc } from "../../services/orpcClient";
 import { flattenTree } from "../../lib/treeUtils";
 import type { SessionSummary } from "../../../../shared/contracts";
-import { sessionPayloadSchema } from "./sessionSchemas";
+import { sessionPayloadSchema, type SessionTree } from "./sessionSchemas";
 import type { WorkspacePageState } from "./useWorkspacePageState";
 import type { SessionRailItem } from "../../components/Workspace/SessionRail";
 import type { LivePreview } from "./workspaceRail";
@@ -36,15 +36,13 @@ export function useWorkspacePreviewNavigation(state: WorkspacePageState, items: 
         // An older list response must not hide a tree we just successfully loaded.
         await queryClient.cancelQueries({ queryKey });
         if (controller.signal.aborted) return;
-        const fileCount = [...flattenTree(parsed.data.tree).nodesByPath.values()].filter(
-          (node) => node.type === "file",
-        ).length;
+        const tree = parsed.data.tree;
         queryClient.setQueryData<{ items: SessionSummary[] }>(queryKey, (current) => ({
           items: withOpenedSession(
             current?.items ?? [],
             sessionId,
             parsed.data.firstFilePath ?? "",
-            fileCount,
+            tree,
           ),
         }));
         state.setActiveJob(null);
@@ -55,6 +53,10 @@ export function useWorkspacePreviewNavigation(state: WorkspacePageState, items: 
         state.setActiveView("explore");
       } catch (cause) {
         if (!controller.signal.aborted) {
+          state.setActiveJob(null);
+          state.setSession(null);
+          state.setSelectedPath("");
+          setLivePreview(null);
           setError(
             cause instanceof Error ? cause.message : "Could not open this preview. Try again.",
           );
@@ -91,7 +93,7 @@ function withOpenedSession(
   items: SessionSummary[],
   sessionId: string,
   firstFilePath: string,
-  fileCount: number,
+  tree: SessionTree,
 ): SessionSummary[] {
   const existing = items.find(({ id }) => id === sessionId);
   return [
@@ -100,7 +102,8 @@ function withOpenedSession(
       ...existing,
       id: sessionId,
       firstFilePath: existing?.firstFilePath ?? firstFilePath,
-      fileCount,
+      fileCount: [...flattenTree(tree).nodesByPath.values()].filter((node) => node.type === "file")
+        .length,
       lastAccessedAt: Date.now(),
     },
   ];
