@@ -191,19 +191,22 @@ describe("real download flows", () => {
     }
   }, 20_000);
 
-  it("confirms an oversized URL through RPC and completes the queued download", async () => {
+  it("confirms a signed-query HTTP archive through RPC and preserves Unicode entries in the contract", async () => {
     const fixtureRoot = await mkdtemp(path.join(tmpdir(), "ziv-confirm-source-"));
     cleanupPaths.push(fixtureRoot);
     const sourceDirectory = path.join(fixtureRoot, "source", "album");
     const archivePath = path.join(fixtureRoot, "oversized.zip");
-    const expectedFile = Buffer.from("confirmed archive contents");
+    const expectedFile = Buffer.from("confirmed archive contents 日本語\n");
+    const unicodeName = "résumé_日本語 #1.txt";
     await mkdir(sourceDirectory, { recursive: true });
-    await writeFile(path.join(sourceDirectory, "confirmed.txt"), expectedFile);
+    await writeFile(path.join(sourceDirectory, unicodeName), expectedFile);
     await runCommand(path7za, ["a", "-tzip", archivePath, "."], {
       cwd: path.join(fixtureRoot, "source"),
     });
     const archiveBytes = await readFile(archivePath);
+    const sourceRequests: string[] = [];
     const source = createServer((request, response) => {
+      sourceRequests.push(`${request.method ?? ""} ${request.url ?? ""}`);
       if (request.method === "HEAD") {
         response.writeHead(200, { "content-length": CONFIRM_SIZE_BYTES + 1 }).end();
         return;
@@ -299,7 +302,7 @@ describe("real download flows", () => {
     let job: SessionJob | undefined;
     try {
       const createdJob = manager.createJob(
-        `http://127.0.0.1:${String(sourceAddress.port)}/oversized.zip`,
+        `http://127.0.0.1:${String(sourceAddress.port)}/oversized.zip?signature=fixture-token`,
       );
       job = createdJob;
       queue.enqueueSessionJob(createdJob, false);
@@ -321,9 +324,22 @@ describe("real download flows", () => {
       const session = [...sessions.values()][0];
       expect(session).toBeDefined();
       cleanupPaths.push(session.workspaceDir);
-      expect(await readFile(path.join(session.extractDir, "album", "confirmed.txt"))).toEqual(
+      expect(await readFile(path.join(session.extractDir, "album", unicodeName))).toEqual(
         expectedFile,
       );
+      expect(createdJob.downloadedBytes).toBe(archiveBytes.length);
+      expect(sourceRequests).toEqual(
+        expect.arrayContaining([
+          "HEAD /oversized.zip?signature=fixture-token",
+          "GET /oversized.zip?signature=fixture-token",
+        ]),
+      );
+      const summary = await rpc.sessions.get({ id: session.id });
+      expect(summary).toMatchObject({
+        id: session.id,
+        fileCount: 1,
+        firstFilePath: `album/${unicodeName}`,
+      });
     } finally {
       if (job?.workspaceDir) cleanupPaths.push(job.workspaceDir);
       await new Promise<void>((resolve, reject) =>

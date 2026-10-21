@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - master
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -46,16 +49,49 @@ jobs:
             type=raw,value=${{ steps.app-version.outputs.version }}
 
       - name: Build Docker image
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
-          load: ${{ github.event_name == 'pull_request' }}
+          load: ${{ github.event_name != 'push' }}
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Docker's local image exporter cannot retain attestations.
+          provenance: ${{ github.event_name == 'push' && 'mode=max' || 'false' }}
+          sbom: ${{ github.event_name == 'push' }}
+
+      - name: Inventory production image packages and licenses
+        uses: anchore/sbom-action@fffec3d851af758d56fee099cf3fbf8aa8779843 # v0.24.3
+        with:
+          image: ${{ github.event_name == 'push' && format('{0}@{1}', env.IMAGE_NAME, steps.build.outputs.digest) || format('{0}:latest', env.IMAGE_NAME) }}
+          format: spdx-json
+          output-file: ${{ runner.temp }}/image-sbom.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Report production image vulnerabilities for triage
+        uses: anchore/scan-action@8576240a41341d866dbd7ebc72cd9fc0ef023f54 # v7.4.2
+        with:
+          sbom: ${{ runner.temp }}/image-sbom.spdx.json
+          output-format: json
+          output-file: ${{ runner.temp }}/image-vulnerabilities.json
+          # Findings need exposure/fix review; scanner failures still fail the job.
+          fail-build: false
+
+      - name: Retain image inventory and vulnerability evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: image-dependency-reports
+          path: |
+            ${{ runner.temp }}/image-sbom.spdx.json
+            ${{ runner.temp }}/image-vulnerabilities.json
+          retention-days: 30
+          if-no-files-found: error
 
       - name: Smoke-test Docker image
         if: github.event_name == 'pull_request'

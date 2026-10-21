@@ -1,0 +1,45 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+      timezone: Asia/Colombo
+    open-pull-requests-limit: 5
+    groups:
+      runtime-compatible:
+        dependency-type: production
+        patterns: ["*"]
+        update-types: [minor, patch]
+      development-compatible:
+        dependency-type: development
+        patterns: ["*"]
+        update-types: [minor, patch]
+      runtime-security:
+        applies-to: security-updates
+        dependency-type: production
+        patterns: ["*"]
+      development-security:
+        applies-to: security-updates
+        dependency-type: development
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions-compatible:
+        patterns: ["*"]
+        update-types: [minor, patch]
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      images-compatible:
+        patterns: ["*"]
+        update-types: [minor, patch]

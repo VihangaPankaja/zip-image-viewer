@@ -1,6 +1,6 @@
 {
   "name": "zip-image-viewer",
-  "version": "3.20.2",
+  "version": "3.21.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -27,6 +27,7 @@
     "screenshots:pr": "vp exec playwright test --config playwright.review.config.ts",
     "screenshots:publish": "vp exec node tooling/publish-pr-screenshots.mjs",
     "check:roadmap": "vp exec node docs/app-roadmap.check.mjs",
+    "dependencies:report": "vp exec node tooling/dependency-report.mjs",
     "benchmark:video": "vp exec tsx tests/benchmarks/videoLatency.ts",
     "benchmark:encoding": "vp exec tsx tests/benchmarks/videoEncoding.ts",
     "benchmark:storyboard": "vp exec tsx tests/benchmarks/videoStoryboard.ts",
