@@ -51,7 +51,6 @@ jobs:
       - run: vp install --frozen-lockfile
       - run: vp check
       - run: vpr lint:css
-      - run: vpr typecheck
       - run: vpr test:coverage
       - name: Fallow dead-code and dependency gate
         run: vpr fallow:dead

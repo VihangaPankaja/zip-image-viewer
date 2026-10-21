@@ -2,7 +2,7 @@
 
 ## Local checks
 
-`vpr quality` runs formatting, typed lint, all TypeScript projects, coverage,
+`vpr quality` runs formatting, typed lint and type checks through `vp check`, coverage,
 Fallow dead-code and duplication checks, the health floor, and the production
 build. Lint warnings fail the check.
 

@@ -23,7 +23,9 @@ only the client.
 ## Configuration
 
 `vite.config.ts` owns client builds, tests, coverage, lint, formatting and staged
-checks. Separate TypeScript projects check client, server and test code.
+checks. Vite+ checks types through the client, server and test TypeScript projects;
+`vpr typecheck` runs only that part of `vp check`. The server build uses `tsc`
+to emit its JavaScript.
 Playwright and Fallow have their own configuration files.
 
 CSS rules also live in `vite.config.ts`; `stylelint.config.mjs` adapts them for
