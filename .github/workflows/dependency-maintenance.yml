@@ -1,0 +1,53 @@
+name: Dependency maintenance
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  schedule:
+    - cron: "30 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependencies-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inventory-and-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: voidzero-dev/setup-vp@v1.21.2
+        with:
+          cache: true
+          run-install: false
+          node-version-file: .node-version
+      - run: vp install --frozen-lockfile
+      - name: Generate license, purpose and runtime vulnerability reports
+        run: vpr dependencies:report
+      - name: Publish audit triage summary
+        if: always()
+        run: |
+          if [ -f test-results/dependency-maintenance/summary.md ]; then
+            cat test-results/dependency-maintenance/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Record dependency and lockfile changes for review
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git diff --no-ext-diff "$BASE_SHA" HEAD -- package.json pnpm-lock.yaml pnpm-workspace.yaml .node-version Dockerfile patches/ > test-results/dependency-maintenance/lockfile-review.diff
+      - name: Retain dependency review evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: dependency-maintenance
+          path: test-results/dependency-maintenance/
+          retention-days: 30
+          if-no-files-found: error

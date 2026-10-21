@@ -14,6 +14,7 @@ Start with the [project README](../README.md) to run the app.
 - [Workflow and commands](development/README.md)
 - [Architecture and source map](development/architecture.md)
 - [Testing and benchmarks](development/testing.md)
+- [Dependency and release maintenance](development/dependencies.md)
 - [UI design](development/design.md)
 
 ## Reference

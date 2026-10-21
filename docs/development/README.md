@@ -47,5 +47,7 @@ can follow the [official integration guide](https://viteplus.dev/guide/ide-integ
 
 See the [source map](architecture.md) to find the owning module and
 [testing guide](testing.md) for focused suites, browser checks and benchmarks.
+See [dependency maintenance](dependencies.md) for update, license, vulnerability
+and image provenance review.
 Use the [design guide](design.md) for shared UI changes. Update the relevant
 user or reference page when behavior changes.
