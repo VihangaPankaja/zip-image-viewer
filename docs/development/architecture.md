@@ -69,7 +69,7 @@ File routes validate paths against their owning session, including real paths.
 
 ## Tests and delivery
 
-Unit and component tests live beside source files. `tests/` contains integration,
-E2E, review and benchmark suites plus fixtures. The [testing guide](testing.md)
+`tests/` contains unit, component, integration, UI, E2E, review and benchmark
+suites plus fixtures, with client/server paths mirrored inside each suite. The [testing guide](testing.md)
 lists commands. Production output is `dist/` for the client and `build/` for
 server and shared modules. Neither output belongs in Git.

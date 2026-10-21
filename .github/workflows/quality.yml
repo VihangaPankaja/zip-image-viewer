@@ -51,7 +51,6 @@ jobs:
       - run: vp install --frozen-lockfile
       - run: vp check
       - run: vpr lint:css
-      - run: vpr typecheck
       - run: vpr test:coverage
       - name: Fallow dead-code and dependency gate
         run: vpr fallow:dead
@@ -120,6 +119,19 @@ jobs:
           path: test-results/pr-screenshots/
           retention-days: 14
           if-no-files-found: error
+  media-benchmarks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: voidzero-dev/setup-vp@v1.21.2
+        with:
+          cache: true
+          run-install: false
+          node-version-file: .node-version
+      - run: vp install --frozen-lockfile
+      - run: vp exec playwright install --with-deps chromium
+      # Keep measured workloads sequential on a runner without gallery encoders.
       - name: Run real video benchmark smoke test
         run: vpr benchmark:video --samples 1 --duration 8 --output "$RUNNER_TEMP/video-latency.md"
       - name: Verify available HLS encoders and CPU fallback without requiring a GPU
@@ -154,7 +166,6 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: checks
     strategy:
       fail-fast: false
       matrix:

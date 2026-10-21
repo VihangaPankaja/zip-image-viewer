@@ -309,7 +309,7 @@ test.afterAll(async () => {
     encoding: "utf8",
   }).trim();
   await writeFile(
-    path.join(output, "manifest.json"),
+    path.join(output, `manifest-worker-${test.info().workerIndex}.json`),
     JSON.stringify(
       {
         sourceCommit,

@@ -53,8 +53,13 @@ export default defineConfig({
           environment: "jsdom",
           environmentOptions: { jsdom: { url: "http://localhost/" } },
           globals: true,
-          include: ["client/src/**/*.test.{ts,tsx}"],
-          setupFiles: ["./client/src/test/setup.ts"],
+          include: [
+            "tests/unit/client/**/*.test.{ts,tsx}",
+            "tests/component/client/**/*.test.{ts,tsx}",
+            "tests/integration/client/**/*.test.{ts,tsx}",
+            "tests/ui/client/**/*.test.{ts,tsx}",
+          ],
+          setupFiles: ["./tests/component/client/setup.ts"],
         },
       },
       {
@@ -63,8 +68,10 @@ export default defineConfig({
           environment: "node",
           globals: true,
           include: [
-            "server/**/*.test.ts",
-            "tests/integration/**/*.test.ts",
+            "tests/unit/server/**/*.test.ts",
+            "tests/integration/*.test.ts",
+            "tests/integration/server/**/*.test.ts",
+            "tests/unit/tooling/**/*.test.ts",
             "tooling/**/*.test.mjs",
           ],
         },
@@ -75,7 +82,7 @@ export default defineConfig({
       reporter: ["text", "json", "json-summary", "html", "lcov"],
       reportOnFailure: true,
       include: ["shared/**/*.ts", "server/**/*.ts", "client/src/**/*.{ts,tsx}"],
-      exclude: ["**/*.test.{ts,tsx}", "**/*.d.ts", "client/src/test/**"],
+      exclude: ["**/*.test.{ts,tsx}", "**/*.d.ts"],
       thresholds: {
         perFile: false,
         statements: 68,

@@ -6,5 +6,6 @@
     "outDir": "build",
     "noEmit": false
   },
-  "include": ["server/**/*.ts", "shared/**/*.ts"]
+  "include": ["server/**/*.ts", "shared/**/*.ts"],
+  "exclude": ["**/*.test.ts", "tests/**"]
 }

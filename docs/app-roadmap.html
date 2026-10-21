@@ -1570,17 +1570,17 @@
           area: "Tooling",
           priority: "P1",
           effort: "M",
-          status: "Proposed",
+          status: "Done",
           title: "Move colocated tests into dedicated test suites",
           summary:
             "Keep production client/server folders focused on app logic and put tests under the existing tests/ root.",
-          now: "Client and server *.test.ts/tsx files currently sit beside implementation files. tests/ already holds integration, E2E, benchmarks, review flows and fixtures; scripts and configs depend on both arrangements.",
+          now: "All client/server tests live under dedicated tests/unit, tests/component, tests/integration and tests/ui suites with mirrored production paths. Real I/O belongs to integration; React hooks/components retain jsdom. Shared DOM setup and fixtures stay under tests. Scripts, type projects, coverage and related-test hooks use the dedicated suites.",
           plan: "Move client/server tests into tests/unit/{client,server}/, tests/component/client/, tests/integration/{client,server}/ and tests/ui/client/ as appropriate. Mirror each production path below its suite, for example tests/unit/server/application/downloads/ and tests/component/client/components/Preview/. Preserve existing e2e/review/benchmarks. Keep shared fixtures/helpers under tests/ and suite-only setup nearby. Update relative imports or stable aliases, Vitest/Vite+ projects, TypeScript includes, coverage ownership/exclusions, ESLint/Fallow patterns, package scripts, related-test hooks, CI and docs. Classify by what a test exercises rather than filename alone; keep test utilities out of production bundles.",
           done: "No production test files remain under client/src or server. Before/after inventories show the same tests and assertions with no new skips. Every suite, coverage gate, related-file selection and all browsers still run from a clean checkout. Coverage maps to original app files; production builds exclude tests/fixtures, and renamed paths preserve history through focused moves.",
           depends: "B02",
-          note: "Move tests as a separate task so path changes and tooling failures can be verified independently.",
+          note: "Relocated tests preserve their original assertions, fixtures and skips. Production builds exclude tests and fixtures. Existing related-file hooks follow production imports into the dedicated suites.",
           evidence:
-            "vite.config.ts; tsconfig.tests.json; tsconfig.app.json; tsconfig.server.json; .fallowrc.json; package.json; .vite-hooks/; .github/workflows/quality.yml; client/src/test/setup.ts; tests/",
+            "vite.config.ts; tsconfig.tests.json; tsconfig.app.json; tsconfig.server.json; .fallowrc.json; package.json; .vite-hooks/; .github/workflows/quality.yml; tests/component/client/setup.ts; tests/",
         },
         {
           id: "V01",
