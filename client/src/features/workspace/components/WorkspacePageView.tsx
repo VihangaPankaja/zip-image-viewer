@@ -25,6 +25,7 @@ import { WorkspaceAppBar } from "./WorkspaceAppBar";
 import { WorkspaceLayout } from "./WorkspaceLayout";
 import { WorkspaceOverlays } from "./WorkspaceOverlays";
 import { DownloadDialog, DownloadManager } from "./DownloadManager";
+import { WorkspaceLivePreview, WorkspacePreviewRecovery } from "./WorkspacePreviewRecovery";
 
 type ViewProps = { controller: WorkspacePageController };
 
@@ -117,9 +118,15 @@ function WorkspaceSessions({ controller }: ViewProps) {
   const { actions, railItems, state } = controller;
   return (
     <SessionRail
-      activeId={state.session?.id || state.activeJob?.id || ""}
+      activeId={
+        actions.livePreview
+          ? controller.queue.jobs.find(({ id }) => id === actions.livePreview?.jobId)?.sessionId ||
+            actions.livePreview.jobId
+          : state.session?.id || ""
+      }
       sessions={railItems}
-      onSelect={(id) => void actions.openSession(id)}
+      onSelect={actions.selectPreview}
+      onOpenDownloads={() => state.setActiveView("downloads")}
     />
   );
 }
@@ -127,6 +134,10 @@ function WorkspaceSessions({ controller }: ViewProps) {
 function WorkspaceFiles({ controller }: ViewProps) {
   const { selection } = controller.media;
   const { selectedPath, session, setSelectedPath } = controller.state;
+  const available =
+    !session?.id ||
+    !controller.queue.sessionsLoaded ||
+    controller.railItems.some(({ id, state }) => id === session.id && state === "ready");
   return (
     <section className="explorer-tree-panel" aria-labelledby="explorer-title">
       <header className="panel-header explorer-header">
@@ -136,7 +147,7 @@ function WorkspaceFiles({ controller }: ViewProps) {
         </div>
         {session ? <span className="panel-chip">{selection.explorerRows.length}</span> : null}
       </header>
-      {selection.sortedTree ? (
+      {selection.sortedTree && available ? (
         <TreeExplorer
           compact
           rootNode={selection.sortedTree}
@@ -161,6 +172,20 @@ function WorkspaceFiles({ controller }: ViewProps) {
 function WorkspacePreview({ controller }: ViewProps) {
   const { image, selection, text, video } = controller.media;
   const { settings, state } = controller;
+  if (controller.actions.error)
+    return <WorkspacePreviewRecovery controller={controller} message={controller.actions.error} />;
+  if (controller.actions.livePreview) return <WorkspaceLivePreview controller={controller} />;
+  if (
+    state.session?.id &&
+    controller.queue.sessionsLoaded &&
+    !controller.railItems.some(({ id }) => id === state.session?.id)
+  )
+    return (
+      <WorkspacePreviewRecovery
+        controller={controller}
+        message="This session is no longer available."
+      />
+    );
   return (
     <PreviewContent
       {...selection}

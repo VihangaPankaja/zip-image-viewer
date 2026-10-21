@@ -891,6 +891,72 @@ async function captureResourceRejection(
   );
 }
 
+async function capturePreviewRail(
+  page: Page,
+  device: (typeof devices)[number],
+  theme: string,
+  state: Awaited<ReturnType<typeof installReviewFixtures>>,
+) {
+  let ready = false;
+  const sessionId = "00000000-0000-4000-8000-000000000008";
+  const sessionRoute = async (route: import("@playwright/test").Route) =>
+    route.fulfill({
+      json: {
+        json: {
+          items: ready
+            ? [
+                {
+                  id: sessionId,
+                  firstFilePath: "Coastal collection",
+                  fileCount: 6,
+                  lastAccessedAt: 0,
+                },
+              ]
+            : [],
+        },
+      },
+    });
+  await page.route("**/rpc/sessions/list", sessionRoute);
+  await page.getByRole("tab", { name: "Explore" }).click();
+  const mobile = device.width <= 760;
+  if (mobile) await page.getByRole("button", { name: "Show sessions" }).click();
+  const rail = page.getByRole("region", { name: "Sessions", exact: true });
+  await expect(
+    rail.getByText("No previews available yet. Ready files and playable torrents appear here."),
+  ).toBeVisible();
+  await save(page, device, theme, "preview-rail-empty");
+  const torrent = reviewActiveTorrentJob();
+  state.jobs = [torrent];
+  const open = rail.getByRole("button", {
+    name: `Open ${torrent.torrentFiles[0].path}`,
+    exact: true,
+  });
+  await expect(open).toBeVisible();
+  await save(page, device, theme, "preview-rail-live");
+  await open.focus();
+  await page.keyboard.press("Enter");
+  const video = page.getByLabel("Early video preview", { exact: true });
+  await expect
+    .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState))
+    .toBeGreaterThanOrEqual(2);
+  await save(page, device, theme, "preview-rail-playing");
+  state.jobs = [{ ...torrent, status: "paused" }];
+  await expect(
+    page.getByText("This live preview is no longer available.", { exact: true }),
+  ).toBeVisible();
+  await save(page, device, theme, "preview-rail-recovery");
+  ready = true;
+  state.jobs = [{ ...torrent, status: "ready", phase: "ready", sessionId }];
+  await page.getByRole("button", { name: "Open ready files" }).click();
+  if (mobile) await page.getByRole("radio", { name: "Files", exact: true }).check({ force: true });
+  await expect(rail.getByRole("button", { name: /^Open / })).toHaveCount(1);
+  await save(page, device, theme, "preview-rail-ready");
+  await page.unroute("**/rpc/sessions/list", sessionRoute);
+  state.jobs = [];
+  if (mobile) await page.getByRole("button", { name: "Hide sessions" }).click();
+  await page.getByRole("tab", { name: "Downloads" }).click();
+}
+
 for (const device of devices) {
   for (const theme of ["light", "dark"] as const) {
     test(`${device.name} ${theme} review screens`, async ({ page }) => {
@@ -901,6 +967,7 @@ for (const device of devices) {
       await page.goto("/");
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
       await save(page, device, theme, "downloads-empty");
+      await capturePreviewRail(page, device, theme, state);
       state.jobs = reviewJobs();
       await expect(page.locator(".download-row")).toHaveCount(4);
       await save(page, device, theme, "http-and-torrent-downloads");

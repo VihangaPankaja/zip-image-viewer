@@ -1,25 +1,28 @@
-export type SessionRailState = "downloading" | "ready" | "error";
+import type { LivePreview } from "../../features/workspace/workspaceRail";
+
+type SessionRailState = "downloading" | "ready";
 
 export type SessionRailItem = {
   detail: string;
   id: string;
   label: string;
   state: SessionRailState;
+  livePreview?: LivePreview;
 };
 
 type SessionRailProps = {
   activeId: string;
   onSelect: (id: string) => void;
+  onOpenDownloads: () => void;
   sessions: readonly SessionRailItem[];
 };
 
 const stateLabels: Record<SessionRailState, string> = {
-  downloading: "Downloading",
-  error: "Needs attention",
+  downloading: "Play while downloading",
   ready: "Ready",
 };
 
-export function SessionRail({ activeId, onSelect, sessions }: SessionRailProps) {
+export function SessionRail({ activeId, onSelect, onOpenDownloads, sessions }: SessionRailProps) {
   return (
     <section className="session-rail" aria-labelledby="sessions-title">
       <div className="session-rail-heading">
@@ -30,7 +33,12 @@ export function SessionRail({ activeId, onSelect, sessions }: SessionRailProps) 
         <span className="session-count">{sessions.length}</span>
       </div>
       {sessions.length === 0 ? (
-        <p className="session-empty">Queued downloads will appear here.</p>
+        <div className="session-empty">
+          <p>No previews available yet. Ready files and playable torrents appear here.</p>
+          <button className="ghost-button" type="button" onClick={onOpenDownloads}>
+            View downloads
+          </button>
+        </div>
       ) : (
         <ol className="session-list" aria-label="Sessions">
           {sessions.map((session) => (
@@ -40,6 +48,7 @@ export function SessionRail({ activeId, onSelect, sessions }: SessionRailProps) 
                 type="button"
                 aria-current={session.id === activeId ? "true" : undefined}
                 aria-label={`Open ${session.label}`}
+                title={session.label}
                 onClick={() => onSelect(session.id)}
               >
                 <span className={`session-state state-${session.state}`}>
@@ -52,6 +61,11 @@ export function SessionRail({ activeId, onSelect, sessions }: SessionRailProps) 
           ))}
         </ol>
       )}
+      {sessions.length > 0 ? (
+        <button className="ghost-button" type="button" onClick={onOpenDownloads}>
+          Manage downloads
+        </button>
+      ) : null}
     </section>
   );
 }

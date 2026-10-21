@@ -41,6 +41,9 @@ export const test = base.extend<{ appOrigin: string; withAudio: boolean }>({
     app.get("/api/sessions/:id/video/play", (_req, res) =>
       res.sendFile(path.join(mediaDirectory, filename)),
     );
+    app.get("/api/session-jobs/:id/video/stream", (_req, res) =>
+      res.sendFile(path.join(mediaDirectory, filename)),
+    );
     app.use(proxyApp(baseURL));
     const server = app.listen(0, "127.0.0.1");
     await once(server, "listening");

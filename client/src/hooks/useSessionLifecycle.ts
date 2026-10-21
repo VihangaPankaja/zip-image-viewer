@@ -12,7 +12,6 @@ import { useJobSnapshot } from "../features/workspace/useJobSnapshot";
 import { useJobTransport } from "../features/workspace/useJobTransport";
 import { useSessionHydration } from "../features/workspace/useSessionHydration";
 import { useSessionRequest } from "../features/workspace/useSessionRequest";
-export type { JobPayload, SessionPayload } from "../features/workspace/sessionSchemas";
 
 type UseSessionLifecycleParams = {
   zipUrl: string;

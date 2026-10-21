@@ -86,5 +86,6 @@ export function useWorkspaceQueue() {
     setMaxConcurrent: (maxConcurrent: number) =>
       control(schedulerMutation.mutateAsync({ maxConcurrent })),
     sessions: sessionsQuery.data?.items ?? ([] as SessionSummary[]),
+    sessionsLoaded: sessionsQuery.isSuccess,
   };
 }

@@ -26,6 +26,11 @@ audio in the background.
 ## Play a torrent before it finishes
 
 In Downloads, choose **View files**, then **Play now** for a selected video.
+In Explore, the Sessions rail also offers selected videos once the server has
+verified their early playback capability. Queued, paused, failed and extracting
+downloads stay in Downloads until files are ready. **Manage downloads** opens
+their transfer controls.
+
 Early playback requires a fast-start MP4 or M4V with browser-compatible codecs.
 Other files offer **Download first**, which keeps the transfer running.
 
@@ -33,6 +38,10 @@ Only verified torrent pieces play. Seeking may wait for peers. After an idle
 read expires, use **Retry playback** or finish the download. Closing the preview
 keeps the transfer running. Pausing or cancelling the transfer stops playback.
 Playback keeps its position when the completed file becomes available.
+
+If a rail preview becomes unavailable, **View downloads** opens recovery controls.
+When its session is ready, **Open ready files** switches to the full file player.
+The rail groups a transfer and its ready session into one card.
 
 ## Audio languages and captions
 

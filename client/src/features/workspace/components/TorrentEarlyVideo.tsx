@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, type RefObject } from "react";
 import {
   torrentVideoInfoSchema,
   type Job,
@@ -76,26 +76,29 @@ function StreamVideo({ src, onError }: { src: string; onError: () => void }) {
   );
 }
 
-function TorrentEarlyVideo({
+export function TorrentEarlyVideo({
   job,
   file,
   onBack,
+  backLabel = "Back to files",
 }: {
   job: Job;
   file: TorrentFile;
   onBack: () => void;
+  backLabel?: string;
 }) {
+  const titleId = useId();
   const { active, attempt, state, message, retry, fail } = useTorrentVideo(job, file);
   const backRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     backRef.current?.focus();
   }, []);
   return (
-    <section className="torrent-early-video" aria-labelledby="torrent-video-title">
+    <section className="torrent-early-video" aria-labelledby={titleId}>
       <button ref={backRef} type="button" className="ghost-button" onClick={onBack}>
-        Back to files
+        {backLabel}
       </button>
-      <h3 id="torrent-video-title">{file.path}</h3>
+      <h3 id={titleId}>{file.path}</h3>
       <p>
         Play while downloading. Only verified pieces are served; playback and seeking may wait for
         peers. Early playback supports fast-start MP4 with browser-compatible codecs.
