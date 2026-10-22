@@ -17,6 +17,21 @@ type CustomDropdownProps = {
   disabled?: boolean;
 };
 
+function restoreDropdownFocus(trigger: HTMLButtonElement | null) {
+  if (!trigger) return;
+  trigger.focus();
+  const header = trigger.closest(".settings-dialog")?.querySelector(".panel-header");
+  const headerBounds = header?.getBoundingClientRect();
+  // Native focus scrolling does not account for the sticky header or focus outline.
+  if (
+    headerBounds &&
+    headerBounds.height > 0 &&
+    trigger.getBoundingClientRect().top < headerBounds.bottom + 4
+  ) {
+    trigger.scrollIntoView({ block: "center", inline: "nearest" });
+  }
+}
+
 function useDropdownNavigation(
   menuRef: RefObject<HTMLDivElement | null>,
   triggerRef: RefObject<HTMLButtonElement | null>,
@@ -24,7 +39,7 @@ function useDropdownNavigation(
   const search = useRef({ text: "", time: 0 });
   function close() {
     menuRef.current?.hidePopover();
-    triggerRef.current?.focus();
+    restoreDropdownFocus(triggerRef.current);
   }
   function navigate(event: KeyboardEvent<HTMLDivElement>) {
     const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("[role=option]")];

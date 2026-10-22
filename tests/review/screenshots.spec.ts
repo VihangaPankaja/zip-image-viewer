@@ -847,6 +847,14 @@ async function captureDialogs(
   await save(page, device, theme, "settings-controls-menu");
   await page.keyboard.press("Escape");
   await expect(sort).toBeFocused();
+  expect(
+    await sort.evaluate((element) => {
+      const header = element.closest("dialog")?.querySelector(".panel-header");
+      return (
+        element.getBoundingClientRect().top >= (header?.getBoundingClientRect().bottom ?? 0) + 4
+      );
+    }),
+  ).toBe(true);
   await save(page, device, theme, "settings-controls-focus-return");
   for (const accent of ["Blue", "Violet", "Amber", "Rose"]) {
     await page.getByText(accent, { exact: true }).click();
