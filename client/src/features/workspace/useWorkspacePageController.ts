@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 import { useImagePreviewCache } from "../../hooks/useImagePreviewCache";
 import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
 import { useLocalStorageSettings } from "../../hooks/useLocalStorageSettings";
@@ -10,9 +10,9 @@ import { downloadOptionsToLegacySettings } from "../../lib/downloadOptions";
 import { useWorkspacePageEffects } from "./useWorkspacePageEffects";
 import { useWorkspacePageState, type WorkspacePageState } from "./useWorkspacePageState";
 import { useWorkspaceQueue } from "./useWorkspaceQueue";
-import { buildWorkspaceProgress } from "./workspaceProgress";
 import { buildWorkspaceRailItems } from "./workspaceRail";
-import { sessionPayloadSchema } from "./sessionSchemas";
+import { useWorkspaceLivePreviews } from "./useWorkspaceLivePreviews";
+import { useWorkspacePreviewNavigation } from "./useWorkspacePreviewNavigation";
 
 function useWorkspaceMedia(state: WorkspacePageState) {
   const selection = usePreviewSelection({
@@ -72,32 +72,6 @@ function useWorkspaceLifecycle(
   });
 }
 
-type WorkspaceQueue = ReturnType<typeof useWorkspaceQueue>;
-
-function useWorkspaceActions(state: WorkspacePageState, queue: WorkspaceQueue) {
-  const openSession = useCallback(
-    async (sessionId: string) => {
-      if (!queue.sessions.some((item) => item.id === sessionId)) return;
-      const response = await fetch(`/api/sessions/${sessionId}/tree`);
-      if (!response.ok) {
-        state.setError("That session is not ready to browse yet.");
-        return;
-      }
-      const parsed = sessionPayloadSchema.safeParse(await response.json());
-      if (!parsed.success) {
-        state.setError("That session returned invalid data.");
-        return;
-      }
-      state.setSession(parsed.data);
-      state.setSelectedPath(parsed.data.firstFilePath || parsed.data.tree?.path || "");
-      state.setError("");
-      state.setActiveView("explore");
-    },
-    [queue.sessions, state],
-  );
-  return { openSession };
-}
-
 function useWorkspaceKeyboard(
   state: WorkspacePageState,
   settings: WorkspaceSettings,
@@ -130,15 +104,11 @@ export function useWorkspacePageController() {
   const media = useWorkspaceMedia(state);
   const lifecycle = useWorkspaceLifecycle(state, settings, media, downloadSettings);
   const queue = useWorkspaceQueue();
-  const actions = useWorkspaceActions(state, queue);
   useWorkspacePageEffects(state, media.selection, media.image.loadImagePreview);
   useWorkspaceKeyboard(state, settings, media);
-  const progress = buildWorkspaceProgress(state.activeJob);
-  const railItems = useMemo(
-    () =>
-      buildWorkspaceRailItems(queue.jobs, queue.sessions, state.activeJob, state.session, progress),
-    [progress, queue.jobs, queue.sessions, state.activeJob, state.session],
-  );
+  const livePreviews = useWorkspaceLivePreviews(queue.jobs, queue.sessions);
+  const railItems = buildWorkspaceRailItems(queue.jobs, queue.sessions, livePreviews);
+  const actions = useWorkspacePreviewNavigation(state, railItems);
   return {
     actions,
     downloadSettings,

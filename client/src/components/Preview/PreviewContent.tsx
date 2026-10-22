@@ -171,6 +171,9 @@ export function PreviewContent(props: PreviewContentProps) {
           </span>
           <strong>Nothing selected</strong>
           <p>Choose a file from the sidebar to start previewing its contents.</p>
+          <button className="ghost-button" type="button" onClick={props.onOpenDownloads}>
+            View downloads
+          </button>
         </div>
       ) : null}
 

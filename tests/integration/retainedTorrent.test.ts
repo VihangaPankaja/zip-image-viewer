@@ -140,6 +140,9 @@ it("retains and reverifies selective downloads across graceful and forced restar
       .toBe("ready");
     let job = (await server.client.jobs.list()).items[0];
     const sessionId = job.sessionId;
+    expect((await server.client.sessions.list()).items).toEqual([
+      expect.objectContaining({ id: sessionId, jobId: id }),
+    ]);
     const downloadDir = path.join(directory, "sessions", id, "torrent", "fixture");
     expect(await readFile(path.join(downloadDir, "0.bin"))).toEqual(contents[0]);
     expect(new Set(requests)).toEqual(new Set([0, 1, 2]));
@@ -153,6 +156,9 @@ it("retains and reverifies selective downloads across graceful and forced restar
     server = await startServer(directory, seed.torrentPort);
     job = (await server.client.jobs.list()).items[0];
     expect(job).toMatchObject({ id, status: "ready", sessionId });
+    expect((await server.client.sessions.list()).items).toEqual([
+      expect.objectContaining({ id: sessionId, jobId: id }),
+    ]);
     expect(requests.length).toBe(firstRequests);
     expect(
       await fetch(`${server.origin}/api/sessions/${sessionId}`, {

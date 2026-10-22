@@ -191,7 +191,9 @@ describe("createProcessSessionJob", () => {
       });
       return Promise.resolve({ files: ["album/image.jpg"] });
     });
-    const prepareRetainedSession = vi.fn();
+    const prepareRetainedSession = vi.fn((session: Session) => {
+      expect(session.jobId).toBe(job.id);
+    });
     const processJob = createProcessSessionJob({
       prepareRetainedSession,
       sessionStore,
