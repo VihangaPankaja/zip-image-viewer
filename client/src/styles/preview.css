@@ -279,13 +279,13 @@
 }
 
 .slideshow-floating-nav button {
-  width: 46px;
-  min-height: 56px;
+  width: var(--control-height);
+  min-height: var(--control-height);
   padding: 0;
   background: var(--bg-panel-strong);
   pointer-events: auto;
   font-family: var(--font-display);
-  font-size: 1.3rem;
+  font-size: var(--control-icon-size);
 }
 
 .slideshow-info-card,

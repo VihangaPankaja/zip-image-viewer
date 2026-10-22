@@ -81,8 +81,8 @@
 
 .explorer-file-button {
   width: 100%;
-  min-height: 40px;
-  padding: 9px 10px;
+  min-height: var(--control-height);
+  padding: var(--control-padding);
   overflow: hidden;
   border: 0;
   background: transparent;
@@ -99,8 +99,8 @@
 
 .explorer-directory-name {
   display: block;
-  min-height: 40px;
-  padding: 9px 10px;
+  min-height: var(--control-height);
+  padding: var(--control-padding);
   color: var(--text-muted);
 }
 
