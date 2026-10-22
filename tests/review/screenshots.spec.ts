@@ -332,14 +332,25 @@ async function save(page: Page, device: (typeof devices)[number], theme: string,
   await page.screenshot({
     path: path.join(output, file),
     fullPage:
-      screen === "http-and-torrent-downloads" ||
-      screen === "download-storage-rejected" ||
-      screen === "loaded-video-downloads-visit",
+      screen.startsWith("http-and-torrent-downloads") ||
+      screen.startsWith("download-storage-rejected") ||
+      screen.startsWith("loaded-video-downloads-visit"),
     animations: "disabled",
     caret: "hide",
     scale: "css",
   });
   captures.push({ ...device, device: device.name, theme, screen, file });
+  if (theme === "dark" && !screen.includes("amoled")) {
+    const previous = await page.evaluate(() => {
+      const value = document.documentElement.dataset.darkSurface;
+      document.documentElement.dataset.darkSurface = "amoled";
+      return value;
+    });
+    await save(page, device, theme, `${screen}-amoled`);
+    await page.evaluate((value) => {
+      document.documentElement.dataset.darkSurface = value;
+    }, previous);
+  }
 }
 
 async function installSearchTree(page: Page) {
@@ -823,6 +834,18 @@ async function captureDialogs(
 ) {
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await save(page, device, theme, "settings");
+  if (theme === "dark") {
+    await page.getByText("AMOLED", { exact: true }).click();
+    await expect(page.locator("body")).toHaveCSS("background-color", "rgb(5, 5, 5)");
+    await save(page, device, theme, "settings-amoled-selected");
+    await page.keyboard.press("Escape");
+    await save(page, device, theme, "downloads-amoled");
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await page.getByRole("button", { name: "Default sort", exact: true }).click();
+    await save(page, device, theme, "menu-amoled");
+    await page.keyboard.press("Escape");
+    await page.getByText("Charcoal", { exact: true }).click();
+  }
   await page.getByLabel("Show Path column").scrollIntoViewIfNeeded();
   await save(page, device, theme, "settings-more");
   await page.getByRole("spinbutton", { name: "Torrent download limit (KiB/s)" }).fill("512");

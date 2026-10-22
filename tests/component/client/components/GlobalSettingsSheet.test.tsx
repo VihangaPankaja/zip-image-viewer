@@ -4,10 +4,13 @@ import { GlobalSettingsSheet } from "../../../../client/src/components/GlobalSet
 describe("GlobalSettingsSheet", () => {
   it("groups controls in a native dialog and saves theme and concurrency", async () => {
     const setTheme = vi.fn();
+    const setDarkSurface = vi.fn();
     const onSetTorrentLimits = vi.fn().mockResolvedValue(undefined);
     const onSetConcurrency = vi.fn().mockRejectedValue(new Error("Offline"));
     render(
       <GlobalSettingsSheet
+        darkSurface="charcoal"
+        setDarkSurface={setDarkSurface}
         theme="system"
         setTheme={setTheme}
         maxConcurrent={2}
@@ -63,6 +66,8 @@ describe("GlobalSettingsSheet", () => {
     );
     fireEvent.click(screen.getByRole("radio", { name: "Dark" }));
     expect(setTheme).toHaveBeenCalledWith("dark");
+    fireEvent.click(screen.getByRole("radio", { name: "AMOLED" }));
+    expect(setDarkSurface).toHaveBeenCalledWith("amoled");
     fireEvent.change(screen.getByRole("combobox", { name: "Concurrent downloads" }), {
       target: { value: "4" },
     });

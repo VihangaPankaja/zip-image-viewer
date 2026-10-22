@@ -15,7 +15,9 @@ with tokens when needed. `transparent`, `currentcolor` and system colors remain
 available for transparency, inherited borders and forced-color accessibility.
 Media backdrop and caption tokens keep their colors in both themes.
 
-- Keep both light and dark themes readable. System appearance follows the OS.
+- Keep Light, Charcoal and AMOLED readable. System appearance follows the OS;
+  `data-dark-surface` selects the saved dark palette. Dialogs and popovers inherit
+  the root tokens. Use `--focus` for focus outlines.
 - Pair status color with text. Use a visible focus outline.
 - Use the existing spacing scale, borders and radii.
 - Keep buttons at least 44px high. Give icon-only controls accessible names.

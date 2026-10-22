@@ -37,11 +37,11 @@ for (const width of [320, 375, 768, 1440]) {
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
       await expect(page.locator("body")).toHaveCSS(
         "color",
-        theme === "light" ? "rgb(25, 44, 56)" : "rgb(240, 245, 248)",
+        theme === "light" ? "rgb(25, 44, 56)" : "rgb(242, 242, 243)",
       );
       await expect(page.getByRole("heading", { name: "Transfer desk" })).toHaveCSS(
         "color",
-        theme === "light" ? "rgb(25, 44, 56)" : "rgb(240, 245, 248)",
+        theme === "light" ? "rgb(25, 44, 56)" : "rgb(242, 242, 243)",
       );
       await expectNoHorizontalOverflow(page);
       await page.screenshot({

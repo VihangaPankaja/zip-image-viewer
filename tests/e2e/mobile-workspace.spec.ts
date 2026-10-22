@@ -367,3 +367,22 @@ test("queue keyboard navigation cannot change the hidden media selection", async
     await expect(page.getByLabel("Video preview")).toHaveJSProperty("playbackRate", 1);
   }
 });
+
+test("dark surface choices have usable touch targets on a narrow phone", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+  await page.goto("/");
+  await tapVisibleTarget(page.getByRole("button", { name: "Settings", exact: true }));
+  for (const [name, surface] of [
+    ["AMOLED", "amoled"],
+    ["Charcoal", "charcoal"],
+  ]) {
+    const label = page.locator(`.theme-option:has(input[value="${surface}"])`);
+    expect((await label.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    await tapVisibleTarget(label);
+    await expect(page.getByRole("radio", { name, exact: true })).toBeChecked();
+    await expect(page.locator("html")).toHaveAttribute("data-dark-surface", surface);
+  }
+  await tapVisibleTarget(page.getByRole("button", { name: "Close", exact: true }));
+  await expect(page.getByRole("button", { name: "Settings", exact: true })).toBeFocused();
+});

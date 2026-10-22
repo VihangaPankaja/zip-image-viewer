@@ -6,11 +6,15 @@
     <title>ZIP Image Viewer</title>
     <script>
       let theme = "system";
+      let darkSurface = "charcoal";
       try {
         theme = localStorage.getItem("zip-image-viewer-theme") || "system";
+        darkSurface = localStorage.getItem("zip-image-viewer-dark-surface") || "charcoal";
       } catch {
         // Storage can be unavailable in private or restricted browser contexts.
       }
+      document.documentElement.dataset.darkSurface =
+        darkSurface === "amoled" ? "amoled" : "charcoal";
       document.documentElement.dataset.theme =
         theme === "light" || theme === "dark"
           ? theme

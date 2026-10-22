@@ -6,6 +6,9 @@ save failures appear beside the affected control.
 ## Browser preferences
 
 - Choose System, Light or Dark appearance. System follows the device theme.
+- Choose Charcoal or AMOLED dark surfaces independently. Charcoal uses neutral grey
+  panels; AMOLED uses a near-black canvas. The choice stays saved while Light is active
+  and applies whenever the workspace switches to dark.
 - Choose file sorting, preview quality and visible file columns.
 - Set the video seek interval and playback-speed step for keyboard shortcuts.
 

@@ -726,8 +726,8 @@
             <article>
               <h3>Theme and preview gaps</h3>
               <p>
-                System mode already follows the OS. Dark surfaces are blue-grey, audio uses native
-                controls and video has native controls plus VideoScrubber.
+                System mode already follows the OS. Dark surfaces offer charcoal and AMOLED, audio
+                uses native controls and video has native controls plus VideoScrubber.
               </p>
               <code>client/src/styles/tokens.css · client/src/components/Preview/</code>
             </article>
@@ -1330,16 +1330,16 @@
           area: "Interface",
           priority: "P0",
           effort: "M",
-          status: "Proposed",
+          status: "Done",
           title: "Add AMOLED and neutral charcoal dark themes",
           summary: "Replace blue-grey surfaces with deliberate black and neutral-grey choices.",
-          now: "tokens.css uses blue-grey values such as #10171d/#1b2630. System/light/dark mode already exists.",
+          now: "Charcoal and AMOLED dark surfaces share semantic tokens across the workspace, dialogs and popovers. The saved surface applies before paint and stays independent of System/Light/Dark mode.",
           plan: "Define semantic surface/elevated/border/text/focus tokens. Offer AMOLED near #050505 and charcoal near #111214 with distinguishable layers. Remove component hard-coded colors and review disabled/error/success states. Final values must pass contrast checks.",
           done: "All app screens and portals use the chosen dark subtheme without unreadable states or invisible focus/borders. Check AA text contrast across four device sizes, forced colors and reduced motion; preserve light mode.",
           depends: "None",
-          note: "",
+          note: "Verified text, status, selection and focus contrast, four device sizes, forced colors, reduced motion and blocked storage. Light mode remains unchanged.",
           evidence:
-            "client/src/styles/; client/src/components/GlobalSettingsSheet.tsx; client/src/components/Common/CustomDropdown.tsx; client/src/styles/tokens.css",
+            "client/src/styles/tokens.css; client/src/components/AppearanceConfiguration.tsx; client/src/hooks/useLocalStorageSettings.ts; client/index.html; tests/e2e/dark-surfaces.spec.ts; tests/review/screenshots.spec.ts",
         },
         {
           id: "N02",
@@ -1349,7 +1349,7 @@
           status: "Proposed",
           title: "Choose accents independently of theme mode",
           summary: "Apply an accent to light and dark; keep System mode working.",
-          now: "AppearanceConfiguration/useLocalStorageSettings already offer System/Light/Dark and listen to OS changes. Accent and dark-subtheme choices are missing.",
+          now: "AppearanceConfiguration/useLocalStorageSettings already offer System/Light/Dark and listen to OS changes. Charcoal/AMOLED surfaces are saved independently; accent choices are still missing.",
           plan: "Save mode, dark surface and accent separately. Add curated teal/blue/violet/amber/rose presets with theme-specific hover/text/focus colors. Preserve status color meaning. Apply saved choice before first paint, migrate settings and tolerate blocked storage. Verify the existing auto mode rather than duplicating it.",
           done: "Accent updates buttons/links/selection/focus in both themes. System reacts live to OS changes while explicit mode does not. No bright reload flash; every preset passes contrast checks.",
           depends: "N01",
