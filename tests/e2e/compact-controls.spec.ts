@@ -13,36 +13,32 @@ async function fits(page: Page) {
   );
 }
 
-test("Escape keeps the returned menu focus clear of the sticky settings header", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await installReviewFixtures(page);
-  await page.goto("/");
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
-  const sort = page.getByRole("button", { name: "Default sort", exact: true });
-  for (const coverTrigger of [false, true]) {
+for (const theme of ["light", "dark"] as const) {
+  test(`native ${theme} choice keeps keyboard focus visible`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.emulateMedia({ reducedMotion: "reduce", colorScheme: theme });
+    await installReviewFixtures(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    const sort = page.getByRole("combobox", { name: "Default sort", exact: true });
+    await sort.scrollIntoViewIfNeeded();
     await sort.focus();
     await page.keyboard.press("ArrowDown");
-    await page.keyboard.press("End");
-    await expect(page.getByRole("listbox").getByRole("option").last()).toBeFocused();
-    if (coverTrigger) await sort.evaluate((element) => element.scrollIntoView({ block: "start" }));
-    await page.screenshot({ animations: "disabled" });
-    await page.keyboard.press("Escape");
+    await page.keyboard.press("Tab");
+    await expect(sort).not.toBeFocused();
+    await page.keyboard.press("Shift+Tab");
     await expect(sort).toBeFocused();
+    await expect(page.getByRole("dialog", { name: "Settings", exact: true })).toBeVisible();
     await page.screenshot({ animations: "disabled" });
-    const bounds = await sort.evaluate((element) => ({
-      top: element.getBoundingClientRect().top,
-      headerBottom:
-        element.closest("dialog")?.querySelector(".panel-header")?.getBoundingClientRect().bottom ??
-        0,
-    }));
-    expect(bounds.top, JSON.stringify({ coverTrigger, ...bounds })).toBeGreaterThanOrEqual(
-      bounds.headerBottom + 4,
-    );
-  }
-});
+    expect(
+      await sort.evaluate((element) => {
+        const header = element.closest("dialog")?.querySelector(".panel-header");
+        if (!header) throw new Error("Settings header is missing.");
+        return element.getBoundingClientRect().top >= header.getBoundingClientRect().bottom + 4;
+      }),
+    ).toBe(true);
+  });
+}
 
 for (const width of [360, 390, 820, 1440, 2560]) {
   test(`compact settings and menus fit at ${width}px`, async ({ page }, testInfo) => {
@@ -51,32 +47,19 @@ for (const width of [360, 390, 820, 1440, 2560]) {
     for (const theme of ["light", "dark"] as const) {
       await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
       await page.getByRole("button", { name: "Settings", exact: true }).click();
-      const trigger = page.getByRole("button", { name: "Default sort", exact: true });
-      await trigger.focus();
+      const select = page.getByRole("combobox", { name: "Default sort", exact: true });
+      await select.focus();
       await page.keyboard.press("ArrowDown");
-      await expect(trigger).toHaveAttribute("aria-expanded", "true");
-      await expect(page.getByRole("listbox").getByRole("option", { selected: true })).toBeFocused();
-      await page.keyboard.press("End");
-      await expect(page.getByRole("listbox").getByRole("option").last()).toBeFocused();
-      await page.keyboard.press("Home");
-      await expect(page.getByRole("listbox").getByRole("option").first()).toBeFocused();
+      await expect(select).toBeFocused();
+      await select.selectOption({ label: "Name A-Z" });
+      await expect(select).toHaveValue("name-asc");
       await page.screenshot({ path: testInfo.outputPath(`menu-${theme}.png`) });
-      await page.keyboard.press("Escape");
-      await expect(trigger).toBeFocused();
-      await expect(trigger).toHaveAttribute("aria-expanded", "false");
-      await expect(page.getByRole("dialog", { name: "Settings", exact: true })).toBeVisible();
-      await page.keyboard.press("Enter");
-      await page.keyboard.press("n");
-      await page.keyboard.press("Enter");
-      await expect(trigger).toBeFocused();
-      await page.keyboard.press("Enter");
-      await expect(trigger).toHaveAttribute("aria-expanded", "true");
       await page.keyboard.press("Tab");
-      await expect(trigger).toHaveAttribute("aria-expanded", "false");
-      await expect(trigger).not.toBeFocused();
+      await expect(select).not.toBeFocused();
+      await expect(select).toHaveValue("name-asc");
       await fits(page);
       expect((await new AxeBuilder({ page }).include("dialog").analyze()).violations).toEqual([]);
-      await page.keyboard.press("Escape");
+      await page.getByRole("button", { name: "Close", exact: true }).click();
       await expect(page.getByRole("button", { name: "Settings", exact: true })).toBeFocused();
     }
   });
@@ -112,17 +95,17 @@ test("touch targets remain 44px and native controls support loading and errors",
   await expect(page.getByRole("alert")).toContainText("Could not update concurrent downloads");
   for (const locator of [
     concurrency,
-    page.getByRole("button", { name: "Default sort", exact: true }),
+    page.getByRole("combobox", { name: "Default sort", exact: true }),
     page.locator(".toggle-row").first(),
     page.locator(".theme-option").first(),
   ]) {
     await locator.scrollIntoViewIfNeeded();
     expect(Math.round((await locator.boundingBox())?.height ?? 0)).toBeGreaterThanOrEqual(44);
   }
-  await tapVisibleTarget(page.getByRole("button", { name: "Default sort", exact: true }));
-  await tapVisibleTarget(
-    page.getByRole("listbox").getByRole("option", { name: "Name A-Z", exact: true }),
-  );
+  const sort = page.getByRole("combobox", { name: "Default sort", exact: true });
+  await tapVisibleTarget(sort);
+  await sort.selectOption({ label: "Name A-Z" });
+  await expect(sort).toHaveValue("name-asc");
   await fits(page);
   await context.close();
 });
@@ -183,20 +166,12 @@ test("long labels and fields reflow at 200% zoom", async ({ page }) => {
     .locator(".theme-option")
     .first()
     .evaluate((element) => element.append(" with a longer translated label"));
-  await page.getByRole("button", { name: "Default sort", exact: true }).click();
-  await page
-    .getByRole("listbox")
-    .getByRole("option")
-    .first()
-    .evaluate((element) => {
-      element.textContent = "A long sorting option that must wrap and remain selectable";
-    });
-  expect(
-    await page
-      .getByRole("listbox")
-      .evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
-  ).toBe(true);
-  await page.getByRole("listbox").getByRole("option").first().click();
+  const sort = page.getByRole("combobox", { name: "Default sort", exact: true });
+  const label = "A long sorting option that must remain readable and selectable";
+  await sort.locator("option:checked").evaluate((element, text) => {
+    element.textContent = text;
+  }, label);
+  await expect(sort.locator("option:checked")).toHaveText(label);
   await fits(page);
   await page.getByLabel("Seek jump seconds").scrollIntoViewIfNeeded();
   await expect(page.getByLabel("Seek jump seconds")).toBeInViewport();

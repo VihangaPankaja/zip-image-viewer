@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { CustomDropdown } from "../../../../../client/src/components/Common/CustomDropdown";
 
 describe("CustomDropdown", () => {
-  it.each([true, false])("does not open a disabled or empty menu, disabled=%s", (disabled) => {
+  it.each([true, false])("disables unavailable choices, disabled=%s", (disabled) => {
     render(
       <CustomDropdown
         id="sort"
@@ -14,84 +14,39 @@ describe("CustomDropdown", () => {
         options={disabled ? [{ value: "a", label: "Alpha" }] : []}
       />,
     );
-    expect(screen.getByRole("button", { name: "Sort" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Sort" })).toBeDisabled();
   });
-  it("moves focus with arrows, Home, End and typeahead without selecting", async () => {
-    const user = userEvent.setup();
+  it.each(["b", 2])("preserves the original option value type: %s", async (value) => {
     const onChange = vi.fn();
+    const user = userEvent.setup();
     render(
       <CustomDropdown
         id="sort"
         label="Sort"
         value="a"
-        onChange={onChange}
         options={[
           { value: "a", label: "Alpha" },
-          { value: "b", label: "Beta" },
-          { value: "c", label: "Charlie" },
+          { value, label: "Beta" },
         ]}
-      />,
-    );
-    const [alpha, beta, charlie] = screen.getAllByRole("option", { hidden: true });
-    alpha.focus();
-    await user.keyboard("{ArrowDown}");
-    expect(beta).toHaveFocus();
-    await user.keyboard("{End}");
-    expect(charlie).toHaveFocus();
-    await user.keyboard("{ArrowDown}");
-    expect(alpha).toHaveFocus();
-    await user.keyboard("{ArrowUp}");
-    expect(charlie).toHaveFocus();
-    await user.keyboard("{Home}b");
-    expect(beta).toHaveFocus();
-    expect(onChange).not.toHaveBeenCalled();
-    await user.keyboard("{Enter}");
-    expect(onChange).toHaveBeenCalledWith("b");
-    expect(screen.getByRole("button", { name: "Sort" })).toHaveFocus();
-  });
-
-  it("returns focus on Escape without changing the selection", async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    render(
-      <CustomDropdown
-        id="sort"
-        label="Sort"
-        value="a"
         onChange={onChange}
-        options={[{ value: "a", label: "Alpha" }]}
       />,
     );
-    screen.getByRole("option", { hidden: true }).focus();
-    await user.keyboard("{Escape}");
-    expect(screen.getByRole("button", { name: "Sort" })).toHaveFocus();
-    expect(onChange).not.toHaveBeenCalled();
+    await user.selectOptions(screen.getByRole("combobox", { name: "Sort" }), String(value));
+    expect(onChange).toHaveBeenCalledWith(value);
   });
-
-  it("uses a native popover while preserving controlled selection", async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-
+  it("uses labelled native options and exposes the full selected label", () => {
     render(
       <CustomDropdown
         id="quality"
         label="Quality"
-        value="auto"
-        options={[
-          { value: "auto", label: "Auto" },
-          { value: "1080p", label: "1080p" },
-        ]}
-        onChange={onChange}
+        value="missing"
+        options={[{ value: "auto", label: "Automatic preview quality" }]}
+        onChange={vi.fn()}
       />,
     );
-
-    const trigger = screen.getByRole("button", { name: "Quality" });
-    const listbox = screen.getByRole("listbox", { hidden: true });
-    expect(trigger).toHaveAttribute("popovertarget", "quality-menu");
-    expect(listbox).toHaveAttribute("popover", "auto");
-    expect(listbox).toHaveAttribute("aria-label", "Quality");
-
-    await user.click(screen.getByRole("option", { name: "1080p", hidden: true }));
-    expect(onChange).toHaveBeenCalledWith("1080p");
+    const select = screen.getByRole("combobox", { name: "Quality" });
+    expect(select).toHaveValue("auto");
+    expect(select).toHaveAttribute("title", "Automatic preview quality");
+    expect(screen.getByRole("option", { name: "Automatic preview quality" })).toBeInTheDocument();
   });
 });

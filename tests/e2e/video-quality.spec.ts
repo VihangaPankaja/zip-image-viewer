@@ -212,10 +212,12 @@ test("switches HLS quality and resumes real playback after reopening", async ({
       .toBeGreaterThan(0.5);
     await video.evaluate((element: HTMLVideoElement) => element.pause());
     const before = await video.evaluate((element: HTMLVideoElement) => element.currentTime);
-    await page.getByRole("button", { name: "Quality", exact: true }).click();
-    await page.getByRole("option", { name: "720p" }).click();
-    await page.getByRole("button", { name: "Quality", exact: true }).click();
-    await page.getByRole("option", { name: "Auto" }).click();
+    await page
+      .getByRole("combobox", { name: "Quality", exact: true })
+      .selectOption({ label: "720p" });
+    await page
+      .getByRole("combobox", { name: "Quality", exact: true })
+      .selectOption({ label: "Auto" });
     await expect(page.getByText(/Auto · (360|720)p playback/)).toBeVisible({
       timeout: 20_000,
     });

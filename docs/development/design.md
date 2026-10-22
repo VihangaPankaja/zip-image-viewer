@@ -50,17 +50,17 @@ Shared control sizes, padding and icons come from `styles/tokens.css`. Pointer
 controls use compact 36px rows; narrow screens, short phone landscapes and any
 touch pointer raise the shared minimum to 44px. Native fields, selects, checkboxes and radios retain their platform
 semantics and share theme colors. Forced colors restores the native select arrow.
-Custom dropdowns focus the selected option on open. Arrows, Home/End and typing
-move focus; Enter/Space commits. Escape cancels and returns focus, while Tab
-closes the menu and continues through the form.
+All choice menus use labelled native selects. The browser supplies keyboard navigation,
+typeahead, touch pickers, dismissal and focus behavior. Selected labels remain
+available in the control title when space is limited.
 
-| Controls                                                                    | Shared styling and behavior                                                                                                                   |
-| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| Header, preview, queue, storage and dialog actions                          | Button classes in `controls.css`; queue actions inherit the same sizing tokens. Preview actions use two columns on phones.                    |
-| Settings, download drafts, torrent tools, explorer search, caption fields   | Native fields inherit themed borders, text, padding, disabled and invalid states from `foundation.css`.                                       |
-| Concurrency, file type, source, torrent priority, audio and caption choices | Native selects share an arrow and field styling, retaining native keyboard and touch pickers.                                                 |
-| Sort, preview and encoding quality, thread and retry menus                  | `CustomDropdown` supplies popovers, keyboard navigation, typeahead and focus return. Menus wrap long options and stay within viewport bounds. |
-| Appearance radios, preference toggles, file selection                       | Native inputs use the accent token. Their labels provide the control-sized target.                                                            |
+| Controls                                                                    | Shared styling and behavior                                                                                                |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Header, preview, queue, storage and dialog actions                          | Button classes in `controls.css`; queue actions inherit the same sizing tokens. Preview actions use two columns on phones. |
+| Settings, download drafts, torrent tools, explorer search, caption fields   | Native fields inherit themed borders, text, padding, disabled and invalid states from `foundation.css`.                    |
+| Concurrency, file type, source, torrent priority, audio and caption choices | Native selects share an arrow and field styling, retaining native keyboard and touch pickers.                              |
+| Sort, preview and encoding quality, thread and retry menus                  | `CustomDropdown` renders labelled native selects with shared field styling, preserving numeric and string choice values.   |
+| Appearance radios, preference toggles, file selection                       | Native inputs use the accent token. Their labels provide the control-sized target.                                         |
 
 Use native controls and dialogs. Support Escape, focus return and keyboard
 navigation. Honor reduced motion and forced colors. Keep animations limited

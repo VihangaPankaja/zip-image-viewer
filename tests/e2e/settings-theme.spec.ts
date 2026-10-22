@@ -62,7 +62,7 @@ for (const width of [320, 375, 768, 1440]) {
       });
       for (const control of [
         dialog.getByLabel("Concurrent downloads"),
-        dialog.getByRole("button", { name: "Default sort", exact: true }),
+        dialog.getByRole("combobox", { name: "Default sort", exact: true }),
         dialog.getByLabel("Seek jump seconds"),
         dialog.getByLabel("Show Path column"),
       ]) {
@@ -126,8 +126,9 @@ test("theme override and settings persist while dialogs contain keyboard focus",
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await dialog.getByLabel("Concurrent downloads").selectOption("4");
   await expect.poll(() => maxConcurrent).toBe(4);
-  await dialog.getByRole("button", { name: "Default sort", exact: true }).click();
-  await page.getByRole("option", { name: "Name A-Z", exact: true }).click();
+  await dialog
+    .getByRole("combobox", { name: "Default sort", exact: true })
+    .selectOption({ label: "Name A-Z" });
   await dialog.getByLabel("Seek jump seconds").fill("9");
   await dialog.getByRole("button", { name: "Close", exact: true }).focus();
   await page.keyboard.press("Shift+Tab");
@@ -143,8 +144,8 @@ test("theme override and settings persist while dialogs contain keyboard focus",
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(dialog.getByRole("radio", { name: "Light", exact: true })).toBeChecked();
   await expect(dialog.getByLabel("Concurrent downloads")).toHaveValue("4");
-  await expect(dialog.getByRole("button", { name: "Default sort", exact: true })).toHaveText(
-    "Name A-Z",
+  await expect(dialog.getByRole("combobox", { name: "Default sort", exact: true })).toHaveValue(
+    "name-asc",
   );
   await expect(dialog.getByLabel("Seek jump seconds")).toHaveValue("9");
   await dialog.getByText("Dark", { exact: true }).click();
