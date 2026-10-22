@@ -15,6 +15,11 @@
   flex-wrap: wrap;
 }
 
+.preview-panel .panel-actions {
+  justify-content: start;
+  gap: var(--space-1);
+}
+
 .preview-empty {
   display: grid;
   place-content: center;
@@ -319,7 +324,7 @@
   position: absolute;
   right: 16px;
   bottom: 16px;
-  min-height: 40px;
+  min-height: var(--control-height);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: var(--bg-panel-strong);
@@ -345,6 +350,8 @@
 
   .preview-panel .panel-actions {
     width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .preview-toolbar .custom-dropdown-shell {

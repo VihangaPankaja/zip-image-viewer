@@ -117,8 +117,7 @@
 }
 
 .workspace-appbar-actions > button {
-  height: 44px;
-  min-height: 44px;
+  min-height: var(--control-height);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -358,7 +357,7 @@
 
 .download-priority {
   display: grid;
-  grid-template-columns: repeat(2, 44px);
+  grid-template-columns: repeat(2, var(--control-height));
   align-content: start;
 }
 
@@ -376,9 +375,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 8px 10px;
+  min-width: var(--control-height);
+  min-height: var(--control-height);
+  padding: var(--control-padding);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg-inset);
@@ -593,11 +592,11 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 44px;
+  min-height: var(--control-height);
 }
 /* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */
 .storage-dialog-content button {
-  min-height: 44px;
+  min-height: var(--control-height);
 }
 .storage-dialog-content section {
   display: grid;
@@ -659,7 +658,7 @@
 .download-compose textarea {
   min-width: 0;
   min-height: 108px;
-  padding: 10px 12px;
+  padding: var(--control-padding);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg-inset);
@@ -696,12 +695,7 @@
 .draft-settings input,
 .draft-settings select {
   min-width: 0;
-  min-height: 44px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-inset);
-  color: var(--text);
+  min-height: var(--control-height);
 }
 
 .download-draft > details {
@@ -710,7 +704,7 @@
 
 .download-draft > details summary {
   display: flex;
-  min-height: 44px;
+  min-height: var(--control-height);
   align-items: center;
   color: var(--text-muted);
 }
@@ -718,7 +712,7 @@
 .download-draft > .ghost-button {
   grid-column: 3;
   grid-row: 1;
-  min-height: 44px;
+  min-height: var(--control-height);
 }
 
 .draft-error,
@@ -736,7 +730,7 @@
 
 .download-dialog .primary-button,
 .download-dialog .ghost-button {
-  min-height: 44px;
+  min-height: var(--control-height);
 }
 
 .download-draft.invalid {
@@ -888,6 +882,18 @@
   }
 }
 
+@media (width <= 1100px) {
+  .workspace-appbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .workspace-tabs {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+}
+
 @media (width <= 760px), (width <= 960px) and (height <= 500px) {
   .unified-workspace {
     display: grid;
@@ -937,14 +943,14 @@
   }
 
   .workspace-tabs button {
-    min-height: 44px;
+    min-height: var(--control-height);
     flex: 1;
     justify-content: center;
   }
 
   .workspace-appbar-actions .primary-button {
-    width: 44px;
-    min-height: 44px;
+    width: var(--control-height);
+    min-height: var(--control-height);
     padding: 0;
     overflow: hidden;
     font-size: 0;
@@ -987,7 +993,7 @@
   .workspace-mobile-nav > button,
   .workspace-mobile-view label {
     display: grid;
-    min-height: 44px;
+    min-height: var(--control-height);
     place-items: center;
     border: 0;
     border-radius: var(--radius-sm);
@@ -1046,10 +1052,10 @@
   .mobile-sessions-toggle {
     display: inline-flex;
     align-items: center;
-    min-height: 44px;
+    min-height: var(--control-height);
     width: max-content;
     margin: 10px 10px 0;
-    padding: 8px 10px;
+    padding: var(--control-padding);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--bg-panel);
@@ -1089,7 +1095,7 @@
   }
 
   .download-priority {
-    grid-template-columns: 44px;
+    grid-template-columns: var(--control-height);
   }
 
   .download-telemetry {
@@ -1212,8 +1218,8 @@
 /* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */
 .torrent-file-tools input {
   min-width: 0;
-  min-height: 44px;
-  padding: 8px 12px;
+  min-height: var(--control-height);
+  padding: var(--control-padding);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg-inset);
@@ -1253,7 +1259,7 @@
 }
 .torrent-file-choice {
   display: flex;
-  min-height: 44px;
+  min-height: var(--control-height);
   align-items: center;
   gap: 10px;
   padding: 6px 8px;
@@ -1272,8 +1278,6 @@
 /* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */
 .torrent-file-choice input {
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
   accent-color: var(--accent);
 }
 /* stylelint-disable-next-line no-descending-specificity -- These selectors belong to separate controls, not a shared cascade. */

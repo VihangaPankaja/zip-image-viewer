@@ -28,11 +28,90 @@ body {
   text-rendering: optimizelegibility;
 }
 
-button,
-input,
-textarea,
-select {
+:where(button, input, textarea, select) {
   font: inherit;
+}
+
+:where(
+  button,
+  select,
+  textarea,
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="hidden"])
+) {
+  min-width: 0;
+  max-width: 100%;
+  min-height: var(--control-height);
+  padding: var(--control-padding);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-inset);
+  color: var(--text);
+  font-size: var(--control-font-size);
+  line-height: 1.4;
+}
+
+:where(button, a, label, summary) {
+  overflow-wrap: anywhere;
+}
+
+:where(summary) {
+  min-height: var(--control-height);
+}
+
+:where(button) svg {
+  flex-shrink: 0;
+  width: var(--control-icon-size);
+  height: var(--control-icon-size);
+}
+
+:where(input[type="checkbox"], input[type="radio"], input[type="range"]) {
+  accent-color: var(--accent);
+}
+
+:where(input[type="checkbox"], input[type="radio"]) {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+
+:where(select) {
+  appearance: none;
+  padding-inline-end: 30px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position:
+    right 14px center,
+    right 9px center;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  text-overflow: ellipsis;
+}
+
+:where(button, input, select, textarea):disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+:where(input, select, textarea)[aria-invalid="true"] {
+  border-color: var(--accent-danger);
+}
+
+:where(button)[aria-busy="true"] {
+  cursor: progress;
+}
+
+@media (any-pointer: coarse) {
+  :where(input, select, textarea) {
+    font-size: 1rem;
+  }
+}
+
+@media (forced-colors: active) {
+  :where(select) {
+    appearance: auto;
+    background-image: none;
+  }
 }
 
 button,

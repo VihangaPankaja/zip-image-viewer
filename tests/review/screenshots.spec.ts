@@ -839,6 +839,15 @@ async function captureDialogs(
 ) {
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await save(page, device, theme, "settings");
+  const sort = page.getByRole("button", { name: "Default sort", exact: true });
+  await sort.focus();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("End");
+  await expect(page.getByRole("listbox").getByRole("option").last()).toBeFocused();
+  await save(page, device, theme, "settings-controls-menu");
+  await page.keyboard.press("Escape");
+  await expect(sort).toBeFocused();
+  await save(page, device, theme, "settings-controls-focus-return");
   for (const accent of ["Blue", "Violet", "Amber", "Rose"]) {
     await page.getByText(accent, { exact: true }).click();
     await expect(page.locator("html")).toHaveAttribute("data-accent", accent.toLowerCase());
@@ -1358,6 +1367,10 @@ for (const device of devices) {
       await expect(page.locator(".slideshow-meta")).toContainText("1 / 1");
       await expect(page.locator(".slideshow-stage img")).toHaveJSProperty("naturalWidth", 1200);
       await save(page, device, theme, "slideshow");
+      await page.getByRole("button", { name: "Hide UI", exact: true }).click();
+      await save(page, device, theme, "slideshow-controls-hidden");
+      await page.getByRole("button", { name: "Show UI", exact: true }).click();
+      await save(page, device, theme, "slideshow-controls-restored");
       await page.keyboard.press("Escape");
       await page.getByRole("button", { name: "Open explorer", exact: true }).click();
       await save(page, device, theme, "explorer-dialog");

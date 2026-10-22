@@ -197,13 +197,6 @@
 .explorer-search input {
   width: 100%;
   min-width: 0;
-  min-height: 44px;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-inset);
-  color: var(--text);
-  font: inherit;
 }
 
 .torrent-file-tools .media-type-filter {
@@ -225,7 +218,7 @@
 
 .tree-windowed .tree-item {
   height: 44px;
-  min-height: 44px;
+  min-height: var(--control-height);
   margin-block-end: 3px;
 }
 
