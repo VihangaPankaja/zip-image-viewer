@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { measureThemeContrast } from "./helpers/themeContrast";
+import { tapVisibleTarget } from "./touch";
 
 for (const accent of ["teal", "blue", "violet", "amber", "rose"]) {
   test(`${accent} passes text, hover, selection and focus contrast in every palette`, async ({
@@ -120,10 +121,10 @@ test("accent labels work with touch at a narrow viewport", async ({ browser }) =
   });
   const page = await context.newPage();
   await page.goto("/");
-  await page.getByRole("button", { name: "Settings", exact: true }).tap();
+  await tapVisibleTarget(page.getByRole("button", { name: "Settings", exact: true }));
   for (const accent of ["Teal", "Blue", "Violet", "Amber", "Rose"]) {
     const label = page.locator(".theme-option").filter({ hasText: accent });
-    await label.tap();
+    await tapVisibleTarget(label);
     await expect(page.getByRole("radio", { name: accent, exact: true })).toBeChecked();
     const bounds = await label.boundingBox();
     expect(bounds?.height).toBeGreaterThanOrEqual(44);
