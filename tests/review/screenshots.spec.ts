@@ -332,14 +332,30 @@ async function save(page: Page, device: (typeof devices)[number], theme: string,
   await page.screenshot({
     path: path.join(output, file),
     fullPage:
-      screen === "http-and-torrent-downloads" ||
-      screen === "download-storage-rejected" ||
-      screen === "loaded-video-downloads-visit",
+      screen.startsWith("http-and-torrent-downloads") ||
+      screen.startsWith("download-storage-rejected") ||
+      screen.startsWith("loaded-video-downloads-visit"),
     animations: "disabled",
     caret: "hide",
     scale: "css",
   });
   captures.push({ ...device, device: device.name, theme, screen, file });
+  // Settings captures use the real surface selection so their radio state stays accurate.
+  if (
+    theme === "dark" &&
+    !screen.includes("amoled") &&
+    !(await page.locator(".settings-dialog").isVisible())
+  ) {
+    const previous = await page.evaluate(() => {
+      const value = document.documentElement.dataset.darkSurface;
+      document.documentElement.dataset.darkSurface = "amoled";
+      return value;
+    });
+    await save(page, device, theme, `${screen}-amoled`);
+    await page.evaluate((value) => {
+      document.documentElement.dataset.darkSurface = value;
+    }, previous);
+  }
 }
 
 async function installSearchTree(page: Page) {
@@ -823,6 +839,18 @@ async function captureDialogs(
 ) {
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await save(page, device, theme, "settings");
+  if (theme === "dark") {
+    await page.getByText("AMOLED", { exact: true }).click();
+    await expect(page.locator("body")).toHaveCSS("background-color", "rgb(5, 5, 5)");
+    await save(page, device, theme, "settings-amoled-selected");
+    await page.keyboard.press("Escape");
+    await save(page, device, theme, "downloads-amoled");
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await page.getByRole("button", { name: "Default sort", exact: true }).click();
+    await save(page, device, theme, "menu-amoled");
+    await page.keyboard.press("Escape");
+    await page.getByText("Charcoal", { exact: true }).click();
+  }
   await page.getByLabel("Show Path column").scrollIntoViewIfNeeded();
   await save(page, device, theme, "settings-more");
   await page.getByRole("spinbutton", { name: "Torrent download limit (KiB/s)" }).fill("512");
@@ -1376,9 +1404,35 @@ for (const device of devices) {
       await video.evaluate(async (element: HTMLVideoElement) => {
         element.muted = true;
         await element.play();
+      });
+      // Wait for the progressive playlist to expose the position used by the gallery.
+      await expect
+        .poll(
+          () =>
+            video.evaluate(
+              (element: HTMLVideoElement) =>
+                element.seekable.length > 0 &&
+                element.seekable.end(element.seekable.length - 1) > 5,
+            ),
+          { timeout: 30_000 },
+        )
+        .toBe(true);
+      await video.evaluate((element: HTMLVideoElement) => {
         element.pause();
         element.currentTime = 5;
       });
+      await expect
+        .poll(
+          () =>
+            video.evaluate(
+              (element: HTMLVideoElement) =>
+                !element.seeking &&
+                element.readyState >= 2 &&
+                Math.abs(element.currentTime - 5) < 0.1,
+            ),
+          { timeout: 30_000 },
+        )
+        .toBe(true);
       const audio = page.getByRole("combobox", { name: "Audio language" });
       await audio.scrollIntoViewIfNeeded();
       await audio.focus();

@@ -10,6 +10,8 @@ import {
 } from "../features/workspace/settingsStorage";
 import type { DownloadOptions } from "../types/download";
 
+export type DarkSurface = "charcoal" | "amoled";
+
 export type ThemePreference = "system" | "light" | "dark";
 
 export function useLocalStorageSettings() {
@@ -17,6 +19,10 @@ export function useLocalStorageSettings() {
     const stored = readStoredSetting("zip-image-viewer-theme");
     return stored === "light" || stored === "dark" ? stored : "system";
   });
+
+  const [darkSurface, setDarkSurface] = useState<DarkSurface>(() =>
+    readStoredSetting("zip-image-viewer-dark-surface") === "amoled" ? "amoled" : "charcoal",
+  );
 
   const [keyboardSettings, setKeyboardSettings] = useState<KeyboardSettings>(readKeyboardSettings);
 
@@ -37,6 +43,11 @@ export function useLocalStorageSettings() {
   }, [theme]);
 
   useEffect(() => {
+    document.documentElement.dataset.darkSurface = darkSurface;
+    writeStoredSetting("zip-image-viewer-dark-surface", darkSurface);
+  }, [darkSurface]);
+
+  useEffect(() => {
     writeStoredSetting("zip-download-options", JSON.stringify(downloadOptions));
   }, [downloadOptions]);
 
@@ -51,6 +62,8 @@ export function useLocalStorageSettings() {
   return {
     theme,
     setTheme,
+    darkSurface,
+    setDarkSurface,
     keyboardSettings,
     setKeyboardSettings,
     explorerColumns,

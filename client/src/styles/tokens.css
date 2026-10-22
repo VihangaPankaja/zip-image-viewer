@@ -5,17 +5,18 @@
   --accent-contrast: #0b2322;
   --accent-danger: #ff9a94;
   --accent-success: #8ad5a6;
-  --bg: #10171d;
-  --bg-inset: #131c24;
-  --bg-panel: #1b2630;
-  --bg-panel-strong: #22303b;
-  --bg-overlay: rgb(5 12 18 / 72%);
-  --media-backdrop: #050808;
+  --focus: var(--accent-strong);
+  --bg: #111214;
+  --bg-inset: #18191b;
+  --bg-panel: #202124;
+  --bg-panel-strong: #2a2b2e;
+  --bg-overlay: rgb(0 0 0 / 72%);
+  --media-backdrop: #050505;
   --media-black: #000;
   --media-caption-bg: rgb(0 0 0 / 75%);
   --media-caption-text: #fff;
-  --border: #354551;
-  --border-strong: #6b8292;
+  --border: #77787d;
+  --border-strong: #999a9f;
   --font-body: aptos, "Segoe UI Variable", "Segoe UI", sans-serif;
   --font-display: "Aptos Display", aptos, "Segoe UI Variable", sans-serif;
   --radius-lg: 16px;
@@ -33,10 +34,19 @@
   --space-10: 40px;
   --control-height: 44px;
   --surface-highlight: #24433f;
-  --text: #f0f5f8;
-  --text-dim: #a1b4c2;
-  --text-muted: #bfccd5;
+  --text: #f2f2f3;
+  --text-dim: #b0b0b5;
+  --text-muted: #c9c9ce;
   --transition-fast: 140ms ease;
+}
+
+html[data-theme="dark"][data-dark-surface="amoled"] {
+  --bg: #050505;
+  --bg-inset: #0b0b0c;
+  --bg-panel: #141415;
+  --bg-panel-strong: #202022;
+  --border: #6c6c71;
+  --border-strong: #89898e;
 }
 
 html[data-theme="light"] {

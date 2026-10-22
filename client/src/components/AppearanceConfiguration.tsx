@@ -1,5 +1,5 @@
 import { Monitor, Moon, Sun } from "lucide-react";
-import type { ThemePreference } from "../hooks/useLocalStorageSettings";
+import type { DarkSurface, ThemePreference } from "../hooks/useLocalStorageSettings";
 
 const THEME_OPTIONS = [
   { value: "system", label: "System", Icon: Monitor },
@@ -8,6 +8,8 @@ const THEME_OPTIONS = [
 ] as const;
 
 export function AppearanceConfiguration(props: {
+  darkSurface: DarkSurface;
+  setDarkSurface: (value: DarkSurface) => void;
   theme: ThemePreference;
   setTheme: (value: ThemePreference) => void;
 }) {
@@ -30,6 +32,24 @@ export function AppearanceConfiguration(props: {
           </label>
         ))}
       </div>
+      <fieldset className="dark-surface-options">
+        <legend>Dark surfaces</legend>
+        <p className="settings-hint">Used in Dark mode and when System switches to dark.</p>
+        <div className="theme-options dark-surface-choices">
+          {(["charcoal", "amoled"] as const).map((value) => (
+            <label className="theme-option" key={value}>
+              <input
+                type="radio"
+                name="dark-surface"
+                value={value}
+                checked={props.darkSurface === value}
+                onChange={() => props.setDarkSurface(value)}
+              />
+              <span>{value === "amoled" ? "AMOLED" : "Charcoal"}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
     </fieldset>
   );
 }

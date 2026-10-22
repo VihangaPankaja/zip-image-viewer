@@ -21,6 +21,7 @@ it("follows system appearance, persists overrides, and removes its media listene
   localStorage.setItem("zip-image-viewer-theme", "invalid");
   const { result, unmount } = renderHook(useLocalStorageSettings);
   expect(result.current.theme).toBe("system");
+  expect(result.current.darkSurface).toBe("charcoal");
   expect(document.documentElement.dataset.theme).toBe("light");
   act(() => {
     preference.matches = true;
@@ -64,8 +65,25 @@ it("keeps settings usable when browser storage is unavailable", () => {
   expect(workspace.result.current.sortMode).toBe("natural-tail");
   act(() => {
     settings.result.current.setTheme("dark");
+    settings.result.current.setDarkSurface("amoled");
     workspace.result.current.setSortMode("name-desc");
   });
   expect(document.documentElement.dataset.theme).toBe("dark");
   expect(workspace.result.current.sortMode).toBe("name-desc");
+  expect(document.documentElement.dataset.darkSurface).toBe("amoled");
+});
+
+it("restores dark surfaces independently of mode and rejects invalid saved surfaces", () => {
+  localStorage.setItem("zip-image-viewer-theme", "dark");
+  localStorage.setItem("zip-image-viewer-dark-surface", "invalid");
+  const view = renderHook(useLocalStorageSettings);
+  expect(view.result.current.darkSurface).toBe("charcoal");
+  act(() => view.result.current.setDarkSurface("amoled"));
+  expect(document.documentElement.dataset.darkSurface).toBe("amoled");
+  expect(localStorage.getItem("zip-image-viewer-dark-surface")).toBe("amoled");
+  act(() => view.result.current.setTheme("light"));
+  view.unmount();
+  const restored = renderHook(useLocalStorageSettings);
+  expect(restored.result.current.theme).toBe("light");
+  expect(restored.result.current.darkSurface).toBe("amoled");
 });
