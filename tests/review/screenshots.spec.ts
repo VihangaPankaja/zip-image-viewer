@@ -340,7 +340,12 @@ async function save(page: Page, device: (typeof devices)[number], theme: string,
     scale: "css",
   });
   captures.push({ ...device, device: device.name, theme, screen, file });
-  if (theme === "dark" && !screen.includes("amoled")) {
+  // Settings captures use the real surface selection so their radio state stays accurate.
+  if (
+    theme === "dark" &&
+    !screen.includes("amoled") &&
+    !(await page.locator(".settings-dialog").isVisible())
+  ) {
     const previous = await page.evaluate(() => {
       const value = document.documentElement.dataset.darkSurface;
       document.documentElement.dataset.darkSurface = "amoled";
