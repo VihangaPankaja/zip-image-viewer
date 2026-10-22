@@ -19,16 +19,10 @@ type CustomDropdownProps = {
 
 function restoreDropdownFocus(trigger: HTMLButtonElement | null) {
   if (!trigger) return;
-  trigger.focus();
-  const header = trigger.closest(".settings-dialog")?.querySelector(".panel-header");
-  const headerBounds = header?.getBoundingClientRect();
-  // Native focus scrolling does not account for the sticky header or focus outline.
-  if (
-    headerBounds &&
-    headerBounds.height > 0 &&
-    trigger.getBoundingClientRect().top < headerBounds.bottom + 4
-  ) {
-    trigger.scrollIntoView({ block: "center", inline: "nearest" });
+  trigger.focus({ preventScroll: true });
+  if (trigger.closest(".settings-dialog")) {
+    // Cancel native focus scrolling that can settle underneath the sticky header.
+    trigger.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
   }
 }
 

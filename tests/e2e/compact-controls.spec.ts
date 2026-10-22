@@ -17,23 +17,31 @@ test("Escape keeps the returned menu focus clear of the sticky settings header",
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await installReviewFixtures(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   const sort = page.getByRole("button", { name: "Default sort", exact: true });
-  await sort.focus();
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("End");
-  await sort.evaluate((element) => element.scrollIntoView({ block: "start" }));
-  await page.keyboard.press("Escape");
-  await expect(sort).toBeFocused();
-  expect(
-    await sort.evaluate((element) => {
-      const header = element.closest("dialog")?.querySelector(".panel-header");
-      return (
-        element.getBoundingClientRect().top >= (header?.getBoundingClientRect().bottom ?? 0) + 4
-      );
-    }),
-  ).toBe(true);
+  for (const coverTrigger of [false, true]) {
+    await sort.focus();
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("End");
+    await expect(page.getByRole("listbox").getByRole("option").last()).toBeFocused();
+    if (coverTrigger) await sort.evaluate((element) => element.scrollIntoView({ block: "start" }));
+    await page.screenshot({ animations: "disabled" });
+    await page.keyboard.press("Escape");
+    await expect(sort).toBeFocused();
+    await page.screenshot({ animations: "disabled" });
+    const bounds = await sort.evaluate((element) => ({
+      top: element.getBoundingClientRect().top,
+      headerBottom:
+        element.closest("dialog")?.querySelector(".panel-header")?.getBoundingClientRect().bottom ??
+        0,
+    }));
+    expect(bounds.top, JSON.stringify({ coverTrigger, ...bounds })).toBeGreaterThanOrEqual(
+      bounds.headerBottom + 4,
+    );
+  }
 });
 
 for (const width of [360, 390, 820, 1440, 2560]) {
