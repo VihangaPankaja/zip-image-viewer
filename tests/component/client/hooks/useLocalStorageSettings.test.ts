@@ -22,6 +22,7 @@ it("follows system appearance, persists overrides, and removes its media listene
   const { result, unmount } = renderHook(useLocalStorageSettings);
   expect(result.current.theme).toBe("system");
   expect(result.current.darkSurface).toBe("charcoal");
+  expect(result.current.accent).toBe("teal");
   expect(document.documentElement.dataset.theme).toBe("light");
   act(() => {
     preference.matches = true;
@@ -66,12 +67,35 @@ it("keeps settings usable when browser storage is unavailable", () => {
   act(() => {
     settings.result.current.setTheme("dark");
     settings.result.current.setDarkSurface("amoled");
+    settings.result.current.setAccent("rose");
     workspace.result.current.setSortMode("name-desc");
   });
   expect(document.documentElement.dataset.theme).toBe("dark");
   expect(workspace.result.current.sortMode).toBe("name-desc");
   expect(document.documentElement.dataset.darkSurface).toBe("amoled");
+  expect(document.documentElement.dataset.accent).toBe("rose");
+  expect(settings.result.current.accentSaveError).toBe(true);
 });
+
+it.each(["teal", "blue", "violet", "amber", "rose"] as const)(
+  "restores %s independently of existing mode and surface settings",
+  (accent) => {
+    localStorage.setItem("zip-image-viewer-theme", "dark");
+    localStorage.setItem("zip-image-viewer-dark-surface", "amoled");
+    localStorage.setItem("zip-image-viewer-accent", "unsupported");
+    const view = renderHook(useLocalStorageSettings);
+    expect(view.result.current.accent).toBe("teal");
+    act(() => view.result.current.setAccent(accent));
+    expect(document.documentElement.dataset.accent).toBe(accent);
+    expect(localStorage.getItem("zip-image-viewer-accent")).toBe(accent);
+    expect(view.result.current.accentSaveError).toBe(false);
+    view.unmount();
+    const restored = renderHook(useLocalStorageSettings);
+    expect(restored.result.current.accent).toBe(accent);
+    expect(restored.result.current.theme).toBe("dark");
+    expect(restored.result.current.darkSurface).toBe("amoled");
+  },
+);
 
 it("restores dark surfaces independently of mode and rejects invalid saved surfaces", () => {
   localStorage.setItem("zip-image-viewer-theme", "dark");

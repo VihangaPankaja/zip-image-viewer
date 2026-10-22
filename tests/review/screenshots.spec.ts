@@ -839,6 +839,15 @@ async function captureDialogs(
 ) {
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await save(page, device, theme, "settings");
+  for (const accent of ["Blue", "Violet", "Amber", "Rose"]) {
+    await page.getByText(accent, { exact: true }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-accent", accent.toLowerCase());
+    await save(page, device, theme, `settings-accent-${accent.toLowerCase()}`);
+  }
+  await page.keyboard.press("Escape");
+  await save(page, device, theme, "downloads-accent-rose");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByText("Teal", { exact: true }).click();
   if (theme === "dark") {
     await page.getByText("AMOLED", { exact: true }).click();
     await expect(page.locator("body")).toHaveCSS("background-color", "rgb(5, 5, 5)");

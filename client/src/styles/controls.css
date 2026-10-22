@@ -317,7 +317,8 @@ button:disabled {
   grid-column: 1 / -1;
 }
 
-.dark-surface-options {
+.dark-surface-options,
+.accent-options {
   display: grid;
   gap: var(--space-3);
   min-width: 0;
@@ -334,6 +335,10 @@ button:disabled {
 
 .dark-surface-choices {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.accent-choices {
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
 }
 
 .theme-option {

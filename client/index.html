@@ -7,14 +7,19 @@
     <script>
       let theme = "system";
       let darkSurface = "charcoal";
+      let accent = "teal";
       try {
         theme = localStorage.getItem("zip-image-viewer-theme") || "system";
         darkSurface = localStorage.getItem("zip-image-viewer-dark-surface") || "charcoal";
+        accent = localStorage.getItem("zip-image-viewer-accent") || "teal";
       } catch {
         // Storage can be unavailable in private or restricted browser contexts.
       }
       document.documentElement.dataset.darkSurface =
         darkSurface === "amoled" ? "amoled" : "charcoal";
+      document.documentElement.dataset.accent = ["blue", "violet", "amber", "rose"].includes(accent)
+        ? accent
+        : "teal";
       document.documentElement.dataset.theme =
         theme === "light" || theme === "dark"
           ? theme
