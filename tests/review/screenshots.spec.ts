@@ -1404,9 +1404,35 @@ for (const device of devices) {
       await video.evaluate(async (element: HTMLVideoElement) => {
         element.muted = true;
         await element.play();
+      });
+      // Wait for the progressive playlist to expose the position used by the gallery.
+      await expect
+        .poll(
+          () =>
+            video.evaluate(
+              (element: HTMLVideoElement) =>
+                element.seekable.length > 0 &&
+                element.seekable.end(element.seekable.length - 1) > 5,
+            ),
+          { timeout: 30_000 },
+        )
+        .toBe(true);
+      await video.evaluate((element: HTMLVideoElement) => {
         element.pause();
         element.currentTime = 5;
       });
+      await expect
+        .poll(
+          () =>
+            video.evaluate(
+              (element: HTMLVideoElement) =>
+                !element.seeking &&
+                element.readyState >= 2 &&
+                Math.abs(element.currentTime - 5) < 0.1,
+            ),
+          { timeout: 30_000 },
+        )
+        .toBe(true);
       const audio = page.getByRole("combobox", { name: "Audio language" });
       await audio.scrollIntoViewIfNeeded();
       await audio.focus();
