@@ -162,14 +162,13 @@ try {
       { file, compatible },
       { timeout: 90_000 },
     );
-    const quality = page.getByRole("button", { name: "Quality", exact: true });
+    const quality = page.getByRole("combobox", { name: "Quality", exact: true });
     assert.equal(
-      await quality.textContent(),
+      await quality.locator("option:checked").textContent(),
       compatible ? "Direct play" : "Auto",
       "Browser did not apply the default playback mode for " + file,
     );
-    await quality.click();
-    await page.getByRole("option", { name: "360p", exact: true }).click();
+    await quality.selectOption({ label: "360p" });
     for (let attempt = 0; attempt < 180 && !mediaResponses.has("segment"); attempt += 1) {
       await page.waitForTimeout(500);
     }
