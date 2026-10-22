@@ -87,10 +87,12 @@ for (const width of [390, 820, 1440, 2560]) {
         dialog.getByRole("radio", { name: surface === "amoled" ? "AMOLED" : "Charcoal" }),
       ).toBeChecked();
       expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+      await dialog.getByRole("button", { name: "Close", exact: true }).focus();
       await page.keyboard.press("Tab");
-      await dialog
-        .getByRole("radio", { name: surface === "amoled" ? "AMOLED" : "Charcoal" })
-        .focus();
+      await page.keyboard.press("Tab");
+      await expect(
+        dialog.getByRole("radio", { name: surface === "amoled" ? "AMOLED" : "Charcoal" }),
+      ).toBeFocused();
       await expect(page.locator(".theme-option:has(:focus-visible)")).toHaveCSS(
         "outline-style",
         "solid",
@@ -105,7 +107,10 @@ for (const width of [390, 820, 1440, 2560]) {
       await page.keyboard.press("Escape");
       await page.emulateMedia({ forcedColors: "active" });
       await page.getByRole("button", { name: "Settings", exact: true }).click();
-      await dialog.getByRole("radio", { name: "AMOLED" }).focus();
+      await dialog.getByRole("button", { name: "Close", exact: true }).focus();
+      await page.keyboard.press("Tab");
+      await page.keyboard.press("Tab");
+      if (surface === "charcoal") await page.keyboard.press("ArrowRight");
       await page.keyboard.press("Space");
       await expect(dialog.getByRole("radio", { name: "AMOLED" })).toBeChecked();
       await expect(page.locator(".theme-option:has(:focus-visible)")).toHaveCSS(
