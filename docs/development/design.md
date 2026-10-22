@@ -1,6 +1,6 @@
 # UI design
 
-Use the existing compact layout, neutral panels and teal selection. File
+Use the existing compact layout, neutral panels and the saved accent for selection. File
 content, transfer status and controls take priority over decoration.
 
 ## Styles
@@ -18,6 +18,9 @@ Media backdrop and caption tokens keep their colors in both themes.
 - Keep Light, Charcoal and AMOLED readable. System appearance follows the OS;
   `data-dark-surface` selects the saved dark palette. Dialogs and popovers inherit
   the root tokens. Use `--focus` for focus outlines.
+- `data-accent` selects Teal, Blue, Violet, Amber or Rose independently of mode and
+  dark surfaces. Use the shared accent, hover, contrast and selection tokens;
+  keep success and error colors independent of the accent.
 - Pair status color with text. Use a visible focus outline.
 - Use the existing spacing scale, borders and radii.
 - Keep buttons at least 44px high. Give icon-only controls accessible names.

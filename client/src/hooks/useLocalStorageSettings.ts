@@ -13,6 +13,7 @@ import type { DownloadOptions } from "../types/download";
 export type DarkSurface = "charcoal" | "amoled";
 
 export type ThemePreference = "system" | "light" | "dark";
+export type Accent = "teal" | "blue" | "violet" | "amber" | "rose";
 
 export function useLocalStorageSettings() {
   const [theme, setTheme] = useState<ThemePreference>(() => {
@@ -23,6 +24,13 @@ export function useLocalStorageSettings() {
   const [darkSurface, setDarkSurface] = useState<DarkSurface>(() =>
     readStoredSetting("zip-image-viewer-dark-surface") === "amoled" ? "amoled" : "charcoal",
   );
+  const [accent, setAccent] = useState<Accent>(() => {
+    const stored = readStoredSetting("zip-image-viewer-accent");
+    return stored === "blue" || stored === "violet" || stored === "amber" || stored === "rose"
+      ? stored
+      : "teal";
+  });
+  const [accentSaveError, setAccentSaveError] = useState(false);
 
   const [keyboardSettings, setKeyboardSettings] = useState<KeyboardSettings>(readKeyboardSettings);
 
@@ -48,6 +56,11 @@ export function useLocalStorageSettings() {
   }, [darkSurface]);
 
   useEffect(() => {
+    document.documentElement.dataset.accent = accent;
+    setAccentSaveError(!writeStoredSetting("zip-image-viewer-accent", accent));
+  }, [accent]);
+
+  useEffect(() => {
     writeStoredSetting("zip-download-options", JSON.stringify(downloadOptions));
   }, [downloadOptions]);
 
@@ -64,6 +77,9 @@ export function useLocalStorageSettings() {
     setTheme,
     darkSurface,
     setDarkSurface,
+    accent,
+    setAccent,
+    accentSaveError,
     keyboardSettings,
     setKeyboardSettings,
     explorerColumns,

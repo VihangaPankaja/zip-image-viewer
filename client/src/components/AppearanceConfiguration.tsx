@@ -1,5 +1,5 @@
 import { Monitor, Moon, Sun } from "lucide-react";
-import type { DarkSurface, ThemePreference } from "../hooks/useLocalStorageSettings";
+import type { Accent, DarkSurface, ThemePreference } from "../hooks/useLocalStorageSettings";
 
 const THEME_OPTIONS = [
   { value: "system", label: "System", Icon: Monitor },
@@ -7,12 +7,48 @@ const THEME_OPTIONS = [
   { value: "dark", label: "Dark", Icon: Moon },
 ] as const;
 
-export function AppearanceConfiguration(props: {
-  darkSurface: DarkSurface;
-  setDarkSurface: (value: DarkSurface) => void;
-  theme: ThemePreference;
-  setTheme: (value: ThemePreference) => void;
-}) {
+type AccentSettings = {
+  accent: Accent;
+  setAccent: (value: Accent) => void;
+  accentSaveError: boolean;
+};
+
+function AccentConfiguration(props: AccentSettings) {
+  return (
+    <fieldset className="accent-options">
+      <legend>Accent</legend>
+      <p className="settings-hint">Used in both light and dark themes.</p>
+      <div className="theme-options accent-choices">
+        {(["teal", "blue", "violet", "amber", "rose"] as const).map((value) => (
+          <label className="theme-option" key={value}>
+            <input
+              type="radio"
+              name="accent"
+              value={value}
+              checked={props.accent === value}
+              onChange={() => props.setAccent(value)}
+            />
+            <span>{value[0].toUpperCase() + value.slice(1)}</span>
+          </label>
+        ))}
+      </div>
+      {props.accentSaveError ? (
+        <p className="settings-hint" role="status">
+          Accent applies to this tab. Browser storage is unavailable, so it cannot be saved.
+        </p>
+      ) : null}
+    </fieldset>
+  );
+}
+
+export function AppearanceConfiguration(
+  props: AccentSettings & {
+    darkSurface: DarkSurface;
+    setDarkSurface: (value: DarkSurface) => void;
+    theme: ThemePreference;
+    setTheme: (value: ThemePreference) => void;
+  },
+) {
   return (
     <fieldset className="settings-group settings-group-appearance">
       <legend>Appearance</legend>
@@ -50,6 +86,7 @@ export function AppearanceConfiguration(props: {
           ))}
         </div>
       </fieldset>
+      <AccentConfiguration {...props} />
     </fieldset>
   );
 }

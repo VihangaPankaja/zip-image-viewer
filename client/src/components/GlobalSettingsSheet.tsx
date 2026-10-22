@@ -1,7 +1,7 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { useModalDialog } from "../hooks/useModalDialog";
 import { AppearanceConfiguration } from "./AppearanceConfiguration";
-import type { DarkSurface, ThemePreference } from "../hooks/useLocalStorageSettings";
+import type { Accent, DarkSurface, ThemePreference } from "../hooks/useLocalStorageSettings";
 import type { DownloadSettings } from "../lib/appConstants";
 import type { KeyboardSettings, ExplorerColumns } from "../features/workspace/settingsStorage";
 import { CustomDropdown } from "./Common/CustomDropdown";
@@ -14,6 +14,9 @@ type DropdownOption = {
 };
 
 type GlobalSettingsSheetProps = {
+  accent: Accent;
+  setAccent: (value: Accent) => void;
+  accentSaveError: boolean;
   darkSurface: DarkSurface;
   setDarkSurface: (value: DarkSurface) => void;
   theme: ThemePreference;

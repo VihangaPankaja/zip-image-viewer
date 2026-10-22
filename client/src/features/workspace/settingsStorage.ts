@@ -25,11 +25,13 @@ export function readStoredSetting(key: string): string | null {
   }
 }
 
-export function writeStoredSetting(key: string, value: string): void {
+export function writeStoredSetting(key: string, value: string): boolean {
   try {
     window.localStorage.setItem(key, value);
+    return true;
   } catch {
     // Keep settings usable for this tab when browser storage is unavailable.
+    return false;
   }
 }
 
