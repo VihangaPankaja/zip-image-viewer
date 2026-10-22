@@ -100,7 +100,10 @@ test("compact fields and browser-zoom breakpoints use the shared sizes", async (
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await expect(page.getByLabel("Concurrent downloads")).toHaveCSS("font-size", "14px");
+  const fieldSize = await page.evaluate(() =>
+    matchMedia("(any-pointer: coarse)").matches ? "16px" : "14px",
+  );
+  await expect(page.getByLabel("Concurrent downloads")).toHaveCSS("font-size", fieldSize);
   await page.keyboard.press("Escape");
   // A 1440px window at 200% browser zoom has a 720px CSS viewport.
   await page.setViewportSize({ width: 720, height: 500 });
