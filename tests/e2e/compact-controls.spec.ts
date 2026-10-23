@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { tapVisibleTarget } from "./touch";
-import { installReviewFixtures } from "../review/fixtures";
+import { installReviewFixtures, prepareMedia } from "../review/fixtures";
 
 async function setCssViewport(page: Page, width: number, height: number) {
   await page.setViewportSize({ width, height });
@@ -36,6 +36,32 @@ async function fits(page: Page) {
     true,
   );
 }
+
+test("tablet video actions remain clickable above the player", async ({ page }) => {
+  await setCssViewport(page, 820, 1180);
+  await prepareMedia();
+  await installReviewFixtures(page);
+  for (const theme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+    await page.goto("/");
+    await page.getByRole("tab", { name: "Explore" }).click();
+    await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
+    await page.getByRole("treeitem", { name: "06-film.mkv", exact: true }).click();
+    await expect(page.getByText("Mode: Remux", { exact: true })).toBeVisible();
+    const fallback = page.getByRole("button", { name: "Transcode instead", exact: true });
+    await fallback.scrollIntoViewIfNeeded();
+    expect(
+      await fallback.evaluate((button) => {
+        const bounds = button.getBoundingClientRect();
+        return button.contains(
+          document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2),
+        );
+      }),
+    ).toBe(true);
+    await fallback.click();
+    await expect(page.getByText("Mode: Transcode", { exact: true })).toBeVisible();
+  }
+});
 
 for (const { width, hasTouch } of [
   { width: 761, hasTouch: false },
