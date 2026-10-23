@@ -125,9 +125,44 @@ test("plays and seeks a real incomplete torrent, reconnects a missing seek, and 
           await element.play();
         });
       await expect(video).toHaveJSProperty("paused", false);
-      await expect
-        .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
-        .toBeGreaterThan(32.1);
+      try {
+        await expect
+          .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
+          .toBeGreaterThan(32.1);
+      } catch (cause) {
+        const diagnostics = JSON.stringify({
+          recordedAt: Date.now(),
+          video: await video.evaluate((element: HTMLVideoElement) => ({
+            time: element.currentTime,
+            duration: element.duration,
+            paused: element.paused,
+            ended: element.ended,
+            seeking: element.seeking,
+            readyState: element.readyState,
+            networkState: element.networkState,
+            playbackRate: element.playbackRate,
+            visibility: document.visibilityState,
+            error: element.error?.message ?? null,
+            buffered: Array.from({ length: element.buffered.length }, (_, index) => [
+              element.buffered.start(index),
+              element.buffered.end(index),
+            ]),
+            seekable: Array.from({ length: element.seekable.length }, (_, index) => [
+              element.seekable.start(index),
+              element.seekable.end(index),
+            ]),
+          })),
+          job: (await client.jobs.list()).items.find((job) => job.id === id),
+          recentPieces: fixture.requests.slice(-20),
+          mediaTransfers: fixture.mediaTransfers,
+        });
+        console.info("Torrent resume diagnostics:", diagnostics);
+        await testInfo.attach("torrent-resume-state", {
+          body: diagnostics,
+          contentType: "application/json",
+        });
+        throw cause;
+      }
       await video.evaluate((element: HTMLVideoElement) => element.pause());
       await testInfo.attach("real-torrent-decoded-and-seeked", {
         body: await page.screenshot(),

@@ -59,6 +59,16 @@ export async function startTorrentPlaybackFixture({
   let magnetURI = "";
   let infoHash = "";
   const requests: number[] = [];
+  const mediaTransfers: {
+    startedAt: number;
+    lastDataAt: number;
+    range: string;
+    status: number;
+    contentRange: string;
+    contentLength: number;
+    bytes: number;
+    completed: boolean;
+  }[] = [];
   const names = ["0-faststart.mp4", "1-tail-index.mp4", "2-unsupported.mkv"];
   const close = async () => {
     if (proxy) {
@@ -229,6 +239,19 @@ export async function startTorrentPlaybackFixture({
     if (frontendOrigin) {
       const backendOrigin = origin;
       proxy = createServer((req, res) => {
+        const transfer = req.url?.includes("/video/stream")
+          ? {
+              startedAt: Date.now(),
+              lastDataAt: 0,
+              range: req.headers.range ?? "",
+              status: 0,
+              contentRange: "",
+              contentLength: 0,
+              bytes: 0,
+              completed: false,
+            }
+          : undefined;
+        if (transfer) mediaTransfers.push(transfer);
         const target = new URL(
           req.url ?? "/",
           /^\/(api|rpc|health)(\/|\?|$)/.test(req.url ?? "/") ? backendOrigin : frontendOrigin,
@@ -240,6 +263,18 @@ export async function startTorrentPlaybackFixture({
             headers: { ...req.headers, host: target.host },
           },
           (response) => {
+            if (transfer) {
+              transfer.status = response.statusCode ?? 502;
+              transfer.contentRange = response.headers["content-range"] ?? "";
+              transfer.contentLength = Number(response.headers["content-length"] ?? 0);
+              response.on("data", (chunk: Buffer) => {
+                transfer.bytes += chunk.length;
+                transfer.lastDataAt = Date.now();
+              });
+              response.once("end", () => {
+                transfer.completed = true;
+              });
+            }
             res.writeHead(response.statusCode ?? 502, response.headers);
             response.pipe(res);
           },
@@ -272,6 +307,7 @@ export async function startTorrentPlaybackFixture({
       magnetURI,
       files,
       requests,
+      mediaTransfers,
       serverOutput: () => output,
       enqueue,
       close,

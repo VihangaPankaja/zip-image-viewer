@@ -67,8 +67,9 @@ test("torrent file status filters compose without changing selection", async ({ 
   await status.selectOption("available");
   await expect(dialog.getByText("3 of 4 files shown")).toBeVisible();
   await status.focus();
-  await page.keyboard.press("ArrowUp");
-  await page.keyboard.press("Enter");
+  // Native type-ahead avoids opening a macOS menu outside the page.
+  await page.keyboard.press("a");
+  await page.keyboard.press("Tab");
   await expect(status).toHaveValue("all");
   await expect(dialog.getByText("4 of 4 files shown")).toBeVisible();
   expect(mutations).toEqual([]);

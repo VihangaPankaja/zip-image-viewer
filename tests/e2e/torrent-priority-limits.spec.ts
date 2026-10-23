@@ -7,7 +7,6 @@ test.use({ hasTouch: true, viewport: { width: 360, height: 844 } });
 
 test("changes selected torrent file priorities and saves global bandwidth limits", async ({
   page,
-  browserName,
 }) => {
   test.setTimeout(60_000);
   const state = await installReviewFixtures(page);
@@ -25,14 +24,9 @@ test("changes selected torrent file priorities and saves global bandwidth limits
   await expect(priority).toHaveValue("high");
   expect(state.jobs[0].torrentFiles[0].priority).toBe("high");
   await priority.focus();
-  if (browserName === "webkit") {
-    // macOS native pickers navigate options with arrows rather than Home.
-    await page.keyboard.press("ArrowUp");
-    await page.keyboard.press("Enter");
-    await expect(priority).toHaveValue("normal");
-    await page.keyboard.press("ArrowUp");
-  } else await page.keyboard.press("Home");
-  await page.keyboard.press("Enter");
+  // Native type-ahead avoids opening a macOS menu outside the page.
+  await page.keyboard.press("l");
+  await page.keyboard.press("Tab");
   await expect(priority).toHaveValue("low");
   expect(state.jobs[0].torrentFiles[0].priority).toBe("low");
   await expect(dialog.getByRole("combobox", { name: /^Priority for/ })).toHaveCount(3);
