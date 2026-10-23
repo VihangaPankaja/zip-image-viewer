@@ -101,6 +101,8 @@ test("plays and seeks a real incomplete torrent, reconnects a missing seek, and 
       await expect(video).toHaveJSProperty("seeking", true);
       await page.waitForTimeout(400);
       await expect(video).toHaveJSProperty("seeking", true);
+      // Native decoders may backfill before the target; restore bandwidth after proving peer loss.
+      fixture.setUploadLimit(1024 * 1024);
       await fixture.reconnect();
       await waitForPlayback(
         async () => (await client.jobs.list()).items[0].peerCount,
