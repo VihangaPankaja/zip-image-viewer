@@ -189,7 +189,7 @@ jobs:
       - name: Use Ubuntu archive for browser dependencies
         if: runner.os == 'Linux'
         # The Azure mirror has repeatedly exhausted the browser job's install budget.
-        run: sudo sed -i 's|azure.archive.ubuntu.com|archive.ubuntu.com|g' /etc/apt/sources.list.d/ubuntu.sources
+        run: sudo sed -i 's|azure.archive.ubuntu.com|archive.ubuntu.com|g' /etc/apt/sources.list.d/ubuntu.sources /etc/apt/apt-mirrors.txt
       - run: vp exec playwright install --with-deps ${{ matrix.browser }}
       - name: Enable WebKit keyboard navigation through all controls
         if: runner.os == 'macOS'
