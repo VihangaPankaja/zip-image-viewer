@@ -164,12 +164,20 @@ jobs:
           if-no-files-found: warn
 
   e2e:
-    runs-on: ubuntu-latest
+    name: e2e (${{ matrix.browser }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        browser: [chromium, firefox, webkit]
+        include:
+          - browser: chromium
+            os: ubuntu-latest
+          - browser: firefox
+            os: ubuntu-latest
+          # macOS exercises Safari's platform media support with WebKit.
+          - browser: webkit
+            os: macos-15-intel
     steps:
       - uses: actions/checkout@v7
       - uses: voidzero-dev/setup-vp@v1.21.2
