@@ -26,16 +26,17 @@ audioTest(
         page.getByRole("button", { name: `Open ${torrent.torrentFiles[0].path}`, exact: true }),
       );
       const video = page.getByLabel("Early video preview", { exact: true });
-      await expect
-        .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState))
-        .toBeGreaterThanOrEqual(2);
       await expect(video).toHaveJSProperty("muted", false);
+      // Metadata preload may stop before decoding a frame until the user plays.
       if (browserName === "webkit") await tapVisibleTarget(video);
       else {
         await video.focus();
         await page.keyboard.press("Space");
       }
       await expect(video).toHaveJSProperty("paused", false);
+      await expect
+        .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState))
+        .toBeGreaterThanOrEqual(2);
       const player = await video.elementHandle();
       await page.getByRole("tab", { name: "Downloads" }).click();
       await expect(video).toHaveJSProperty("paused", false);
@@ -118,6 +119,7 @@ test("a newly opened ready session stays usable while the sessions list catches 
 test("preview rail filters transfers, opens verified video, recovers and deduplicates completion after restart", async ({
   page,
   appOrigin,
+  browserName,
 }) => {
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 390, height: 844 });
@@ -160,6 +162,12 @@ test("preview rail filters transfers, opens verified video, recovers and dedupli
   await page.keyboard.press("Enter");
   const video = page.getByLabel("Early video preview", { exact: true });
   await expect(video).toBeVisible();
+  if (browserName === "webkit") await tapVisibleTarget(video);
+  else {
+    await video.focus();
+    await page.keyboard.press("Space");
+  }
+  await expect(video).toHaveJSProperty("paused", false);
   await expect
     .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState))
     .toBeGreaterThanOrEqual(2);

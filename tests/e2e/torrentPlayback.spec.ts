@@ -118,9 +118,13 @@ test("plays and seeks a real incomplete torrent, reconnects a missing seek, and 
           { timeout: 25_000 },
         )
         .toEqual({ seeking: false, ready: true, time: 32, error: null });
-      await video.evaluate(async (element: HTMLVideoElement) => {
-        await element.play();
-      });
+      // Resume through native controls so WebKit receives a visible user play gesture.
+      if (browserName === "webkit") await tapVisibleTarget(video);
+      else
+        await video.evaluate(async (element: HTMLVideoElement) => {
+          await element.play();
+        });
+      await expect(video).toHaveJSProperty("paused", false);
       await expect
         .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
         .toBeGreaterThan(32.1);

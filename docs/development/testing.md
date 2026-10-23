@@ -85,6 +85,8 @@ check, and the device/theme gallery. Docker checks load the production image,
 verify health and retained-data restart, decode HLS, and play and seek in Chromium.
 Chromium and Firefox E2E run on Linux; WebKit runs on macOS to exercise Safari's
 platform media support. WebKit uses Playwright's browser build rather than released Safari.
+The macOS job enables keyboard navigation through all controls so Tab and focus
+checks exercise buttons and radios as well as text fields and selects.
 Gallery capture and media benchmarks run in separate jobs. Benchmarks stay
 sequential on their runner so competing encoders do not distort measurements.
 See `.github/workflows/` for exact steps and retained artifacts.
