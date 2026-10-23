@@ -3,6 +3,7 @@
   grid-template-rows: auto minmax(0, 1fr);
   align-content: start;
   gap: var(--space-5);
+  height: 100dvh;
   min-height: 100dvh;
   container-type: inline-size;
 }
@@ -13,10 +14,11 @@
 
 .workspace-explore-content {
   min-width: 0;
+  min-height: 0;
 }
 
 .workspace-panel-group {
-  height: calc(100dvh - 116px);
+  height: 100%;
   min-height: 0;
 }
 
@@ -284,6 +286,7 @@
 
 .downloads-workspace {
   grid-template-rows: auto auto;
+  height: auto;
   padding-block-end: var(--space-6);
 }
 
@@ -899,6 +902,7 @@
     display: grid;
     grid-template-rows: auto auto;
     align-content: start;
+    height: auto;
     min-height: 100dvh;
     gap: var(--space-2);
     padding-block: env(safe-area-inset-top) calc(76px + env(safe-area-inset-bottom));

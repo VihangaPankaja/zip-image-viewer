@@ -3,6 +3,30 @@ import { expect, test, type Page } from "@playwright/test";
 import { tapVisibleTarget } from "./touch";
 import { installReviewFixtures } from "../review/fixtures";
 
+async function setCssViewport(page: Page, width: number, height: number) {
+  await page.setViewportSize({ width, height });
+  const viewport = await page.evaluate(() => {
+    if (!visualViewport) throw new Error("Visual viewport is unavailable.");
+    return {
+      width: innerWidth,
+      height: innerHeight,
+      visualWidth: visualViewport.width,
+      visualHeight: visualViewport.height,
+    };
+  });
+  // Windows WebKit applies desktop display scaling to the emulated viewport.
+  if (viewport.width !== width || viewport.height !== height) {
+    await page.setViewportSize({
+      width: Math.ceil((width * width) / viewport.visualWidth - 0.00001),
+      height: Math.ceil((height * height) / viewport.visualHeight - 0.00001),
+    });
+  }
+  expect(await page.evaluate(() => ({ width: innerWidth, height: innerHeight }))).toEqual({
+    width,
+    height,
+  });
+}
+
 async function fits(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
     true,
@@ -13,9 +37,53 @@ async function fits(page: Page) {
   );
 }
 
+for (const { width, hasTouch } of [
+  { width: 761, hasTouch: false },
+  { width: 820, hasTouch: false },
+  { width: 1100, hasTouch: false },
+  { width: 1440, hasTouch: false },
+  { width: 820, hasTouch: true },
+]) {
+  test(`explorer fits below the header at ${width}px with ${hasTouch ? "touch" : "pointer"}`, async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({
+      viewport: { width, height: 1000 },
+      hasTouch,
+    });
+    const page = await context.newPage();
+    await setCssViewport(page, width, 1000);
+    await installReviewFixtures(page);
+    await page.route("**/api/sessions/*/file?*", (route) =>
+      route.fulfill({
+        contentType: "image/svg+xml",
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540"><rect width="960" height="540" fill="teal"/></svg>',
+      }),
+    );
+    for (const theme of ["light", "dark"] as const) {
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+      await page.goto("http://127.0.0.1:5173/");
+      await page.getByRole("tab", { name: "Explore" }).click();
+      await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
+      await page.getByRole("treeitem").filter({ hasText: "01-coast.png" }).click();
+      await expect(page.locator(".image-frame img")).toBeVisible();
+      const panels = page.locator(".workspace-panel-group");
+      await expect(panels).toBeVisible();
+      const layout = await panels.evaluate((element) => ({
+        bottom: element.getBoundingClientRect().bottom,
+        viewport: innerHeight,
+        pageHeight: document.documentElement.scrollHeight,
+      }));
+      expect(layout.pageHeight).toBeLessThanOrEqual(layout.viewport + 1);
+      expect(Math.round(layout.bottom)).toBeLessThanOrEqual(layout.viewport);
+    }
+    await context.close();
+  });
+}
+
 for (const theme of ["light", "dark"] as const) {
   test(`native ${theme} choice keeps keyboard focus visible`, async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+    await setCssViewport(page, 390, 844);
     await page.emulateMedia({ reducedMotion: "reduce", colorScheme: theme });
     await installReviewFixtures(page);
     await page.goto("/");
@@ -42,7 +110,7 @@ for (const theme of ["light", "dark"] as const) {
 
 for (const width of [360, 390, 820, 1440, 2560]) {
   test(`compact settings and menus fit at ${width}px`, async ({ page }, testInfo) => {
-    await page.setViewportSize({ width, height: 1000 });
+    await setCssViewport(page, width, 1000);
     await page.goto("/");
     for (const theme of ["light", "dark"] as const) {
       await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
@@ -74,6 +142,7 @@ test("touch targets remain 44px and native controls support loading and errors",
     hasTouch: true,
   });
   const page = await context.newPage();
+  await setCssViewport(page, 360, 900);
   let failSave: (() => Promise<void>) | undefined;
   await page.route("**/rpc/scheduler/update", async (route) => {
     await new Promise<void>((resolve) => {
@@ -111,7 +180,7 @@ test("touch targets remain 44px and native controls support loading and errors",
 });
 
 test("compact fields and browser-zoom breakpoints use the shared sizes", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 1000 });
+  await setCssViewport(page, 1440, 1000);
   await page.goto("/");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   const fieldSize = await page.evaluate(() =>
@@ -120,7 +189,7 @@ test("compact fields and browser-zoom breakpoints use the shared sizes", async (
   await expect(page.getByLabel("Concurrent downloads")).toHaveCSS("font-size", fieldSize);
   await page.keyboard.press("Escape");
   // A 1440px window at 200% browser zoom has a 720px CSS viewport.
-  await page.setViewportSize({ width: 720, height: 500 });
+  await setCssViewport(page, 720, 500);
   expect(await page.evaluate(() => matchMedia("(width <= 760px)").matches)).toBe(true);
   await expect(page.getByRole("button", { name: "Settings", exact: true })).toHaveCSS(
     "min-height",
@@ -131,7 +200,7 @@ test("compact fields and browser-zoom breakpoints use the shared sizes", async (
 });
 
 test("slideshow reveal remains a full touch target with hidden controls", async ({ page }) => {
-  await page.setViewportSize({ width: 360, height: 900 });
+  await setCssViewport(page, 360, 900);
   await installReviewFixtures(page);
   await page.route("**/api/sessions/*/file?*", (route) =>
     route.fulfill({
@@ -156,7 +225,7 @@ test("slideshow reveal remains a full touch target with hidden controls", async 
 });
 
 test("long labels and fields reflow at 200% zoom", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 1000 });
+  await setCssViewport(page, 1440, 1000);
   await page.goto("/");
   await page.evaluate(() => {
     document.documentElement.style.zoom = "2";
