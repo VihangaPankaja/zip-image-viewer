@@ -82,7 +82,7 @@ audio.video-player {
 }
 
 .video-scrubber-control input {
-  min-height: 44px;
+  min-height: var(--control-height);
   margin: 0;
   padding: 0;
   accent-color: var(--accent);
@@ -134,19 +134,13 @@ audio.video-player {
 .video-subtitle-controls input,
 .video-subtitle-controls select,
 .video-subtitle-controls button {
-  min-height: 44px;
+  min-height: var(--control-height);
 }
 
 .video-subtitle-controls input,
 .video-subtitle-controls select {
   width: 100%;
   max-width: 12rem;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-inset);
-  color: var(--text);
-  font: inherit;
 }
 
 .video-subtitle-note,
@@ -160,7 +154,7 @@ audio.video-player {
   color: var(--text-muted);
 }
 .video-subtitle-error {
-  color: var(--danger);
+  color: var(--accent-danger);
 }
 .video-player[data-caption-size="small"]::cue {
   font-size: 16px;

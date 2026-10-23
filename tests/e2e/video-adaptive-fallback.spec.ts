@@ -34,8 +34,9 @@ test("Auto downshifts to a prepared rendition after a mid-video bandwidth drop",
     await expect(page.getByText("Auto · 480p playback", { exact: true })).toBeVisible({
       timeout: 30_000,
     });
-    await page.getByRole("button", { name: "Quality", exact: true }).click();
-    await page.getByRole("option", { name: "480p", exact: true }).click();
+    await page
+      .getByRole("combobox", { name: "Quality", exact: true })
+      .selectOption({ label: "480p" });
     await video.evaluate(async (v: HTMLVideoElement) => {
       v.muted = true;
       v.currentTime = 64;
@@ -85,8 +86,9 @@ test("Auto downshifts to a prepared rendition after a mid-video bandwidth drop",
       downloadThroughput: 75_000,
       uploadThroughput: -1,
     });
-    await page.getByRole("button", { name: "Quality", exact: true }).click();
-    await page.getByRole("option", { name: "Auto", exact: true }).click();
+    await page
+      .getByRole("combobox", { name: "Quality", exact: true })
+      .selectOption({ label: "Auto" });
     await expect.poll(() => fallbacks.length, { timeout: 45_000 }).toBeGreaterThan(0);
     expect(fallbacks[0].index).toBeGreaterThan(0);
     await expect.poll(() => fallbacks[0].cached).toBe(true);

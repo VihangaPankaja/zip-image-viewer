@@ -24,8 +24,9 @@ test("changes selected torrent file priorities and saves global bandwidth limits
   await expect(priority).toHaveValue("high");
   expect(state.jobs[0].torrentFiles[0].priority).toBe("high");
   await priority.focus();
-  await page.keyboard.press("Home");
-  await page.keyboard.press("Enter");
+  // Native type-ahead avoids opening a macOS menu outside the page.
+  await page.keyboard.press("l");
+  await page.keyboard.press("Tab");
   await expect(priority).toHaveValue("low");
   expect(state.jobs[0].torrentFiles[0].priority).toBe("low");
   await expect(dialog.getByRole("combobox", { name: /^Priority for/ })).toHaveCount(3);

@@ -38,12 +38,11 @@ for (const width of [390, 820, 1440, 2560]) {
         "solid",
       );
       await page.screenshot({ path: testInfo.outputPath("settings.png") });
-      await dialog.getByRole("button", { name: "Default sort", exact: true }).click();
-      await expect(page.getByRole("listbox")).toHaveCSS(
+      await dialog.getByRole("combobox", { name: "Default sort", exact: true }).focus();
+      await expect(dialog.getByRole("combobox", { name: "Default sort", exact: true })).toHaveCSS(
         "background-color",
-        surface === "amoled" ? "rgb(32, 32, 34)" : "rgb(42, 43, 46)",
+        surface === "amoled" ? "rgb(11, 11, 12)" : "rgb(24, 25, 27)",
       );
-      await page.keyboard.press("Escape");
       await page.keyboard.press("Escape");
       await page.emulateMedia({ forcedColors: "active" });
       await page.getByRole("button", { name: "Settings", exact: true }).click();

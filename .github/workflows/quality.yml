@@ -164,12 +164,20 @@ jobs:
           if-no-files-found: warn
 
   e2e:
-    runs-on: ubuntu-latest
+    name: e2e (${{ matrix.browser }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        browser: [chromium, firefox, webkit]
+        include:
+          - browser: chromium
+            os: ubuntu-latest
+          - browser: firefox
+            os: ubuntu-latest
+          # macOS exercises Safari's platform media support with WebKit.
+          - browser: webkit
+            os: macos-15-intel
     steps:
       - uses: actions/checkout@v7
       - uses: voidzero-dev/setup-vp@v1.21.2
@@ -178,7 +186,16 @@ jobs:
           run-install: false
           node-version-file: .node-version
       - run: vp install --frozen-lockfile
+      - name: Use Ubuntu archive for browser dependencies
+        if: runner.os == 'Linux'
+        # The Azure mirror has repeatedly exhausted the browser job's install budget.
+        run: sudo sed -i 's|azure.archive.ubuntu.com|archive.ubuntu.com|g' /etc/apt/sources.list.d/ubuntu.sources /etc/apt/apt-mirrors.txt
       - run: vp exec playwright install --with-deps ${{ matrix.browser }}
+      - name: Enable WebKit keyboard navigation through all controls
+        if: runner.os == 'macOS'
+        # Safari follows this OS preference; keep the full Tab/focus assertions.
+        # https://github.com/microsoft/playwright/issues/41808
+        run: defaults write org.webkit.Playwright AppleKeyboardUIMode -int 2
       - run: vp exec playwright test --project=${{ matrix.browser }}
 
       - name: Publish browser failure evidence

@@ -32,12 +32,21 @@
   --space-6: 24px;
   --space-8: 32px;
   --space-10: 40px;
-  --control-height: 44px;
+  --control-height: 36px;
+  --control-padding: 6px 10px;
+  --control-font-size: 0.875rem;
+  --control-icon-size: 18px;
   --surface-highlight: #24433f;
   --text: #f2f2f3;
   --text-dim: #b0b0b5;
   --text-muted: #c9c9ce;
   --transition-fast: 140ms ease;
+}
+
+@media (any-pointer: coarse), (width <= 760px), (width <= 960px) and (height <= 500px) {
+  :root {
+    --control-height: 44px;
+  }
 }
 
 html[data-theme="dark"][data-dark-surface="amoled"] {

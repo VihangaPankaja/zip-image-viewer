@@ -1,12 +1,5 @@
-import { useRef } from "react";
-
 type DropdownOptionValue = string | number;
-
-type DropdownOption = {
-  value: DropdownOptionValue;
-  label: string;
-};
-
+type DropdownOption = { value: DropdownOptionValue; label: string };
 type CustomDropdownProps = {
   id: string;
   label: string;
@@ -14,6 +7,7 @@ type CustomDropdownProps = {
   options: DropdownOption[];
   onChange: (value: DropdownOptionValue) => void;
   className?: string;
+  disabled?: boolean;
 };
 
 export function CustomDropdown({
@@ -23,54 +17,31 @@ export function CustomDropdown({
   options,
   onChange,
   className = "",
+  disabled = false,
 }: CustomDropdownProps) {
-  const menuRef = useRef<HTMLDivElement>(null);
-  const menuId = `${id}-menu`;
-  const activeOption = options.find((option) => option.value === value) ?? options.at(0);
-
+  const selected = options.find((option) => option.value === value) ?? options.at(0);
   return (
-    <div className={`toolbar-select-shell custom-dropdown-shell ${className}`.trim()}>
+    <label
+      className={`toolbar-select-shell custom-dropdown-shell ${className}`.trim()}
+      htmlFor={id}
+    >
       <span className="toolbar-label">{label}</span>
-      <button
-        type="button"
+      <select
         id={id}
-        className="custom-dropdown-trigger"
-        aria-label={label}
-        aria-haspopup="listbox"
-        aria-controls={menuId}
-        popoverTarget={menuId}
+        value={selected ? String(selected.value) : ""}
+        title={selected?.label}
+        disabled={disabled || options.length === 0}
+        onChange={(event) => {
+          const option = options.find((item) => String(item.value) === event.currentTarget.value);
+          if (option) onChange(option.value);
+        }}
       >
-        <span>{activeOption ? activeOption.label : "Select"}</span>
-        <span className="custom-dropdown-caret" aria-hidden="true" />
-      </button>
-
-      <div
-        ref={menuRef}
-        id={menuId}
-        className="custom-dropdown-menu"
-        role="listbox"
-        aria-label={label}
-        popover="auto"
-      >
-        {options.map((option) => {
-          const isActive = option.value === value;
-          return (
-            <button
-              key={option.value}
-              type="button"
-              role="option"
-              aria-selected={isActive}
-              className={`custom-dropdown-option ${isActive ? "active" : ""}`}
-              onClick={() => {
-                onChange(option.value);
-                menuRef.current?.hidePopover();
-              }}
-            >
-              {option.label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
+        {options.map((option) => (
+          <option key={option.value} value={String(option.value)}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

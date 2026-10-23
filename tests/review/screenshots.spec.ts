@@ -155,12 +155,11 @@ for (const device of devices) {
           timeout: 30_000,
         })
         .toBeGreaterThanOrEqual(2);
-      const quality = page.getByRole("button", {
+      const quality = page.getByRole("combobox", {
         name: "Quality",
         exact: true,
       });
-      await quality.click();
-      await page.getByRole("option", { name: "480p", exact: true }).click();
+      await quality.selectOption({ label: "480p" });
       await video.evaluate(async (v: HTMLVideoElement) => {
         v.muted = true;
         v.currentTime = 64;
@@ -186,10 +185,10 @@ for (const device of devices) {
         expect(bounds.y + bounds.height).toBeLessThanOrEqual(navigation.y);
       }
       await save(page, device, theme, "video-warm-high-playback");
-      await quality.click();
+      await quality.focus();
       await save(page, device, theme, "video-warm-quality-choice");
-      await page.getByRole("option", { name: "360p", exact: true }).click();
-      await expect(quality).toContainText("360p");
+      await quality.selectOption({ label: "360p" });
+      await expect(quality).toHaveValue("360p");
       const seek = page.getByRole("slider", { name: "Seek video" });
       await seek.scrollIntoViewIfNeeded();
       const bounds = await seek.boundingBox();
@@ -839,6 +838,20 @@ async function captureDialogs(
 ) {
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await save(page, device, theme, "settings");
+  const sort = page.getByRole("combobox", { name: "Default sort", exact: true });
+  await sort.scrollIntoViewIfNeeded();
+  await sort.focus();
+  await save(page, device, theme, "settings-controls-menu");
+  await sort.selectOption({ label: "Name A-Z" });
+  await expect(sort).toBeFocused();
+  await save(page, device, theme, "settings-controls-focus-return");
+  expect(
+    await sort.evaluate((element) => {
+      const header = element.closest("dialog")?.querySelector(".panel-header");
+      if (!header) throw new Error("Settings header is missing.");
+      return element.getBoundingClientRect().top >= header.getBoundingClientRect().bottom + 4;
+    }),
+  ).toBe(true);
   for (const accent of ["Blue", "Violet", "Amber", "Rose"]) {
     await page.getByText(accent, { exact: true }).click();
     await expect(page.locator("html")).toHaveAttribute("data-accent", accent.toLowerCase());
@@ -855,9 +868,8 @@ async function captureDialogs(
     await page.keyboard.press("Escape");
     await save(page, device, theme, "downloads-amoled");
     await page.getByRole("button", { name: "Settings", exact: true }).click();
-    await page.getByRole("button", { name: "Default sort", exact: true }).click();
+    await page.getByRole("combobox", { name: "Default sort", exact: true }).focus();
     await save(page, device, theme, "menu-amoled");
-    await page.keyboard.press("Escape");
     await page.getByText("Charcoal", { exact: true }).click();
   }
   await page.getByLabel("Show Path column").scrollIntoViewIfNeeded();
@@ -1358,6 +1370,10 @@ for (const device of devices) {
       await expect(page.locator(".slideshow-meta")).toContainText("1 / 1");
       await expect(page.locator(".slideshow-stage img")).toHaveJSProperty("naturalWidth", 1200);
       await save(page, device, theme, "slideshow");
+      await page.getByRole("button", { name: "Hide UI", exact: true }).click();
+      await save(page, device, theme, "slideshow-controls-hidden");
+      await page.getByRole("button", { name: "Show UI", exact: true }).click();
+      await save(page, device, theme, "slideshow-controls-restored");
       await page.keyboard.press("Escape");
       await page.getByRole("button", { name: "Open explorer", exact: true }).click();
       await save(page, device, theme, "explorer-dialog");

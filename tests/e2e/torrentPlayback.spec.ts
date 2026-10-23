@@ -101,6 +101,8 @@ test("plays and seeks a real incomplete torrent, reconnects a missing seek, and 
       await expect(video).toHaveJSProperty("seeking", true);
       await page.waitForTimeout(400);
       await expect(video).toHaveJSProperty("seeking", true);
+      // Native decoders may backfill before the target; restore bandwidth after proving peer loss.
+      fixture.setUploadLimit(1024 * 1024);
       await fixture.reconnect();
       await waitForPlayback(
         async () => (await client.jobs.list()).items[0].peerCount,
@@ -118,12 +120,51 @@ test("plays and seeks a real incomplete torrent, reconnects a missing seek, and 
           { timeout: 25_000 },
         )
         .toEqual({ seeking: false, ready: true, time: 32, error: null });
-      await video.evaluate(async (element: HTMLVideoElement) => {
-        await element.play();
-      });
-      await expect
-        .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
-        .toBeGreaterThan(32.1);
+      // Resume through native controls so WebKit receives a visible user play gesture.
+      if (browserName === "webkit") await tapVisibleTarget(video);
+      else
+        await video.evaluate(async (element: HTMLVideoElement) => {
+          await element.play();
+        });
+      await expect(video).toHaveJSProperty("paused", false);
+      try {
+        await expect
+          .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
+          .toBeGreaterThan(32.1);
+      } catch (cause) {
+        const diagnostics = JSON.stringify({
+          recordedAt: Date.now(),
+          video: await video.evaluate((element: HTMLVideoElement) => ({
+            time: element.currentTime,
+            duration: element.duration,
+            paused: element.paused,
+            ended: element.ended,
+            seeking: element.seeking,
+            readyState: element.readyState,
+            networkState: element.networkState,
+            playbackRate: element.playbackRate,
+            visibility: document.visibilityState,
+            error: element.error?.message ?? null,
+            buffered: Array.from({ length: element.buffered.length }, (_, index) => [
+              element.buffered.start(index),
+              element.buffered.end(index),
+            ]),
+            seekable: Array.from({ length: element.seekable.length }, (_, index) => [
+              element.seekable.start(index),
+              element.seekable.end(index),
+            ]),
+          })),
+          job: (await client.jobs.list()).items.find((job) => job.id === id),
+          recentPieces: fixture.requests.slice(-20),
+          mediaTransfers: fixture.mediaTransfers,
+        });
+        console.info("Torrent resume diagnostics:", diagnostics);
+        await testInfo.attach("torrent-resume-state", {
+          body: diagnostics,
+          contentType: "application/json",
+        });
+        throw cause;
+      }
       await video.evaluate((element: HTMLVideoElement) => element.pause());
       await testInfo.attach("real-torrent-decoded-and-seeked", {
         body: await page.screenshot(),

@@ -94,8 +94,9 @@ test("media filter keeps nested folders, sorting and keyboard preview usable", a
   );
   await openCollection(page, true);
   await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await page.getByRole("button", { name: "Default sort", exact: true }).click();
-  await page.getByRole("option", { name: "Name Z-A", exact: true }).click();
+  await page
+    .getByRole("combobox", { name: "Default sort", exact: true })
+    .selectOption({ label: "Name Z-A" });
   await page.keyboard.press("Escape");
   const filter = page.getByRole("combobox", { name: "Media type" });
   await page.getByRole("searchbox", { name: "Search explorer files" }).fill("Season 1/episode");

@@ -80,7 +80,7 @@ describe("GlobalSettingsSheet", () => {
     expect(onSetConcurrency).toHaveBeenCalledWith(4);
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Could not update"));
     expect(screen.getByRole("combobox", { name: "Concurrent downloads" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Default sort" })).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "Default sort" })).toBeVisible();
     expect(screen.getByRole("dialog")).toHaveProperty("tagName", "DIALOG");
     expect(screen.getByRole("group", { name: "Downloads" })).toBeVisible();
     expect(screen.getByRole("group", { name: "Preview and explorer" })).toBeVisible();
