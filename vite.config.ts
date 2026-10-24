@@ -2,7 +2,6 @@ import { fileURLToPath } from "node:url";
 import { defineConfig, lazyPlugins } from "vite-plus";
 import react from "@vitejs/plugin-react";
 import type { Config as StylelintConfig } from "stylelint";
-import htmlCssSyntax from "postcss-html";
 
 // Stylelint's adapter reads this alongside the other project checks.
 export const cssLintConfig: StylelintConfig = {
@@ -34,18 +33,13 @@ export const cssLintConfig: StylelintConfig = {
       files: ["client/src/styles/tokens.css"],
       rules: { "color-no-hex": null, "color-named": null, "function-disallowed-list": null },
     },
-    {
-      files: ["docs/app-roadmap.html"],
-      customSyntax: htmlCssSyntax,
-      // The standalone tracker uses IDs for its controls and print layout.
-      rules: { "selector-max-id": 1 },
-    },
   ],
 };
 
 export default defineConfig({
   test: {
     root: fileURLToPath(new URL(".", import.meta.url)),
+    maxWorkers: 2,
     projects: [
       {
         test: {
@@ -79,7 +73,7 @@ export default defineConfig({
     ],
     coverage: {
       provider: "v8",
-      reporter: ["text", "json", "json-summary", "html", "lcov"],
+      reporter: ["text", "json", "html"],
       reportOnFailure: true,
       include: ["shared/**/*.ts", "server/**/*.ts", "client/src/**/*.{ts,tsx}"],
       exclude: ["**/*.test.{ts,tsx}", "**/*.d.ts"],
@@ -115,7 +109,6 @@ export default defineConfig({
   staged: {
     "*": "vp check --fix",
     "*.css": "vp exec stylelint --max-warnings 0",
-    "docs/app-roadmap.html": "vp exec stylelint --max-warnings 0",
     "{vite.config.ts,stylelint.config.mjs}": () => "vpr lint:css",
   },
   lint: {
@@ -305,10 +298,6 @@ export default defineConfig({
       "vite-plus/prefer-vite-plus-imports": "error",
     },
     overrides: [
-      {
-        files: ["docs/app-roadmap.check.mjs"],
-        env: { node: true, browser: true },
-      },
       {
         files: ["client/src/**/*.tsx"],
 

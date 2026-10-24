@@ -1,43 +1,54 @@
 name: Docker Build
 
 on:
-  pull_request:
-  push:
-    branches:
-      - master
-  schedule:
-    - cron: "0 4 * * 1"
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      publish:
+        type: boolean
+        default: false
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: false
+      DOCKERHUB_TOKEN:
+        required: false
 
 permissions:
   contents: read
 
+concurrency:
+  group: container-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   docker-build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     env:
       IMAGE_NAME: vihangapankaja/zip-image-viewer
+      DOCKER_BUILD_RECORD_UPLOAD: false
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
 
+      - name: Retain attestations in the local image store
+        uses: docker/setup-docker-action@v5.6.0
+        with:
+          set-host: true
+          daemon-config: |
+            { "features": { "containerd-snapshotter": true } }
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
+        with:
+          driver: docker
 
       - name: Read app version
         id: app-version
         run: |
           version=$(node -p "require('./package.json').version")
           echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - name: Log in to Docker Hub
-        if: github.event_name == 'push'
-        uses: docker/login-action@v4
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Extract Docker metadata
         id: meta
@@ -48,26 +59,24 @@ jobs:
             type=raw,value=latest
             type=raw,value=${{ steps.app-version.outputs.version }}
 
-      - name: Build Docker image
-        id: build
+      - name: Build the local candidate with provenance and SBOM
         uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
-          load: ${{ github.event_name != 'push' }}
-          push: ${{ github.event_name == 'push' }}
+          push: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          # Docker's local image exporter cannot retain attestations.
-          provenance: ${{ github.event_name == 'push' && 'mode=max' || 'false' }}
-          sbom: ${{ github.event_name == 'push' }}
+          # The Docker driver loads into the containerd store, preserving attestations.
+          provenance: mode=max
+          sbom: true
 
       - name: Inventory production image packages and licenses
         uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
-          image: ${{ github.event_name == 'push' && format('{0}@{1}', env.IMAGE_NAME, steps.build.outputs.digest) || format('{0}:latest', env.IMAGE_NAME) }}
+          image: ${{ env.IMAGE_NAME }}:latest
           format: spdx-json
           output-file: ${{ runner.temp }}/image-sbom.spdx.json
           upload-artifact: false
@@ -94,7 +103,6 @@ jobs:
           if-no-files-found: error
 
       - name: Smoke-test Docker image
-        if: github.event_name == 'pull_request'
         run: |
           volume_name="retention-smoke-${{ github.run_id }}-${{ github.run_attempt }}"
           docker volume create "$volume_name"
@@ -104,7 +112,7 @@ jobs:
             ${{ env.IMAGE_NAME }}:latest)
           trap 'docker logs "$container_id"; docker rm --force "$container_id"; docker volume rm "$volume_name"' EXIT
           wait_ready() {
-            for attempt in {1..60}; do
+            for _ in {1..60}; do
               status=$(docker inspect --format '{{.State.Health.Status}}' "$container_id")
               if [ "$status" = healthy ] && docker exec "$container_id" node -e "fetch('http://127.0.0.1:8080/health').then(async r=>{if(!(await r.json()).ready)process.exit(1)}).catch(()=>process.exit(1))"; then
                 docker logs "$container_id" 2>&1 | grep --fixed-strings "[INFO] server.started"
@@ -122,43 +130,60 @@ jobs:
           docker exec "$container_id" node tests/integration/containerRetentionSmoke.mjs verify
 
       - name: Decode HLS in production image
-        if: github.event_name == 'pull_request'
         run: |
           docker run --rm --entrypoint node \
             --mount type=bind,source="$PWD/tests/integration/containerHlsSmoke.mjs",target=/app/tests/integration/containerHlsSmoke.mjs,readonly \
             ${{ env.IMAGE_NAME }}:latest /app/tests/integration/containerHlsSmoke.mjs
 
       - name: Set up Vite+ for browser smoke checks
-        if: github.event_name == 'pull_request'
         uses: voidzero-dev/setup-vp@v1.21.2
         with:
           cache: true
           run-install: false
           node-version-file: .node-version
-      - if: github.event_name == 'pull_request'
-        run: vp install --frozen-lockfile
-      - if: github.event_name == 'pull_request'
-        run: vp exec playwright install --with-deps chromium
+      - run: vp install --frozen-lockfile
+      - run: vp exec playwright install --with-deps chromium
+
+      - name: Verify HLS encoders and CPU fallback
+        run: vpr benchmark:encoding --output test-results/video-encoding.json
 
       - name: Play HLS through the production image in Chromium
-        if: github.event_name == 'pull_request'
         run: |
           container_id=$(docker run --detach --publish 127.0.0.1:8080:8080 \
             --entrypoint node \
             --mount type=bind,source="$PWD/tests/integration/containerBrowserFixture.mjs",target=/app/tests/integration/containerBrowserFixture.mjs,readonly \
             ${{ env.IMAGE_NAME }}:latest /app/tests/integration/containerBrowserFixture.mjs)
           trap 'docker logs "$container_id"; docker rm --force "$container_id"' EXIT
-          for attempt in {1..90}; do
+          for _ in {1..90}; do
             if curl --fail --silent http://127.0.0.1:8080/health > /dev/null; then break; fi
             sleep 1
           done
           node tests/integration/containerBrowserSmoke.mjs
 
-      - name: Publish container browser screenshot
-        if: always() && github.event_name == 'pull_request'
+      - name: Retain media verification evidence
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: container-browser-playback
-          path: test-results/container-playback.png
+          name: container-media
+          path: |
+            test-results/container-playback.png
+            test-results/video-encoding.json
           retention-days: 14
           if-no-files-found: warn
+
+      - name: Log in to Docker Hub after verification
+        if: inputs.publish && github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Publish the verified candidate without rebuilding
+        if: inputs.publish && github.event_name == 'push' && github.ref == 'refs/heads/master'
+        env:
+          VERSION: ${{ steps.app-version.outputs.version }}
+        run: |
+          docker push "$IMAGE_NAME:$VERSION"
+          docker push "$IMAGE_NAME:latest"
+          docker buildx imagetools inspect "$IMAGE_NAME:$VERSION" --format '{{json .Provenance}}' | jq -e 'length > 0'
+          docker buildx imagetools inspect "$IMAGE_NAME:$VERSION" --format '{{json .SBOM}}' | jq -e 'length > 0'

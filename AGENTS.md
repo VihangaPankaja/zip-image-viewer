@@ -17,8 +17,9 @@ ZIP Image Viewer uses React, Express and TypeScript. Start with the
 - Before each major commit, run `vpr lint`, `vpr typecheck` and `vpr build`.
   Run `vpr format` immediately before every commit. Fix failures first.
 - Before opening a PR, run `vpr quality`, `vpr test` and `vpr test:e2e`.
-  Preserve all suite, coverage, browser and container checks. Never lower gates
-  or add skips to make a change pass.
+  Preserve all suite, coverage, browser and container checks. Do not lower
+  acceptance limits or add skips to make a change pass. Fallow's aggregate
+  health score is advisory; actionable code and dependency findings remain gated.
 - Verify changed flows in a real browser, including keyboard, pointer, touch
   and responsive behavior where relevant.
 - For PRs with visible UI changes, follow the

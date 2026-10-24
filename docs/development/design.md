@@ -66,7 +66,8 @@ Use native controls and dialogs. Support Escape, focus return and keyboard
 navigation. Honor reduced motion and forced colors. Keep animations limited
 to short color and opacity transitions.
 
-Check both themes at narrow mobile, tablet and desktop sizes, including short
-landscape layouts. Exercise scrolling, keyboard focus, long names and errors.
-Run the relevant Playwright and Axe scenarios and inspect the PR gallery.
-See [testing](testing.md) for commands.
+Check affected areas at relevant viewport sizes, including short landscape
+layouts. Exercise scrolling, keyboard focus, long names and errors.
+Run the relevant Playwright and Axe scenarios. Follow the
+[screenshot skill](../../.agents/skills/pr-screenshots/SKILL.md) for targeted PR
+captures and theme selection. See [testing](testing.md) for commands.

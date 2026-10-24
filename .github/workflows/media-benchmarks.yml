@@ -1,0 +1,64 @@
+name: Media benchmarks
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/media-benchmarks.yml"
+      - "server/**"
+      - "shared/**"
+      - "client/src/**"
+      - "client/index.html"
+      - "tests/benchmarks/**"
+      - "tests/fixtures/**"
+      - "tests/e2e/media-fixture.ts"
+      - "playwright.seek.config.ts"
+      - "playwright.config.ts"
+      - "vite.config.ts"
+      - "tsconfig*.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".node-version"
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: media-benchmarks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  measurements:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: voidzero-dev/setup-vp@v1.21.2
+        with:
+          cache: true
+          run-install: false
+          node-version-file: .node-version
+      - run: vp install --frozen-lockfile
+      - run: vp exec playwright install --with-deps chromium
+      # Keep workloads sequential so encoders do not distort measurements.
+      - name: Measure real video startup and seeking
+        run: vpr benchmark:video --samples 1 --duration 8 --output test-results/video-latency.md
+      - name: Measure storyboard latency and sustained dragging under media load
+        run: vpr benchmark:storyboard --output test-results/storyboard-performance.json
+      - name: Measure cold and prepared long-video seeking
+        run: vpr benchmark:seek
+      - name: Retain performance measurements and failure evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: media-benchmarks
+          retention-days: 14
+          path: |
+            test-results/video-latency.md
+            test-results/storyboard-performance.json
+            test-results/priority-seek-metrics.json
+            test-results/priority-seek-run/
+            playwright-report/
+          if-no-files-found: warn

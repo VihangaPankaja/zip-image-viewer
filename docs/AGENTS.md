@@ -11,5 +11,6 @@
 - Put change history, migration notes and one-off measurements in PRs, not guides.
   Describe benchmark commands and how to interpret their output.
 - Keep agent files limited to local rules. Keep skill steps with the skill.
-- Update links when moving pages. Check relative links, documented commands and
-  `vpr check:roadmap` after editing the roadmap. Preserve task IDs and saved progress.
+- Update links when moving pages. Check relative links and documented commands.
+  The roadmap is a TODO document; preserve task IDs and saved progress without
+  adding CI checks for its contents or completion percentages.
