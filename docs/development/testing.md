@@ -80,7 +80,7 @@ reports in test artifacts or PR evidence, not maintained guides.
 
 ## CI
 
-PRs and master pushes show Linux, Windows and macOS compatibility checks,
+PRs and unverified master pushes show Linux, Windows and macOS compatibility checks,
 dependency review and three separate browser checks. Each compatibility check
 verifies dependency installation and the production build. A separate Linux job
 runs the full quality gate, validates workflow syntax with Actionlint and runs
@@ -90,12 +90,22 @@ PRs also gate new Fallow findings against their base commit. Dead-code,
 dependency, architecture and duplication checks remain blocking; the aggregate
 health score is advisory. The roadmap TODO document has no dedicated checker.
 
+Successful PR runs retain a small verification record for 14 days. After a
+squash merge, a read-only planning job checks that the push contains exactly
+that merged PR and that its tracked files match the tested merge tree. When
+the latest Quality run for that PR head succeeded and its record matches, CI
+reuses its static, OS, dependency and browser results. Direct pushes, changed
+trees, missing or expired records and API failures run full CI. Manual runs
+also perform full verification.
+
 After these checks pass, the container job builds a local image with its
 provenance and SBOM, scans it, verifies health and retained-data restart, decodes
 HLS, checks encoders and CPU fallback, and plays and seeks in Chromium.
 Master pushes then publish that same image without rebuilding. PR, scheduled
 and manual maintenance runs do not publish images. The final `Verification`
-check fails if any prerequisite failed or was cancelled or skipped.
+check requires successful verification or a proven reused PR run, plus
+successful container verification. The release image is built and verified
+on master even when the source checks are reused.
 Chromium and Firefox E2E run on Linux; WebKit runs on macOS to exercise Safari's
 platform media support. WebKit uses Playwright's browser build rather than released Safari.
 The WebKit browser job enables keyboard navigation through all controls so Tab

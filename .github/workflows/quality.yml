@@ -14,8 +14,39 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  prepare:
+    name: Verification plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    outputs:
+      reuse: ${{ steps.plan.outputs.reuse }}
+      tree: ${{ steps.plan.outputs.tree }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Find successful PR verification for this squash merge
+        id: plan
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { execFileSync } = require('node:child_process');
+            const { pathToFileURL } = require('node:url');
+            const { findVerifiedPullRequest } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/tooling/ci-verification.mjs`).href);
+            const tree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' }).trim();
+            const run = await findVerifiedPullRequest({ github, context, core, tree });
+            core.setOutput('tree', tree);
+            core.setOutput('reuse', Boolean(run));
+            await core.summary.addRaw(run
+              ? `Reusing successful PR verification: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${run.id}\n`
+              : 'No matching successful PR verification; running full CI.\n').write();
+
   checks:
     name: Static checks and coverage
+    needs: prepare
+    if: needs.prepare.outputs.reuse != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -48,6 +79,8 @@ jobs:
 
   compatibility:
     name: ${{ matrix.platform }} compatibility
+    needs: prepare
+    if: needs.prepare.outputs.reuse != 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -72,10 +105,14 @@ jobs:
 
   dependencies:
     name: Dependencies
+    needs: prepare
+    if: needs.prepare.outputs.reuse != 'true'
     uses: ./.github/workflows/dependency-maintenance.yml
 
   e2e:
     name: e2e (${{ matrix.browser }})
+    needs: prepare
+    if: needs.prepare.outputs.reuse != 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -117,7 +154,14 @@ jobs:
 
   container:
     name: Container
-    needs: [checks, compatibility, dependencies, e2e]
+    needs: [prepare, checks, compatibility, dependencies, e2e]
+    if: >-
+      !cancelled() && needs.prepare.result == 'success' &&
+      (needs.checks.result == 'success' && needs.compatibility.result == 'success' &&
+      needs.dependencies.result == 'success' && needs.e2e.result == 'success' ||
+      needs.prepare.outputs.reuse == 'true' && needs.checks.result == 'skipped' &&
+      needs.compatibility.result == 'skipped' && needs.dependencies.result == 'skipped' &&
+      needs.e2e.result == 'skipped')
     uses: ./.github/workflows/docker-build.yml
     with:
       publish: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
@@ -128,11 +172,25 @@ jobs:
   verified:
     name: Verification
     if: always()
-    needs: [checks, compatibility, dependencies, e2e, container]
+    needs: [prepare, checks, compatibility, dependencies, e2e, container]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
+      - uses: actions/checkout@v7
       - name: Require every verification job to succeed
         env:
           RESULTS: ${{ toJSON(needs) }}
-        run: node -e 'if (Object.values(JSON.parse(process.env.RESULTS)).some(job => job.result !== "success")) process.exit(1)'
+        run: node --input-type=module -e 'import { verificationPassed } from "./tooling/ci-verification.mjs"; if (!verificationPassed(JSON.parse(process.env.RESULTS))) process.exit(1)'
+      - name: Record the tested PR merge tree
+        if: github.event_name == 'pull_request'
+        env:
+          TREE: ${{ needs.prepare.outputs.tree }}
+        run: printf '%s\n' "$TREE" > verification-tree.txt
+      - name: Retain successful PR verification evidence
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: verified-pr-${{ github.event.pull_request.number }}-${{ needs.prepare.outputs.tree }}
+          path: verification-tree.txt
+          retention-days: 14
+          if-no-files-found: error
