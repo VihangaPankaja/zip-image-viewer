@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   checks:
-    name: Linux compatibility
+    name: Static checks and coverage
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -46,10 +46,20 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
-  windows:
-    name: Windows compatibility
-    runs-on: windows-latest
+  compatibility:
+    name: ${{ matrix.platform }} compatibility
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: Linux
+            os: ubuntu-latest
+          - platform: Windows
+            os: windows-latest
+          - platform: macOS
+            os: macos-15-intel
     steps:
       - uses: actions/checkout@v7
       - uses: voidzero-dev/setup-vp@v1.21.2
@@ -64,43 +74,20 @@ jobs:
     name: Dependencies
     uses: ./.github/workflows/dependency-maintenance.yml
 
-  macos:
-    name: macOS compatibility
-    runs-on: macos-15-intel
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v7
-      - uses: voidzero-dev/setup-vp@v1.21.2
-        with:
-          cache: true
-          run-install: false
-          node-version-file: .node-version
-      - run: vp install --frozen-lockfile
-      - run: vpr build
-      - run: vp exec playwright install --with-deps webkit
-      - name: Enable WebKit keyboard navigation through all controls
-        run: defaults write org.webkit.Playwright AppleKeyboardUIMode -int 2
-      - name: Verify WebKit browser flows
-        run: vp exec playwright test --project=webkit
-      - name: Retain WebKit failure evidence
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-webkit
-          path: |
-            playwright-report/
-            test-results/e2e-run/
-          retention-days: 14
-          if-no-files-found: ignore
-
   e2e:
-    name: Linux browser (${{ matrix.browser }})
-    runs-on: ubuntu-latest
+    name: e2e (${{ matrix.browser }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        browser: [chromium, firefox]
+        include:
+          - browser: chromium
+            os: ubuntu-latest
+          - browser: firefox
+            os: ubuntu-latest
+          - browser: webkit
+            os: macos-15-intel
     steps:
       - uses: actions/checkout@v7
       - uses: voidzero-dev/setup-vp@v1.21.2
@@ -110,8 +97,12 @@ jobs:
           node-version-file: .node-version
       - run: vp install --frozen-lockfile
       - name: Use Ubuntu archive for browser dependencies
+        if: runner.os == 'Linux'
         run: sudo sed -i 's|azure.archive.ubuntu.com|archive.ubuntu.com|g' /etc/apt/sources.list.d/ubuntu.sources /etc/apt/apt-mirrors.txt
       - run: vp exec playwright install --with-deps ${{ matrix.browser }}
+      - name: Enable WebKit keyboard navigation through all controls
+        if: runner.os == 'macOS'
+        run: defaults write org.webkit.Playwright AppleKeyboardUIMode -int 2
       - run: vp exec playwright test --project=${{ matrix.browser }}
       - name: Retain browser failure evidence
         if: failure()
@@ -126,7 +117,7 @@ jobs:
 
   container:
     name: Container
-    needs: [checks, windows, macos, dependencies, e2e]
+    needs: [checks, compatibility, dependencies, e2e]
     uses: ./.github/workflows/docker-build.yml
     with:
       publish: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
@@ -137,7 +128,7 @@ jobs:
   verified:
     name: Verification
     if: always()
-    needs: [checks, windows, macos, dependencies, e2e, container]
+    needs: [checks, compatibility, dependencies, e2e, container]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
