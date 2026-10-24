@@ -69,7 +69,7 @@ File routes validate paths against their owning session, including real paths.
 
 ## Tests and delivery
 
-`tests/` contains unit, component, integration, UI, E2E, review and benchmark
+`tests/` contains unit, component, integration, UI, E2E and benchmark
 suites plus fixtures, with client/server paths mirrored inside each suite. The [testing guide](testing.md)
 lists commands. Production output is `dist/` for the client and `build/` for
 server and shared modules. Neither output belongs in Git.

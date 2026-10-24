@@ -72,8 +72,6 @@ image libraries and Debian package licenses before redistributing an image.
 The npm inventory and image SBOM are complementary evidence; retain required
 notices and source offers according to the components actually shipped.
 
-PR screenshots use immutable commit names in release assets, without asset
-branches. Keep existing release assets and historical commit refs, including
-refs used by older PR galleries. Follow the
-[screenshot skill](../../.agents/skills/pr-screenshots/SKILL.md) for capture and
-publishing; asset capacity rollover must preserve old URLs.
+PR screenshots are direct PR attachments, separate from releases and image
+provenance. Follow the [screenshot skill](../../.agents/skills/pr-screenshots/SKILL.md)
+when a change affects the displayed UI.

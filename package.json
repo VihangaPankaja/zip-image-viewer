@@ -24,8 +24,6 @@
     "test:coverage": "vp test --coverage",
     "test:related": "vp test related --run",
     "test:e2e": "vp exec playwright test",
-    "screenshots:pr": "vp exec playwright test --config playwright.review.config.ts",
-    "screenshots:publish": "vp exec node tooling/publish-pr-screenshots.mjs",
     "check:roadmap": "vp exec node docs/app-roadmap.check.mjs",
     "dependencies:report": "vp exec node tooling/dependency-report.mjs",
     "benchmark:video": "vp exec tsx tests/benchmarks/videoLatency.ts",

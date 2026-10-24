@@ -34,18 +34,18 @@ vpr test:e2e
 For one browser, run `vp exec playwright test --project=chromium`.
 E2E uses two workers locally and in CI; override with `--workers=1` when debugging.
 E2E artifacts stay in `test-results/e2e-run/` so the runner's cleanup preserves
-the PR gallery and other verification evidence.
+other verification evidence.
 The suite covers workspace flows, keyboard and touch input, responsive layouts
 and Axe accessibility checks. Use a real browser for changed user flows and
 inspect screenshots as well as overflow assertions.
 
-The [screenshot skill](../../.agents/skills/pr-screenshots/SKILL.md) owns PR gallery
-capture, inspection and publishing. Its HTTP and torrent progress is simulated;
+For changes with a visible effect, the
+[screenshot skill](../../.agents/skills/pr-screenshots/SKILL.md) covers targeted
+local captures and direct PR attachments. Use dark mode by default and capture
+all affected themes, surfaces and accents for color/theme changes. Screenshots
+are not a CI job or release asset. Shared browser fixtures remain in
+`tests/review/fixtures.ts`; their HTTP and torrent progress is simulated, while
 real transfer integration tests run separately.
-Gallery capture also uses two workers, each running a device's scenes in order
-with isolated fixture servers. Workers write separate manifests that are merged
-after capture. Publishing still requires every scene in both themes on all four
-devices. Use `vpr screenshots:pr --workers=1` for a serial comparison.
 
 ## Coverage and code health
 
@@ -81,12 +81,12 @@ reports in test artifacts or PR evidence, not maintained guides.
 
 PRs run clean Windows/Linux install and build checks, the non-browser quality
 gate, each test suite, Chromium/Firefox/WebKit E2E, media benchmarks, the roadmap
-check, and the device/theme gallery. Docker checks load the production image,
+check. Docker checks load the production image,
 verify health and retained-data restart, decode HLS, and play and seek in Chromium.
 Chromium and Firefox E2E run on Linux; WebKit runs on macOS to exercise Safari's
 platform media support. WebKit uses Playwright's browser build rather than released Safari.
 The macOS job enables keyboard navigation through all controls so Tab and focus
 checks exercise buttons and radios as well as text fields and selects.
-Gallery capture and media benchmarks run in separate jobs. Benchmarks stay
-sequential on their runner so competing encoders do not distort measurements.
+Media benchmarks stay sequential on their runner so competing encoders do not
+distort measurements.
 See `.github/workflows/` for exact steps and retained artifacts.
