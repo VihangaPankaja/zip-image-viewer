@@ -80,9 +80,10 @@ reports in test artifacts or PR evidence, not maintained guides.
 
 ## CI
 
-PRs and master pushes run one Linux quality job, Windows compatibility checks,
-dependency review and Chromium/Firefox/WebKit E2E. The quality job validates the
-workflow syntax with Actionlint and runs every Vitest suite once with coverage.
+PRs and master pushes show Linux, Windows and macOS compatibility checks,
+dependency review and browser verification. Linux compatibility runs the full
+quality gate, validates workflow syntax with Actionlint and runs every Vitest
+suite once with coverage. Formatting, lint and full type checks run once on Linux.
 PRs also gate new Fallow findings against their base commit. Dead-code,
 dependency, architecture and duplication checks remain blocking; the aggregate
 health score is advisory. The roadmap TODO document has no dedicated checker.
@@ -95,7 +96,9 @@ and manual maintenance runs do not publish images. The final `Verification`
 check fails if any prerequisite failed or was cancelled or skipped.
 Chromium and Firefox E2E run on Linux; WebKit runs on macOS to exercise Safari's
 platform media support. WebKit uses Playwright's browser build rather than released Safari.
-The macOS job enables keyboard navigation through all controls so Tab and focus
+Windows and macOS each verify dependency installation and production builds.
+The macOS compatibility job reuses that install for WebKit E2E and enables
+keyboard navigation through all controls so Tab and focus
 checks exercise buttons and radios as well as text fields and selects.
 Full media benchmarks run daily, manually and on PRs that affect the media code,
 fixtures or toolchain lockfile. Version-only and documentation changes do not
