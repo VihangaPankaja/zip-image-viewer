@@ -280,7 +280,7 @@
 }
 
 .mobile-back-action,
-.mobile-sessions-toggle {
+.mobile-file-tools {
   display: none;
 }
 
@@ -921,9 +921,6 @@
   }
 
   /* stylelint-disable selector-max-id -- These IDs connect the native pane radios to their panels. */
-  .unified-workspace:has(#workspace-pane-sessions:checked)
-    .workspace-panel-group
-    > [data-panel]:has(.unified-workspace-sessions),
   .unified-workspace:has(#workspace-pane-files:checked)
     .workspace-panel-group
     > [data-panel]:has(.unified-workspace-files),
@@ -1030,18 +1027,27 @@
   }
 
   .explore-sidebar {
-    grid-template-rows: auto auto auto;
+    grid-template-rows: auto auto minmax(0, 1fr);
     align-content: start;
     width: 100%;
-    height: auto;
+    height: calc(100dvh - 240px - env(safe-area-inset-bottom));
+    min-height: 280px;
+    overflow: auto;
   }
 
   .explorer-tree-panel {
-    height: auto;
+    height: 100%;
+    min-height: 240px;
+  }
+
+  .explore-sidebar .unified-workspace-files {
+    height: 100%;
+    min-height: 0;
+    overflow: auto;
   }
 
   .explore-sidebar.sessions-collapsed {
-    grid-template-rows: auto auto;
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .explore-sidebar .session-list {
@@ -1053,6 +1059,7 @@
   }
 
   .mobile-back-action,
+  .mobile-close-files,
   .mobile-sessions-toggle {
     display: inline-flex;
     align-items: center;
@@ -1067,6 +1074,17 @@
     cursor: pointer;
     font-size: 0.78rem;
     font-weight: 750;
+  }
+
+  .mobile-file-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    padding: 10px 10px 0;
+  }
+
+  .mobile-file-tools button {
+    margin: 0;
   }
 
   .download-manager-header,

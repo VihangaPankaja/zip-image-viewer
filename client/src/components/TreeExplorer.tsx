@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useId, useMemo, useState, type ReactNode } from "react";
 import {
   ChevronRight,
   Folder,
@@ -44,7 +44,6 @@ export type TreeExplorerProps = {
   rootNode: ExplorerNode | null;
   selectedPath: string;
   onSelect: (_node: ExplorerNode) => void;
-  compact?: boolean;
 };
 
 function TreeItem({
@@ -80,7 +79,7 @@ function TreeItem({
       aria-selected={isSelected}
       tabIndex={index === navigation.activeIndex ? 0 : -1}
       className={`tree-item ${isSelected ? "selected" : ""}`}
-      style={{ paddingInlineStart: `${10 + row.depth * 14}px` }}
+      style={{ paddingInlineStart: `${6 + Math.min(row.depth, 6) * 10}px` }}
       onFocus={() => navigation.setActiveIndex(index)}
       onClick={activate}
     >
@@ -98,7 +97,7 @@ function TreeItem({
         {iconForNode(row.node)}
       </span>
       <span className="tree-item-label">{row.node.name}</span>
-      <span className="tree-item-meta">
+      <span className="tree-item-meta" aria-hidden="true">
         {row.node.type === "directory" ? "Folder" : row.node.extension || "file"}
       </span>
     </button>
@@ -121,12 +120,8 @@ function filterMediaTree(
   return children.length ? { ...node, children } : null;
 }
 
-export function TreeExplorer({
-  rootNode,
-  selectedPath,
-  onSelect,
-  compact = false,
-}: TreeExplorerProps) {
+export function TreeExplorer({ rootNode, selectedPath, onSelect }: TreeExplorerProps) {
+  const [density, setDensity] = useState("compact");
   const [mediaType, setMediaType] = useState("all");
   const [search, setSearch] = useState("");
   const query = search.trim().toLowerCase();
@@ -137,7 +132,10 @@ export function TreeExplorer({
         : rootNode,
     [rootNode, mediaType, query],
   );
-  const { treeRef, range, revealIndex, setScrollTop } = useTreeWindow(filteredRoot);
+  const { treeRef, range, revealIndex, setScrollTop, rowHeight } = useTreeWindow(
+    filteredRoot,
+    density,
+  );
   const navigation = useTreeNavigation(
     filteredRoot ?? rootNode,
     onSelect,
@@ -168,6 +166,8 @@ export function TreeExplorer({
         onSearch={setSearch}
         mediaType={mediaType}
         onMediaType={setMediaType}
+        density={density}
+        onDensity={setDensity}
       />
       {!filteredRoot ? (
         <p role="status">
@@ -176,7 +176,8 @@ export function TreeExplorer({
       ) : (
         <div
           ref={treeRef}
-          className={`tree-shell ${compact ? "compact" : ""} ${windowed ? "tree-windowed" : ""}`}
+          className={`tree-shell ${windowed ? "tree-windowed" : ""}`}
+          data-density={density}
           onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
           tabIndex={
             windowed && (navigation.activeIndex < start || navigation.activeIndex >= end)
@@ -188,7 +189,7 @@ export function TreeExplorer({
           onKeyDown={(event) => handleTreeKeyDown(event, navigation)}
         >
           {windowed ? (
-            <TreeWindow start={start} rowCount={rows.length}>
+            <TreeWindow start={start} rowCount={rows.length} rowHeight={rowHeight}>
               {items}
             </TreeWindow>
           ) : (
@@ -203,16 +204,18 @@ export function TreeExplorer({
 function TreeWindow({
   start,
   rowCount,
+  rowHeight,
   children,
 }: {
   start: number;
   rowCount: number;
+  rowHeight: number;
   children: ReactNode;
 }) {
   // Keep scroll height stable while React replaces rows at either end of the window.
   return (
-    <div className="tree-window-canvas" style={{ height: rowCount * 47 }}>
-      <div className="tree-window-rows" style={{ top: start * 47 }}>
+    <div className="tree-window-canvas" style={{ height: rowCount * rowHeight }}>
+      <div className="tree-window-rows" style={{ top: start * rowHeight }}>
         {children}
       </div>
     </div>
@@ -223,12 +226,17 @@ function ExplorerTools({
   onSearch,
   mediaType,
   onMediaType,
+  density,
+  onDensity,
 }: {
   search: string;
   onSearch: (search: string) => void;
   mediaType: string;
   onMediaType: (mediaType: string) => void;
+  density: string;
+  onDensity: (density: string) => void;
 }) {
+  const densityId = useId();
   return (
     <div className="explorer-tools">
       <label className="explorer-search">
@@ -240,6 +248,17 @@ function ExplorerTools({
         />
       </label>
       <MediaTypeFilter value={mediaType} onChange={onMediaType} />
+      <label className="explorer-density" htmlFor={densityId}>
+        Row density
+        <select
+          id={densityId}
+          value={density}
+          onChange={(event) => onDensity(event.currentTarget.value)}
+        >
+          <option value="compact">Compact</option>
+          <option value="comfortable">Comfortable</option>
+        </select>
+      </label>
     </div>
   );
 }

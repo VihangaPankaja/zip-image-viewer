@@ -60,9 +60,7 @@ it("navigates folders and selects files with the keyboard", () => {
 
 it("supports pointer activation and resets navigation when the archive changes", () => {
   const onSelect = vi.fn();
-  const { rerender } = render(
-    <TreeExplorer rootNode={root} selectedPath="" onSelect={onSelect} compact />,
-  );
+  const { rerender } = render(<TreeExplorer rootNode={root} selectedPath="" onSelect={onSelect} />);
   fireEvent.click(screen.getByRole("treeitem", { name: "Photos" }));
   fireEvent.click(screen.getByRole("treeitem", { name: "Cover" }));
   expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ path: "photos/cover.jpg" }));
@@ -170,7 +168,7 @@ it("finds nested files by path while retaining order, folder context and prior e
 it("keeps a large tree bounded and focuses an initially unmounted last file", async () => {
   const largeRoot = {
     ...root,
-    children: Array.from({ length: 1000 }, (_, index) => ({
+    children: Array.from({ length: 10_000 }, (_, index) => ({
       name: `episode-${index}.txt`,
       path: `episode-${index}.txt`,
       type: "file" as const,
@@ -180,13 +178,27 @@ it("keeps a large tree bounded and focuses an initially unmounted last file", as
   render(<TreeExplorer rootNode={largeRoot} selectedPath="" onSelect={vi.fn()} />);
   expect(screen.getAllByRole("treeitem").length).toBeLessThan(100);
   fireEvent.keyDown(screen.getByRole("tree"), { key: "End" });
-  expect(await screen.findByRole("treeitem", { name: "episode-999.txt" })).toHaveFocus();
-  expect(screen.getByRole("treeitem", { name: "episode-999.txt" })).toHaveAttribute(
+  expect(await screen.findByRole("treeitem", { name: "episode-9999.txt" })).toHaveFocus();
+  expect(screen.getByRole("treeitem", { name: "episode-9999.txt" })).toHaveAttribute(
     "aria-posinset",
-    "1000",
+    "10000",
   );
   fireEvent.keyDown(screen.getByRole("tree"), { key: "Home" });
   expect(await screen.findByRole("treeitem", { name: "Archive" })).toHaveFocus();
+});
+
+it("switches row density without losing selection or folder expansion", () => {
+  render(<TreeExplorer rootNode={root} selectedPath="photos/cover.jpg" onSelect={vi.fn()} />);
+  fireEvent.click(screen.getByRole("treeitem", { name: "Photos" }));
+  const density = screen.getByRole("combobox", { name: "Row density" });
+  expect(density).toHaveValue("compact");
+  fireEvent.change(density, { target: { value: "comfortable" } });
+  expect(screen.getByRole("tree")).toHaveAttribute("data-density", "comfortable");
+  expect(screen.getByRole("treeitem", { name: "Cover" })).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByRole("treeitem", { name: "Cover" })).toHaveAttribute(
+    "title",
+    "photos/cover.jpg",
+  );
 });
 
 it("does not restore a completed tree focus request after the user leaves the tree", () => {

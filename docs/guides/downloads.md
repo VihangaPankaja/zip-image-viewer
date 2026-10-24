@@ -32,8 +32,16 @@ not supported. Open the completed session in **Explore**, search by filename or
 path, and filter by media type. Matching folders keep their surrounding path
 visible. Arrow keys move through files; selecting a file opens its preview.
 
-On smaller screens, **Files** and **Preview** switch panes. The image slideshow
-supports previous and next controls and keyboard navigation.
+Choose **Compact** or **Comfortable** row density beside the media filter. Touch
+targets stay at least 44px in either mode. Long names truncate to one line; hover
+for the full path or select a file to read its path in **Details**. File-type
+badges appear on hover, keyboard focus or selection, and stay visible on touch.
+
+Drag the desktop sidebar separator, or focus it and use arrow keys, Home or End,
+to resize between 260px and 480px. On smaller screens, **Files** opens the
+scrollable file drawer. Selecting a file, **Close files** or Escape returns to
+**Preview**. **Back to files** reopens it with its filters and selection intact.
+The image slideshow supports previous and next controls and keyboard navigation.
 
 When a torrent contains archives, the first selected archive keeps its extracted
 paths when you add more files. Added sibling files appear under **Torrent files**.
