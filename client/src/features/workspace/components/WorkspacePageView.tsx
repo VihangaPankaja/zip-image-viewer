@@ -152,7 +152,6 @@ function WorkspaceFiles({ controller }: ViewProps) {
       </header>
       {selection.sortedTree && available ? (
         <TreeExplorer
-          compact
           rootNode={selection.sortedTree}
           selectedPath={selectedPath}
           onSelect={(node) => {

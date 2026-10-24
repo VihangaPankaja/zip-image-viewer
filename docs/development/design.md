@@ -36,6 +36,10 @@ must remain visible.
 Explore uses a resizable file sidebar and preview. On small or short landscape
 screens, Files and Preview switch panes and navigation moves to its own row.
 Keep controls clear of fixed navigation and device safe areas.
+The sidebar stays between 260px and 480px on desktop. Tree rows use the shared
+control height in Compact mode and at least 48px in Comfortable mode. Windowing
+measures rendered row height, including touch and responsive changes. Keep
+indentation bounded, names on one line and secondary badges within their column.
 
 Settings uses a scrollable dialog with a visible close control and sticky
 heading. It becomes a single-column, full-screen dialog on mobile. Settings

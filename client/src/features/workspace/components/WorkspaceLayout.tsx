@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 
 type WorkspaceLayoutProps = {
@@ -19,6 +19,35 @@ const mobileViews: ReadonlyArray<{
   { id: "preview", label: "Preview" },
 ];
 
+function useMobileFileDrawer({
+  mobilePane,
+  onMobilePaneChange,
+}: Pick<WorkspaceLayoutProps, "mobilePane" | "onMobilePaneChange">) {
+  const filesRef = useRef<HTMLElement>(null);
+  const previewRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (
+      !document.activeElement?.matches(".workspace-pane-control") &&
+      window.matchMedia("(width <= 760px), (width <= 960px) and (height <= 500px)").matches
+    ) {
+      (mobilePane === "files" ? filesRef : previewRef).current?.focus({ preventScroll: true });
+    }
+  }, [mobilePane]);
+  useEffect(() => {
+    const sidebar = filesRef.current;
+    function closeFiles(event: KeyboardEvent) {
+      if (
+        event.key === "Escape" &&
+        window.matchMedia("(width <= 760px), (width <= 960px) and (height <= 500px)").matches
+      )
+        onMobilePaneChange("preview");
+    }
+    sidebar?.addEventListener("keydown", closeFiles);
+    return () => sidebar?.removeEventListener("keydown", closeFiles);
+  }, [onMobilePaneChange]);
+  return { filesRef, previewRef };
+}
+
 export function WorkspaceLayout({
   mobilePane,
   onMobilePaneChange,
@@ -29,23 +58,35 @@ export function WorkspaceLayout({
   sessions,
 }: WorkspaceLayoutProps) {
   const [sessionsExpanded, setSessionsExpanded] = useState(false);
+  const { filesRef, previewRef } = useMobileFileDrawer({ mobilePane, onMobilePaneChange });
   return (
     <>
       <Group className="workspace-panel-group" orientation="horizontal">
-        <Panel defaultSize="30" minSize="20">
+        <Panel defaultSize="320px" minSize="260px" maxSize="480px">
           <section
+            ref={filesRef}
+            tabIndex={-1}
             className={`explore-sidebar ${sessionsExpanded ? "sessions-expanded" : "sessions-collapsed"}`}
             aria-label="Explorer sidebar"
           >
-            <button
-              className="mobile-sessions-toggle"
-              type="button"
-              aria-expanded={sessionsExpanded}
-              aria-controls="workspace-sessions"
-              onClick={() => setSessionsExpanded(!sessionsExpanded)}
-            >
-              {sessionsExpanded ? "Hide sessions" : "Show sessions"}
-            </button>
+            <div className="mobile-file-tools">
+              <button
+                className="mobile-close-files ghost-button"
+                type="button"
+                onClick={() => onMobilePaneChange("preview")}
+              >
+                Close files
+              </button>
+              <button
+                className="mobile-sessions-toggle"
+                type="button"
+                aria-expanded={sessionsExpanded}
+                aria-controls="workspace-sessions"
+                onClick={() => setSessionsExpanded(!sessionsExpanded)}
+              >
+                {sessionsExpanded ? "Hide sessions" : "Show sessions"}
+              </button>
+            </div>
             <div id="workspace-sessions" className="unified-workspace-sessions">
               {sessions}
             </div>
@@ -54,7 +95,12 @@ export function WorkspaceLayout({
         </Panel>
         <Separator className="workspace-resize-handle" />
         <Panel defaultSize="70" minSize="40">
-          <section className="unified-workspace-preview" aria-label="Preview panel" tabIndex={0}>
+          <section
+            ref={previewRef}
+            className="unified-workspace-preview"
+            aria-label="Preview panel"
+            tabIndex={0}
+          >
             <button
               className="mobile-back-action"
               type="button"

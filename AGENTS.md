@@ -27,8 +27,12 @@ ZIP Image Viewer uses React, Express and TypeScript. Start with the
   that affect displayed content, states or interactions; skip screenshots when
   there is no visible effect. Capture affected areas in dark mode by default;
   include all affected themes, surfaces and accents only for color/theme changes.
-  Attach screenshots directly to the PR. Keep screenshot capture out of CI,
-  package scripts and releases.
+  Embed the screenshots in the PR description using GitHub attachments, then
+  verify that every image renders in the saved description. Local paths and
+  comments about captured images do not satisfy this requirement. If upload is
+  blocked, keep the UI delivery unfinished and report the exact blocker and
+  capture paths; do not present the PR as complete or ready to merge. Keep
+  screenshot capture out of CI, package scripts and releases.
 - Commit major steps separately. Bump `package.json` before opening a PR to `master`.
 - Monitor every check on the latest PR commit. Fix failures and valid review
   findings within scope. Report blockers; do not claim unfinished work is complete.
