@@ -191,7 +191,9 @@ test("10,000-file window follows density and responsive row heights", async ({ p
   await expect(last).toBeFocused();
   await setCssViewport(page, 390, 900);
   await expect(last).toBeFocused();
+  await expect(last).toBeInViewport({ ratio: 0.99 });
   await expect.poll(() => tree.evaluate((element) => element.scrollTop)).toBeGreaterThan(400_000);
   await setCssViewport(page, 1440, 900);
   await expect(last).toBeFocused();
+  await expect(last).toBeInViewport({ ratio: 0.99 });
 });

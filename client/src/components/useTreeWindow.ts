@@ -12,12 +12,22 @@ export function useTreeWindow(root: ExplorerNode | null, density: string) {
     if (!tree) return;
     const row = tree.querySelector<HTMLElement>(".tree-item");
     const measure = () => {
-      setViewportHeight(tree.clientHeight || 400);
+      const viewport = tree.clientHeight || 400;
       const height = tree.querySelector(".tree-item")?.getBoundingClientRect().height || 44;
-      if (height !== rowHeight) {
-        resizedScrollTop.current = (tree.scrollTop / rowHeight) * height;
-        setScrollTop(resizedScrollTop.current);
+      if (height !== rowHeight || viewport !== viewportHeight) {
+        let top = (tree.scrollTop / rowHeight) * height;
+        const focusedIndex = Number(
+          tree.querySelector<HTMLElement>(".tree-item:focus")?.dataset.rowIndex,
+        );
+        if (Number.isFinite(focusedIndex)) {
+          const focusedTop = focusedIndex * height;
+          if (focusedTop < top) top = focusedTop;
+          else if (focusedTop + height > top + viewport) top = focusedTop + height - viewport;
+        }
+        resizedScrollTop.current = top;
+        setScrollTop(top);
         setRowHeight(height);
+        setViewportHeight(viewport);
       }
     };
     measure();
@@ -25,7 +35,7 @@ export function useTreeWindow(root: ExplorerNode | null, density: string) {
     observer.observe(tree);
     if (row) observer.observe(row);
     return () => observer.disconnect();
-  }, [root, density, rowHeight]);
+  }, [root, density, rowHeight, viewportHeight]);
   useLayoutEffect(() => {
     const tree = treeRef.current;
     if (tree && resizedScrollTop.current !== null) {
@@ -34,7 +44,7 @@ export function useTreeWindow(root: ExplorerNode | null, density: string) {
       setScrollTop(tree.scrollTop);
       resizedScrollTop.current = null;
     }
-  }, [rowHeight]);
+  }, [rowHeight, viewportHeight]);
   useLayoutEffect(() => {
     if (treeRef.current) treeRef.current.scrollTop = 0;
     resizedScrollTop.current = null;

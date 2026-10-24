@@ -72,6 +72,7 @@ function TreeItem({
       role="treeitem"
       aria-label={row.node.name}
       aria-level={row.depth + 1}
+      data-row-index={index}
       aria-posinset={row.position}
       aria-setsize={row.siblingCount}
       title={row.node.path}
