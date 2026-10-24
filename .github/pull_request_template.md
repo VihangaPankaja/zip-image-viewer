@@ -4,7 +4,11 @@ Describe the problem, resulting behavior and roadmap task completed.
 
 ## Validation
 
-Record quality, test, browser and production-container results. Attach the device/theme gallery using the PR screenshot skill.
+Record quality, test, browser and production-container results. For visible changes,
+attach screenshots of the affected areas using the [PR screenshot skill](../.agents/skills/pr-screenshots/SKILL.md).
+Use dark mode by default; include all affected themes, surfaces and accents for
+color/theme changes. Backend changes can affect the UI. If there is no visible
+effect, state that screenshots are not needed and why.
 
 ## Dependency and release review
 

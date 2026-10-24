@@ -1339,7 +1339,7 @@
           depends: "None",
           note: "Verified text, status, selection and focus contrast, four device sizes, forced colors, reduced motion and blocked storage. Light mode remains unchanged.",
           evidence:
-            "client/src/styles/tokens.css; client/src/components/AppearanceConfiguration.tsx; client/src/hooks/useLocalStorageSettings.ts; client/index.html; tests/e2e/dark-surfaces.spec.ts; tests/review/screenshots.spec.ts",
+            "client/src/styles/tokens.css; client/src/components/AppearanceConfiguration.tsx; client/src/hooks/useLocalStorageSettings.ts; client/index.html; tests/e2e/dark-surfaces.spec.ts",
         },
         {
           id: "N02",
@@ -1355,7 +1355,7 @@
           depends: "N01",
           note: "Existing settings keep Teal; invalid accents fall back safely. Blocked storage keeps the current tab usable and explains persistence. Browser checks cover contrast in all 15 palettes, keyboard/touch, reload and live System changes; the review gallery captures every accent on four device sizes.",
           evidence:
-            "client/src/styles/; client/src/components/GlobalSettingsSheet.tsx; client/src/components/Common/CustomDropdown.tsx; client/src/components/AppearanceConfiguration.tsx; client/src/hooks/useLocalStorageSettings.ts; tests/e2e/accent-presets.spec.ts; tests/e2e/helpers/themeContrast.ts; tests/e2e/settings-theme.spec.ts; client/index.html; tests/review/screenshots.spec.ts",
+            "client/src/styles/; client/src/components/GlobalSettingsSheet.tsx; client/src/components/Common/CustomDropdown.tsx; client/src/components/AppearanceConfiguration.tsx; client/src/hooks/useLocalStorageSettings.ts; tests/e2e/accent-presets.spec.ts; tests/e2e/helpers/themeContrast.ts; tests/e2e/settings-theme.spec.ts; client/index.html",
         },
         {
           id: "N03",
@@ -1371,7 +1371,7 @@
           depends: "N01",
           note: "All choice menus use styled native selects, retaining browser keyboard navigation, touch pickers, dismissal, focus and forced-color arrows. Tests cover long labels, five widths, zoom-equivalent breakpoints, CSS enlargement, touch, disabled/loading/error states and slideshow recovery.",
           evidence:
-            "client/src/styles/; client/src/components/Common/CustomDropdown.tsx; docs/development/design.md; tests/e2e/compact-controls.spec.ts; tests/component/client/components/Common/CustomDropdown.test.tsx; tests/review/screenshots.spec.ts",
+            "client/src/styles/; client/src/components/Common/CustomDropdown.tsx; docs/development/design.md; tests/e2e/compact-controls.spec.ts; tests/component/client/components/Common/CustomDropdown.test.tsx",
         },
         {
           id: "N04",
@@ -1563,7 +1563,7 @@
           depends: "B02, B03, B04",
           note: "",
           evidence:
-            ".github/dependabot.yml; .github/workflows/dependency-maintenance.yml; .github/workflows/docker-build.yml; tooling/dependency-report.mjs; tooling/dependency-report.test.mjs; tooling/dependency-purposes.json; tests/integration/downloadFlow.test.ts; docs/development/dependencies.md; tooling/publish-pr-screenshots.mjs; .agents/skills/pr-screenshots/SKILL.md",
+            ".github/dependabot.yml; .github/workflows/dependency-maintenance.yml; .github/workflows/docker-build.yml; tooling/dependency-report.mjs; tooling/dependency-report.test.mjs; tooling/dependency-purposes.json; tests/integration/downloadFlow.test.ts; docs/development/dependencies.md; .agents/skills/pr-screenshots/SKILL.md",
         },
         {
           id: "B06",

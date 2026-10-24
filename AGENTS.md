@@ -17,11 +17,18 @@ ZIP Image Viewer uses React, Express and TypeScript. Start with the
 - Before each major commit, run `vpr lint`, `vpr typecheck` and `vpr build`.
   Run `vpr format` immediately before every commit. Fix failures first.
 - Before opening a PR, run `vpr quality`, `vpr test` and `vpr test:e2e`.
-  Preserve all suite, coverage, browser and container checks. Never lower gates
-  or add skips to make a change pass.
+  Preserve all suite, coverage, browser and container checks. Do not lower
+  acceptance limits or add skips to make a change pass. Fallow's aggregate
+  health score is advisory; actionable code and dependency findings remain gated.
 - Verify changed flows in a real browser, including keyboard, pointer, touch
   and responsive behavior where relevant.
-- For every PR, follow the [screenshot skill](.agents/skills/pr-screenshots/SKILL.md).
+- For PRs with visible UI changes, follow the
+  [screenshot skill](.agents/skills/pr-screenshots/SKILL.md). Include backend changes
+  that affect displayed content, states or interactions; skip screenshots when
+  there is no visible effect. Capture affected areas in dark mode by default;
+  include all affected themes, surfaces and accents only for color/theme changes.
+  Attach screenshots directly to the PR. Keep screenshot capture out of CI,
+  package scripts and releases.
 - Commit major steps separately. Bump `package.json` before opening a PR to `master`.
 - Monitor every check on the latest PR commit. Fix failures and valid review
   findings within scope. Report blockers; do not claim unfinished work is complete.

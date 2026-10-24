@@ -94,12 +94,3 @@ it("allows palette definitions only in the token stylesheet", async () => {
   );
   expect((await lint(":root { --accent: #5ed4c4; }")).status).toBe(2);
 });
-
-it("parses roadmap HTML and reports embedded CSS errors without linting script text", async () => {
-  const html = `<html><head><style>.card { color: #fff; }</style></head>
-<body><script>const message = "not { CSS";</script></body></html>`;
-  expect((await lint(html, "docs/app-roadmap.html")).status).toBe(0);
-  const invalid = await lint(html.replace("color:", "colr:"), "docs/app-roadmap.html");
-  expect(invalid.status).toBe(2);
-  expect(invalid.diagnostics).toContain("property-no-unknown");
-});

@@ -24,7 +24,7 @@ development licenses because build and test tools also need review. Unknown
 license metadata needs investigation; an inventory is not a license approval.
 Machine paths are omitted from the inventory. Do not commit generated reports.
 
-Dependency PRs use the same version bump, quality, coverage, browser, gallery and
+Dependency PRs use the same version bump, quality, coverage, browser and
 production-container gates as application PRs. The existing HTTP, archive and
 contract suites run on every update. The release regression fixture follows an
 HTTP URL with a signed query, confirms the download through RPC and checks
@@ -36,8 +36,9 @@ for review; existing correctness and resource-budget assertions still apply.
 
 ## Triage vulnerabilities
 
-Dependency maintenance runs on PRs, master pushes and weekly against the locked
-production dependency graph. Docker Build also runs weekly and on demand, builds
+Quality calls dependency maintenance on PRs and master pushes; it also runs
+weekly and on demand against the locked production dependency graph. Scheduled
+and manual maintenance calls the reusable container verification workflow, builds
 the current production image, and retains an SPDX package/license SBOM plus a
 Grype JSON vulnerability report. Reports include unfixed findings. Tool crashes,
 invalid audit output, registry failures and missing artifacts fail the job;
@@ -61,9 +62,11 @@ image digest. Inspect these with `docker buildx imagetools inspect IMAGE@DIGEST`
 and its `--format '{{json .Provenance}}'` or `--format '{{json .SBOM}}'` options.
 The digest in the build output identifies the image to verify; a mutable tag
 alone does not. See [Docker's attestation guide](https://docs.docker.com/build/ci/github-actions/attestations/).
-PR builds load the image for real playback/retention checks. Docker's local
-exporter cannot preserve attestations, so PR artifacts include a separately
-generated image SBOM and vulnerability scan. Scheduled/on-demand builds scan
+The containerd image store retains attestations while the Docker driver builds
+the candidate locally. All candidates pass real playback/retention checks and
+an image inventory/scan before publication. Only verified master pushes log in
+and push the same candidate; no rebuild occurs between testing and publication.
+PR and scheduled/on-demand runs retain image SBOM and vulnerability reports
 without publishing images or using registry credentials.
 
 Package license fields do not fully describe bundled executables. Review the
@@ -72,8 +75,6 @@ image libraries and Debian package licenses before redistributing an image.
 The npm inventory and image SBOM are complementary evidence; retain required
 notices and source offers according to the components actually shipped.
 
-PR screenshots use immutable commit names in release assets, without asset
-branches. Keep existing release assets and historical commit refs, including
-refs used by older PR galleries. Follow the
-[screenshot skill](../../.agents/skills/pr-screenshots/SKILL.md) for capture and
-publishing; asset capacity rollover must preserve old URLs.
+PR screenshots are direct PR attachments, separate from releases and image
+provenance. Follow the [screenshot skill](../../.agents/skills/pr-screenshots/SKILL.md)
+when a change affects the displayed UI.

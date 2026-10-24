@@ -4,88 +4,95 @@ on:
   pull_request:
   push:
     branches: [master]
-  schedule:
-    - cron: "0 3 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: quality-${{ github.workflow }}-${{ github.ref }}
+  group: quality-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  toolchain-install:
-    name: Clean toolchain install (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
+  prepare:
+    name: Verification plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    outputs:
+      reuse: ${{ steps.plan.outputs.reuse }}
+      tree: ${{ steps.plan.outputs.tree }}
     steps:
       - uses: actions/checkout@v7
-      - uses: voidzero-dev/setup-vp@v1.21.2
+      - name: Find successful PR verification for this squash merge
+        id: plan
+        uses: actions/github-script@v8
         with:
-          cache: true
-          run-install: false
-          node-version-file: .node-version
-      - run: vp install --frozen-lockfile
-      - run: vpr lint:css
-      - run: vp exec vp toolchain
-      - run: vpr typecheck
-      - run: vpr build
+          script: |
+            const { execFileSync } = require('node:child_process');
+            const { pathToFileURL } = require('node:url');
+            const { findVerifiedPullRequest } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/tooling/ci-verification.mjs`).href);
+            const tree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' }).trim();
+            const run = await findVerifiedPullRequest({ github, context, core, tree });
+            core.setOutput('tree', tree);
+            core.setOutput('reuse', Boolean(run));
+            await core.summary.addRaw(run
+              ? `Reusing successful PR verification: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${run.id}\n`
+              : 'No matching successful PR verification; running full CI.\n').write();
 
   checks:
+    name: Static checks and coverage
+    needs: prepare
+    if: needs.prepare.outputs.reuse != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - name: Validate GitHub Actions workflows
+        uses: docker://rhysd/actionlint:1.7.12
       - uses: voidzero-dev/setup-vp@v1.21.2
         with:
           cache: true
           run-install: false
           node-version-file: .node-version
       - run: vp install --frozen-lockfile
-      - run: vp check
-      - run: vpr lint:css
-      - run: vpr test:coverage
-      - name: Fallow dead-code and dependency gate
-        run: vpr fallow:dead
-      - name: Fallow duplication gate
-        run: vpr fallow:duplicates
-      - name: Fallow health-score gate
-        run: vpr fallow:health
-      - name: Fallow coverage-gap report
-        run: vpr fallow:coverage-gaps
-      - name: Fallow branch review brief
-        run: vpr fallow:audit
-      - name: Render Fallow SARIF
-        if: always()
-        continue-on-error: true
-        # Task banners would corrupt the machine-readable stdout.
-        run: vp exec fallow dead-code --format sarif --quiet > fallow.sarif
-      - run: vpr build
-      - name: Publish coverage and quality reports
+      - run: vp exec vp toolchain
+      - run: vpr quality
+      - name: Review new code issues against the PR base
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: vp exec fallow audit --base "$BASE_SHA" --gate new-only --brief
+      - name: Retain coverage
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: quality-reports
+          name: coverage
+          path: coverage/
           retention-days: 14
-          path: |
-            coverage/
-            fallow.sarif
           if-no-files-found: warn
 
-  tests:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+  compatibility:
+    name: ${{ matrix.platform }} compatibility
+    needs: prepare
+    if: needs.prepare.outputs.reuse != 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        suite: [unit, component, integration, ui]
+        include:
+          - platform: Linux
+            os: ubuntu-latest
+          - platform: Windows
+            os: windows-latest
+          - platform: macOS
+            os: macos-15-intel
     steps:
       - uses: actions/checkout@v7
       - uses: voidzero-dev/setup-vp@v1.21.2
@@ -94,77 +101,18 @@ jobs:
           run-install: false
           node-version-file: .node-version
       - run: vp install --frozen-lockfile
-      - run: vpr test:${{ matrix.suite }}
+      - run: vpr build
 
-  browser-checks:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v7
-      - uses: voidzero-dev/setup-vp@v1.21.2
-        with:
-          cache: true
-          run-install: false
-          node-version-file: .node-version
-      - run: vp install --frozen-lockfile
-      - run: vp exec playwright install --with-deps chromium
-      - run: vpr check:roadmap
-      - name: Capture device and theme review gallery
-        run: vpr screenshots:pr
-      - name: Publish review gallery
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: pr-screenshots
-          path: test-results/pr-screenshots/
-          retention-days: 14
-          if-no-files-found: error
-  media-benchmarks:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v7
-      - uses: voidzero-dev/setup-vp@v1.21.2
-        with:
-          cache: true
-          run-install: false
-          node-version-file: .node-version
-      - run: vp install --frozen-lockfile
-      - run: vp exec playwright install --with-deps chromium
-      # Keep measured workloads sequential on a runner without gallery encoders.
-      - name: Run real video benchmark smoke test
-        run: vpr benchmark:video --samples 1 --duration 8 --output "$RUNNER_TEMP/video-latency.md"
-      - name: Verify available HLS encoders and CPU fallback without requiring a GPU
-        run: vpr benchmark:encoding --output "$RUNNER_TEMP/video-encoding.json"
-      - name: Publish encoder benchmark and fallback evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: video-encoding-benchmark
-          path: ${{ runner.temp }}/video-encoding.json
-          retention-days: 14
-          if-no-files-found: error
-      - name: Remove benchmark output
-        if: always()
-        run: rm -f "$RUNNER_TEMP/video-latency.md"
-      - name: Verify storyboard latency and sustained dragging under media load
-        run: vpr benchmark:storyboard --output "$RUNNER_TEMP/storyboard-performance.json"
-      - name: Verify cold and prepared long-video seeking without competing browser tests
-        run: vpr benchmark:seek
-      - name: Publish long-video seek benchmark evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: priority-seek-benchmark
-          retention-days: 14
-          path: |
-            test-results/priority-seek-metrics.json
-            test-results/priority-seek-run/
-            playwright-report/
-          if-no-files-found: warn
+  dependencies:
+    name: Dependencies
+    needs: prepare
+    if: needs.prepare.outputs.reuse != 'true'
+    uses: ./.github/workflows/dependency-maintenance.yml
 
   e2e:
     name: e2e (${{ matrix.browser }})
+    needs: prepare
+    if: needs.prepare.outputs.reuse != 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -175,7 +123,6 @@ jobs:
             os: ubuntu-latest
           - browser: firefox
             os: ubuntu-latest
-          # macOS exercises Safari's platform media support with WebKit.
           - browser: webkit
             os: macos-15-intel
     steps:
@@ -188,23 +135,62 @@ jobs:
       - run: vp install --frozen-lockfile
       - name: Use Ubuntu archive for browser dependencies
         if: runner.os == 'Linux'
-        # The Azure mirror has repeatedly exhausted the browser job's install budget.
         run: sudo sed -i 's|azure.archive.ubuntu.com|archive.ubuntu.com|g' /etc/apt/sources.list.d/ubuntu.sources /etc/apt/apt-mirrors.txt
       - run: vp exec playwright install --with-deps ${{ matrix.browser }}
       - name: Enable WebKit keyboard navigation through all controls
         if: runner.os == 'macOS'
-        # Safari follows this OS preference; keep the full Tab/focus assertions.
-        # https://github.com/microsoft/playwright/issues/41808
         run: defaults write org.webkit.Playwright AppleKeyboardUIMode -int 2
       - run: vp exec playwright test --project=${{ matrix.browser }}
-
-      - name: Publish browser failure evidence
+      - name: Retain browser failure evidence
         if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: playwright-${{ matrix.browser }}
           path: |
             playwright-report/
-            test-results/
+            test-results/e2e-run/
           retention-days: 14
           if-no-files-found: ignore
+
+  container:
+    name: Container
+    needs: [prepare, checks, compatibility, dependencies, e2e]
+    if: >-
+      !cancelled() && needs.prepare.result == 'success' &&
+      (needs.checks.result == 'success' && needs.compatibility.result == 'success' &&
+      needs.dependencies.result == 'success' && needs.e2e.result == 'success' ||
+      needs.prepare.outputs.reuse == 'true' && needs.checks.result == 'skipped' &&
+      needs.compatibility.result == 'skipped' && needs.dependencies.result == 'skipped' &&
+      needs.e2e.result == 'skipped')
+    uses: ./.github/workflows/docker-build.yml
+    with:
+      publish: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  verified:
+    name: Verification
+    if: always()
+    needs: [prepare, checks, compatibility, dependencies, e2e, container]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v7
+      - name: Require every verification job to succeed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: node --input-type=module -e 'import { verificationPassed } from "./tooling/ci-verification.mjs"; if (!verificationPassed(JSON.parse(process.env.RESULTS))) process.exit(1)'
+      - name: Record the tested PR merge tree
+        if: github.event_name == 'pull_request'
+        env:
+          TREE: ${{ needs.prepare.outputs.tree }}
+        run: printf '%s\n' "$TREE" > verification-tree.txt
+      - name: Retain successful PR verification evidence
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: verified-pr-${{ github.event.pull_request.number }}-${{ needs.prepare.outputs.tree }}
+          path: verification-tree.txt
+          retention-days: 14
+          if-no-files-found: error

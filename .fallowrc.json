@@ -5,6 +5,7 @@
     "server/index.ts",
     "server/runtimeComposition.ts",
     "client/src/main.tsx",
+    "tooling/ci-verification.mjs",
     "tests/integration/containerHlsSmoke.mjs",
     "tests/integration/containerBrowserFixture.mjs",
     "tests/integration/containerRetentionSmoke.mjs"

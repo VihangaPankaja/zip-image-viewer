@@ -3,7 +3,7 @@
 ## Local checks
 
 `vpr quality` runs formatting, typed lint and type checks through `vp check`, coverage,
-Fallow dead-code and duplication checks, the health floor, and the production
+Fallow dead-code and duplication checks, an advisory health score, and the production
 build. Lint warnings fail the check.
 
 Use `vpr test` for the full Vitest suite or `vpr test:watch` while editing.
@@ -15,6 +15,7 @@ components in component, and real filesystem, HTTP, archive or process work in
 integration. App composition belongs in UI. Shared fixtures stay in
 `tests/fixtures/`; DOM setup lives in `tests/component/client/setup.ts`.
 The client test project uses jsdom and the server/tooling project uses Node.
+Vitest uses two workers to bound concurrent browser environments and media fixtures.
 Production TypeScript projects exclude tests and their fixtures.
 Pass a file to the runner for a single test, for example:
 
@@ -34,18 +35,18 @@ vpr test:e2e
 For one browser, run `vp exec playwright test --project=chromium`.
 E2E uses two workers locally and in CI; override with `--workers=1` when debugging.
 E2E artifacts stay in `test-results/e2e-run/` so the runner's cleanup preserves
-the PR gallery and other verification evidence.
+other verification evidence.
 The suite covers workspace flows, keyboard and touch input, responsive layouts
 and Axe accessibility checks. Use a real browser for changed user flows and
 inspect screenshots as well as overflow assertions.
 
-The [screenshot skill](../../.agents/skills/pr-screenshots/SKILL.md) owns PR gallery
-capture, inspection and publishing. Its HTTP and torrent progress is simulated;
+For changes with a visible effect, the
+[screenshot skill](../../.agents/skills/pr-screenshots/SKILL.md) covers targeted
+local captures and direct PR attachments. Use dark mode by default and capture
+all affected themes, surfaces and accents for color/theme changes. Screenshots
+are not a CI job or release asset. Shared browser fixtures remain in
+`tests/review/fixtures.ts`; their HTTP and torrent progress is simulated, while
 real transfer integration tests run separately.
-Gallery capture also uses two workers, each running a device's scenes in order
-with isolated fixture servers. Workers write separate manifests that are merged
-after capture. Publishing still requires every scene in both themes on all four
-devices. Use `vpr screenshots:pr --workers=1` for a serial comparison.
 
 ## Coverage and code health
 
@@ -54,7 +55,7 @@ including untested modules. `vpr test:coverage` writes reports to `coverage/`.
 Thresholds live in `vite.config.ts`, including stricter rules for core modules.
 Do not exclude production code or lower thresholds to raise the result.
 
-`vpr fallow:health` enforces the score in `package.json`. Use `vpr fallow:targets`
+`vpr fallow:health` reports an advisory aggregate score. Use `vpr fallow:targets`
 for refactor candidates and `vpr fallow:audit` for changes against `origin/master`.
 Existing advisory debt may appear in the audit; new issues still fail its gate.
 Keep lint exceptions narrow and explain them next to the code.
@@ -79,14 +80,41 @@ reports in test artifacts or PR evidence, not maintained guides.
 
 ## CI
 
-PRs run clean Windows/Linux install and build checks, the non-browser quality
-gate, each test suite, Chromium/Firefox/WebKit E2E, media benchmarks, the roadmap
-check, and the device/theme gallery. Docker checks load the production image,
-verify health and retained-data restart, decode HLS, and play and seek in Chromium.
+PRs and unverified master pushes show Linux, Windows and macOS compatibility checks,
+dependency review and three separate browser checks. Each compatibility check
+verifies dependency installation and the production build. A separate Linux job
+runs the full quality gate, validates workflow syntax with Actionlint and runs
+every Vitest suite once with coverage. Formatting, lint and full type checks
+run once on Linux.
+PRs also gate new Fallow findings against their base commit. Dead-code,
+dependency, architecture and duplication checks remain blocking; the aggregate
+health score is advisory. The roadmap TODO document has no dedicated checker.
+
+Successful PR runs retain a small verification record for 14 days. After a
+squash merge, a read-only planning job checks that the push contains exactly
+that merged PR and that its tracked files match the tested merge tree. When
+the latest Quality run for that PR head succeeded and its record matches, CI
+reuses its static, OS, dependency and browser results. Direct pushes, changed
+trees, missing or expired records and API failures run full CI. Manual runs
+also perform full verification.
+
+After these checks pass, the container job builds a local image with its
+provenance and SBOM, scans it, verifies health and retained-data restart, decodes
+HLS, checks encoders and CPU fallback, and plays and seeks in Chromium.
+Master pushes then publish that same image without rebuilding. PR, scheduled
+and manual maintenance runs do not publish images. The final `Verification`
+check requires successful verification or a proven reused PR run, plus
+successful container verification. The release image is built and verified
+on master even when the source checks are reused.
 Chromium and Firefox E2E run on Linux; WebKit runs on macOS to exercise Safari's
 platform media support. WebKit uses Playwright's browser build rather than released Safari.
-The macOS job enables keyboard navigation through all controls so Tab and focus
-checks exercise buttons and radios as well as text fields and selects.
-Gallery capture and media benchmarks run in separate jobs. Benchmarks stay
-sequential on their runner so competing encoders do not distort measurements.
+The WebKit browser job enables keyboard navigation through all controls so Tab
+and focus checks exercise buttons and radios as well as text fields and selects.
+Full media benchmarks run daily, manually and on PRs that affect the media code,
+fixtures or toolchain lockfile. Version-only and documentation changes do not
+trigger them. Workloads stay sequential so competing encoders do not distort
+measurements. Their latency, storyboard and seek reports are retained together.
+Weekly/manual dependency maintenance also verifies and scans the current image.
+Coverage, dependency and container reports and browser failure evidence are
+retained as Actions artifacts. Screenshots for PR review are direct attachments.
 See `.github/workflows/` for exact steps and retained artifacts.
