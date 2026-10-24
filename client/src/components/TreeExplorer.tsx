@@ -133,7 +133,7 @@ export function TreeExplorer({ rootNode, selectedPath, onSelect }: TreeExplorerP
         : rootNode,
     [rootNode, mediaType, query],
   );
-  const { treeRef, range, revealIndex, setScrollTop, rowHeight } = useTreeWindow(
+  const { treeRef, range, revealIndex, setScrollTop, rowHeight, onFocusCapture } = useTreeWindow(
     filteredRoot,
     density,
   );
@@ -180,6 +180,7 @@ export function TreeExplorer({ rootNode, selectedPath, onSelect }: TreeExplorerP
           className={`tree-shell ${windowed ? "tree-windowed" : ""}`}
           data-density={density}
           onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+          onFocusCapture={onFocusCapture}
           tabIndex={
             windowed && (navigation.activeIndex < start || navigation.activeIndex >= end)
               ? 0
@@ -213,9 +214,9 @@ function TreeWindow({
   rowHeight: number;
   children: ReactNode;
 }) {
-  // Keep scroll height stable while React replaces rows at either end of the window.
+  // A rounding pixel lets Firefox scroll the final row fully into view.
   return (
-    <div className="tree-window-canvas" style={{ height: rowCount * rowHeight }}>
+    <div className="tree-window-canvas" style={{ height: rowCount * rowHeight + 1 }}>
       <div className="tree-window-rows" style={{ top: start * rowHeight }}>
         {children}
       </div>

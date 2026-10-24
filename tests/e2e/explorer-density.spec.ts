@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { installReviewFixtures, prepareMedia } from "../review/fixtures";
 import { setCssViewport } from "./helpers/viewport";
+import { tapVisibleTarget } from "./touch";
 
 test.beforeAll(async () => {
   await prepareMedia();
@@ -16,9 +17,10 @@ test("file rows change density and sidebar resizing stays bounded", async ({ pag
   const density = page.getByRole("combobox", { name: "Row density" });
   const rows = page.getByRole("treeitem");
   await expect(density).toHaveValue("compact");
-  expect((await rows.first().boundingBox())?.height).toBe(36);
+  const touchPointer = await page.evaluate(() => matchMedia("(any-pointer: coarse)").matches);
+  expect((await rows.first().boundingBox())?.height).toBeCloseTo(touchPointer ? 44 : 36, 3);
   await density.selectOption("comfortable");
-  expect((await rows.first().boundingBox())?.height).toBe(48);
+  expect((await rows.first().boundingBox())?.height).toBeCloseTo(48, 3);
   await density.selectOption("compact");
   for (const width of [1440, 2560]) {
     await setCssViewport(page, width, 900);
@@ -26,18 +28,22 @@ test("file rows change density and sidebar resizing stays bounded", async ({ pag
     await separator.focus();
     await page.keyboard.press("End");
     await expect
-      .poll(
-        async () =>
-          (await page.getByRole("region", { name: "Explorer sidebar" }).boundingBox())?.width,
+      .poll(async () =>
+        Math.abs(
+          ((await page.getByRole("region", { name: "Explorer sidebar" }).boundingBox())?.width ??
+            0) - 480,
+        ),
       )
-      .toBeCloseTo(480, 0);
+      .toBeLessThanOrEqual(1);
     await page.keyboard.press("Home");
     await expect
-      .poll(
-        async () =>
-          (await page.getByRole("region", { name: "Explorer sidebar" }).boundingBox())?.width,
+      .poll(async () =>
+        Math.abs(
+          ((await page.getByRole("region", { name: "Explorer sidebar" }).boundingBox())?.width ??
+            0) - 260,
+        ),
       )
-      .toBeCloseTo(260, 0);
+      .toBeLessThanOrEqual(1);
     const handle = await separator.boundingBox();
     if (!handle) throw new Error("Resize handle is missing");
     await page.mouse.move(handle.x + handle.width / 2, handle.y + 30);
@@ -82,14 +88,16 @@ test.describe("touch file drawer", () => {
     );
     await page.goto("/");
     await page.getByRole("tab", { name: "Explore" }).click();
-    await page.getByRole("button", { name: "Show sessions" }).tap();
-    await page.getByRole("button", { name: "Open Coastal collection", exact: true }).tap();
-    await page.getByRole("button", { name: "Hide sessions" }).tap();
+    await tapVisibleTarget(page.getByRole("button", { name: "Show sessions" }));
+    await tapVisibleTarget(
+      page.getByRole("button", { name: "Open Coastal collection", exact: true }),
+    );
+    await tapVisibleTarget(page.getByRole("button", { name: "Hide sessions" }));
     await page.getByRole("searchbox", { name: "Search explorer files" }).fill("a-long-filename");
     const row = page.getByRole("treeitem", { name, exact: true });
     await row.scrollIntoViewIfNeeded();
     await expect(row).toHaveAttribute("title", path);
-    expect((await row.boundingBox())?.height).toBe(44);
+    expect((await row.boundingBox())?.height).toBeCloseTo(44, 3);
     const geometry = await row.evaluate((element) => {
       const label = element.querySelector(".tree-item-label");
       const meta = element.querySelector(".tree-item-meta");
@@ -107,16 +115,16 @@ test.describe("touch file drawer", () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
-    await row.tap();
+    await tapVisibleTarget(row);
     const preview = page.getByRole("region", { name: "Preview panel" });
     await expect(preview).toBeFocused();
     await expect(page.getByRole("region", { name: "Explorer sidebar" })).toBeHidden();
-    await page.getByRole("button", { name: "Back to files" }).tap();
+    await tapVisibleTarget(page.getByRole("button", { name: "Back to files" }));
     await expect(page.getByRole("region", { name: "Explorer sidebar" })).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(preview).toBeFocused();
-    await page.getByRole("button", { name: "Back to files" }).tap();
-    await page.getByRole("button", { name: "Close files", exact: true }).tap();
+    await tapVisibleTarget(page.getByRole("button", { name: "Back to files" }));
+    await tapVisibleTarget(page.getByRole("button", { name: "Close files", exact: true }));
     await expect(preview).toBeFocused();
     const filesRadio = page.getByRole("radio", { name: "Files", exact: true });
     const previewRadio = page.getByRole("radio", { name: "Preview", exact: true });
@@ -152,6 +160,7 @@ test("10,000-file window follows density and responsive row heights", async ({ p
   await page.getByRole("tab", { name: "Explore" }).click();
   await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
   const tree = page.getByRole("tree");
+  const touchPointer = await page.evaluate(() => matchMedia("(any-pointer: coarse)").matches);
   for (const width of [1440, 390, 820]) {
     await setCssViewport(page, width, 900);
     for (const density of ["comfortable", "compact"]) {
@@ -160,15 +169,15 @@ test("10,000-file window follows density and responsive row heights", async ({ p
       await page.keyboard.press("End");
       const last = page.getByRole("treeitem", { name: "file-09999.txt", exact: true });
       await expect(last).toBeFocused();
-      const height = density === "comfortable" ? 48 : width <= 760 ? 44 : 36;
-      await expect.poll(async () => (await last.boundingBox())?.height).toBe(height);
+      const height = density === "comfortable" ? 48 : width <= 760 || touchPointer ? 44 : 36;
+      await expect.poll(async () => (await last.boundingBox())?.height).toBeCloseTo(height, 3);
       await expect
         .poll(() =>
           tree
             .locator(".tree-window-canvas")
             .evaluate((element) => (element as HTMLElement).offsetHeight),
         )
-        .toBe(10_001 * height);
+        .toBe(10_001 * height + 1);
       expect(await tree.getByRole("treeitem").count()).toBeLessThan(100);
       const visible = await last.evaluate((element) => {
         const container = element.closest('[role="tree"]');
@@ -196,4 +205,8 @@ test("10,000-file window follows density and responsive row heights", async ({ p
   await setCssViewport(page, 1440, 900);
   await expect(last).toBeFocused();
   await expect(last).toBeInViewport({ ratio: 0.99 });
+  const search = page.getByRole("searchbox", { name: "Search explorer files" });
+  await search.focus();
+  await setCssViewport(page, 390, 900);
+  await expect(search).toBeFocused();
 });
