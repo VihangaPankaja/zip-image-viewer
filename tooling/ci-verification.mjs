@@ -1,3 +1,23 @@
+export function imageAuditNeeded(files, before, after) {
+  const auditFiles = new Set([
+    "Dockerfile",
+    ".dockerignore",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    ".node-version",
+  ]);
+  // Every PR bumps the app version; that alone does not change installed packages.
+  return (
+    files.some(
+      (file) =>
+        auditFiles.has(file) ||
+        ["patches/", ".github/workflows/", "tooling/"].some((prefix) => file.startsWith(prefix)),
+    ) ||
+    JSON.stringify({ ...before, version: undefined }) !==
+      JSON.stringify({ ...after, version: undefined })
+  );
+}
+
 export async function findVerifiedPullRequest({ github, context, core, tree }) {
   if (context.eventName !== "push" || context.ref !== "refs/heads/master") return null;
   try {

@@ -25,23 +25,40 @@ jobs:
     outputs:
       reuse: ${{ steps.plan.outputs.reuse }}
       tree: ${{ steps.plan.outputs.tree }}
+      audit: ${{ steps.plan.outputs.audit }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - name: Find successful PR verification for this squash merge
         id: plan
         uses: actions/github-script@v8
         with:
           script: |
             const { execFileSync } = require('node:child_process');
+            const { readFileSync } = require('node:fs');
             const { pathToFileURL } = require('node:url');
-            const { findVerifiedPullRequest } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/tooling/ci-verification.mjs`).href);
+            const { findVerifiedPullRequest, imageAuditNeeded } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/tooling/ci-verification.mjs`).href);
             const tree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' }).trim();
             const run = await findVerifiedPullRequest({ github, context, core, tree });
+            let audit = true;
+            if (context.eventName === 'pull_request') {
+              try {
+                const base = context.payload.pull_request.base.sha;
+                const files = execFileSync('git', ['diff', '--name-only', '-z', '--no-renames', base, 'HEAD'], { encoding: 'utf8' }).split('\0').filter(Boolean);
+                const before = JSON.parse(execFileSync('git', ['show', `${base}:package.json`], { encoding: 'utf8' }));
+                audit = imageAuditNeeded(files, before, JSON.parse(readFileSync('package.json', 'utf8')));
+              } catch (error) {
+                core.warning(`Cannot determine image audit scope; keeping audit enabled: ${error.message}`);
+              }
+            }
             core.setOutput('tree', tree);
             core.setOutput('reuse', Boolean(run));
+            core.setOutput('audit', audit);
             await core.summary.addRaw(run
               ? `Reusing successful PR verification: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${run.id}\n`
-              : 'No matching successful PR verification; running full CI.\n').write();
+              : 'No matching successful PR verification; running full CI.\n')
+              .addRaw(audit ? 'Image audit enabled.\n' : 'Image audit skipped: no dependency or container input changes.\n').write();
 
   checks:
     name: Static checks and coverage
@@ -165,6 +182,7 @@ jobs:
     uses: ./.github/workflows/docker-build.yml
     with:
       publish: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+      audit: ${{ github.event_name != 'pull_request' || needs.prepare.outputs.audit != 'false' }}
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}

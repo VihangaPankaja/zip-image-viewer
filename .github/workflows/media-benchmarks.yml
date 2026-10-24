@@ -43,6 +43,8 @@ jobs:
       - run: vp install --frozen-lockfile
       - run: vp exec playwright install --with-deps chromium
       # Keep workloads sequential so encoders do not distort measurements.
+      - name: Measure host encoders and CPU fallback
+        run: vpr benchmark:encoding --output test-results/video-encoding.json
       - name: Measure real video startup and seeking
         run: vpr benchmark:video --samples 1 --duration 8 --output test-results/video-latency.md
       - name: Measure storyboard latency and sustained dragging under media load
@@ -56,6 +58,7 @@ jobs:
           name: media-benchmarks
           retention-days: 14
           path: |
+            test-results/video-encoding.json
             test-results/video-latency.md
             test-results/storyboard-performance.json
             test-results/priority-seek-metrics.json
