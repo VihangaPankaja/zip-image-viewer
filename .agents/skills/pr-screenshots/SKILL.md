@@ -30,10 +30,13 @@ Screenshots are local review evidence attached directly to a PR.
    They must match the final reviewed code. Use the GitHub PR description
    editor's attachment control to upload only the selected images. Keep its
    generated attachment Markdown and add short captions identifying the area,
-   state, viewport and theme. Verify the saved PR displays each image.
+   state, viewport and theme. Put the attachment Markdown in the PR description,
+   not only a comment. Verify the saved description displays each image before
+   treating UI delivery as complete.
 
 If authenticated attachment upload is unavailable, report the blocker and the
-local capture paths. Do not claim local paths are embedded PR images. Do not
+local capture paths and keep UI delivery unfinished until the images are
+embedded and verified. Do not claim local paths are embedded PR images. Do not
 use release assets, tags, asset branches, committed media or CI artifacts as
 an attachment fallback.
 
