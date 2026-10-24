@@ -1,6 +1,42 @@
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
-import { findVerifiedPullRequest, verificationPassed } from "./ci-verification.mjs";
+import {
+  findVerifiedPullRequest,
+  imageAuditNeeded,
+  verificationPassed,
+} from "./ci-verification.mjs";
+
+test("image audits skip unrelated PRs and mandatory version-only manifest changes", () => {
+  const before = { version: "1.0.0", dependencies: { express: "5" }, scripts: { build: "tsc" } };
+  const after = { ...before, version: "1.0.1" };
+  assert.equal(
+    imageAuditNeeded(["package.json", "docs/guide.md", "client/src/App.tsx"], before, after),
+    false,
+  );
+});
+
+test("image audits cover dependency, toolchain, patch, container and workflow changes", () => {
+  const manifest = { version: "1.0.0" };
+  for (const file of [
+    "Dockerfile",
+    ".dockerignore",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    ".node-version",
+    "patches/library.patch",
+    ".github/workflows/docker-build.yml",
+    "tooling/ci-verification.mjs",
+  ])
+    assert.equal(imageAuditNeeded([file], manifest, manifest), true, file);
+  for (const after of [
+    { ...manifest, dependencies: { express: "5" } },
+    { ...manifest, scripts: { postinstall: "node patch.js" } },
+    { ...manifest, packageManager: "pnpm@11" },
+  ]) {
+    assert.equal(imageAuditNeeded(["package.json"], manifest, after), true);
+    assert.equal(imageAuditNeeded(["package.json"], after, manifest), true);
+  }
+});
 
 function scenario() {
   const context = {

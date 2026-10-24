@@ -6,6 +6,10 @@ on:
       publish:
         type: boolean
         default: false
+      audit:
+        description: Audit this PR candidate; non-PR runs always audit.
+        type: boolean
+        default: true
     secrets:
       DOCKERHUB_USERNAME:
         required: false
@@ -42,6 +46,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
         with:
+          version: v0.38.1
           driver: docker
 
       - name: Read app version
@@ -59,7 +64,8 @@ jobs:
             type=raw,value=latest
             type=raw,value=${{ steps.app-version.outputs.version }}
 
-      - name: Build the local candidate with provenance and SBOM
+      - name: Build the local candidate
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -71,18 +77,32 @@ jobs:
           cache-to: type=gha,mode=max
           # The Docker driver loads into the containerd store, preserving attestations.
           provenance: mode=max
-          sbom: true
+          sbom: ${{ inputs.audit || github.event_name != 'pull_request' }}
 
-      - name: Inventory production image packages and licenses
-        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
-        with:
-          image: ${{ env.IMAGE_NAME }}:latest
-          format: spdx-json
-          output-file: ${{ runner.temp }}/image-sbom.spdx.json
-          upload-artifact: false
-          upload-release-assets: false
+      - name: Extract the candidate's BuildKit SBOM
+        if: inputs.audit || github.event_name != 'pull_request'
+        shell: bash
+        env:
+          BUILD_REF: ${{ fromJSON(steps.build.outputs.metadata)['buildx.build.ref'] }}
+        run: |
+          [[ "$BUILD_REF" =~ ^([^/]+)/([^/]+)/([^/]+)$ ]]
+          builder="${BASH_REMATCH[1]}"
+          record="${BASH_REMATCH[3]}"
+          # Buildx's SBOM shortcut does not traverse exported attestation manifests.
+          attestation=$(docker buildx --builder "$builder" history inspect attachment --type index "$record" |
+            jq -er '[.manifests[] | select(.annotations["vnd.docker.reference.type"] == "attestation-manifest") | .digest] |
+              select(length == 1) | .[0]')
+          sbom=$(docker buildx --builder "$builder" history inspect attachment "$record" "$attestation" |
+            jq -er '[.layers[] | select(.annotations["in-toto.io/predicate-type"] == "https://spdx.dev/Document") | .digest] |
+              select(length == 1) | .[0]')
+          docker buildx --builder "$builder" history inspect attachment "$record" "$sbom" |
+            jq -e 'select(.predicateType == "https://spdx.dev/Document") | .predicate |
+              select(.spdxVersion | startswith("SPDX-")) |
+              select((.packages | type) == "array" and (.packages | length) > 0)' \
+              > "$RUNNER_TEMP/image-sbom.spdx.json"
 
       - name: Report production image vulnerabilities for triage
+        if: inputs.audit || github.event_name != 'pull_request'
         uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
         with:
           sbom: ${{ runner.temp }}/image-sbom.spdx.json
@@ -92,7 +112,7 @@ jobs:
           fail-build: false
 
       - name: Retain image inventory and vulnerability evidence
-        if: always()
+        if: always() && (inputs.audit || github.event_name != 'pull_request')
         uses: actions/upload-artifact@v7
         with:
           name: image-dependency-reports
@@ -144,9 +164,6 @@ jobs:
       - run: vp install --frozen-lockfile
       - run: vp exec playwright install --with-deps chromium
 
-      - name: Verify HLS encoders and CPU fallback
-        run: vpr benchmark:encoding --output test-results/video-encoding.json
-
       - name: Play HLS through the production image in Chromium
         run: |
           container_id=$(docker run --detach --publish 127.0.0.1:8080:8080 \
@@ -167,7 +184,6 @@ jobs:
           name: container-media
           path: |
             test-results/container-playback.png
-            test-results/video-encoding.json
           retention-days: 14
           if-no-files-found: warn
 

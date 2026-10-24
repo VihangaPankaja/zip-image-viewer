@@ -39,7 +39,7 @@ for review; existing correctness and resource-budget assertions still apply.
 Quality calls dependency maintenance on PRs and master pushes; it also runs
 weekly and on demand against the locked production dependency graph. Scheduled
 and manual maintenance calls the reusable container verification workflow, builds
-the current production image, and retains an SPDX package/license SBOM plus a
+the current production image, and retains its BuildKit SPDX package/license SBOM plus a
 Grype JSON vulnerability report. Reports include unfixed findings. Tool crashes,
 invalid audit output, registry failures and missing artifacts fail the job;
 reported advisories are review evidence, not an automatic severity-only gate.
@@ -63,11 +63,16 @@ and its `--format '{{json .Provenance}}'` or `--format '{{json .SBOM}}'` options
 The digest in the build output identifies the image to verify; a mutable tag
 alone does not. See [Docker's attestation guide](https://docs.docker.com/build/ci/github-actions/attestations/).
 The containerd image store retains attestations while the Docker driver builds
-the candidate locally. All candidates pass real playback/retention checks and
-an image inventory/scan before publication. Only verified master pushes log in
-and push the same candidate; no rebuild occurs between testing and publication.
-PR and scheduled/on-demand runs retain image SBOM and vulnerability reports
-without publishing images or using registry credentials.
+the candidate locally. Every candidate passes real playback/retention and HLS
+checks. Dependency/container, patch, toolchain and CI/tooling PRs also produce
+an SBOM and vulnerability report; mandatory version-only manifest changes do
+not trigger the audit. All master and weekly/manual maintenance candidates are
+audited. Buildx extracts the SBOM from the exact local build record so the
+scanner uses the same inventory attached to the candidate, without generating
+a second SBOM or inspecting the published `latest` tag.
+Only verified master pushes log in and push the same candidate; no rebuild
+occurs between testing and publication. Audited PR and scheduled/on-demand
+runs retain image reports without publishing images or using registry credentials.
 
 Package license fields do not fully describe bundled executables. Review the
 FFmpeg build configuration and applicable GPL/LGPL terms, 7-Zip notices, native

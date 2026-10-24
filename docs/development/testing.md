@@ -98,9 +98,13 @@ reuses its static, OS, dependency and browser results. Direct pushes, changed
 trees, missing or expired records and API failures run full CI. Manual runs
 also perform full verification.
 
-After these checks pass, the container job builds a local image with its
-provenance and SBOM, scans it, verifies health and retained-data restart, decodes
-HLS, checks encoders and CPU fallback, and plays and seeks in Chromium.
+After these checks pass, the container job builds a local image with provenance,
+verifies health and retained-data restart, decodes HLS with hardware selection
+or CPU fallback, and plays and seeks in Chromium. PRs that change dependencies,
+container inputs, patches or CI/tooling also generate a BuildKit SBOM and scan
+it. Version-only package changes do not trigger that audit. Master, manual and
+scheduled maintenance runs always audit. The scanner reads the exact local
+build's SBOM; no second inventory scan is generated.
 Master pushes then publish that same image without rebuilding. PR, scheduled
 and manual maintenance runs do not publish images. The final `Verification`
 check requires successful verification or a proven reused PR run, plus
@@ -113,7 +117,8 @@ and focus checks exercise buttons and radios as well as text fields and selects.
 Full media benchmarks run daily, manually and on PRs that affect the media code,
 fixtures or toolchain lockfile. Version-only and documentation changes do not
 trigger them. Workloads stay sequential so competing encoders do not distort
-measurements. Their latency, storyboard and seek reports are retained together.
+measurements. Host encoder/CPU fallback measurements run here alongside latency,
+storyboard and seek measurements, and their reports are retained together.
 Weekly/manual dependency maintenance also verifies and scans the current image.
 Coverage, dependency and container reports and browser failure evidence are
 retained as Actions artifacts. Screenshots for PR review are direct attachments.
