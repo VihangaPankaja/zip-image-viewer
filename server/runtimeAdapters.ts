@@ -1,3 +1,4 @@
+import type { HttpCheckpoint } from "./infrastructure/downloads/httpCheckpoint.js";
 import type { Session } from "./domain/models.js";
 import type { DownloadSettings } from "./application/downloads/downloadOptions.js";
 import type { RemoteMetadata } from "./infrastructure/downloads/remoteMetadata.js";
@@ -60,6 +61,7 @@ export async function downloadRuntimeSource({
   state,
   metadata,
   confirmOversize,
+  checkpoint,
 }: {
   url: string;
   targetPath: string;
@@ -68,6 +70,7 @@ export async function downloadRuntimeSource({
   state: DownloadState;
   metadata: RemoteMetadata;
   confirmOversize: boolean;
+  checkpoint?: HttpCheckpoint;
 }): Promise<void> {
   await downloadWithSegmentedManager({
     url,
@@ -76,6 +79,7 @@ export async function downloadRuntimeSource({
     settings,
     state,
     metadata,
+    checkpoint,
   });
   if (!confirmOversize && state.downloadedBytes > CONFIRM_SIZE_BYTES) {
     throw Object.assign(new Error("Archive exceeds 1 GB."), {

@@ -2,6 +2,7 @@ import type { Session, SessionJob, VideoTranscodeEntry } from "../domain/models.
 import type { createJobManager } from "../application/jobs/jobManager.js";
 import type { createSessionJobQueue } from "../application/jobs/sessionJobQueue.js";
 import { createSessionManager } from "../application/sessions/sessionManager.js";
+import { assertHttpWorkspace } from "../infrastructure/downloads/httpWorkspace.js";
 
 export function createRuntimeJobActions(
   jobs: Map<string, SessionJob>,
@@ -20,6 +21,16 @@ export function createRuntimeJobActions(
     return job;
   };
   const retrySessionJob = (previous: SessionJob) => {
+    if (previous.sourceKind === "http" && previous.storageRoot) {
+      manager.emitJob(previous, {
+        status: "queued",
+        phase: "queued",
+        error: "",
+        message: "Waiting to retry",
+      });
+      queue.enqueueSessionJob(previous, !!previous.oversizeConfirmed);
+      return previous;
+    }
     const job = manager.createJob(
       previous.url,
       previous.downloadOptions,
@@ -39,6 +50,7 @@ export function createRuntimeJobActions(
       (job) => job.sessionId === id,
     );
     if (owningJob && !["expired", "shutdown", "viewer"].includes(reason)) {
+      await assertHttpWorkspace(owningJob);
       // Reject deletion while a worker is still using the files.
       queue.removeSessionJob(owningJob.id);
       await sessionManager.removeSession(id, reason);
@@ -50,12 +62,17 @@ export function createRuntimeJobActions(
   }
   async function removeSessionJob(jobId: string) {
     const job = jobs.get(jobId);
-    if (job?.sourceKind === "torrent" && job.sessionId && sessions.has(job.sessionId)) {
+    if (
+      job &&
+      (job.sourceKind === "torrent" || job.storageRoot) &&
+      job.sessionId &&
+      sessions.has(job.sessionId)
+    ) {
       await removeSession(job.sessionId, "removed");
       return;
     }
     queue.removeSessionJob(jobId);
-    if (job?.sourceKind === "torrent") job.sessionId = "";
+    if (job?.sourceKind === "torrent" || job?.storageRoot) job.sessionId = "";
     await manager.cleanupJob(jobId, "removed");
   }
   return {

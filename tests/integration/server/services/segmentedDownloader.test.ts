@@ -17,7 +17,7 @@ it("preserves a later segment's HTTP failure after cancelling an earlier segment
   });
   const server = createServer((request, response) => {
     if (request.headers.range === "bytes=0-3") {
-      response.writeHead(206, { "content-range": "bytes 0-3/8" });
+      response.writeHead(206, { etag: '"fixture"', "content-range": "bytes 0-3/8" });
       response.write("a");
       started();
     } else {
@@ -34,7 +34,7 @@ it("preserves a later segment's HTTP failure after cancelling an earlier segment
         targetPath: join(workspace, "download.bin"),
         signal: new AbortController().signal,
         state: { downloadedBytes: 0 },
-        metadata: { size: 8, acceptRanges: true },
+        metadata: { etag: '"fixture"', size: 8, acceptRanges: true },
         settings: {
           enableResume: false,
           enableMultithread: true,
@@ -57,6 +57,7 @@ it("downloads encoded responses using a decoded byte cap instead of the wire con
   const server = createServer((_request, response) =>
     response
       .writeHead(200, {
+        etag: '"fixture"',
         "content-encoding": "gzip",
         "content-length": compressed.length,
       })
@@ -72,7 +73,7 @@ it("downloads encoded responses using a decoded byte cap instead of the wire con
       targetPath,
       signal: new AbortController().signal,
       state: { downloadedBytes: 0 },
-      metadata: { size: compressed.length, acceptRanges: false },
+      metadata: { etag: '"fixture"', size: compressed.length, acceptRanges: false },
       settings: {
         enableResume: false,
         enableMultithread: false,
@@ -111,6 +112,7 @@ describe("downloadWithSegmentedManager", () => {
       const end = Number(match[2]);
       const body = payload.subarray(start, end + 1);
       response.writeHead(206, {
+        etag: '"fixture"',
         "accept-ranges": "bytes",
         "content-length": body.length,
         "content-range": `bytes ${String(start)}-${String(end)}/${String(payload.length)}`,
@@ -140,7 +142,7 @@ describe("downloadWithSegmentedManager", () => {
           maxRetries: 0,
         },
         state,
-        metadata: { acceptRanges: true, size: payload.length },
+        metadata: { etag: '"fixture"', acceptRanges: true, size: payload.length },
       });
 
       expect(await readFile(targetPath)).toEqual(payload);
@@ -199,6 +201,7 @@ it.each([
       const part = body.subarray(start, end + 1);
       response
         .writeHead(206, {
+          etag: '"fixture"',
           "content-encoding": encoding,
           "content-length": part.length,
           "content-range": `bytes ${String(start)}-${String(end)}/${String(body.length)}`,
@@ -221,7 +224,7 @@ it.each([
           threadCount: threads,
           maxRetries: 0,
         },
-        metadata: { acceptRanges: true, size: body.length },
+        metadata: { etag: '"fixture"', acceptRanges: true, size: body.length },
       });
       expect(await readFile(targetPath)).toEqual(body);
       expect(state.downloadedBytes).toBe(body.length);

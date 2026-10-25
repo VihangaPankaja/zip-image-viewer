@@ -29,7 +29,7 @@ beforeEach(() => {
   mocks.metadata.mockResolvedValue({
     size: 100,
     acceptRanges: true,
-    etag: "",
+    etag: '"fixture"',
     lastModified: "",
   });
   mocks.sleep.mockResolvedValue(undefined);
@@ -76,7 +76,7 @@ it.each([
   "selects transport capabilities from settings and remote metadata (%j)",
   async (settings, ranges, mode, threads, resume) => {
     const test = await setup(settings);
-    mocks.metadata.mockResolvedValue({ size: 100, acceptRanges: ranges });
+    mocks.metadata.mockResolvedValue({ size: 100, acceptRanges: ranges, etag: '"fixture"' });
     test.download.mockImplementation(({ state }) => {
       state.downloadedBytes = 100;
       return Promise.resolve();
@@ -105,9 +105,7 @@ it("waits for confirmation before downloading a known oversized archive", async 
     status: "awaiting_confirmation",
     requiresConfirmation: true,
   });
-  await expect(stat(test.input.workspaceDir)).rejects.toMatchObject({
-    code: "ENOENT",
-  });
+  await expect(stat(test.input.workspaceDir)).resolves.toMatchObject({});
 });
 
 it("continues an oversized archive after explicit confirmation", async () => {

@@ -15,6 +15,7 @@ import {
 } from "../downloads/downloadOptions.js";
 import { isTerminalJobStatus } from "../../infrastructure/runtime/runtimePrimitives.js";
 import { detectSourceKind, type SourcePreference } from "../torrents/torrentSource.js";
+import { assertHttpWorkspace } from "../../infrastructure/downloads/httpWorkspace.js";
 
 type LogEvent = (
   _level: "info" | "warn" | "error",
@@ -97,7 +98,8 @@ class JobManager {
       downloadOptions: normalizeDownloadOptions(downloadOptions),
     };
     this.jobStore.set(job.id, job);
-    if (job.sourceKind === "torrent" && this.retained) {
+    if (this.retained) {
+      job.storageRoot = this.retained.directory;
       job.workspaceDir = path.join(this.retained.directory, job.id);
       this.saveJob(job);
     }
@@ -109,6 +111,7 @@ class JobManager {
       id: job.id,
       url: job.url,
       sourceKind: job.sourceKind,
+      retained: job.sourceKind === "torrent" || !!job.storageRoot,
       sourcePreference: job.sourcePreference,
       status: job.status,
       torrentFiles: job.torrentFiles,
@@ -163,8 +166,11 @@ class JobManager {
 
   emitJob = (job: SessionJob, patch: Partial<SessionJob> = {}, event = "progress"): void => {
     Object.assign(job, patch, { updatedAt: Date.now() });
-    if (this.retained && job.sourceKind === "torrent") {
-      const progress = job.status === "downloading" && patch.downloadedBytes !== undefined;
+    if (this.retained) {
+      const progress =
+        job.status === "downloading" &&
+        patch.downloadedBytes !== undefined &&
+        patch.httpDownload === undefined;
       if (!progress || Date.now() - (this.progressSavedAt.get(job) ?? 0) >= 1_000) {
         this.saveJob(job);
         if (progress) this.progressSavedAt.set(job, Date.now());
@@ -188,16 +194,17 @@ class JobManager {
   cleanupJob = async (jobId: string, reason = "cleanup"): Promise<void> => {
     const job = this.jobStore.get(jobId);
     if (!job) return;
-    if (job.sourceKind === "torrent" && reason === "expired") return;
+    if (this.retained && reason === "expired") return;
     for (const response of job.subscribers) response.end();
     for (const socket of job.socketSubscribers) socket.close(1000, "job-cleanup");
     job.subscribers.clear();
     job.socketSubscribers.clear();
-    if (job.sourceKind === "torrent" && reason === "shutdown") {
+    if (this.retained && reason === "shutdown") {
       this.saveJob(job);
       return;
     }
     if (job.workspaceDir && !job.sessionId) {
+      await assertHttpWorkspace(job);
       await rm(job.workspaceDir, { recursive: true, force: true });
     }
     this.jobStore.delete(jobId);

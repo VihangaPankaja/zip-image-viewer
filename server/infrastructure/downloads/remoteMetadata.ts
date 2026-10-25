@@ -5,6 +5,7 @@ export type RemoteMetadata = {
   acceptRanges: boolean;
   etag: string;
   lastModified: string;
+  resolvedUrl?: string;
 };
 
 const emptyMetadata: RemoteMetadata = {
@@ -27,9 +28,11 @@ export async function fetchRemoteMetadata(
     if (!response.ok) return emptyMetadata;
     const encoding = response.headers.get("content-encoding");
     const encoded = Boolean(encoding && encoding.toLowerCase() !== "identity");
+    const size = Number(response.headers.get("content-length"));
     return {
-      size: encoded ? 0 : Number(response.headers.get("content-length")) || 0,
+      size: encoded || !Number.isSafeInteger(size) || size < 0 ? 0 : size,
       acceptRanges: !encoded && /bytes/i.test(response.headers.get("accept-ranges") ?? ""),
+      resolvedUrl: response.url || url,
       etag: response.headers.get("etag") ?? "",
       lastModified: response.headers.get("last-modified") ?? "",
     };

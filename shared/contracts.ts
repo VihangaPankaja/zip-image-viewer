@@ -112,6 +112,33 @@ const torrentFileSchema = z.object({
 export type TorrentFile = z.infer<typeof torrentFileSchema>;
 export type TorrentPriority = NonNullable<TorrentFile["priority"]>;
 
+export const httpDownloadStateSchema = z.object({
+  originalUrl: publicHttpUrlSchema,
+  resolvedUrl: publicHttpUrlSchema,
+  size: z.number().int().nonnegative(),
+  validator: z.string().max(512),
+  files: z
+    .array(
+      z.object({
+        index: z.number().int().min(-1).max(7),
+        start: z.number().int().nonnegative(),
+        end: z.number().int().nonnegative().nullable(),
+        bytes: z.number().int().nonnegative(),
+        sha256: z
+          .string()
+          .regex(/^[a-f\d]{64}$/)
+          .or(z.literal("")),
+      }),
+    )
+    .min(1)
+    .max(8),
+  completedSha256: z
+    .string()
+    .regex(/^[a-f\d]{64}$/)
+    .or(z.literal("")),
+});
+export type HttpDownloadState = z.infer<typeof httpDownloadStateSchema>;
+
 export const torrentVideoInfoSchema = z.object({
   state: z.enum(["ready", "download-first"]),
   message: z.string(),
@@ -122,6 +149,7 @@ export const jobSchema = z.object({
   id: z.uuid(),
   url: downloadSourceSchema,
   sourceKind: z.enum(["http", "torrent"]).default("http"),
+  retained: z.boolean().optional(),
   sourcePreference: sourcePreferenceSchema.default("auto"),
   status: jobStatusSchema,
   torrentFiles: z.array(torrentFileSchema).default([]),

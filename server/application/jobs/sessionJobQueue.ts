@@ -92,7 +92,9 @@ function scheduleSessionJobs(state: QueueState): void {
 }
 
 function enqueueSessionJob(state: QueueState, job: SessionJob, confirmOversize: boolean): void {
-  const item = { job, confirmOversize };
+  job.oversizeConfirmed = confirmOversize || job.oversizeConfirmed;
+  state.emitJob?.(job, {});
+  const item = { job, confirmOversize: !!job.oversizeConfirmed };
   state.jobs.set(job.id, item);
   if (!state.jobOrder.includes(job.id)) state.jobOrder.push(job.id);
   refreshPositions(state);
@@ -166,6 +168,7 @@ function resumeSessionJob(state: QueueState, jobId: string): SessionJob {
     message: "Waiting to resume",
     canPause: false,
   });
+  state.emitJob?.(item.job, {});
   if (state.activeItems.has(jobId)) state.requeueAfterActive.add(jobId);
   else if (!state.pendingSessionJobs.some(({ job }) => job.id === jobId)) {
     state.pendingSessionJobs.push(item);
@@ -187,7 +190,9 @@ function confirmSessionJob(state: QueueState, jobId: string): SessionJob {
     requiresConfirmation: false,
     cleanupAt: 0,
     message: "Confirmation accepted. Waiting to start.",
+    oversizeConfirmed: true,
   });
+  state.emitJob?.(item.job, {});
   item.confirmOversize = true;
   if (state.activeItems.has(jobId)) {
     state.requeueAfterActive.add(jobId);
@@ -272,7 +277,9 @@ export function createSessionJobQueue(deps: SessionJobQueueDeps) {
     ...deps,
     maxConcurrent: deps.maxActiveSessionJobs,
     activeItems: new Map(),
-    jobs: new Map(initialJobs.map((job) => [job.id, { job, confirmOversize: false }])),
+    jobs: new Map(
+      initialJobs.map((job) => [job.id, { job, confirmOversize: !!job.oversizeConfirmed }]),
+    ),
     jobOrder: initialJobs.map(({ id }) => id),
     pausing: new Set(),
     requeueAfterActive: new Set(),
