@@ -2,11 +2,10 @@
 
 ## What stays on disk
 
-| Download type       | Retention                                                                      |
-| ------------------- | ------------------------------------------------------------------------------ |
-| HTTP session        | Temporary. Expires after inactivity or closes with the viewer.                 |
-| Pinned HTTP session | Kept through viewer close and expiry until the server stops.                   |
-| Torrent             | Kept across viewer close, expiry and server restarts until explicitly deleted. |
+| Download type | Retention                                                                      |
+| ------------- | ------------------------------------------------------------------------------ |
+| HTTP download | Kept across viewer close, expiry and server restarts until explicitly deleted. |
+| Torrent       | Kept across viewer close, expiry and server restarts until explicitly deleted. |
 
 Open **Storage** to see original files, previews and thumbnails, and transcodes
 and remuxes. Totals count hardlinked files once and exclude symbolic links.
@@ -23,19 +22,31 @@ exceed that budget.
 
 ## Keep or delete a session
 
-For a temporary HTTP session, **Keep until the server stops** prevents viewer
-close and expiry from removing it. This choice does not survive shutdown.
-Removing a completed HTTP item from the queue does not delete its session files.
+Downloads remain available after closing their viewer. Removing a retained item
+from the queue deletes its session files as well.
 
 **Delete session files** explains what will be removed before confirmation.
-For a retained torrent, deletion removes the torrent, its payloads and queue
+Deletion removes the retained download, its source, derived files and queue
 entry. Pause or cancel an active transfer before deleting its files.
 
 ## Restart and backup
 
-Retained torrents store their metadata and payloads together under `sessions/`.
-On restart, the server verifies existing pieces before restoring sessions.
-Incomplete or damaged downloads return paused and can be resumed.
+HTTP downloads and torrents store their metadata and payloads together under
+`sessions/`. SQLite commits source metadata, download options, ownership,
+confirmation and partial-file checkpoints together.
+
+After restart, unfinished HTTP downloads return paused. Resume rechecks the
+original and resolved URLs, size and a strong ETag or valid Last-Modified date
+before sending If-Range requests. Weak or missing validators, changed identities
+and damaged partial files cause a fresh download. Checkpoint hashes reject
+corrupt prefixes; bytes written after the last checkpoint are discarded.
+
+Interrupted segment assembly rebuilds from verified parts. A completed source
+is retained while extraction runs, so extraction can restart without fetching
+the source again. Ready HTTP sessions rebuild their extracted files from the
+verified source before the server becomes ready. Torrents verify existing pieces
+before restoring their sessions. Pause and size-confirmation decisions survive
+restart; confirmation is still required for an oversized unconfirmed download.
 
 Back up the whole directory while the server is stopped. For Docker volume and
 readiness details, see [deployment](../reference/deployment.md).

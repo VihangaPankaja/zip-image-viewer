@@ -21,7 +21,7 @@ The [README](../../README.md#run-in-docker) has the build and run commands.
 The image includes its runtime and media tools and runs as a non-root user.
 It uses Tini for process handling and has a `/health` check.
 
-Mount a persistent volume at `/app/sessions`. Keep retained-torrent SQLite data
+Mount a persistent volume at `/app/sessions`. Keep retained-download SQLite data
 and payload files together. Stop the server before copying a backup. Ensure the
 app user can write to a bind-mounted directory.
 
