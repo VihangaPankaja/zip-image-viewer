@@ -27,6 +27,49 @@ afterEach(async () => {
 });
 
 describe("createProcessSessionJob", () => {
+  it("keeps a transient checkpoint storage failure visible when pause has already aborted the transport", async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), "http-pause-full-"));
+    workspaces.push(workspace);
+    const store = createRetainedTorrentStore(workspace);
+    try {
+      const manager = createJobManager(new Map(), vi.fn(), store);
+      const job = manager.createJob("https://example.com/file.bin");
+      const original = store.save.bind(store);
+      let failed = false;
+      vi.spyOn(store, "save").mockImplementation((changed) => {
+        if (!failed && changed.pauseRequested) {
+          failed = true;
+          throw new Error("SQLITE_FULL");
+        }
+        original(changed);
+      });
+      mocks.downloadSessionSource.mockImplementation((active: SessionJob) => {
+        active.canResume = true;
+        active.pauseRequested = true;
+        active.abortController?.abort();
+        manager.emitJob(active, { downloadedBytes: 1 });
+        return Promise.reject(
+          Object.assign(new Error("The operation was aborted"), { name: "AbortError" }),
+        );
+      });
+      await createProcessSessionJob({
+        sessionStore: new Map(),
+        torrentAdapter: { download: vi.fn(), close: vi.fn() },
+        emitJob: manager.emitJob,
+        closeJob: manager.closeJob,
+        download: vi.fn(),
+        detectEncryption: vi.fn(),
+        extractWith7zip: vi.fn(),
+        listExtractedEntries: vi.fn(),
+        logEvent: vi.fn(),
+      })(job);
+      expect(job.status).toBe("error");
+      expect(job.error).toContain("SQLITE_FULL");
+      expect(store.readHttp()[0].status).toBe("error");
+    } finally {
+      store.close();
+    }
+  });
   it.each(["indexing", "ready"])(
     "keeps a transient persistence failure at %s in a controlled error state",
     async (phase) => {

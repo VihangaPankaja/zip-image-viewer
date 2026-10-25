@@ -273,7 +273,10 @@ async function processSessionJob(
     }
   } catch (error) {
     const abortReason: unknown = job.abortController?.signal.reason;
-    const jobError = errorFromUnknown(abortReason instanceof Error ? abortReason : error);
+    const jobError =
+      job.status === "error" && job.error
+        ? new Error(job.error)
+        : errorFromUnknown(abortReason instanceof Error ? abortReason : error);
     if (jobError.name === "AbortError" && job.pauseRequested && job.canResume) {
       deps.emitJob(
         job,
