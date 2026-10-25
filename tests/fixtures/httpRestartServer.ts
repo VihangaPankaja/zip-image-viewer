@@ -58,12 +58,10 @@ export async function startHttpRestartServer(directory: string, slowStage = "") 
     },
   );
   let output = "";
-  child.stdout?.on("data", (data: Buffer) => {
-    output += data.toString();
-  });
-  child.stderr?.on("data", (data: Buffer) => {
-    output += data.toString();
-  });
+  for (const stream of [child.stdout, child.stderr])
+    stream?.on("data", (data: Buffer) => {
+      output += data.toString();
+    });
   const client: ContractRouterClient<typeof serverContract> = createORPCClient(
     new RPCLink({ url: `${origin}/rpc` }),
   );

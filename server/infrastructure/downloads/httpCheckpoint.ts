@@ -32,7 +32,7 @@ export async function hashDownloadFile(filename: string, bytes?: number) {
   return hash.digest("hex");
 }
 
-export function checkpointPath(target: string, file: HttpFileCheckpoint) {
+function checkpointPath(target: string, file: HttpFileCheckpoint) {
   return file.index === -1 ? target : `${target}.part.${file.index}`;
 }
 

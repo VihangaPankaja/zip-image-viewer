@@ -1,7 +1,7 @@
 import { lstat, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 
-export async function reusableDownloadBytes(filePath: string, size: number, resume: boolean) {
+async function reusableDownloadBytes(filePath: string, size: number, resume: boolean) {
   const file = await lstat(filePath).catch(() => null);
   if (file && !file.isFile() && !file.isSymbolicLink())
     throw Object.assign(new Error("Download output path is not a regular file."), {
