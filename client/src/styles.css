@@ -7,3 +7,4 @@
 @import url("./styles/explorer.css") layer(components);
 @import url("./styles/preview.css") layer(components);
 @import url("./styles/player.css") layer(components);
+@import url("./styles/audio.css") layer(components);

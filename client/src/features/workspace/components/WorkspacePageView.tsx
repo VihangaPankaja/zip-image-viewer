@@ -26,54 +26,78 @@ import { WorkspaceLayout } from "./WorkspaceLayout";
 import { WorkspaceOverlays } from "./WorkspaceOverlays";
 import { DownloadDialog, DownloadManager } from "./DownloadManager";
 import { WorkspaceLivePreview, WorkspacePreviewRecovery } from "./WorkspacePreviewRecovery";
+import { AudioPlayerProvider } from "../../player/AudioPlayerProvider";
 
 type ViewProps = { controller: WorkspacePageController };
 
 export function WorkspacePageView({ controller }: ViewProps) {
   const { queue, settings, state } = controller;
   const [storageOpen, setStorageOpen] = useState(false);
+  const sessionAvailable =
+    !queue.sessionsLoaded ||
+    controller.railItems.some((item) => item.id === state.session?.id && item.state === "ready");
   return (
-    <div className="app-shell">
-      <main className="workspace">
-        <section
-          className={`unified-workspace ${state.activeView === "downloads" ? "downloads-workspace" : ""}`}
-        >
-          <header className="unified-workspace-header">
-            <WorkspaceHeader controller={controller} onOpenStorage={() => setStorageOpen(true)} />
-          </header>
-          {state.activeView === "downloads" ? <WorkspaceDownloads controller={controller} /> : null}
-          <div className="workspace-explore-content" hidden={state.activeView !== "explore"}>
-            <WorkspaceLayout
-              mobilePane={state.mobilePane}
-              onMobilePaneChange={state.setMobilePane}
-              onOpenDownloads={() => state.setActiveView("downloads")}
-              sessions={<WorkspaceSessions controller={controller} />}
-              files={<WorkspaceFiles controller={controller} />}
-              preview={<WorkspacePreview controller={controller} />}
-              metadata={<WorkspaceMetadata controller={controller} />}
-            />
-          </div>
-        </section>
-      </main>
-      <WorkspaceSettings controller={controller} />
-      <DownloadDialog
-        defaultOptions={settings.downloadOptions}
-        open={state.downloadDialogOpen}
-        onClose={() => state.setDownloadDialogOpen(false)}
-        onSubmit={async (items) => {
-          await queue.enqueue(items);
-          state.setDownloadDialogOpen(false);
-        }}
-      />
-      {state.activeView === "explore" ? <WorkspacePageOverlays controller={controller} /> : null}
-      {storageOpen && state.session?.id ? (
-        <SessionStorageDialog
-          id={state.session.id}
-          onClose={() => setStorageOpen(false)}
-          onDeleted={() => controller.lifecycle.clearArchive(false)}
+    <AudioPlayerProvider
+      sessionId={sessionAvailable ? state.session?.id || "" : ""}
+      files={controller.media.selection.explorerRows}
+      selectedPath={state.selectedPath}
+      filesVisible={state.mobilePane === "files"}
+      visible={
+        state.activeView === "explore" &&
+        controller.media.selection.selectedKind === "audio" &&
+        !controller.actions.livePreview &&
+        !controller.actions.error
+      }
+      onSelect={state.setSelectedPath}
+      onReveal={() => {
+        state.setActiveView("explore");
+        state.setMobilePane("preview");
+      }}
+    >
+      <div className="app-shell">
+        <main className="workspace">
+          <section
+            className={`unified-workspace ${state.activeView === "downloads" ? "downloads-workspace" : ""}`}
+          >
+            <header className="unified-workspace-header">
+              <WorkspaceHeader controller={controller} onOpenStorage={() => setStorageOpen(true)} />
+            </header>
+            {state.activeView === "downloads" ? (
+              <WorkspaceDownloads controller={controller} />
+            ) : null}
+            <div className="workspace-explore-content" hidden={state.activeView !== "explore"}>
+              <WorkspaceLayout
+                mobilePane={state.mobilePane}
+                onMobilePaneChange={state.setMobilePane}
+                onOpenDownloads={() => state.setActiveView("downloads")}
+                sessions={<WorkspaceSessions controller={controller} />}
+                files={<WorkspaceFiles controller={controller} />}
+                preview={<WorkspacePreview controller={controller} />}
+                metadata={<WorkspaceMetadata controller={controller} />}
+              />
+            </div>
+          </section>
+        </main>
+        <WorkspaceSettings controller={controller} />
+        <DownloadDialog
+          defaultOptions={settings.downloadOptions}
+          open={state.downloadDialogOpen}
+          onClose={() => state.setDownloadDialogOpen(false)}
+          onSubmit={async (items) => {
+            await queue.enqueue(items);
+            state.setDownloadDialogOpen(false);
+          }}
         />
-      ) : null}
-    </div>
+        {state.activeView === "explore" ? <WorkspacePageOverlays controller={controller} /> : null}
+        {storageOpen && state.session?.id ? (
+          <SessionStorageDialog
+            id={state.session.id}
+            onClose={() => setStorageOpen(false)}
+            onDeleted={() => controller.lifecycle.clearArchive(false)}
+          />
+        ) : null}
+      </div>
+    </AudioPlayerProvider>
   );
 }
 

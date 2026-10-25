@@ -28,7 +28,7 @@ schemas rather than maintaining separate client and server definitions.
 | ---------------------------------------------- | --------------------------------------------------------------- |
 | `pages/`                                       | App composition.                                                |
 | `features/workspace/`                          | Queue state, layout, sessions and dialogs.                      |
-| `features/player/`                             | Quality selection, seeking and HLS playback.                    |
+| `features/player/`                             | Audio queues, video quality, seeking and HLS playback.          |
 | `components/Workspace/`, `components/Preview/` | Workspace and media views.                                      |
 | `hooks/`                                       | Selection, keyboard behavior, caching and playback controllers. |
 | `services/`                                    | Validated HTTP and typed RPC clients.                           |

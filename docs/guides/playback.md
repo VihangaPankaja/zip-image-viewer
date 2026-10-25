@@ -4,6 +4,34 @@ Choose a file in **Explore** to open an image, text, audio or video preview.
 **Open raw** opens the original file. Files without an inline preview can still
 be opened or downloaded. Images support a slideshow and preview-quality choices.
 
+## Audio playback and queues
+
+Opening audio loads its metadata without starting playback. Use Play/Pause, the
+timeline, ten-second skips, previous/next, mute, volume and Speed. An unknown
+duration disables seeking. Device volume may use the hardware buttons.
+
+The Queue starts with the session's audio files in explorer order. Open it to
+choose, move or remove tracks. Repeat can loop one track or the queue; Shuffle
+changes the queue order without repeating a track early. These choices and volume
+and speed survive track changes within the open session. Removing every track
+offers **Load session audio** to start a fresh queue. Queues are not saved across reloads.
+
+A compact player remains available while browsing files or visiting Downloads.
+Select its filename to return to audio. Automatic track changes leave an image,
+slideshow or text preview open. Starting a video pauses audio, and starting audio
+pauses video. Closing or deleting the owning session releases its audio source.
+
+The player shows the filename and folder. A same-folder `cover`, `folder` or
+`front` JPEG, PNG or WebP supplies artwork; missing or failed artwork uses an icon.
+Embedded audio tags and embedded artwork are not read. Supported browsers expose
+play, pause, track changes and seeking through OS media controls after playback starts.
+
+**Use browser audio controls** replaces the custom timeline and transport with
+the browser's player, exiting preview fullscreen to keep that player visible.
+Switch back to custom controls before maximizing the audio preview.
+Failed loads or unsupported codecs offer Retry and
+**Download original audio**. A failed track does not silently skip to another.
+
 ## Video quality and seeking
 
 Compatible videos play directly. Other videos can use a remux or adaptive
