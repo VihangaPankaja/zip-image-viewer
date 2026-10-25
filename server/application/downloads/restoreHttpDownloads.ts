@@ -47,6 +47,7 @@ export async function restoreHttpDownloads(
       etaSeconds: null,
     };
     job.zipPath = httpSourcePath(job);
+    job.reportedSize = job.httpDownload?.size || job.reportedSize;
     jobs.set(job.id, job);
     try {
       await assertHttpWorkspace(job);

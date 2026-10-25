@@ -63,6 +63,7 @@ it.each(["paused", "awaiting_confirmation", "error", "corrupt", "suffix"])(
         status: job.status,
         requiresConfirmation: job.requiresConfirmation,
         downloadedBytes: scenario === "corrupt" ? 0 : 4,
+        reportedSize: complete ? 4 : 8,
       });
       if (complete) expect(restored?.httpDownload?.completedSha256).toBeTruthy();
       if (scenario === "corrupt")

@@ -108,7 +108,9 @@ await restoreRetainedTorrents(retainedTorrents, jobStore, torrentAdapter, (job) 
 await restoreHttpDownloads(retainedTorrents, jobStore, processSessionJob);
 
 const sessionJobQueue = createSessionJobQueue({
-  initialJobs: [...jobStore.values()],
+  initialJobs: [...jobStore.values()].sort(
+    (left, right) => left.queuePosition - right.queuePosition,
+  ),
   pendingSessionJobs,
   getActiveSessionJobCount,
   incrementActiveSessionJobCount,

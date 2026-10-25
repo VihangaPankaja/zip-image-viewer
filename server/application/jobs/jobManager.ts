@@ -194,12 +194,12 @@ class JobManager {
   cleanupJob = async (jobId: string, reason = "cleanup"): Promise<void> => {
     const job = this.jobStore.get(jobId);
     if (!job) return;
-    if (this.retained && reason === "expired") return;
+    if ((job.sourceKind === "torrent" || job.storageRoot) && reason === "expired") return;
     for (const response of job.subscribers) response.end();
     for (const socket of job.socketSubscribers) socket.close(1000, "job-cleanup");
     job.subscribers.clear();
     job.socketSubscribers.clear();
-    if (this.retained && reason === "shutdown") {
+    if ((job.sourceKind === "torrent" || job.storageRoot) && reason === "shutdown") {
       this.saveJob(job);
       return;
     }

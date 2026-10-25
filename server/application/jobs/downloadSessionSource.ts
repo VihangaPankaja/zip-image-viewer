@@ -154,6 +154,28 @@ async function retryDownload(
   throw new Error("Download retries exhausted.");
 }
 
+async function reuseVerifiedSource(
+  job: SessionJob,
+  input: { zipPath: string; confirmOversize: boolean },
+  deps: DownloadSourceDependencies,
+): Promise<"complete" | "paused" | null> {
+  if (!job.httpDownload?.completedSha256) return null;
+  const source = await lstat(input.zipPath).catch(() => null);
+  if (
+    !source?.isFile() ||
+    (await hashDownloadFile(input.zipPath)) !== job.httpDownload.completedSha256
+  ) {
+    deps.emitJob(job, { httpDownload: undefined });
+    return null;
+  }
+  if (source.size > CONFIRM_SIZE_BYTES && !input.confirmOversize) {
+    pauseForConfirmation(job, source.size, deps);
+    return "paused";
+  }
+  deps.emitJob(job, { downloadedBytes: source.size, reportedSize: source.size, percent: 100 });
+  return "complete";
+}
+
 export async function downloadSessionSource(
   job: SessionJob,
   settings: DownloadSettings,
@@ -165,15 +187,8 @@ export async function downloadSessionSource(
   },
   deps: DownloadSourceDependencies,
 ): Promise<"complete" | "paused"> {
-  const saved = job.httpDownload;
-  if (saved?.completedSha256) {
-    const source = await lstat(input.zipPath).catch(() => null);
-    if (source?.isFile() && (await hashDownloadFile(input.zipPath)) === saved.completedSha256) {
-      deps.emitJob(job, { downloadedBytes: source.size, reportedSize: source.size, percent: 100 });
-      return "complete";
-    }
-    deps.emitJob(job, { httpDownload: undefined });
-  }
+  const reused = await reuseVerifiedSource(job, input, deps);
+  if (reused) return reused;
   const state: DownloadState = {
     downloadedBytes: 0,
     reportedSize: 0,

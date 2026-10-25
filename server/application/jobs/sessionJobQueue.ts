@@ -94,11 +94,17 @@ function scheduleSessionJobs(state: QueueState): void {
 function enqueueSessionJob(state: QueueState, job: SessionJob, confirmOversize: boolean): void {
   job.oversizeConfirmed = confirmOversize || job.oversizeConfirmed;
   state.emitJob?.(job, {});
-  const item = { job, confirmOversize: !!job.oversizeConfirmed };
+  const item = state.jobs.get(job.id) ?? { job, confirmOversize: false };
+  item.confirmOversize = !!job.oversizeConfirmed;
   state.jobs.set(job.id, item);
   if (!state.jobOrder.includes(job.id)) state.jobOrder.push(job.id);
   refreshPositions(state);
-  state.pendingSessionJobs.push(item);
+  if (state.activeItems.has(job.id)) {
+    state.requeueAfterActive.add(job.id);
+    return;
+  }
+  if (!state.pendingSessionJobs.some((pending) => pending.job.id === job.id))
+    state.pendingSessionJobs.push(item);
   sortPending(state);
   scheduleSessionJobs(state);
 }
