@@ -1,66 +1,11 @@
-import { CustomDropdown } from "../Common/CustomDropdown";
-import { PlaybackDiagnostics } from "./PlaybackDiagnostics";
+import { useEffect, useRef, useState } from "react";
 import type { VideoPreviewProps } from "../../features/workspace/types";
 import { useVideoResume } from "../../features/player/useVideoResume";
 import { VideoScrubber } from "./VideoScrubber";
-import { VideoSubtitles } from "./VideoSubtitles";
-import { VideoAudioTracks } from "./VideoAudioTracks";
+import { VideoSettings, transcodeAction } from "./VideoSettings";
+import { VideoPlayerControls } from "./VideoPlayerControls";
 
 type VideoPreviewDetailsProps = Omit<VideoPreviewProps, "videoRef" | "videoShellRef">;
-
-function transcodeAction(
-  props: Pick<
-    VideoPreviewDetailsProps,
-    "selectedVideoQuality" | "videoQualityOptions" | "setSelectedVideoQuality"
-  >,
-  label: string,
-) {
-  return ["source", "remux"].includes(props.selectedVideoQuality) &&
-    props.videoQualityOptions.some(({ id }) => id === "auto") ? (
-    <button
-      className="ghost-button"
-      type="button"
-      onClick={() => props.setSelectedVideoQuality("auto")}
-    >
-      {label}
-    </button>
-  ) : null;
-}
-function VideoPreviewToolbar(props: VideoPreviewDetailsProps) {
-  const qualityOptions = props.videoQualityOptions.length
-    ? props.videoQualityOptions.map((item) => ({
-        value: item.id,
-        label: item.label,
-      }))
-    : [{ value: "source", label: "Original" }];
-  return (
-    <div className="preview-toolbar">
-      <span>{props.formatBytes(props.selectedNode.size ?? 0)}</span>
-      <span>{(props.selectedNode.extension || "video").toUpperCase()} stream</span>
-      <CustomDropdown
-        id="video-quality"
-        label="Quality"
-        value={props.selectedVideoQuality}
-        options={qualityOptions}
-        onChange={(value) => props.setSelectedVideoQuality(String(value))}
-      />
-      <span>
-        Mode:{" "}
-        {props.selectedVideoQuality === "source"
-          ? props.videoQualityOptions.find(({ id }) => id === "source")?.label === "Direct play"
-            ? "Direct play"
-            : "Original file"
-          : props.selectedVideoQuality === "remux"
-            ? "Remux"
-            : "Transcode"}
-      </span>
-      {(props.audioTracks?.length ?? 0) > 1 && (props.videoAudioTracks?.length ?? 0) <= 1
-        ? null
-        : transcodeAction(props, "Transcode instead")}
-      <span>{props.formatDate(props.selectedNode.modifiedAt ?? 0)}</span>
-    </div>
-  );
-}
 
 function selectedRendition(props: VideoPreviewDetailsProps) {
   return (
@@ -125,10 +70,6 @@ function PlaybackStatus(props: VideoPreviewDetailsProps) {
           Try Original
         </button>
       ) : null}
-      <span>
-        Keyboard: ±{props.keyboardSettings.jumpSeconds}s · speed step{" "}
-        {props.keyboardSettings.rateStep}x
-      </span>
     </div>
   );
 }
@@ -181,55 +122,67 @@ function PlaybackRecovery(
 
 export function VideoPreviewContent({ videoRef, videoShellRef, ...props }: VideoPreviewProps) {
   const resume = useVideoResume(videoRef, props.sessionId, props.selectedNode.path);
+  const [native, setNative] = useState(false);
+  const [controlError, setControlError] = useState("");
+  const settingsRef = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    setNative(false);
+    setControlError("");
+    if (settingsRef.current) settingsRef.current.open = false;
+  }, [props.sessionId, props.selectedNode.path]);
+  useEffect(() => {
+    if (native && controlError) videoRef.current?.focus();
+  }, [native, controlError, videoRef]);
+  const fallback = () => {
+    setNative(true);
+    setControlError("Use the browser controls to continue playback or enter fullscreen.");
+  };
   return (
     <div className="preview-stage">
-      <VideoPreviewToolbar {...props} />
-      <p className="navigation-hint">
-        {props.selectedVideoQuality === "source"
-          ? props.videoQualityOptions.find(({ id }) => id === "source")?.label === "Direct play"
-            ? "Compatible MP4: plays the original file without encoding."
-            : "Original file: browser support depends on its container and codecs."
-          : props.selectedVideoQuality === "remux"
-            ? "Compatible codecs: copies video and audio into MP4 without encoding."
-            : "Transcode: converts video and audio for browser playback when the original is incompatible or a converted quality is selected."}
-      </p>
-      <div className="image-frame media-frame" ref={videoShellRef}>
-        <video
-          ref={videoRef}
-          aria-label="Video preview"
-          className="video-player"
-          controls
-          playsInline
-          preload="metadata"
-        >
-          Your browser cannot play this video inline.
-        </video>
+      <div className="video-shell" ref={videoShellRef}>
+        <div className="image-frame media-frame">
+          <video
+            ref={videoRef}
+            aria-label="Video preview"
+            className="video-player"
+            controls={native}
+            tabIndex={native ? 0 : undefined}
+            playsInline
+            preload="metadata"
+          >
+            Your browser cannot play this video inline.
+          </video>
+        </div>
+        {!native ? (
+          <>
+            <VideoScrubber
+              path={props.selectedNode.path}
+              quality={props.selectedVideoQuality}
+              sessionId={props.sessionId}
+              videoRef={videoRef}
+            />
+            <VideoPlayerControls
+              videoRef={videoRef}
+              videoShellRef={videoShellRef}
+              onFallback={fallback}
+            />
+          </>
+        ) : null}
+        <VideoSettings
+          {...props}
+          videoRef={videoRef}
+          settingsRef={settingsRef}
+          native={native}
+          onNativeChange={(value) => {
+            setNative(value);
+            setControlError("");
+          }}
+        />
+        <PlaybackResume {...resume} />
+        <PlaybackStatus {...props} />
+        {controlError ? <p role="status">{controlError}</p> : null}
+        <PlaybackRecovery {...props} />
       </div>
-      <VideoScrubber
-        path={props.selectedNode.path}
-        quality={props.selectedVideoQuality}
-        sessionId={props.sessionId}
-        videoRef={videoRef}
-      />
-      <VideoSubtitles
-        key={JSON.stringify([props.sessionId, props.selectedNode.path])}
-        videoRef={videoRef}
-        embeddedTracks={props.subtitleTracks}
-        path={props.selectedNode.path}
-        sessionId={props.sessionId}
-      />
-      <VideoAudioTracks {...props} />
-      <PlaybackResume {...resume} />
-      <PlaybackStatus {...props} />
-      <PlaybackDiagnostics
-        hlsRef={props.hlsRef}
-        videoRef={videoRef}
-        selectedVideoQuality={props.selectedVideoQuality}
-        videoHeight={props.videoHeight}
-        videoPlaybackError={props.videoPlaybackError}
-        videoHlsStatus={props.videoHlsStatus}
-      />
-      <PlaybackRecovery {...props} />
     </div>
   );
 }

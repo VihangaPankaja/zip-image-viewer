@@ -7,10 +7,11 @@ test.use({ hasTouch: true });
 test("retained short video is prepared before opening and plays near its end", async ({
   page,
   browserName,
+  baseURL,
 }) => {
   test.skip(browserName !== "chromium", "Real H.264/AAC decode uses Chromium's bundled codecs.");
   test.setTimeout(60_000);
-  const fixture = await startMultilingualFixture("http://127.0.0.1:5173");
+  const fixture = await startMultilingualFixture(baseURL ?? "http://127.0.0.1:5173");
   try {
     fixture.session.retained = true;
     const entry = await fixture.runtime.ensureVideoTranscodeEntry(
@@ -50,10 +51,11 @@ test("retained short video is prepared before opening and plays near its end", a
 test("long video supports two viewers, pointer seeking and narrow touch/keyboard seeking", async ({
   page,
   browserName,
+  baseURL,
 }) => {
   test.skip(browserName !== "chromium", "Real H.264/AAC decode uses Chromium's bundled codecs.");
   test.setTimeout(90_000);
-  const fixture = await startMultilingualFixture("http://127.0.0.1:5173", 0, 130.25);
+  const fixture = await startMultilingualFixture(baseURL ?? "http://127.0.0.1:5173", 0, 130.25);
   const other = await page.context().newPage();
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));

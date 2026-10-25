@@ -146,6 +146,7 @@ try {
     const { defaultQuality } = (await (await qualitiesResponse).json()).json;
     const compatible = file !== "direct/unsupported-mpeg4.mp4";
     assert.equal(defaultQuality, compatible ? "source" : "auto");
+    await page.getByText("Video settings", { exact: true }).click();
     await page
       .getByText("Mode: " + (compatible ? "Direct play" : "Transcode"), {
         exact: true,

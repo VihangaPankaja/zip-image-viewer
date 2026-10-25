@@ -6,7 +6,7 @@ import { VideoPreviewContent } from "../../../../../client/src/components/Previe
 import { VideoScrubber } from "../../../../../client/src/components/Preview/VideoScrubber";
 
 describe("VideoPreviewContent", () => {
-  it("uses accessible native playback controls", () => {
+  it("uses one accessible timeline and keeps advanced controls in Settings", async () => {
     render(
       <VideoPreviewContent
         activeJob={null}
@@ -36,11 +36,26 @@ describe("VideoPreviewContent", () => {
       />,
     );
 
-    const video = screen.getByLabelText("Video preview");
-    expect(video).toHaveAttribute("controls");
+    const video = screen.getByLabelText<HTMLVideoElement>("Video preview");
+    expect(video).not.toHaveAttribute("controls");
     expect(video).toHaveAttribute("playsinline");
     expect(screen.getByText("Auto · 720p playback")).toBeInTheDocument();
     expect(screen.queryByRole("slider", { name: "Seek video" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Play video" })).toBeVisible();
+    expect(screen.getByLabelText("Quality")).not.toBeVisible();
+    fireEvent.click(screen.getByText("Video settings"));
+    expect(screen.getByRole("combobox", { name: "Quality" })).toBeVisible();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Use browser controls" }));
+    expect(video).toHaveAttribute("controls");
+    expect(screen.queryByRole("button", { name: "Play video" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Use browser controls" }));
+    expect(video).not.toHaveAttribute("controls");
+    vi.spyOn(video, "play").mockRejectedValue(new Error("Playback blocked"));
+    const play = screen.getByRole("button", { name: "Play video" });
+    play.focus();
+    fireEvent.click(play);
+    await waitFor(() => expect(video).toHaveFocus());
+    expect(video).toHaveAttribute("controls");
   });
 
   it("previews a thumbnail without seeking until the value is committed", () => {
@@ -222,6 +237,7 @@ describe("VideoPreviewContent", () => {
       setSelectedVideoAudioTrack: changeAudio,
     };
     const { rerender } = render(<VideoPreviewContent {...props} />);
+    fireEvent.click(screen.getByText("Video settings"));
     fireEvent.click(screen.getByRole("button", { name: "Switch to adaptive playback" }));
     expect(changeQuality).toHaveBeenCalledWith("auto");
     rerender(

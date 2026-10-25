@@ -6,6 +6,7 @@ import { startMultilingualFixture } from "../fixtures/multilingual";
 test("Auto downshifts to a prepared rendition after a mid-video bandwidth drop", async ({
   page,
   browserName,
+  baseURL,
 }) => {
   test.skip(
     browserName !== "chromium",
@@ -13,7 +14,12 @@ test("Auto downshifts to a prepared rendition after a mid-video bandwidth drop",
   );
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1440, height: 1000 });
-  const fixture = await startMultilingualFixture("http://127.0.0.1:5173", 0, 130.25, 480);
+  const fixture = await startMultilingualFixture(
+    baseURL ?? "http://127.0.0.1:5173",
+    0,
+    130.25,
+    480,
+  );
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   try {
@@ -21,6 +27,7 @@ test("Auto downshifts to a prepared rendition after a mid-video bandwidth drop",
     await page.getByRole("tab", { name: "Explore" }).click();
     await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
     const video = page.getByLabel("Video preview");
+    await page.getByText("Video settings", { exact: true }).click();
     await expect
       .poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState), {
         timeout: 30_000,

@@ -7,8 +7,17 @@ be opened or downloaded. Images support a slideshow and preview-quality choices.
 ## Video quality and seeking
 
 Compatible videos play directly. Other videos can use a remux or adaptive
-playback. **Quality** offers automatic selection and the available resolutions.
+playback. Open **Video settings** for **Quality**, audio languages, captions,
+playback speed and diagnostics. Quality offers automatic selection and the available resolutions.
 Changing quality keeps the current playback position.
+
+The player has one thumbnail timeline with Play/Pause, Mute, Volume and
+Fullscreen controls. Fullscreen keeps the same controls beside the video.
+Closing Video settings keeps captions active; Escape closes it and returns focus
+to its heading. **Use browser controls** switches to the browser's player and
+removes the custom bar. Failed custom play/fullscreen requests also offer that
+fallback. On iOS, native video fullscreen uses the browser controls and restores
+the custom timeline when it closes. Device volume may use hardware controls.
 
 Dragging the seek bar shows a thumbnail and time. Playback moves when you release
 it. Focus the timeline to seek with arrow keys. In fullscreen, J and L seek by
@@ -45,7 +54,7 @@ The rail groups a transfer and its ready session into one card.
 
 ## Audio languages and captions
 
-Use **Audio language** for videos with multiple tracks. Adaptive playback changes
+In Video settings, use **Audio language** for videos with multiple tracks. Adaptive playback changes
 language without resetting position or play state. Original and remux playback
 depend on browser support; use **Switch to adaptive playback** when offered.
 
@@ -58,7 +67,7 @@ captions without closing the video.
 
 - Check the displayed preparation, buffering or peer status before retrying.
 - Try adaptive playback if the browser cannot decode the original file.
-- Open playback diagnostics to inspect the active rendition and buffer.
+- Open Video settings, then playback diagnostics to inspect the active rendition and buffer.
   A copied diagnostic report omits source URLs and local paths.
 
 Server-side encoder options are in [configuration](../reference/configuration.md#hardware-encoding).

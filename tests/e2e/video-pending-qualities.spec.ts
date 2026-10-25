@@ -54,6 +54,7 @@ test("clears the playing video until the next file's qualities resolve", async (
       )
       .toEqual({ paused: true, src: null, readyState: 0, sources: 0 });
     release();
+    await page.getByText("Video settings", { exact: true }).click();
     await expect(page.getByText("Mode: Remux", { exact: true })).toBeVisible();
     await expect
       .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState))
@@ -73,6 +74,7 @@ test("clears the playing video until the next file's qualities resolve", async (
       route.fulfill({ status: 500, json: { error: "Probe failed" } }),
     );
     await page.getByRole("treeitem", { name: filenames[2], exact: true }).click();
+    await page.getByText("Video settings", { exact: true }).click();
     await expect(page.getByText("Mode: Original file", { exact: true })).toBeVisible();
     await expect
       .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState))

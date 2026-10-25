@@ -24,6 +24,7 @@ test("tablet video actions remain clickable above the player", async ({ page }) 
     await page.getByRole("tab", { name: "Explore" }).click();
     await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
     await page.getByRole("treeitem", { name: "06-film.mkv", exact: true }).click();
+    await page.getByText("Video settings", { exact: true }).click();
     await expect(page.getByText("Mode: Remux", { exact: true })).toBeVisible();
     const fallback = page.getByRole("button", { name: "Transcode instead", exact: true });
     await fallback.scrollIntoViewIfNeeded();
@@ -49,6 +50,7 @@ for (const { width, hasTouch } of [
 ]) {
   test(`explorer fits below the header at ${width}px with ${hasTouch ? "touch" : "pointer"}`, async ({
     browser,
+    baseURL,
   }) => {
     const context = await browser.newContext({
       viewport: { width, height: 1000 },
@@ -65,7 +67,7 @@ for (const { width, hasTouch } of [
     );
     for (const theme of ["light", "dark"] as const) {
       await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
-      await page.goto("http://127.0.0.1:5173/");
+      await page.goto(baseURL ?? "http://127.0.0.1:5173/");
       await page.getByRole("tab", { name: "Explore" }).click();
       await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
       await page.getByRole("treeitem").filter({ hasText: "01-coast.png" }).click();
@@ -138,6 +140,7 @@ for (const width of [360, 390, 820, 1440, 2560]) {
 
 test("touch targets remain 44px and native controls support loading and errors", async ({
   browser,
+  baseURL,
 }) => {
   test.setTimeout(60_000);
   const context = await browser.newContext({
@@ -155,7 +158,7 @@ test("touch targets remain 44px and native controls support loading and errors",
       };
     });
   });
-  await page.goto("http://127.0.0.1:5173/");
+  await page.goto(baseURL ?? "http://127.0.0.1:5173/");
   await tapVisibleTarget(page.getByRole("button", { name: "Settings", exact: true }));
   const concurrency = page.getByLabel("Concurrent downloads");
   await expect(concurrency).toHaveCSS("font-size", "16px");

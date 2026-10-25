@@ -20,17 +20,105 @@
   object-fit: contain;
 }
 
+.video-shell {
+  min-width: 0;
+}
+
+.unified-workspace-preview > .preview-panel:has(.video-shell) {
+  flex: 1 0 auto;
+}
+
+.video-basic-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.video-volume {
+  display: flex;
+  flex: 1 1 8rem;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.video-volume input {
+  width: 100%;
+  min-width: 3rem;
+  max-width: 10rem;
+  min-height: var(--control-height);
+  padding: 0;
+}
+
+.video-settings {
+  margin-top: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-panel);
+}
+
+.video-settings > summary {
+  min-height: var(--control-height);
+  align-content: center;
+  cursor: pointer;
+}
+
+.video-settings .preview-toolbar {
+  margin-block: var(--space-2);
+}
+
+.video-native-choice,
+.video-speed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height);
+}
+
+.video-speed input {
+  width: 6rem;
+}
+
+.media-frame:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.video-shell:fullscreen {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: var(--space-3);
+  overflow: auto;
+  background: var(--bg-panel);
+}
+
+.video-shell:fullscreen .media-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  aspect-ratio: auto;
+}
+
+.video-shell:fullscreen .video-player {
+  max-height: 100%;
+}
+
+.video-shell:fullscreen > :not(.media-frame) {
+  flex-shrink: 0;
+}
+
 audio.video-player {
   width: min(720px, calc(100% - 32px));
   height: 54px;
   min-height: 54px;
   border-radius: 99px;
   background: var(--bg-panel-strong);
-}
-
-.media-frame:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
 .progress-meta-row {
@@ -90,6 +178,20 @@ audio.video-player {
 }
 
 @media (width <= 760px), (width <= 960px) and (height <= 500px) {
+  .video-basic-controls {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+  }
+
+  .video-volume {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .video-volume input {
+    max-width: none;
+  }
+
   .media-frame {
     width: 100%;
     min-height: 0;

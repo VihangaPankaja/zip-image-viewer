@@ -144,10 +144,11 @@ audioTest(
       fullPage: true,
     });
     await expect(video).toHaveJSProperty("muted", false);
+    const play = page.getByRole("button", { name: "Play video", exact: true });
     if (browserName === "webkit") {
-      await tapVisibleTarget(video);
+      await tapVisibleTarget(play);
     } else {
-      await video.focus();
+      await play.focus();
       await page.keyboard.press("Space");
     }
     await expect(video).toHaveJSProperty("paused", false);
