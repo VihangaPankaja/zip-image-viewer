@@ -121,6 +121,19 @@ it("clears saved progress when native controls seek back to zero", () => {
   expect(screen.queryByText(/Continue/)).not.toBeInTheDocument();
 });
 
+it("does not offer Continue from 0:00 after restarting and immediately leaving", () => {
+  localStorage.setItem(key(), "32");
+  const view = render(<Harness />);
+  const player = media();
+  fireEvent.click(screen.getByText("Start over"));
+  player.currentTime = 0.3;
+  fireEvent(window, new Event("pagehide"));
+  view.unmount();
+  render(<Harness />);
+  expect(screen.queryByText(/Continue/)).not.toBeInTheDocument();
+  expect(localStorage.getItem(key())).toBeNull();
+});
+
 it("tolerates corrupt and unavailable storage", () => {
   localStorage.setItem(key(), "{bad");
   const view = render(<Harness />);

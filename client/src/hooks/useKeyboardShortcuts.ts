@@ -1,5 +1,6 @@
 import { useEffect, type Dispatch, type RefObject, type SetStateAction } from "react";
 import { getImageNavigationTarget } from "../features/workspace/imageNavigation";
+import { toggleVideoFullscreen } from "../features/player/videoFullscreen";
 
 type KeyboardSettings = {
   jumpSeconds?: number;
@@ -121,22 +122,12 @@ function handleVideoShortcut(event: KeyboardEvent, context: UseKeyboardShortcuts
     player.playbackRate = nextRate;
     context.setVideoPlaybackRate(nextRate);
   } else if (key === "f") {
-    toggleFullscreen(context.videoShellRef.current);
+    void toggleVideoFullscreen(context.videoShellRef.current, player).catch(() => undefined);
   } else {
     return false;
   }
   event.preventDefault();
   return true;
-}
-
-function toggleFullscreen(shell: HTMLDivElement | null): void {
-  if (document.fullscreenElement) {
-    void document.exitFullscreen().catch(() => undefined);
-    return;
-  }
-  void (shell as { requestFullscreen?: () => Promise<void> } | null)
-    ?.requestFullscreen?.()
-    .catch(() => undefined);
 }
 
 function handleImageShortcut(event: KeyboardEvent, context: UseKeyboardShortcutsParams): void {

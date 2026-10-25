@@ -187,8 +187,9 @@ test("plays real direct, remux and unsupported inputs and explicitly falls back 
       await page.goto(origin);
       await page.getByRole("tab", { name: "Explore" }).click();
       await page.getByRole("button", { name: `Open ${file}` }).click();
-      await expect(page.getByText(`Mode: ${mode}`, { exact: true })).toBeVisible();
       const video = page.getByLabel("Video preview");
+      await page.getByText("Video settings", { exact: true }).click();
+      await expect(page.getByText(`Mode: ${mode}`, { exact: true })).toBeVisible();
       await expect
         .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState))
         .toBeGreaterThanOrEqual(2);

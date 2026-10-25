@@ -201,6 +201,7 @@ test("switches HLS quality and resumes real playback after reopening", async ({
     await page.getByRole("tab", { name: "Explore" }).click();
     await page.getByRole("button", { name: `Open ${filePath}` }).click();
     const video = page.getByLabel("Video preview");
+    await page.getByText("Video settings", { exact: true }).click();
     await expect(page.getByText(/Auto · (360|720)p playback/)).toBeVisible({
       timeout: 20_000,
     });
@@ -338,6 +339,7 @@ test("switches HLS quality and resumes real playback after reopening", async ({
     await page.setViewportSize({ width: 360, height: 800 });
     await page.locator('label[for="workspace-pane-preview"]').click();
     await expect(page.getByLabel("Video preview")).toBeVisible();
+    await page.getByText("Video settings", { exact: true }).click();
     await expect(page.getByText("Playback diagnostics")).toBeVisible();
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),

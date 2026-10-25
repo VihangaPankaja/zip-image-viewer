@@ -25,6 +25,7 @@ test("real multilingual audio switches in sync and embedded captions recover on 
     await page.getByRole("tab", { name: "Explore" }).click();
     await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
     const video = page.getByLabel("Video preview");
+    await page.getByText("Video settings", { exact: true }).click();
     const audio = page.getByRole("combobox", { name: "Audio language" });
     await expect(audio).toBeVisible();
     await expect
@@ -196,6 +197,7 @@ mediaTest(
     await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
     await page.getByRole("treeitem", { name: filenames[2], exact: true }).click();
     const video = page.getByLabel("Video preview");
+    await page.getByText("Video settings", { exact: true }).click();
     await expect
       .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState))
       .toBeGreaterThanOrEqual(2);

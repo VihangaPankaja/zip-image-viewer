@@ -20,7 +20,7 @@ function writePosition(key: string, position: number | null) {
 }
 
 function resumablePosition(video: HTMLVideoElement, time: number) {
-  return Number.isFinite(video.duration) && video.duration - time <= 10 ? 0 : time;
+  return time < 1 || (Number.isFinite(video.duration) && video.duration - time <= 10) ? 0 : time;
 }
 
 function createResumeHandlers(

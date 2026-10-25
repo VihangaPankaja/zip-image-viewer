@@ -162,6 +162,7 @@ try {
       { file, compatible },
       { timeout: 90_000 },
     );
+    await page.getByText("Video settings", { exact: true }).click();
     const quality = page.getByRole("combobox", { name: "Quality", exact: true });
     assert.equal(
       await quality.locator("option:checked").textContent(),

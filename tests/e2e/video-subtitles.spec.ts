@@ -30,6 +30,7 @@ test("local SRT and WebVTT captions render, shift, resize and recover at 360px",
     await element.play();
     element.pause();
   });
+  await page.getByText("Video settings", { exact: true }).click();
   const upload = page.getByLabel("Subtitle file", { exact: true });
   const load = page.getByRole("button", {
     name: "Load subtitles",

@@ -38,6 +38,7 @@ async function resetPlayer(page: Page) {
   await page.reload();
   await page.getByRole("tab", { name: "Explore" }).click();
   await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
+  await page.getByText("Video settings", { exact: true }).click();
   await page.getByRole("combobox", { name: "Audio language" }).selectOption({ label: "Spanish" });
   const video = page.getByLabel("Video preview");
   await expect
@@ -65,6 +66,7 @@ test("cold hour seeks, crosses windows and preserves alternate audio on desktop 
     await page.goto(fixture.origin);
     await page.getByRole("tab", { name: "Explore" }).click();
     await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
+    await page.getByText("Video settings", { exact: true }).click();
     const video = page.getByLabel("Video preview");
     await expect
       .poll(() => video.evaluate((v: HTMLVideoElement) => v.duration), {
