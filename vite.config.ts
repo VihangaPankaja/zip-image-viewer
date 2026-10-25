@@ -313,8 +313,9 @@ export default defineConfig({
       {
         // Previews consume user media; captions are loaded separately when available.
         files: [
-          "client/src/components/Preview/{Audio,Video}PreviewContent.tsx",
+          "client/src/components/Preview/VideoPreviewContent.tsx",
           "client/src/features/workspace/components/TorrentEarlyVideo.tsx",
+          "client/src/features/player/AudioPlayerProvider.tsx",
         ],
         rules: { "jsx-a11y/media-has-caption": "off" },
       },

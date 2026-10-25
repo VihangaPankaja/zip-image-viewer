@@ -38,6 +38,13 @@ export const test = base.extend<{ appOrigin: string; withAudio: boolean }>({
       );
     }
     const app = express();
+    app.get("/api/sessions/:id/file", (req, res, next) => {
+      if (req.query.path === "invalid-audio.wav")
+        res.type("audio/wav").send("Invalid audio fixture");
+      else if (typeof req.query.path === "string" && req.query.path.endsWith(".wav"))
+        res.sendFile(path.join(mediaDirectory, "sample.wav"));
+      else next();
+    });
     app.get("/api/sessions/:id/video/play", (_req, res) =>
       res.sendFile(path.join(mediaDirectory, filename)),
     );

@@ -14,12 +14,14 @@ import type {
 import type { AudioPreviewContentProps } from "./AudioPreviewContent";
 import type { TextPreviewContentProps } from "./TextPreviewContent";
 import type { PreviewKind } from "../../types/preview";
+import { useAudioPlayer } from "../../features/player/audioContext";
 
 export type PreviewContentProps = Omit<ImagePreviewProps, "selectedNode"> &
   Omit<VideoPreviewProps, "selectedNode"> &
   Omit<AudioPreviewContentProps, "selectedNode"> &
   Omit<TextPreviewContentProps, "selectedNode"> & {
     selectedKind: PreviewKind;
+    selectedFileUrl: string;
     selectedNode: PreviewNode | null;
     setExplorerModalOpen: (value: boolean) => void;
     setSlideshowOpen: (value: boolean) => void;
@@ -69,6 +71,7 @@ function PreviewActions({
   PreviewContentProps,
   "selectedKind" | "selectedFileUrl" | "setExplorerModalOpen" | "setSlideshowOpen"
 >) {
+  const audio = useAudioPlayer();
   return (
     <div className="panel-actions">
       <button
@@ -85,6 +88,12 @@ function PreviewActions({
         <button
           className="ghost-button"
           type="button"
+          disabled={selectedKind === "audio" && audio?.native}
+          title={
+            selectedKind === "audio" && audio?.native
+              ? "Use custom audio controls to maximize preview"
+              : undefined
+          }
           onClick={(event) =>
             void (
               event.currentTarget.closest<HTMLElement>(".preview-panel") as {
@@ -127,7 +136,7 @@ function SelectedPreview({
   props: PreviewContentProps;
   selectedFile: PreviewFileNode;
 }) {
-  const { selectedKind, selectedFileUrl, formatBytes, formatDate, textPreview } = props;
+  const { selectedKind, formatBytes, formatDate, textPreview } = props;
   if (selectedKind === "image") {
     return <ImagePreviewContent {...props} selectedNode={selectedFile} />;
   }
@@ -148,7 +157,6 @@ function SelectedPreview({
     return (
       <AudioPreviewContent
         selectedNode={selectedFile}
-        selectedFileUrl={selectedFileUrl}
         formatBytes={formatBytes}
         formatDate={formatDate}
       />
