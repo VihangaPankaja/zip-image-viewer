@@ -87,43 +87,47 @@ describe("createProcessSessionJob", () => {
       }
     },
   );
-  it("keeps resumable partial files when a pause aborts the download", async () => {
-    const workspace = await mkdtemp(path.join(os.tmpdir(), "queue-pause-"));
-    workspaces.push(workspace);
-    const extractDir = path.join(workspace, "extracted");
-    await mkdir(extractDir);
-    const manager = createJobManager(new Map(), vi.fn());
-    const job = manager.createJob("https://example.com/archive.zip");
-    Object.assign(job, {
-      workspaceDir: workspace,
-      zipPath: path.join(workspace, "archive.zip"),
-      extractDir,
-      canResume: true,
-      canPause: true,
-      pauseRequested: false,
-    });
-    mocks.downloadSessionSource.mockImplementation((downloadJob: SessionJob) => {
-      downloadJob.pauseRequested = true;
-      return Promise.reject(Object.assign(new Error("Paused"), { name: "AbortError" }));
-    });
-    const processJob = createProcessSessionJob({
-      sessionStore: new Map(),
-      torrentAdapter: { download: vi.fn(), close: vi.fn() },
-      emitJob: manager.emitJob,
-      closeJob: manager.closeJob,
-      download: vi.fn(),
-      detectEncryption: vi.fn(),
-      extractWith7zip: vi.fn(),
-      listExtractedEntries: vi.fn(),
-      logEvent: vi.fn(),
-    });
+  it.each(["AbortError", "RequestError"])(
+    "keeps resumable partial files when pause is reported as %s",
+    async (name) => {
+      const workspace = await mkdtemp(path.join(os.tmpdir(), "queue-pause-"));
+      workspaces.push(workspace);
+      const extractDir = path.join(workspace, "extracted");
+      await mkdir(extractDir);
+      const manager = createJobManager(new Map(), vi.fn());
+      const job = manager.createJob("https://example.com/archive.zip");
+      Object.assign(job, {
+        workspaceDir: workspace,
+        zipPath: path.join(workspace, "archive.zip"),
+        extractDir,
+        canResume: true,
+        canPause: true,
+        pauseRequested: false,
+      });
+      mocks.downloadSessionSource.mockImplementation((downloadJob: SessionJob) => {
+        downloadJob.pauseRequested = true;
+        downloadJob.abortController?.abort();
+        return Promise.reject(Object.assign(new Error("Paused"), { name }));
+      });
+      const processJob = createProcessSessionJob({
+        sessionStore: new Map(),
+        torrentAdapter: { download: vi.fn(), close: vi.fn() },
+        emitJob: manager.emitJob,
+        closeJob: manager.closeJob,
+        download: vi.fn(),
+        detectEncryption: vi.fn(),
+        extractWith7zip: vi.fn(),
+        listExtractedEntries: vi.fn(),
+        logEvent: vi.fn(),
+      });
 
-    await processJob(job);
+      await processJob(job);
 
-    expect(job.status).toBe("paused");
-    expect(job.workspaceDir).toBe(workspace);
-    await expect(stat(workspace)).resolves.toMatchObject({});
-  });
+      expect(job.status).toBe("paused");
+      expect(job.workspaceDir).toBe(workspace);
+      await expect(stat(workspace)).resolves.toMatchObject({});
+    },
+  );
 
   it("treats a requested cancellation as a normal terminal state", async () => {
     const logEvent = vi.fn();

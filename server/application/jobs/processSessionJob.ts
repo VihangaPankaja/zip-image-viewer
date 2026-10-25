@@ -272,7 +272,8 @@ async function processSessionJob(
       await processTorrentJob(job, confirmOversize, settings, deps);
     }
   } catch (error) {
-    const jobError = errorFromUnknown(error);
+    const abortReason: unknown = job.abortController?.signal.reason;
+    const jobError = errorFromUnknown(abortReason instanceof Error ? abortReason : error);
     if (jobError.name === "AbortError" && job.pauseRequested && job.canResume) {
       deps.emitJob(
         job,
