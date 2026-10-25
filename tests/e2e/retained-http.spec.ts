@@ -99,9 +99,11 @@ for (const width of [390, 1440]) {
       const dialog = page.getByRole("dialog", { name: "Session storage" });
       await expect(dialog).toContainText("Retained download");
       await expect(dialog.getByRole("checkbox")).toHaveCount(0);
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
-        true,
-      );
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+        ),
+      ).toBe(true);
       await page.keyboard.press("Escape");
       await expect(storage).toBeFocused();
       await page.getByRole("tab", { name: "Downloads", exact: true }).click();
