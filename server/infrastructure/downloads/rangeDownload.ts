@@ -118,7 +118,7 @@ function assertRangeResponse(
     (validator &&
       (validator.startsWith('"') ? response.headers.etag : response.headers["last-modified"]) !==
         validator) ||
-    ("url" in response && response.url && response.url !== resolvedUrl)
+    (response.url && response.url.split("#", 1)[0] !== resolvedUrl.split("#", 1)[0])
   )
     throw Object.assign(new Error("Download source identity changed."), {
       code: "SOURCE_CHANGED",

@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import { cp, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer, request, type Server } from "node:http";
@@ -13,6 +13,8 @@ import ffmpegPath from "ffmpeg-static";
 import WebTorrent, { type Torrent } from "webtorrent";
 import { runCommand } from "../../server/infrastructure/process/commandRunner.js";
 import { serverContract } from "../../shared/contracts.js";
+
+import { spawnFixtureServer } from "./spawnServer.js";
 
 export async function waitForPlayback<T>(
   read: () => Promise<T>,
@@ -173,15 +175,10 @@ export async function startTorrentPlaybackFixture({
     if (!address || typeof address === "string") throw new Error("Missing fixture port");
     await new Promise<void>((resolve) => reservation.close(() => resolve()));
     let origin = `http://127.0.0.1:${address.port}`;
-    child = spawn(
-      process.execPath,
-      [
-        "--import",
-        pathToFileURL(path.resolve("node_modules/tsx/dist/loader.mjs")).href,
-        "--input-type",
-        "module",
-        "--eval",
-        `
+    const server = spawnFixtureServer(
+      directory,
+      address.port,
+      `
       const { default: WebTorrent } = await import(${JSON.stringify(pathToFileURL(path.resolve("node_modules/webtorrent/index.js")).href)});
       const add = WebTorrent.prototype.add;
       const torrents = new Set();
@@ -202,23 +199,11 @@ export async function startTorrentPlaybackFixture({
         }
       });
       await import(${JSON.stringify(pathToFileURL(path.resolve("server/index.ts")).href)});`,
-      ],
-      {
-        cwd: directory,
-        env: { ...process.env, PORT: String(address.port), NODE_ENV: "test" },
-        stdio: ["ignore", "pipe", "pipe", "ipc"],
-      },
     );
-    let output = "";
-    child.stdout?.on("data", (chunk: Buffer) => {
-      output += chunk.toString();
-    });
-    child.stderr?.on("data", (chunk: Buffer) => {
-      output += chunk.toString();
-    });
+    child = server.child;
     await waitForPlayback(
       async () => {
-        if (child?.exitCode !== null) throw new Error(output);
+        if (child?.exitCode !== null) throw new Error(server.logs());
         return fetch(`${origin}/health`, { signal: AbortSignal.timeout(1_000) })
           .then(
             async (response) =>
@@ -229,7 +214,7 @@ export async function startTorrentPlaybackFixture({
       Boolean,
       60_000,
     ).catch((error: unknown) => {
-      throw new Error(`Playback server startup failed: ${output}`, {
+      throw new Error(`Playback server startup failed: ${server.logs()}`, {
         cause: error,
       });
     });
@@ -308,7 +293,7 @@ export async function startTorrentPlaybackFixture({
       files,
       requests,
       mediaTransfers,
-      serverOutput: () => output,
+      serverOutput: server.logs,
       enqueue,
       close,
       setUploadLimit(bytesPerSecond: number) {

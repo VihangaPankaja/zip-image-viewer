@@ -8,27 +8,37 @@ import { expect, it } from "vite-plus/test";
 import { runCommand } from "../../server/infrastructure/process/commandRunner.js";
 import { startHttpRestartServer, stopHttpRestartServer } from "../fixtures/httpRestartServer.js";
 
-it.each(["transfer", "assembly", "extraction"])(
+it.each(["transfer", "changed", "origin", "corrupt", "assembly", "extraction"])(
   "recovers an actual killed server during %s without corrupting bytes or deleting another owner",
   async (stage) => {
     const directory = await mkdtemp(path.join(tmpdir(), "http-restart-"));
     const fixture = path.join(directory, "fixture");
     await mkdir(fixture);
-    const contents = Buffer.alloc(8 * 1024 * 1024, 73);
+    let contents = Buffer.alloc(8 * 1024 * 1024, 73);
     await writeFile(path.join(fixture, "notes.txt"), contents);
     const archive = path.join(directory, "fixture.zip");
     await runCommand(path7za, ["a", "-tzip", "-mx=0", archive, "."], { cwd: fixture });
-    const payload = await readFile(archive);
+    let payload = await readFile(archive);
+    let etag = '"archive-v1"';
+    const transfer = ["transfer", "changed", "origin", "corrupt"].includes(stage);
     let sent = 0;
+    let redirectHost = "first.example";
+    let sourcePort = 0;
     const requests: { range: string; validator: string | string[] | undefined }[] = [];
     const source = createServer((request, response) => {
+      if (stage === "origin" && request.headers.host?.startsWith("download.example:")) {
+        response
+          .writeHead(302, { location: `http://${redirectHost}:${sourcePort}/payload.zip` })
+          .end();
+        return;
+      }
       const match = /^bytes=(\d+)-(\d+)$/.exec(request.headers.range ?? "");
       const start = match ? Number(match[1]) : 0;
       const end = match ? Number(match[2]) : payload.length - 1;
       response.writeHead(match ? 206 : 200, {
         "content-length": end - start + 1,
         "accept-ranges": "bytes",
-        etag: '"archive-v1"',
+        etag,
         ...(match ? { "content-range": `bytes ${start}-${end}/${payload.length}` } : {}),
       });
       if (request.method === "HEAD") return response.end();
@@ -54,6 +64,7 @@ it.each(["transfer", "assembly", "extraction"])(
       await new Promise<void>((resolve) => source.listen(0, "127.0.0.1", resolve));
       const address = source.address();
       if (!address || typeof address === "string") throw new Error("Missing source port");
+      sourcePort = address.port;
       server = await startHttpRestartServer(directory, stage);
       const result = await server.client.jobs.enqueue({
         items: [
@@ -61,7 +72,7 @@ it.each(["transfer", "assembly", "extraction"])(
             url: `http://download.example:${address.port}/archive.zip`,
             downloadOptions: {
               retry: { maxRetries: 0 },
-              transport: { threads: 3, multithread: stage !== "transfer" },
+              transport: { threads: 3, multithread: !transfer },
             },
           },
         ],
@@ -80,8 +91,19 @@ it.each(["transfer", "assembly", "extraction"])(
           timeout: 20_000,
           interval: 10,
         })
-        .toBeGreaterThan(stage === "transfer" ? 1024 * 1024 : 0);
+        .toBeGreaterThan(transfer ? 2 * 1024 * 1024 : 0);
       await stopHttpRestartServer(server.child, true);
+      if (stage === "changed" || stage === "origin") {
+        contents = Buffer.alloc(contents.length, 39);
+        await writeFile(path.join(fixture, "notes.txt"), contents);
+        const changedArchive = path.join(directory, "changed.zip");
+        await runCommand(path7za, ["a", "-tzip", "-mx=0", changedArchive, "."], { cwd: fixture });
+        payload = await readFile(changedArchive);
+        if (stage === "changed") etag = '"archive-v2"';
+        else redirectHost = "second.example";
+      }
+      if (stage === "corrupt")
+        await writeFile(sourcePath, Buffer.alloc((await stat(sourcePath)).size, 88));
       const before = requests.length;
       const beforeBytes = sent;
       const unrelated = path.join(directory, "sessions", "unrelated.txt");
@@ -91,7 +113,8 @@ it.each(["transfer", "assembly", "extraction"])(
       if (!job) throw new Error("Missing restored HTTP job");
       if (stage !== "extraction") {
         expect(job.status).toBe("paused");
-        expect(job.downloadedBytes).toBeGreaterThan(0);
+        if (stage === "corrupt") expect(job.downloadedBytes).toBe(0);
+        else expect(job.downloadedBytes).toBeGreaterThan(0);
         expect(job.downloadedBytes).toBeLessThanOrEqual(payload.length);
         await server.client.jobs.resume({ id });
       }
@@ -116,6 +139,8 @@ it.each(["transfer", "assembly", "extraction"])(
         expect(requests[before].range).not.toBe("full");
         expect(requests[before].validator).toBe('"archive-v1"');
         expect(sent - beforeBytes).toBeLessThan(payload.length);
+      } else if (stage === "changed" || stage === "origin" || stage === "corrupt") {
+        expect(requests[before]).toEqual({ range: "full", validator: undefined });
       } else expect(requests.length).toBe(before);
       await stopHttpRestartServer(server.child);
       server = await startHttpRestartServer(directory);

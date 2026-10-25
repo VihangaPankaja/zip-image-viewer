@@ -7,7 +7,7 @@ import { expect, it } from "vite-plus/test";
 import { downloadWithSegmentedManager } from "../../../../server/services/segmentedDownloader.js";
 import type { HttpDownloadState } from "../../../../shared/contracts.js";
 
-it.each(["same", "changed", "corrupt", "weak", "last-modified", "origin"])(
+it.each(["same", "changed", "corrupt", "weak", "last-modified", "origin", "fragment"])(
   "reconciles partial bytes against source identity and disk hashes after restart (%s)",
   async (scenario) => {
     const directory = await mkdtemp(path.join(tmpdir(), "durable-http-"));
@@ -41,13 +41,13 @@ it.each(["same", "changed", "corrupt", "weak", "last-modified", "origin"])(
       await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
       const address = server.address();
       if (!address || typeof address === "string") throw new Error("Missing TCP port");
-      const url = `http://127.0.0.1:${address.port}/source.bin`;
+      const url = `http://127.0.0.1:${address.port}/source.bin${scenario === "fragment" ? "#download" : ""}`;
       const metadata = () => ({
         size: payload.length,
         acceptRanges: true,
         etag,
         lastModified: scenario === "last-modified" ? lastModified : "",
-        resolvedUrl: url,
+        resolvedUrl: url.split("#")[0],
       });
       const settings = {
         enableResume: true,
@@ -108,7 +108,7 @@ it.each(["same", "changed", "corrupt", "weak", "last-modified", "origin"])(
           .digest("hex"),
       ).toBe(createHash("sha256").update(payload).digest("hex"));
       expect(state.downloadedBytes).toBe(payload.length);
-      const reused = scenario === "same" || scenario === "last-modified";
+      const reused = scenario === "same" || scenario === "last-modified" || scenario === "fragment";
       expect(requests[before]).toEqual(
         reused
           ? {

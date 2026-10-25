@@ -111,8 +111,14 @@ async function moveDirectMedia(
   const mediaDir = path.join(extractDir, "direct");
   await mkdir(mediaDir, { recursive: true });
   const mediaPath = path.join(mediaDir, sourceName);
-  if (preserveSource) await copyFile(archivePath, mediaPath);
-  else await rename(archivePath, mediaPath);
+  if (preserveSource) {
+    const storage = reserveStorage(extractDir, (await stat(archivePath)).size);
+    try {
+      await copyFile(archivePath, mediaPath);
+    } finally {
+      storage.release();
+    }
+  } else await rename(archivePath, mediaPath);
   return {
     relativePath: `direct/${sourceName}`,
     type: "file",
