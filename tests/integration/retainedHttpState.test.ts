@@ -34,6 +34,7 @@ it.each(["paused", "awaiting_confirmation", "error", "corrupt", "suffix"])(
               : "paused",
         phase: scenario === "awaiting_confirmation" ? "confirm" : complete ? "error" : "paused",
         requiresConfirmation: scenario === "awaiting_confirmation",
+        reportedSize: scenario === "awaiting_confirmation" ? 128 : 0,
         httpDownload: {
           originalUrl: job.url,
           resolvedUrl: job.url,
@@ -63,7 +64,7 @@ it.each(["paused", "awaiting_confirmation", "error", "corrupt", "suffix"])(
         status: job.status,
         requiresConfirmation: job.requiresConfirmation,
         downloadedBytes: scenario === "corrupt" ? 0 : 4,
-        reportedSize: complete ? 4 : 8,
+        reportedSize: scenario === "awaiting_confirmation" ? 128 : complete ? 4 : 8,
       });
       if (complete) expect(restored?.httpDownload?.completedSha256).toBeTruthy();
       if (scenario === "corrupt")

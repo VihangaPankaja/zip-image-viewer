@@ -19,35 +19,7 @@ export async function restoreHttpDownloads(
   processJob: (_job: SessionJob, _confirmed: boolean) => Promise<void>,
 ) {
   for (const snapshot of store.readHttp()) {
-    const workspaceDir = path.join(store.directory, snapshot.id);
-    const job: SessionJob = {
-      ...snapshot,
-      downloadOptions: normalizeDownloadOptions(snapshot.downloadOptions),
-      storageRoot: store.directory,
-      workspaceDir,
-      zipPath: "",
-      extractDir: path.join(workspaceDir, "extracted"),
-      abortController: null,
-      pauseRequested: false,
-      cleanupAt: 0,
-      subscribers: new Set(),
-      socketSubscribers: new Set(),
-      extractedEntries: 0,
-      totalEntries: 0,
-      transcodedEntries: 0,
-      totalTranscodeEntries: 0,
-      isStalled: false,
-      stallDurationMs: 0,
-      videoQuality: "720p",
-      enableResume: true,
-      enableMultithread: true,
-      canPause: false,
-      downloadSpeedBytesPerSec: 0,
-      averageSpeedBytesPerSec: 0,
-      etaSeconds: null,
-    };
-    job.zipPath = httpSourcePath(job);
-    job.reportedSize = job.httpDownload?.size || job.reportedSize;
+    const job = hydrateHttpJob(snapshot, store.directory);
     jobs.set(job.id, job);
     try {
       await assertHttpWorkspace(job);
@@ -92,4 +64,41 @@ export async function restoreHttpDownloads(
     }
     saveRetainedTorrent(store, job);
   }
+}
+
+function hydrateHttpJob(
+  snapshot: ReturnType<RetainedTorrentStore["readHttp"]>[number],
+  directory: string,
+): SessionJob {
+  const workspaceDir = path.join(directory, snapshot.id);
+  const job: SessionJob = {
+    ...snapshot,
+    downloadOptions: normalizeDownloadOptions(snapshot.downloadOptions),
+    storageRoot: directory,
+    workspaceDir,
+    zipPath: "",
+    extractDir: path.join(workspaceDir, "extracted"),
+    abortController: null,
+    pauseRequested: false,
+    cleanupAt: 0,
+    subscribers: new Set(),
+    socketSubscribers: new Set(),
+    extractedEntries: 0,
+    totalEntries: 0,
+    transcodedEntries: 0,
+    totalTranscodeEntries: 0,
+    isStalled: false,
+    stallDurationMs: 0,
+    videoQuality: "720p",
+    enableResume: true,
+    enableMultithread: true,
+    canPause: false,
+    downloadSpeedBytesPerSec: 0,
+    averageSpeedBytesPerSec: 0,
+    etaSeconds: null,
+  };
+  job.zipPath = httpSourcePath(job);
+  if (!job.requiresConfirmation || !job.reportedSize)
+    job.reportedSize = job.httpDownload?.size || job.reportedSize;
+  return job;
 }
