@@ -71,7 +71,8 @@
   justify-self: center;
 }
 .audio-transport button {
-  padding-inline: var(--space-1);
+  padding-inline: 0;
+  white-space: nowrap;
 }
 .audio-play {
   display: inline-flex;

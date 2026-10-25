@@ -255,7 +255,6 @@ export function DownloadManager(props: DownloadManagerProps) {
     <section className="download-manager" aria-labelledby="downloads-title">
       <header className="download-manager-header">
         <div>
-          <p className="panel-label">Queue control</p>
           <h2 id="downloads-title" tabIndex={-1}>
             Downloads
           </h2>

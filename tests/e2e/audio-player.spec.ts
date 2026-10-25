@@ -89,6 +89,46 @@ test("real audio stays silent on first open, seeks by keyboard, and survives vie
   await expect(position).toHaveCount(1);
 });
 
+test("starting video clears the paused audio dock and preserves it on return to Downloads", async ({
+  page,
+  appOrigin,
+}) => {
+  await openAudio(page, appOrigin);
+  await setCssViewport(page, 844, 390);
+  await page.getByRole("button", { name: "Play audio", exact: true }).click();
+  const audio = page.getByLabel("Audio playback");
+  await expect(audio).toHaveJSProperty("paused", false);
+  await page.locator('label[for="workspace-pane-files"]').click();
+  await page.getByRole("treeitem", { name: filenames[2], exact: true }).click();
+  const video = page.getByLabel("Video preview");
+  await expect
+    .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState))
+    .toBeGreaterThanOrEqual(2);
+  await video.evaluate((element: HTMLVideoElement) => {
+    element.muted = true;
+  });
+  await tapVisibleTarget(page.getByRole("button", { name: "Play video", exact: true }));
+  await expect(audio).toHaveJSProperty("paused", true);
+  const dock = page.getByRole("complementary", { name: "Persistent audio player" });
+  await expect(dock).toBeHidden();
+  await page.locator(".media-frame").scrollIntoViewIfNeeded();
+  await expect(page.locator(".media-frame")).toBeInViewport({ ratio: 0.99 });
+  await page.getByRole("tab", { name: "Downloads", exact: true }).click();
+  await expect(dock).toBeVisible();
+  await expect(audio).toHaveJSProperty("paused", true);
+  await expect(audio).toHaveAttribute(
+    "src",
+    expect.stringContaining(encodeURIComponent(filenames[3])),
+  );
+  await dock.getByRole("checkbox", { name: "Use browser audio controls" }).check();
+  await page.getByRole("tab", { name: "Explore", exact: true }).click();
+  await expect(audio).toBeHidden();
+  await page.locator('label[for="workspace-pane-files"]').click();
+  await expect(audio).toBeVisible();
+  await page.getByRole("tab", { name: "Downloads", exact: true }).click();
+  await expect(audio).toBeVisible();
+});
+
 test("finishing a track keeps an open slideshow and background playback", async ({
   page,
   appOrigin,

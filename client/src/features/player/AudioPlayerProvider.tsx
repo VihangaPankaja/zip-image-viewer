@@ -7,12 +7,14 @@ import { AudioContext } from "./audioContext";
 export function AudioPlayerProvider({
   children,
   visible,
+  videoVisible = false,
   filesVisible = false,
   onReveal,
   ...workspace
 }: AudioWorkspace & {
   children: ReactNode;
   visible: boolean;
+  videoVisible?: boolean;
   filesVisible?: boolean;
   onReveal: () => void;
 }) {
@@ -38,14 +40,15 @@ export function AudioPlayerProvider({
     return () => document.removeEventListener("play", pauseForVideo, true);
   }, [player.audioRef]);
   const compact = !visible || (mobile && filesVisible);
-  const docked = Boolean(player.track && (compact || player.native));
+  const suppressDock = videoVisible && !(mobile && filesVisible) && player.media.paused;
+  const docked = Boolean(player.track && (compact || player.native) && !suppressDock);
   return (
     <AudioContext value={player}>
       <div className={docked ? "audio-workspace-layout" : undefined}>
         {children}
-        <div className="audio-dock">
+        <div className="audio-dock" hidden={suppressDock}>
           <AudioElement player={player} onClaim={() => setOwnsMediaSession(true)} />
-          {player.track && compact ? (
+          {player.track && compact && !suppressDock ? (
             <aside className="audio-persistent" aria-label="Persistent audio player">
               <button
                 className="audio-reveal"
