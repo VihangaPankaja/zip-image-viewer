@@ -7,7 +7,16 @@ import { expect, it } from "vite-plus/test";
 import { downloadWithSegmentedManager } from "../../../../server/services/segmentedDownloader.js";
 import type { HttpDownloadState } from "../../../../shared/contracts.js";
 
-it.each(["same", "changed", "corrupt", "weak", "last-modified", "origin", "fragment"])(
+it.each([
+  "same",
+  "changed",
+  "corrupt",
+  "weak",
+  "last-modified",
+  "origin",
+  "fragment",
+  "unknown-size",
+])(
   "reconciles partial bytes against source identity and disk hashes after restart (%s)",
   async (scenario) => {
     const directory = await mkdtemp(path.join(tmpdir(), "durable-http-"));
@@ -43,7 +52,7 @@ it.each(["same", "changed", "corrupt", "weak", "last-modified", "origin", "fragm
       if (!address || typeof address === "string") throw new Error("Missing TCP port");
       const url = `http://127.0.0.1:${address.port}/source.bin${scenario === "fragment" ? "#download" : ""}`;
       const metadata = () => ({
-        size: payload.length,
+        size: scenario === "unknown-size" ? 0 : payload.length,
         acceptRanges: true,
         etag,
         lastModified: scenario === "last-modified" ? lastModified : "",

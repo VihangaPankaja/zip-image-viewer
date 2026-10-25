@@ -46,6 +46,7 @@ export async function streamSingleRange({
     headers.Range = `bytes=${String(requestedStart)}-${String(requestedEnd)}`;
   }
 
+  const output = await checkpointWriter(targetPath, file, save);
   const request = got.stream(url, {
     headers,
     retry: { limit: 0 },
@@ -94,7 +95,7 @@ export async function streamSingleRange({
   );
 
   try {
-    await pipeline(request, budget, await checkpointWriter(targetPath, file, save), { signal });
+    await pipeline(request, budget, output, { signal });
   } finally {
     state.downloadedBytes += file.bytes - initialBytes - received.downloadedBytes;
   }

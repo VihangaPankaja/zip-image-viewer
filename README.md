@@ -7,7 +7,7 @@ and previewing images, text, audio and video.
 - Search file trees and preview media without leaving the workspace.
 - Play compatible torrent videos while downloading. Use adaptive video quality,
   seek previews, audio languages and captions.
-- Keep torrent downloads across restarts and manage session storage.
+- Keep HTTP downloads and torrents across restarts and manage session storage.
 
 ## Get started
 
@@ -29,7 +29,7 @@ docker build -t zip-image-viewer .
 docker run -p 8080:8080 -v zip-image-viewer-data:/app/sessions zip-image-viewer
 ```
 
-Open <http://localhost:8080>. Keep the volume to preserve torrent downloads.
+Open <http://localhost:8080>. Keep the volume to preserve HTTP downloads and torrents.
 Run the server on a trusted network or behind access controls.
 
 ## Documentation

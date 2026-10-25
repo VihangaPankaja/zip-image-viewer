@@ -145,6 +145,7 @@ export async function prepareHttpCheckpoint(
     );
   const reusable =
     resume &&
+    metadata.size > 0 &&
     metadata.acceptRanges &&
     validator &&
     previous &&
