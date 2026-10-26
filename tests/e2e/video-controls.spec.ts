@@ -18,8 +18,16 @@ test("one timeline controls real playback, Settings, captions and native recover
   await page.route("**/api/sessions/*/video/play?*", (route) => route.continue());
   await page.goto(appOrigin);
   await page.getByRole("tab", { name: "Explore" }).click();
-  await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
-  await page.getByRole("treeitem", { name: filenames[2], exact: true }).click();
+  await page
+    .getByRole("list", { name: "Sessions", exact: true })
+    .getByRole("button", { name: "Coastal collection" })
+    .click();
+  await page
+    .getByRole("treeitem", {
+      name: `${filenames[2]} ${filenames[2].split(".").at(-1)}`,
+      exact: true,
+    })
+    .click();
   const video = page.getByLabel("Video preview");
   const seek = page.getByRole("slider", { name: "Seek video" });
   const settings = page.getByText("Video settings", { exact: true });
@@ -38,10 +46,9 @@ test("one timeline controls real playback, Settings, captions and native recover
   await page.getByLabel("Playback speed", { exact: true }).fill("1.5");
   await expect(video).toHaveJSProperty("playbackRate", 1.5);
   await page.getByLabel("Subtitle file", { exact: true }).setInputFiles(reviewSubtitles);
-  await expect(page.getByRole("button", { name: "Captions", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(
+    page.getByRole("button", { name: /^Captions (on|off)$/, exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("combobox", { name: "Caption size", exact: true }).press("Escape");
   await expect(settings).toBeFocused();
   await expect(page.getByRole("combobox", { name: "Caption size", exact: true })).toHaveCount(0);

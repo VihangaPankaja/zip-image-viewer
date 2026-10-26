@@ -23,8 +23,16 @@ test("real video previews pointer, keyboard and touch seeks before committing", 
   });
   await page.goto("/");
   await page.getByRole("tab", { name: "Explore" }).click();
-  await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
-  await page.getByRole("treeitem", { name: filenames[2], exact: true }).click();
+  await page
+    .getByRole("list", { name: "Sessions", exact: true })
+    .getByRole("button", { name: "Coastal collection" })
+    .click();
+  await page
+    .getByRole("treeitem", {
+      name: `${filenames[2]} ${filenames[2].split(".").at(-1)}`,
+      exact: true,
+    })
+    .click();
   const video = page.getByLabel("Video preview");
   const seek = page.getByRole("slider", { name: "Seek video" });
   const thumbnail = page.locator(".video-scrubber-preview img");

@@ -27,8 +27,16 @@ test("dialogs return focus and keep background preview shortcuts isolated", asyn
   await page.keyboard.press("Escape");
   await expect(settings).toBeFocused();
   await page.getByRole("tab", { name: "Explore", exact: true }).click();
-  await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
-  await page.getByRole("treeitem", { name: filenames[0], exact: true }).click();
+  await page
+    .getByRole("list", { name: "Sessions", exact: true })
+    .getByRole("button", { name: "Coastal collection" })
+    .click();
+  await page
+    .getByRole("treeitem", {
+      name: `${filenames[0]} ${filenames[0].split(".").at(-1)}`,
+      exact: true,
+    })
+    .click();
   const selected = page.locator(".preview-panel h2");
   await expect(selected).toHaveText(filenames[0]);
   const explorer = page.getByRole("button", {

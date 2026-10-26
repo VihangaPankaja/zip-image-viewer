@@ -22,8 +22,16 @@ async function openAudio(page: Page, origin: string) {
   await serveRealAudio(page);
   await page.goto(origin);
   await page.getByRole("tab", { name: "Explore", exact: true }).click();
-  await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
-  await page.getByRole("treeitem", { name: filenames[3], exact: true }).click();
+  await page
+    .getByRole("list", { name: "Sessions", exact: true })
+    .getByRole("button", { name: "Coastal collection" })
+    .click();
+  await page
+    .getByRole("treeitem", {
+      name: `${filenames[3]} ${filenames[3].split(".").at(-1)}`,
+      exact: true,
+    })
+    .click();
   await expect(page.getByRole("slider", { name: "Audio position" })).toBeEnabled();
 }
 
@@ -99,7 +107,12 @@ test("starting video clears the paused audio dock and preserves it on return to 
   const audio = page.getByLabel("Audio playback");
   await expect(audio).toHaveJSProperty("paused", false);
   await page.locator('label[for="workspace-pane-files"]').click();
-  await page.getByRole("treeitem", { name: filenames[2], exact: true }).click();
+  await page
+    .getByRole("treeitem", {
+      name: `${filenames[2]} ${filenames[2].split(".").at(-1)}`,
+      exact: true,
+    })
+    .click();
   const video = page.getByLabel("Video preview");
   await expect
     .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState))
@@ -139,7 +152,12 @@ test("finishing a track keeps an open slideshow and background playback", async 
     page.getByRole("button", { name: `Queue ${secondAudio}`, exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Play audio", exact: true }).click();
-  await page.getByRole("treeitem", { name: filenames[0], exact: true }).click();
+  await page
+    .getByRole("treeitem", {
+      name: `${filenames[0]} ${filenames[0].split(".").at(-1)}`,
+      exact: true,
+    })
+    .click();
   await page.getByRole("button", { name: "Slideshow", exact: true }).click();
   const audio = page.getByLabel("Audio playback");
   await audio.evaluate((element: HTMLAudioElement) => {
@@ -161,8 +179,16 @@ test("a real decode failure offers retry and original download without auto-skip
   await serveRealAudio(page);
   await page.goto(appOrigin);
   await page.getByRole("tab", { name: "Explore", exact: true }).click();
-  await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
-  await page.getByRole("treeitem", { name: invalidAudio, exact: true }).click();
+  await page
+    .getByRole("list", { name: "Sessions", exact: true })
+    .getByRole("button", { name: "Coastal collection" })
+    .click();
+  await page
+    .getByRole("treeitem", {
+      name: `${invalidAudio} ${invalidAudio.split(".").at(-1)}`,
+      exact: true,
+    })
+    .click();
   await expect(page.getByRole("alert")).toContainText("could not be loaded or decoded");
   await expect(page.getByRole("link", { name: "Download original audio" })).toHaveAttribute(
     "href",

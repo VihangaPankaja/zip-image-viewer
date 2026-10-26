@@ -19,8 +19,16 @@ test("local SRT and WebVTT captions render, shift, resize and recover at 360px",
   await page.goto(appOrigin);
   await page.getByRole("tab", { name: "Explore" }).click();
   await page.getByRole("button", { name: "Show sessions" }).click();
-  await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
-  await page.getByRole("treeitem", { name: filenames[2], exact: true }).click();
+  await page
+    .getByRole("list", { name: "Sessions", exact: true })
+    .getByRole("button", { name: "Coastal collection" })
+    .click();
+  await page
+    .getByRole("treeitem", {
+      name: `${filenames[2]} ${filenames[2].split(".").at(-1)}`,
+      exact: true,
+    })
+    .click();
   const video = page.getByLabel("Video preview");
   await expect
     .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState))
@@ -41,7 +49,7 @@ test("local SRT and WebVTT captions render, shift, resize and recover at 360px",
   await page.keyboard.press("Enter");
   await (await chooser).setFiles(reviewSubtitles);
   await expect(page.getByText(reviewSubtitles.name)).toBeVisible();
-  const captions = page.getByRole("button", { name: "Captions", exact: true });
+  const captions = page.getByRole("button", { name: /^Captions (on|off)$/, exact: true });
   await expect(captions).toHaveAttribute("aria-pressed", "true");
   const activeText = () =>
     video.evaluate((element: HTMLVideoElement) =>
@@ -99,9 +107,19 @@ test("local SRT and WebVTT captions render, shift, resize and recover at 360px",
   await expect.poll(activeText).toEqual([]);
   await upload.setInputFiles(reviewSubtitles);
   await tapVisibleTarget(page.locator('label[for="workspace-pane-files"]'));
-  await page.getByRole("treeitem", { name: filenames[1], exact: true }).click();
+  await page
+    .getByRole("treeitem", {
+      name: `${filenames[1]} ${filenames[1].split(".").at(-1)}`,
+      exact: true,
+    })
+    .click();
   await tapVisibleTarget(page.locator('label[for="workspace-pane-files"]'));
-  await page.getByRole("treeitem", { name: filenames[2], exact: true }).click();
+  await page
+    .getByRole("treeitem", {
+      name: `${filenames[2]} ${filenames[2].split(".").at(-1)}`,
+      exact: true,
+    })
+    .click();
   await expect(page.getByText(reviewSubtitles.name)).toHaveCount(0);
   expect(
     await video.evaluate((element: HTMLVideoElement) =>

@@ -29,7 +29,10 @@ async function openCollection(page: Page, mobile = false) {
   await page.goto("/");
   await page.getByRole("tab", { name: "Explore" }).click();
   if (mobile) await page.getByRole("button", { name: "Show sessions" }).click();
-  await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
+  await page
+    .getByRole("list", { name: "Sessions", exact: true })
+    .getByRole("button", { name: "Coastal collection" })
+    .click();
 }
 
 test("media filter keeps nested folders, sorting and keyboard preview usable", async ({ page }) => {
@@ -100,19 +103,25 @@ test("media filter keeps nested folders, sorting and keyboard preview usable", a
   await page.keyboard.press("Escape");
   const filter = page.getByRole("combobox", { name: "Media type" });
   await page.getByRole("searchbox", { name: "Search explorer files" }).fill("Season 1/episode");
-  await expect(page.getByRole("treeitem", { name: "episode-02.txt", exact: true })).toBeVisible();
-  await expect(page.getByRole("treeitem", { name: "cover.png", exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole("treeitem", { name: "episode-02.txt txt", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("treeitem", { name: "cover.png png", exact: true })).toHaveCount(0);
   await page.getByRole("searchbox", { name: "Search explorer files" }).clear();
   await filter.selectOption("text");
-  await expect(page.getByRole("treeitem", { name: "Unused", exact: true })).toHaveCount(0);
-  const folder = page.getByRole("treeitem", { name: "Season 1", exact: true });
+  await expect(page.getByRole("treeitem", { name: "Unused Folder", exact: true })).toHaveCount(0);
+  const folder = page.getByRole("treeitem", { name: "Season 1 Folder", exact: true });
   await folder.focus();
   await page.keyboard.press("ArrowRight");
   await expect(folder).toHaveAttribute("aria-expanded", "true");
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("treeitem", { name: "episode-02.txt", exact: true })).toBeFocused();
+  await expect(
+    page.getByRole("treeitem", { name: "episode-02.txt txt", exact: true }),
+  ).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("treeitem", { name: "episode-01.txt", exact: true })).toBeFocused();
+  await expect(
+    page.getByRole("treeitem", { name: "episode-01.txt txt", exact: true }),
+  ).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.locator("pre")).toContainText("COASTAL COLLECTION");
   await page.getByRole("button", { name: "Back to files" }).click();
@@ -120,7 +129,7 @@ test("media filter keeps nested folders, sorting and keyboard preview usable", a
   await filter.selectOption("video");
   await expect(page.getByRole("treeitem")).toHaveCount(0);
   await filter.selectOption("all");
-  await expect(page.getByRole("treeitem", { name: "Unused", exact: true })).toBeVisible();
+  await expect(page.getByRole("treeitem", { name: "Unused Folder", exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
@@ -191,17 +200,17 @@ test("profiles filtering and keyboard navigation with 10,000 files", async ({ pa
   await page.goto("/");
   await page.getByRole("tab", { name: "Explore" }).click();
   const started = Date.now();
-  await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
+  await page
+    .getByRole("list", { name: "Sessions", exact: true })
+    .getByRole("button", { name: "Coastal collection" })
+    .click();
 
   await expect(page.locator('[role="treeitem"]').first()).toBeVisible();
   expect(await page.locator('[role="treeitem"]').count()).toBeLessThan(100);
   const loaded = Date.now();
-  const rootRow = page.getByRole("treeitem", {
-    name: "Coastal collection",
-    exact: true,
-  });
+  const rootRow = page.getByRole("treeitem", { name: "Coastal collection Folder", exact: true });
   const lastFile = page.getByRole("treeitem", {
-    name: files[files.length - 1].name,
+    name: `${files[files.length - 1].name} txt`,
     exact: true,
   });
   const unfilteredKeyboardEndMs: Record<string, number> = {};
@@ -220,12 +229,15 @@ test("profiles filtering and keyboard navigation with 10,000 files", async ({ pa
   }
   const filterStarted = Date.now();
   await page.getByRole("combobox", { name: "Media type" }).selectOption("text");
-  await expect(page.getByRole("treeitem", { name: "file-00001.txt", exact: true })).toBeVisible();
-  await expect(page.getByRole("treeitem", { name: "file-00001.txt", exact: true })).toHaveAttribute(
-    "aria-setsize",
-    "5000",
+  await expect(
+    page.getByRole("treeitem", { name: "file-00001.txt txt", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("treeitem", { name: "file-00001.txt txt", exact: true }),
+  ).toHaveAttribute("aria-setsize", "5000");
+  await expect(page.getByRole("treeitem", { name: "file-00000.wav wav", exact: true })).toHaveCount(
+    0,
   );
-  await expect(page.getByRole("treeitem", { name: "file-00000.wav", exact: true })).toHaveCount(0);
   expect(await page.locator('[role="treeitem"]').count()).toBeLessThan(100);
   const filtered = Date.now();
   await page.locator('[role="treeitem"]').first().focus();
@@ -244,13 +256,15 @@ test("profiles filtering and keyboard navigation with 10,000 files", async ({ pa
   );
   await page.keyboard.press("Home");
   await expect(
-    page.getByRole("treeitem", { name: "Coastal collection", exact: true }),
+    page.getByRole("treeitem", { name: "Coastal collection Folder", exact: true }),
   ).toBeFocused();
   const tree = page.getByRole("tree");
   await tree.evaluate((element) => {
     element.scrollTop = element.scrollHeight;
   });
-  await expect(page.getByRole("treeitem", { name: "file-09999.txt", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("treeitem", { name: "file-09999.txt txt", exact: true }),
+  ).toBeVisible();
   expect(errors).toEqual([]);
   const profilePath = testInfo.outputPath("large-file-filter-profile.json");
   await writeFile(

@@ -23,7 +23,10 @@ test("real multilingual audio switches in sync and embedded captions recover on 
   try {
     await page.goto(fixture.origin);
     await page.getByRole("tab", { name: "Explore" }).click();
-    await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
+    await page
+      .getByRole("list", { name: "Sessions", exact: true })
+      .getByRole("button", { name: "multilingual.mkv" })
+      .click();
     const video = page.getByLabel("Video preview");
     await page.getByText("Video settings", { exact: true }).click();
     const audio = page.getByRole("combobox", { name: "Audio language" });
@@ -194,8 +197,16 @@ mediaTest(
     await page.goto(appOrigin);
     await page.getByRole("tab", { name: "Explore" }).click();
     await page.getByRole("button", { name: "Show sessions" }).click();
-    await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
-    await page.getByRole("treeitem", { name: filenames[2], exact: true }).click();
+    await page
+      .getByRole("list", { name: "Sessions", exact: true })
+      .getByRole("button", { name: "Coastal collection" })
+      .click();
+    await page
+      .getByRole("treeitem", {
+        name: `${filenames[2]} ${filenames[2].split(".").at(-1)}`,
+        exact: true,
+      })
+      .click();
     const video = page.getByLabel("Video preview");
     await page.getByText("Video settings", { exact: true }).click();
     await expect
@@ -219,7 +230,7 @@ mediaTest(
     await picker.selectOption({ label: "Spanish captions" });
     await expect.poll(activeText).toEqual(["Subtítulos de la costa"]);
     const captions = page.getByRole("button", {
-      name: "Captions",
+      name: /^Captions (on|off)$/,
       exact: true,
     });
     await tapVisibleTarget(captions);

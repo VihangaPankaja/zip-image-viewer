@@ -19,7 +19,10 @@ test("storage supports narrow-screen keyboard cleanup, pinning and deliberate de
   await page.goto(appOrigin);
   await page.getByRole("tab", { name: "Explore", exact: true }).click();
   await page.getByRole("button", { name: "Show sessions" }).click();
-  await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
+  await page
+    .getByRole("list", { name: "Sessions", exact: true })
+    .getByRole("button", { name: "Coastal collection" })
+    .click();
   const storage = page.getByRole("button", { name: "Storage", exact: true });
   await storage.focus();
   await page.keyboard.press("Enter");
@@ -96,10 +99,9 @@ test("touch dismissal returns focus and a cleanup conflict keeps storage usable"
     await tapVisibleTarget(page.getByRole("tab", { name: "Explore", exact: true }));
     await tapVisibleTarget(page.getByRole("button", { name: "Show sessions" }));
     await tapVisibleTarget(
-      page.getByRole("button", {
-        name: "Open Coastal collection",
-        exact: true,
-      }),
+      page
+        .getByRole("list", { name: "Sessions", exact: true })
+        .getByRole("button", { name: "Coastal collection" }),
     );
     const storage = page.getByRole("button", { name: "Storage", exact: true });
     await tapVisibleTarget(storage);

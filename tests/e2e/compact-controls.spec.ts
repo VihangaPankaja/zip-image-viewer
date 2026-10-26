@@ -22,8 +22,11 @@ test("tablet video actions remain clickable above the player", async ({ page }) 
     await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
     await page.goto("/");
     await page.getByRole("tab", { name: "Explore" }).click();
-    await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
-    await page.getByRole("treeitem", { name: "06-film.mkv", exact: true }).click();
+    await page
+      .getByRole("list", { name: "Sessions", exact: true })
+      .getByRole("button", { name: "Coastal collection" })
+      .click();
+    await page.getByRole("treeitem", { name: "06-film.mkv mkv", exact: true }).click();
     await page.getByText("Video settings", { exact: true }).click();
     await expect(page.getByText("Mode: Remux", { exact: true })).toBeVisible();
     const fallback = page.getByRole("button", { name: "Transcode instead", exact: true });
@@ -69,7 +72,10 @@ for (const { width, hasTouch } of [
       await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
       await page.goto(baseURL ?? "http://127.0.0.1:5173/");
       await page.getByRole("tab", { name: "Explore" }).click();
-      await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
+      await page
+        .getByRole("list", { name: "Sessions", exact: true })
+        .getByRole("button", { name: "Coastal collection" })
+        .click();
       await page.getByRole("treeitem").filter({ hasText: "01-coast.png" }).click();
       await expect(page.locator(".image-frame img")).toBeVisible();
       const panels = page.locator(".workspace-panel-group");
@@ -217,7 +223,10 @@ test("slideshow reveal remains a full touch target with hidden controls", async 
   await page.goto("/");
   await page.getByRole("tab", { name: "Explore" }).click();
   await page.getByRole("button", { name: "Show sessions" }).click();
-  await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
+  await page
+    .getByRole("list", { name: "Sessions", exact: true })
+    .getByRole("button", { name: "Coastal collection" })
+    .click();
   await page.getByRole("button", { name: "Hide sessions" }).click();
   await page.getByRole("treeitem").filter({ hasText: "01-coast.png" }).click();
   await page.getByRole("radio", { name: "Preview", exact: true }).check({ force: true });
