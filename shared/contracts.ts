@@ -2,6 +2,30 @@ import "zod/compile";
 import { oc } from "@orpc/contract";
 import { z } from "zod";
 
+export const TEXT_PREVIEW_BYTES = 128 * 1024;
+export const textPreviewInputSchema = z.object({
+  offset: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
+});
+export const textPreviewSchema = z
+  .object({
+    text: z.string().max(TEXT_PREVIEW_BYTES),
+    offset: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    nextOffset: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    totalBytes: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    encoding: z.enum(["utf-8", "utf-16le", "utf-16be"]),
+    binary: z.boolean(),
+    replacementCharacters: z.boolean(),
+  })
+  .refine(
+    (value) =>
+      value.offset <= value.nextOffset &&
+      value.nextOffset <= value.totalBytes &&
+      value.nextOffset - value.offset <= TEXT_PREVIEW_BYTES &&
+      (value.nextOffset > value.offset || value.nextOffset === value.totalBytes),
+    "Invalid text byte range.",
+  );
+export type TextPreviewChunk = z.infer<typeof textPreviewSchema>;
+
 const blockedHostnames = new Set(["localhost", "localhost.localdomain"]);
 
 function isPrivateIpv4(hostname: string): boolean {
