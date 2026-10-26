@@ -114,7 +114,9 @@ test("media filter keeps nested folders, sorting and keyboard preview usable", a
   await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("treeitem", { name: "episode-01.txt", exact: true })).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(page.locator("pre")).toContainText("COASTAL COLLECTION");
+  await expect(page.getByRole("region", { name: "Text content", exact: true })).toContainText(
+    "COASTAL COLLECTION",
+  );
   await page.getByRole("button", { name: "Back to files" }).click();
   await expect(filter).toHaveValue("text");
   await filter.selectOption("video");

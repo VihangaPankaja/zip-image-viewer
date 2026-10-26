@@ -1,6 +1,6 @@
 {
   "name": "zip-image-viewer",
-  "version": "3.28.0",
+  "version": "3.30.0",
   "private": true,
   "type": "module",
   "scripts": {

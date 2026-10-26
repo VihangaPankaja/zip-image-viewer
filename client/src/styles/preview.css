@@ -94,7 +94,8 @@
 
 .text-preview {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  min-width: 0;
   min-height: 0;
   overflow: auto;
   border: 1px solid var(--border);
@@ -103,16 +104,108 @@
   color: var(--text);
 }
 
-.text-preview pre {
-  min-width: 0;
+.text-preview-actions,
+.text-search-results {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding-inline: var(--space-3);
+}
+
+.text-preview-actions label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height);
+}
+
+.text-preview-note {
   margin: 0;
-  padding: var(--space-4);
+  padding-inline: var(--space-3);
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+.text-preview-search {
+  display: grid;
+  gap: var(--space-1);
+  padding-inline: var(--space-3);
+}
+
+.text-preview-search input {
+  width: 100%;
+  min-width: 0;
+}
+
+.text-lines,
+.text-table-scroll {
+  height: min(55vh, 560px);
+  min-height: 160px;
+  min-width: 0;
   overflow: auto;
+  overscroll-behavior: contain;
+  border-block: 1px solid var(--border);
+}
+
+.text-lines {
   font:
-    0.82rem/1.55 "Cascadia Code",
+    13px/24px "Cascadia Code",
     Consolas,
     monospace;
   tab-size: 2;
+}
+
+.text-lines-canvas {
+  position: relative;
+  min-width: 100%;
+  width: max-content;
+}
+
+.text-lines-window {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-width: 100%;
+}
+
+.text-line {
+  display: flex;
+  height: 24px;
+  white-space: pre;
+}
+
+.text-line-number {
+  flex: 0 0 64px;
+  padding-inline: var(--space-2);
+  color: var(--text-muted);
+  text-align: right;
+  user-select: none;
+}
+
+.text-line-code {
+  padding-right: var(--space-3);
+}
+
+.text-line mark {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.text-table-scroll table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+
+.text-table-scroll th,
+.text-table-scroll td {
+  max-width: 320px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  overflow-wrap: anywhere;
+  text-align: left;
   white-space: pre-wrap;
 }
 

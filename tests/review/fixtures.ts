@@ -505,11 +505,23 @@ export async function installReviewFixtures(page: Page) {
       url.pathname.endsWith("/video/stream")
     ) {
       const name = url.searchParams.get("path") ?? "";
-      if (name.endsWith(".txt"))
-        return route.fulfill({
-          contentType: "text/plain",
-          body: "COASTAL COLLECTION\n\nField notes · January 2026\n\n01  Morning light along the coast\n02  Text notes and project details\n03  Original video sample\n04  Audio field recording\n\nUse the file tree to browse this collection.\nAll media in this review is generated locally.\n",
-        });
+      if (name.endsWith(".txt")) {
+        const text =
+          "COASTAL COLLECTION\n\nField notes · January 2026\n\n01  Morning light along the coast\n02  Text notes and project details\n03  Original video sample\n04  Audio field recording\n\nUse the file tree to browse this collection.\nAll media in this review is generated locally.\n";
+        if (url.searchParams.get("textPreview") === "1")
+          return route.fulfill({
+            json: {
+              text,
+              offset: 0,
+              nextOffset: Buffer.byteLength(text),
+              totalBytes: Buffer.byteLength(text),
+              encoding: "utf-8",
+              binary: false,
+              replacementCharacters: false,
+            },
+          });
+        return route.fulfill({ contentType: "text/plain", body: text });
+      }
       const [file, contentType] = name.endsWith(".png")
         ? ["sample.png", "image/png"]
         : name.endsWith(".wav")

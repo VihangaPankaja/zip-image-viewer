@@ -42,14 +42,16 @@ output on your machine. Confirm the actual encoder before interpreting timings.
 
 ## Resource limits
 
-| Resource                      | Limit                                   |
-| ----------------------------- | --------------------------------------- |
-| Batch                         | 50 download entries.                    |
-| Download or extracted content | 10 GiB and 10,000 entries.              |
-| Free disk headroom            | 64 MiB beyond active reservations.      |
-| Temporary session inactivity  | 30 minutes, checked every five minutes. |
-| Inline text preview           | 2 MiB.                                  |
-| Embedded subtitle conversion  | 2 MiB output and 30 seconds.            |
+| Resource                      | Limit                                                                |
+| ----------------------------- | -------------------------------------------------------------------- |
+| Batch                         | 50 download entries.                                                 |
+| Download or extracted content | 10 GiB and 10,000 entries.                                           |
+| Free disk headroom            | 64 MiB beyond active reservations.                                   |
+| Temporary session inactivity  | 30 minutes, checked every five minutes.                              |
+| Inline text preview           | 128 KiB per chunk; 2 MiB retained client cache.                      |
+| JSON formatting               | 64 Ki input characters, 64 nesting levels, 128 Ki output characters. |
+| CSV/TSV table preview         | 200 rows including header, 32 columns, 2,048 characters per cell.    |
+| Embedded subtitle conversion  | 2 MiB output and 30 seconds.                                         |
 
 Unknown-length downloads reserve available capacity up to the size limit.
 Archive expansion and streamed bytes must fit the admitted disk budget.

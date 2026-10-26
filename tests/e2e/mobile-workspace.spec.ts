@@ -45,8 +45,15 @@ test("mobile file selection opens preview and retains it across queue visits and
   );
   await page.route(`**/api/sessions/${sessionId}/file?*`, (route) =>
     route.fulfill({
-      contentType: "text/plain",
-      body: "Mobile preview fixture",
+      json: {
+        text: "Mobile preview fixture",
+        offset: 0,
+        nextOffset: 22,
+        totalBytes: 22,
+        encoding: "utf-8",
+        binary: false,
+        replacementCharacters: false,
+      },
     }),
   );
   await page.goto("/");
