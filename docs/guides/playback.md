@@ -20,6 +20,8 @@ A compact player remains available while browsing files or visiting Downloads.
 Select its filename to return to audio. Automatic track changes leave an image,
 slideshow or text preview open. Starting a video pauses audio, and starting audio
 pauses video. Closing or deleting the owning session releases its audio source.
+The paused audio player hides while the video pane is open. Browsing files or
+returning to Downloads restores it with the same track and position.
 
 The player shows the filename and folder. A same-folder `cover`, `folder` or
 `front` JPEG, PNG or WebP supplies artwork; missing or failed artwork uses an icon.
