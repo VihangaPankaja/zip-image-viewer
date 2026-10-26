@@ -1,4 +1,4 @@
-FROM ghcr.io/voidzero-dev/vite-plus:1.3.0 AS base
+FROM ghcr.io/voidzero-dev/vite-plus:1.4.0 AS base
 WORKDIR /app
 ENV VP_GIT_HOOKS=0
 COPY --chown=vp:vp package.json pnpm-lock.yaml pnpm-workspace.yaml .node-version ./
