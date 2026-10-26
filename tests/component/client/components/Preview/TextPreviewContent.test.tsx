@@ -60,6 +60,7 @@ it("virtualizes huge line counts and bounds a single displayed row", () => {
 
 it("formats JSON safely and keeps malformed JSON readable", () => {
   const { rerender } = render(<TextPreviewContent {...base} textPreview={preview('{"a":1}')} />);
+  expect(screen.queryByRole("navigation", { name: "Text chunks" })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Format JSON" }));
   expect(screen.getByText(/"a": 1/)).toBeInTheDocument();
   rerender(<TextPreviewContent {...base} textPreview={preview('{"a":')} />);
@@ -113,4 +114,7 @@ it("preserves the chunk navigation control during loading", () => {
     />,
   );
   expect(screen.getByRole("button", { name: "Previous chunk" })).toHaveFocus();
+  fireEvent.click(screen.getByRole("button", { name: "First chunk" }));
+  rerender(<TextPreviewContent {...base} textPreview={loaded} />);
+  expect(screen.getByRole("button", { name: "Next chunk" })).toHaveFocus();
 });

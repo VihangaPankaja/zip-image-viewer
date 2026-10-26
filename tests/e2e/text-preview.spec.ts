@@ -9,7 +9,8 @@ test.setTimeout(60000);
 async function openFile(page: Page, name: string) {
   const files = page.getByRole("radio", { name: "Files", exact: true });
   if (await files.isVisible()) await files.check({ force: true });
-  await tapVisibleTarget(page.getByRole("treeitem", { name, exact: true }));
+  const extension = name.split(".").at(-1);
+  await tapVisibleTarget(page.getByRole("treeitem", { name: `${name} ${extension}`, exact: true }));
 }
 
 test("200 MB text stays bounded, scrolls, searches and navigates by chunk", async ({
@@ -30,7 +31,10 @@ test("200 MB text stays bounded, scrolls, searches and navigates by chunk", asyn
     await page.getByRole("tab", { name: "Explore" }).click();
     const sessions = page.getByRole("button", { name: "Show sessions" });
     if (await sessions.isVisible()) await sessions.click();
-    await page.getByRole("button", { name: "Open 01-large-200MB.log", exact: true }).click();
+    await page
+      .getByRole("list", { name: "Sessions", exact: true })
+      .getByRole("button", { name: "Ready 01-large-200MB.log 9 files", exact: true })
+      .click();
     await openFile(page, "01-large-200MB.log");
     const content = page.getByRole("region", { name: "Text content", exact: true });
     await expect(content).toContainText("bounded preview");
@@ -47,6 +51,7 @@ test("200 MB text stays bounded, scrolls, searches and navigates by chunk", asyn
     await page.getByRole("searchbox", { name: "Search loaded chunk only" }).fill("responsive");
     await expect(page.getByText(/matching display rows/)).toBeVisible();
     await page.getByRole("button", { name: "Last chunk" }).click();
+    await expect(page.getByRole("button", { name: "Last chunk" })).toBeDisabled();
     await content.focus();
     await page.keyboard.press("Control+End");
     await content.evaluate((element) => {
@@ -54,12 +59,39 @@ test("200 MB text stays bounded, scrolls, searches and navigates by chunk", asyn
     });
     await expect(content).toContainText("FINAL LOG RECORD");
     await page.getByRole("button", { name: "First chunk" }).click();
+    await expect(page.getByRole("button", { name: "First chunk" })).toBeDisabled();
     await expect(content).toContainText("bounded preview");
     const next = page.getByRole("button", { name: "Next chunk" });
     await next.focus();
     await page.keyboard.press("Enter");
     await expect(page.getByText(/Bytes 131,072/)).toBeVisible();
     await expect(next).toBeFocused();
+    await page.evaluate(() =>
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          writeText: (text: string) => {
+            document.body.dataset.copiedText = text;
+            return Promise.resolve();
+          },
+        },
+      }),
+    );
+    await page.getByRole("button", { name: "Copy loaded text" }).click();
+    await expect(page.getByRole("status")).toContainText("Loaded text copied");
+    expect(
+      await page.evaluate(() => (document.body.dataset.copiedText?.length ?? 0) > 100000),
+    ).toBe(true);
+    await page.evaluate(() =>
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          writeText: () => Promise.reject(new Error("Permission denied")),
+        },
+      }),
+    );
+    await page.getByRole("button", { name: "Copy loaded text" }).click();
+    await expect(page.getByRole("status")).toContainText("Copy unavailable");
     expect(sizes.length).toBeGreaterThan(0);
     expect(sizes.every((size) => size < 1024 * 1024)).toBe(true);
     expect((await new AxeBuilder({ page }).include(".text-preview").analyze()).violations).toEqual(
@@ -81,7 +113,10 @@ test("narrow text controls support touch, JSON, quoted tables, UTF-16 and binary
     await page.goto(fixture.origin);
     await page.getByRole("tab", { name: "Explore" }).click();
     await page.getByRole("button", { name: "Show sessions" }).click();
-    await page.getByRole("button", { name: "Open 01-large-200MB.log", exact: true }).click();
+    await page
+      .getByRole("list", { name: "Sessions", exact: true })
+      .getByRole("button", { name: "Ready 01-large-200MB.log 9 files", exact: true })
+      .click();
     await page.getByRole("button", { name: "Hide sessions" }).click();
     await openFile(page, "02-quoted.csv");
     await tapVisibleTarget(page.getByRole("button", { name: "Table", exact: true }));

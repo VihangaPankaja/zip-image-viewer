@@ -47,7 +47,9 @@ export function TextPreviewContent({
               Invalid or unsupported encoded characters appear as �.
             </p>
           )}
-          <TextChunkNavigation chunk={chunk} loading={loading} loadOffset={loadOffset} />
+          {(chunk.offset > 0 || chunk.nextOffset < chunk.totalBytes) && (
+            <TextChunkNavigation chunk={chunk} loading={loading} loadOffset={loadOffset} />
+          )}
           {chunk.binary ? (
             <p role="status">
               Binary content detected. Text preview is hidden. Use Open raw to read this file.
@@ -168,14 +170,16 @@ function TextViewActions({
       >
         Copy loaded text
       </button>
-      <button
-        type="button"
-        className="ghost-button"
-        aria-pressed={view === "raw"}
-        onClick={() => setView("raw")}
-      >
-        Raw text
-      </button>
+      {(table || extension.toLowerCase() === "json") && (
+        <button
+          type="button"
+          className="ghost-button"
+          aria-pressed={view === "raw"}
+          onClick={() => setView("raw")}
+        >
+          Raw text
+        </button>
+      )}
       {extension.toLowerCase() === "json" && (
         <button
           type="button"

@@ -34,5 +34,10 @@ ZIP Image Viewer uses React, Express and TypeScript. Start with the
   capture paths; do not present the PR as complete or ready to merge. Keep
   screenshot capture out of CI, package scripts and releases.
 - Commit major steps separately. Bump `package.json` before opening a PR to `master`.
+- Label PRs from their title and description with one type (`bug`, `enhancement`,
+  `documentation`, `refactor` or `maintenance`) and up to two areas (`downloads`,
+  `archives-files`, `media-player`, `interface`, `tooling-ci` or `security`).
+  Preserve unrelated labels on normal PRs. Formal reverts get only `revert`;
+  keep Dependabot's existing labels.
 - Monitor every check on the latest PR commit. Fix failures and valid review
   findings within scope. Report blockers; do not claim unfinished work is complete.

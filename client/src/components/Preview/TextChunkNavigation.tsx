@@ -18,7 +18,10 @@ export function TextChunkNavigation({
     const previous = navigation.current?.querySelector<HTMLButtonElement>(
       'button[data-chunk="Previous chunk"]',
     );
-    (target.disabled ? previous : target)?.focus({ preventScroll: true });
+    const fallback = previous?.disabled
+      ? navigation.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")
+      : previous;
+    (target.disabled ? fallback : target)?.focus({ preventScroll: true });
     pending.current = null;
   }, [chunk, loading]);
   const first = chunk.offset === 0;
