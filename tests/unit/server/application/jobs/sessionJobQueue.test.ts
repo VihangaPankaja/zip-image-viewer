@@ -79,6 +79,52 @@ function queueDependencies(maxActiveSessionJobs: number) {
 }
 
 describe("createSessionJobQueue", () => {
+  it("queues a retained job only once while all worker slots are occupied", async () => {
+    const dependencies = queueDependencies(1);
+    const queue = createSessionJobQueue(dependencies);
+    const blocking = createJob("blocking");
+    let finish: (() => void) | undefined;
+    dependencies.processSessionJob.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    queue.enqueueSessionJob(blocking, false);
+    const pending = createJob("retained");
+    queue.enqueueSessionJob(pending, false);
+    queue.enqueueSessionJob(pending, true);
+    expect(dependencies.pendingSessionJobs).toHaveLength(1);
+    finish?.();
+    await vi.waitFor(() => expect(dependencies.processSessionJob).toHaveBeenCalledTimes(2));
+    expect(dependencies.processSessionJob).toHaveBeenLastCalledWith(pending, true);
+    await queue.stopSessionJobs();
+  });
+  it("waits for a cancelled worker to release its files before retrying the same job", async () => {
+    let finish: (() => void) | undefined;
+    const dependencies = queueDependencies(2);
+    let starts = 0;
+    dependencies.processSessionJob.mockImplementation(() => {
+      starts++;
+      return starts === 1
+        ? new Promise<void>((resolve) => {
+            finish = resolve;
+          })
+        : Promise.resolve();
+    });
+    const queue = createSessionJobQueue(dependencies);
+    const job = createJob("retained");
+    queue.enqueueSessionJob(job, false);
+    queue.cancelSessionJob(job.id);
+    queue.enqueueSessionJob(job, true);
+    queue.enqueueSessionJob(job, true);
+    expect(starts).toBe(1);
+    finish?.();
+    await vi.waitFor(() => expect(starts).toBe(2));
+    await queue.stopSessionJobs();
+    expect(dependencies.processSessionJob).toHaveBeenLastCalledWith(job, true);
+    expect(queue.getSchedulerState().activeCount).toBe(0);
+  });
   it("registers restored jobs without starting them and drains only active work on shutdown", async () => {
     const restored = createJob("restored");
     restored.status = "paused";

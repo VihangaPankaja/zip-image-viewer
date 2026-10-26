@@ -19,7 +19,10 @@ test("storage supports narrow-screen keyboard cleanup, pinning and deliberate de
   await page.goto(appOrigin);
   await page.getByRole("tab", { name: "Explore", exact: true }).click();
   await page.getByRole("button", { name: "Show sessions" }).click();
-  await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
+  await page
+    .getByRole("list", { name: "Sessions", exact: true })
+    .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
+    .click();
   const storage = page.getByRole("button", { name: "Storage", exact: true });
   await storage.focus();
   await page.keyboard.press("Enter");
@@ -42,7 +45,7 @@ test("storage supports narrow-screen keyboard cleanup, pinning and deliberate de
   state.storage.retained = true;
   await storage.click();
   await dialog.getByRole("button", { name: "Delete session files…" }).click();
-  await expect(dialog).toContainText("files needed to download skipped items later");
+  await expect(dialog).toContainText("source data needed to resume later");
   await dialog.getByRole("button", { name: "Keep files" }).click();
   await expect(dialog.getByRole("button", { name: "Delete permanently" })).toHaveCount(0);
   let deleted = false;
@@ -96,10 +99,9 @@ test("touch dismissal returns focus and a cleanup conflict keeps storage usable"
     await tapVisibleTarget(page.getByRole("tab", { name: "Explore", exact: true }));
     await tapVisibleTarget(page.getByRole("button", { name: "Show sessions" }));
     await tapVisibleTarget(
-      page.getByRole("button", {
-        name: "Open Coastal collection",
-        exact: true,
-      }),
+      page
+        .getByRole("list", { name: "Sessions", exact: true })
+        .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ }),
     );
     const storage = page.getByRole("button", { name: "Storage", exact: true });
     await tapVisibleTarget(storage);

@@ -45,7 +45,10 @@ describe("SessionRail", () => {
 
     expect(screen.getByRole("list", { name: "Sessions" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /open brand-kit.zip/i }));
+    expect(screen.getByRole("button", { name: /summer.mp4/ })).toHaveAccessibleName(
+      "Video available summer.mp4 68% · 12 MB/s",
+    );
+    await user.click(screen.getByRole("button", { name: "Ready brand-kit.zip 42 files" }));
 
     expect(onSelect).toHaveBeenCalledWith("session-2");
     expect(screen.getByText("68% · 12 MB/s")).toBeInTheDocument();

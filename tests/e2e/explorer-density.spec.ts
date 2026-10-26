@@ -13,7 +13,10 @@ test("file rows change density and sidebar resizing stays bounded", async ({ pag
   await setCssViewport(page, 1440, 900);
   await page.goto("/");
   await page.getByRole("tab", { name: "Explore" }).click();
-  await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
+  await page
+    .getByRole("list", { name: "Sessions", exact: true })
+    .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
+    .click();
   const density = page.getByRole("combobox", { name: "Row density" });
   const rows = page.getByRole("treeitem");
   await expect(density).toHaveValue("compact");
@@ -90,11 +93,16 @@ test.describe("touch file drawer", () => {
     await page.getByRole("tab", { name: "Explore" }).click();
     await tapVisibleTarget(page.getByRole("button", { name: "Show sessions" }));
     await tapVisibleTarget(
-      page.getByRole("button", { name: "Open Coastal collection", exact: true }),
+      page
+        .getByRole("list", { name: "Sessions", exact: true })
+        .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ }),
     );
     await tapVisibleTarget(page.getByRole("button", { name: "Hide sessions" }));
     await page.getByRole("searchbox", { name: "Search explorer files" }).fill("a-long-filename");
-    const row = page.getByRole("treeitem", { name, exact: true });
+    const row = page.getByRole("treeitem", {
+      name: `${name} ${name.split(".").at(-1)}`,
+      exact: true,
+    });
     await row.scrollIntoViewIfNeeded();
     await expect(row).toHaveAttribute("title", path);
     expect((await row.boundingBox())?.height).toBeCloseTo(44, 3);
@@ -158,7 +166,10 @@ test("10,000-file window follows density and responsive row heights", async ({ p
   await setCssViewport(page, 1440, 900);
   await page.goto("/");
   await page.getByRole("tab", { name: "Explore" }).click();
-  await page.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
+  await page
+    .getByRole("list", { name: "Sessions", exact: true })
+    .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
+    .click();
   const tree = page.getByRole("tree");
   const touchPointer = await page.evaluate(() => matchMedia("(any-pointer: coarse)").matches);
   for (const width of [1440, 390, 820]) {
@@ -167,7 +178,7 @@ test("10,000-file window follows density and responsive row heights", async ({ p
       await page.getByRole("combobox", { name: "Row density" }).selectOption(density);
       await tree.getByRole("treeitem").first().focus();
       await page.keyboard.press("End");
-      const last = page.getByRole("treeitem", { name: "file-09999.txt", exact: true });
+      const last = page.getByRole("treeitem", { name: "file-09999.txt txt", exact: true });
       await expect(last).toBeFocused();
       const height = density === "comfortable" ? 48 : width <= 760 || touchPointer ? 44 : 36;
       await expect.poll(async () => (await last.boundingBox())?.height).toBeCloseTo(height, 3);
@@ -189,14 +200,14 @@ test("10,000-file window follows density and responsive row heights", async ({ p
       expect(visible).toBe(true);
       await page.keyboard.press("Home");
       await expect(
-        page.getByRole("treeitem", { name: "Coastal collection", exact: true }),
+        page.getByRole("treeitem", { name: "Coastal collection Folder", exact: true }),
       ).toBeFocused();
     }
   }
   await setCssViewport(page, 1440, 900);
   await tree.getByRole("treeitem").first().focus();
   await page.keyboard.press("End");
-  const last = page.getByRole("treeitem", { name: "file-09999.txt", exact: true });
+  const last = page.getByRole("treeitem", { name: "file-09999.txt txt", exact: true });
   await expect(last).toBeFocused();
   await setCssViewport(page, 390, 900);
   await expect(last).toBeFocused();

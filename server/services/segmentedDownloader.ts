@@ -1,30 +1,35 @@
-import { createReadStream, createWriteStream } from "node:fs";
-import { stat, rm } from "node:fs/promises";
-import type { IncomingMessage } from "node:http";
+import { rm, rename } from "node:fs/promises";
 import path from "node:path";
-import { pipeline } from "node:stream/promises";
-import got from "got";
+import { mergeSegmentParts } from "../infrastructure/downloads/downloadFiles.js";
 import { sleepWithSignal } from "../infrastructure/runtime/mediaClassification.js";
-import {
-  assertPublicDownloadUrl,
-  validateDownloadResponse,
-} from "../infrastructure/downloads/publicDownload.js";
-import {
-  prepareDownloadFiles,
-  reusableDownloadBytes,
-} from "../infrastructure/downloads/downloadFiles.js";
+import { streamSingleRange } from "../infrastructure/downloads/rangeDownload.js";
 import {
   assertResourceSize,
   MAX_RESOURCE_BYTES,
   reserveStorage,
-  createDownloadBudget,
 } from "../infrastructure/runtime/resourceLimits.js";
+
+import type { HttpDownloadState } from "../../shared/contracts.js";
+import {
+  rangeValidator,
+  reconcileHttpFiles,
+  verifyHttpSource,
+  prepareHttpCheckpoint,
+  type HttpCheckpoint,
+  type HttpFileCheckpoint,
+} from "../infrastructure/downloads/httpCheckpoint.js";
 
 const UNLIMITED_RETRIES = -1;
 const RETRY_BASE_DELAY_MS = 1200;
 
 type DownloadState = { downloadedBytes: number };
-type RemoteMetadata = { acceptRanges: boolean; size: number };
+type RemoteMetadata = {
+  acceptRanges: boolean;
+  size: number;
+  etag?: string;
+  lastModified?: string;
+  resolvedUrl?: string;
+};
 type DownloadSettings = {
   enableResume: boolean;
   enableMultithread: boolean;
@@ -32,19 +37,6 @@ type DownloadSettings = {
   maxRetries: number;
 };
 type Segment = { index: number; start: number; end: number };
-type RangeRequest = {
-  url: string;
-  targetPath: string;
-  requestedStart: number;
-  requestedEnd: number;
-  state: DownloadState;
-  signal: AbortSignal;
-  strictRange: boolean;
-  append: boolean;
-  responseHeader?: (_statusCode: number, _encoded: boolean) => void;
-  checkStorage: (_receivedBytes: number) => void;
-  maxBytes: number;
-};
 
 function getErrorProperty(error: unknown, property: "name" | "code"): string {
   if (error instanceof Error && property === "name") return error.name;
@@ -54,10 +46,6 @@ function getErrorProperty(error: unknown, property: "name" | "code"): string {
 }
 
 function buildSegments(totalSize: number, segmentCount: number): Segment[] {
-  if (!Number.isFinite(totalSize) || totalSize <= 0 || segmentCount <= 1) {
-    return [];
-  }
-
   const safeCount = Math.max(1, Math.min(totalSize, Math.floor(segmentCount)));
   const sizePerSegment = Math.floor(totalSize / safeCount);
   const segments: Segment[] = [];
@@ -72,85 +60,6 @@ function buildSegments(totalSize: number, segmentCount: number): Segment[] {
   return segments;
 }
 
-async function streamSingleRange({
-  url,
-  targetPath,
-  requestedStart,
-  requestedEnd,
-  state,
-  signal,
-  strictRange,
-  append,
-  responseHeader,
-  checkStorage,
-  maxBytes,
-}: RangeRequest): Promise<void> {
-  const headers: Record<string, string> = { "accept-encoding": "identity" };
-  if (Number.isFinite(requestedStart) && Number.isFinite(requestedEnd)) {
-    headers.Range = `bytes=${String(requestedStart)}-${String(requestedEnd)}`;
-  }
-
-  const request = got.stream(url, {
-    headers,
-    retry: { limit: 0 },
-    throwHttpErrors: false,
-    signal,
-    hooks: {
-      beforeRedirect: [
-        (options) => {
-          if (options.url) assertPublicDownloadUrl(options.url);
-        },
-      ],
-    },
-  });
-
-  const responseState = { checked: false };
-  let allowedBytes = maxBytes;
-  request.once("response", (response: IncomingMessage) => {
-    responseState.checked = true;
-    try {
-      const { statusCode, encoded } = validateDownloadResponse(
-        response,
-        Boolean(headers.Range),
-        strictRange,
-      );
-      if (encoded) allowedBytes = MAX_RESOURCE_BYTES;
-      responseHeader?.(statusCode, encoded);
-    } catch (error) {
-      request.destroy(error instanceof Error ? error : new Error(String(error)));
-    }
-  });
-
-  const budget = createDownloadBudget(() => allowedBytes, state, checkStorage);
-
-  await pipeline(
-    request,
-    budget,
-    createWriteStream(targetPath, {
-      flags: append ? "a" : "w",
-    }),
-  );
-
-  if (!responseState.checked) throw new Error("Download failed before response was received.");
-}
-
-async function reserveDownloadStorage(
-  targetPath: string,
-  metadata: RemoteMetadata,
-  settings: DownloadSettings,
-  segmented: boolean,
-) {
-  const existingBytes = await prepareDownloadFiles(targetPath, {
-    size: metadata.size,
-    resume: settings.enableResume && metadata.acceptRanges && metadata.size > 0,
-    segments: segmented ? buildSegments(metadata.size, settings.threadCount) : undefined,
-  });
-  return reserveStorage(
-    path.dirname(targetPath),
-    Math.max(0, metadata.size * (segmented ? 2 : 1) - existingBytes),
-  );
-}
-
 async function downloadSingleWithResume({
   url,
   targetPath,
@@ -159,6 +68,9 @@ async function downloadSingleWithResume({
   settings,
   signal,
   storage,
+  validator,
+  retained,
+  save,
 }: {
   url: string;
   targetPath: string;
@@ -167,11 +79,12 @@ async function downloadSingleWithResume({
   settings: DownloadSettings;
   signal: AbortSignal;
   storage: ReturnType<typeof reserveStorage>;
+  validator: string;
+  retained: HttpDownloadState;
+  save: () => void;
 }): Promise<void> {
-  let existingBytes = 0;
-  if (settings.enableResume) {
-    existingBytes = (await stat(targetPath).catch(() => null))?.size || 0;
-  }
+  const file = retained.files[0];
+  const existingBytes = file.bytes;
 
   state.downloadedBytes = existingBytes;
 
@@ -189,27 +102,31 @@ async function downloadSingleWithResume({
     state,
     signal,
     strictRange: shouldRangeResume,
-    append: shouldRangeResume,
     checkStorage: storage.check,
     maxBytes: (metadata.size || MAX_RESOURCE_BYTES) - start,
-    responseHeader: (statusCode, encoded) => {
-      if (encoded) storage.reserveAvailable();
-      if (shouldRangeResume && statusCode !== 206) {
-        void rm(targetPath, { force: true }).catch(() => undefined);
+    validator,
+    totalSize: metadata.size,
+    resolvedUrl: shouldRangeResume ? retained.resolvedUrl : metadata.resolvedUrl,
+    file,
+    save,
+    responseHeader: (response, encoded) => {
+      if (!shouldRangeResume) {
+        metadata.size = Number(response.headers["content-length"]) || 0;
+        metadata.resolvedUrl = (response.url || metadata.resolvedUrl || url).split("#", 1)[0];
+        metadata.etag = response.headers.etag;
+        metadata.lastModified = response.headers["last-modified"];
       }
+      if (encoded) {
+        storage.reserveAvailable();
+        metadata.size = 0;
+      }
+      retained.resolvedUrl = metadata.resolvedUrl || retained.resolvedUrl;
+      retained.size = metadata.size;
+      retained.validator = rangeValidator(metadata);
+      file.end = metadata.size ? metadata.size - 1 : null;
+      save();
     },
   });
-}
-
-async function mergeSegmentParts(partPaths: string[], targetPath: string): Promise<void> {
-  for (const [index, sourcePath] of partPaths.entries()) {
-    await pipeline(
-      createReadStream(sourcePath),
-      createWriteStream(targetPath, {
-        flags: index === 0 ? "w" : "a",
-      }),
-    );
-  }
 }
 
 async function downloadSegmentWithRetry({
@@ -220,6 +137,11 @@ async function downloadSegmentWithRetry({
   state,
   signal,
   checkStorage,
+  validator,
+  totalSize,
+  resolvedUrl,
+  file,
+  save,
 }: {
   url: string;
   segment: Segment;
@@ -228,6 +150,11 @@ async function downloadSegmentWithRetry({
   state: DownloadState;
   signal: AbortSignal;
   checkStorage: (_receivedBytes: number) => void;
+  validator: string;
+  totalSize: number;
+  resolvedUrl: string;
+  file: HttpFileCheckpoint;
+  save: () => void;
 }): Promise<string> {
   const partPath = `${targetPath}.part.${String(segment.index)}`;
 
@@ -241,11 +168,11 @@ async function downloadSegmentWithRetry({
     }
 
     try {
-      const existingBytes = await reusableDownloadBytes(
-        partPath,
-        segment.end - segment.start + 1,
-        settings.enableResume,
-      );
+      const previousBytes = file.bytes;
+      if (!settings.enableResume) file.bytes = 0;
+      await reconcileHttpFiles(targetPath, { files: [file] });
+      state.downloadedBytes += file.bytes - previousBytes;
+      const existingBytes = file.bytes;
 
       const start = segment.start + existingBytes;
       if (start > segment.end) {
@@ -260,9 +187,13 @@ async function downloadSegmentWithRetry({
         state,
         signal,
         strictRange: true,
-        append: existingBytes > 0,
         checkStorage,
         maxBytes: segment.end - start + 1,
+        validator,
+        totalSize,
+        resolvedUrl,
+        file,
+        save,
       });
 
       return partPath;
@@ -271,6 +202,7 @@ async function downloadSegmentWithRetry({
         getErrorProperty(error, "name") === "AbortError" ||
         getErrorProperty(error, "code") === "RANGE_UNSUPPORTED" ||
         getErrorProperty(error, "code") === "DOWNLOAD_FATAL" ||
+        getErrorProperty(error, "code") === "SOURCE_CHANGED" ||
         (settings.maxRetries !== UNLIMITED_RETRIES && attempt >= settings.maxRetries)
       ) {
         throw error;
@@ -284,6 +216,16 @@ async function downloadSegmentWithRetry({
   throw new Error("Segment download failed.");
 }
 
+type DownloadInput = {
+  url: string;
+  targetPath: string;
+  signal: AbortSignal;
+  settings: DownloadSettings;
+  state: DownloadState;
+  metadata: RemoteMetadata;
+  checkpoint?: HttpCheckpoint;
+};
+
 export async function downloadWithSegmentedManager({
   url,
   targetPath,
@@ -291,24 +233,37 @@ export async function downloadWithSegmentedManager({
   settings,
   state,
   metadata,
-}: {
-  url: string;
-  targetPath: string;
-  signal: AbortSignal;
-  settings: DownloadSettings;
-  state: DownloadState;
-  metadata: RemoteMetadata;
-}): Promise<void> {
+  checkpoint,
+}: DownloadInput): Promise<void> {
   assertResourceSize(metadata.size);
+  const validator = rangeValidator(metadata);
   const canUseSegments =
     settings.enableMultithread &&
     settings.threadCount > 1 &&
     metadata.acceptRanges &&
-    metadata.size > 0;
+    metadata.size > 0 &&
+    Boolean(validator);
 
-  const storage = await reserveDownloadStorage(targetPath, metadata, settings, canUseSegments);
-  const controller = new AbortController();
-  signal = AbortSignal.any([signal, controller.signal]);
+  const segments = canUseSegments ? buildSegments(metadata.size, settings.threadCount) : [];
+  const files: HttpDownloadState["files"] = (
+    canUseSegments
+      ? segments
+      : [{ index: -1, start: 0, end: metadata.size ? metadata.size - 1 : null }]
+  ).map((file) => ({ ...file, bytes: 0, sha256: "" }));
+  const { retained, save, reusedBytes } = await prepareHttpCheckpoint(
+    targetPath,
+    metadata,
+    files,
+    url,
+    checkpoint,
+    settings.enableResume,
+    canUseSegments ? segments : undefined,
+  );
+  state.downloadedBytes = reusedBytes;
+  const storage = reserveStorage(
+    path.dirname(targetPath),
+    Math.max(0, metadata.size * (canUseSegments ? 2 : 1) - reusedBytes),
+  );
   try {
     if (!metadata.size) storage.reserveAvailable();
     if (!canUseSegments) {
@@ -320,46 +275,93 @@ export async function downloadWithSegmentedManager({
         settings,
         signal,
         storage,
+        validator,
+        retained,
+        save,
       });
+      retained.size = metadata.size || state.downloadedBytes;
+      retained.files[0].end = retained.size ? retained.size - 1 : null;
+      state.downloadedBytes = await verifyHttpSource(targetPath, metadata.size, retained, save);
       return;
     }
 
-    const segments = buildSegments(metadata.size, settings.threadCount);
-    const results = await Promise.allSettled(
-      segments.map((segment) =>
-        downloadSegmentWithRetry({
-          url,
-          segment,
-          targetPath,
-          settings,
-          state,
-          signal,
-          checkStorage: storage.check,
-        }).catch((error: unknown) => {
-          controller.abort(error);
-          throw error;
-        }),
-      ),
-    );
-    controller.signal.throwIfAborted();
-    const partPaths = results.map((result) => {
-      if (result.status === "rejected") throw result.reason;
-      return result.value;
+    await downloadSegments({
+      url,
+      targetPath,
+      signal,
+      settings,
+      state,
+      metadata,
+      segments,
+      retained,
+      save,
+      storage,
+      validator,
     });
-
-    storage.check();
-
-    await mergeSegmentParts(partPaths, targetPath);
-
+    state.downloadedBytes = await verifyHttpSource(targetPath, metadata.size, retained, save);
     await Promise.all(
-      partPaths.map((partPath) => rm(partPath, { force: true }).catch(() => undefined)),
+      segments.map(({ index }) => rm(`${targetPath}.part.${index}`, { force: true })),
     );
-
-    const finishedStat = await stat(targetPath).catch(() => null);
-    if (!finishedStat?.isFile()) throw new Error("Download did not produce a file.");
-
-    state.downloadedBytes = finishedStat.size;
   } finally {
     storage.release();
   }
+}
+
+async function downloadSegments(
+  input: DownloadInput & {
+    segments: Segment[];
+    retained: HttpDownloadState;
+    save: () => void;
+    storage: ReturnType<typeof reserveStorage>;
+    validator: string;
+  },
+) {
+  const {
+    url,
+    targetPath,
+    settings,
+    state,
+    metadata,
+    segments,
+    retained,
+    save,
+    storage,
+    validator,
+  } = input;
+  const controller = new AbortController();
+  const signal = AbortSignal.any([input.signal, controller.signal]);
+  const results = await Promise.allSettled(
+    segments.map((segment) =>
+      downloadSegmentWithRetry({
+        url,
+        segment,
+        targetPath,
+        settings,
+        state,
+        signal,
+        checkStorage: storage.check,
+        validator,
+        totalSize: metadata.size,
+        resolvedUrl: metadata.resolvedUrl || url,
+        file: retained.files[segment.index],
+        save,
+      }).catch((error: unknown) => {
+        controller.abort(error);
+        throw error;
+      }),
+    ),
+  );
+  controller.signal.throwIfAborted();
+  const partPaths = results.map((result) => {
+    if (result.status === "rejected") throw result.reason;
+    return result.value;
+  });
+
+  storage.check();
+
+  const assemblyPath = `${targetPath}.assembling`;
+  await rm(assemblyPath, { force: true });
+  await mergeSegmentParts(partPaths, assemblyPath, signal);
+  signal.throwIfAborted();
+  await rename(assemblyPath, targetPath);
 }

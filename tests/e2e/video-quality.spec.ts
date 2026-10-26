@@ -199,7 +199,10 @@ test("switches HLS quality and resumes real playback after reopening", async ({
     });
     await page.goto("/");
     await page.getByRole("tab", { name: "Explore" }).click();
-    await page.getByRole("button", { name: `Open ${filePath}` }).click();
+    await page
+      .getByRole("list", { name: "Sessions", exact: true })
+      .getByRole("button", { name: filePath })
+      .click();
     const video = page.getByLabel("Video preview");
     await page.getByText("Video settings", { exact: true }).click();
     await expect(page.getByText(/Auto · (360|720)p playback/)).toBeVisible({
@@ -321,7 +324,10 @@ test("switches HLS quality and resumes real playback after reopening", async ({
     const reopen = async () => {
       await page.reload();
       await page.getByRole("tab", { name: "Explore" }).click();
-      await page.getByRole("button", { name: `Open ${filePath}` }).click();
+      await page
+        .getByRole("list", { name: "Sessions", exact: true })
+        .getByRole("button", { name: filePath })
+        .click();
     };
     await reopen();
     await continuePlayback();

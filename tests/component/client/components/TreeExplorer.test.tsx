@@ -34,14 +34,16 @@ it("navigates folders and selects files with the keyboard", () => {
   render(<TreeExplorer rootNode={root} selectedPath="photos/cover.jpg" onSelect={onSelect} />);
   const tree = screen.getByRole("tree");
   fireEvent.keyDown(tree, { key: "Home" });
-  expect(screen.getByRole("treeitem", { name: "Archive" })).toHaveFocus();
+  expect(screen.getByRole("treeitem", { name: "Archive Folder" })).toHaveFocus();
   fireEvent.keyDown(tree, { key: "ArrowRight" });
-  const photos = screen.getByRole("treeitem", { name: "Photos" });
+  const photos = screen.getByRole("treeitem", { name: "Photos Folder" });
+  expect(photos).toHaveAccessibleName("Photos Folder");
   expect(photos).toHaveFocus();
   fireEvent.keyDown(tree, { key: "ArrowRight" });
   expect(photos).toHaveAttribute("aria-expanded", "true");
   fireEvent.keyDown(tree, { key: "ArrowDown" });
-  const cover = screen.getByRole("treeitem", { name: "Cover" });
+  const cover = screen.getByRole("treeitem", { name: "Cover jpg" });
+  expect(cover).toHaveAccessibleName("Cover jpg");
   expect(cover).toHaveFocus();
   expect(cover).toHaveAttribute("aria-selected", "true");
   fireEvent.keyDown(tree, { key: "Enter" });
@@ -51,9 +53,9 @@ it("navigates folders and selects files with the keyboard", () => {
   fireEvent.keyDown(tree, { key: "ArrowLeft" });
   expect(photos).toHaveAttribute("aria-expanded", "false");
   fireEvent.keyDown(tree, { key: "End" });
-  expect(screen.getByRole("treeitem", { name: "sample.bin" })).toHaveFocus();
+  expect(screen.getByRole("treeitem", { name: "sample.bin bin" })).toHaveFocus();
   fireEvent.keyDown(tree, { key: "ArrowUp" });
-  expect(screen.getByRole("treeitem", { name: "sample.zip" })).toHaveFocus();
+  expect(screen.getByRole("treeitem", { name: "sample.zip zip" })).toHaveFocus();
   fireEvent.keyDown(tree, { key: " " });
   expect(onSelect).toHaveBeenLastCalledWith(expect.objectContaining({ path: "sample.zip" }));
 });
@@ -61,8 +63,8 @@ it("navigates folders and selects files with the keyboard", () => {
 it("supports pointer activation and resets navigation when the archive changes", () => {
   const onSelect = vi.fn();
   const { rerender } = render(<TreeExplorer rootNode={root} selectedPath="" onSelect={onSelect} />);
-  fireEvent.click(screen.getByRole("treeitem", { name: "Photos" }));
-  fireEvent.click(screen.getByRole("treeitem", { name: "Cover" }));
+  fireEvent.click(screen.getByRole("treeitem", { name: "Photos Folder" }));
+  fireEvent.click(screen.getByRole("treeitem", { name: "Cover jpg" }));
   expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ path: "photos/cover.jpg" }));
   rerender(
     <TreeExplorer
@@ -80,23 +82,26 @@ it("supports pointer activation and resets navigation when the archive changes",
 it("filters media while preserving folder expansion, order and keyboard selection", () => {
   const onSelect = vi.fn();
   render(<TreeExplorer rootNode={root} selectedPath="photos/cover.jpg" onSelect={onSelect} />);
-  fireEvent.click(screen.getByRole("treeitem", { name: "Photos" }));
+  fireEvent.click(screen.getByRole("treeitem", { name: "Photos Folder" }));
   const filter = screen.getByRole("combobox", { name: "Media type" });
   fireEvent.change(filter, { target: { value: "image" } });
-  expect(screen.getAllByRole("treeitem").map((item) => item.getAttribute("aria-label"))).toEqual([
-    "Archive",
-    "Photos",
-    "Cover",
-  ]);
-  expect(screen.getByRole("treeitem", { name: "Cover" })).toHaveAttribute("aria-selected", "true");
+  expect(screen.getAllByRole("treeitem")).toEqual(
+    ["Archive Folder", "Photos Folder", "Cover jpg"].map((name) =>
+      screen.getByRole("treeitem", { name }),
+    ),
+  );
+  expect(screen.getByRole("treeitem", { name: "Cover jpg" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
   fireEvent.keyDown(screen.getByRole("tree"), { key: "End" });
   fireEvent.keyDown(screen.getByRole("tree"), { key: "Enter" });
   expect(onSelect).toHaveBeenLastCalledWith(expect.objectContaining({ path: "photos/cover.jpg" }));
   fireEvent.change(filter, { target: { value: "video" } });
-  expect(screen.queryByRole("treeitem", { name: "Photos" })).not.toBeInTheDocument();
-  expect(screen.getByRole("treeitem", { name: "sample.mp4" })).toBeVisible();
+  expect(screen.queryByRole("treeitem", { name: "Photos Folder" })).not.toBeInTheDocument();
+  expect(screen.getByRole("treeitem", { name: "sample.mp4 mp4" })).toBeVisible();
   fireEvent.change(filter, { target: { value: "all" } });
-  expect(screen.getByRole("treeitem", { name: "Cover" })).toBeVisible();
+  expect(screen.getByRole("treeitem", { name: "Cover jpg" })).toBeVisible();
 });
 
 it("shows an empty filter result without selecting a folder", () => {
@@ -132,13 +137,13 @@ it("filters a single-file root and restores it after no matches", () => {
   );
   const filter = screen.getByRole("combobox", { name: "Media type" });
   fireEvent.change(filter, { target: { value: "video" } });
-  fireEvent.click(screen.getByRole("treeitem", { name: "movie.mp4" }));
+  fireEvent.click(screen.getByRole("treeitem", { name: "movie.mp4 mp4" }));
   expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ path: "movie.mp4" }));
   fireEvent.change(filter, { target: { value: "image" } });
   expect(screen.queryByRole("tree")).not.toBeInTheDocument();
   expect(screen.getByRole("status")).toHaveTextContent("No files match this media type.");
   fireEvent.change(filter, { target: { value: "all" } });
-  expect(screen.getByRole("treeitem", { name: "movie.mp4" })).toHaveAttribute(
+  expect(screen.getByRole("treeitem", { name: "movie.mp4 mp4" })).toHaveAttribute(
     "aria-selected",
     "true",
   );
@@ -150,19 +155,19 @@ it("finds nested files by path while retaining order, folder context and prior e
     name: "Search explorer files",
   });
   fireEvent.change(search, { target: { value: "PHOTOS" } });
-  expect(screen.getAllByRole("treeitem").map((item) => item.getAttribute("aria-label"))).toEqual([
-    "Archive",
-    "Photos",
-    "Cover",
-  ]);
+  expect(screen.getAllByRole("treeitem")).toEqual(
+    ["Archive Folder", "Photos Folder", "Cover jpg"].map((name) =>
+      screen.getByRole("treeitem", { name }),
+    ),
+  );
   fireEvent.change(search, { target: { value: "unmatched" } });
   expect(screen.queryByRole("tree")).not.toBeInTheDocument();
   fireEvent.change(search, { target: { value: "" } });
-  expect(screen.getByRole("treeitem", { name: "Photos" })).toHaveAttribute(
+  expect(screen.getByRole("treeitem", { name: "Photos Folder" })).toHaveAttribute(
     "aria-expanded",
     "false",
   );
-  expect(screen.queryByRole("treeitem", { name: "Cover" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("treeitem", { name: "Cover jpg" })).not.toBeInTheDocument();
 });
 
 it("keeps a large tree bounded and focuses an initially unmounted last file", async () => {
@@ -178,24 +183,27 @@ it("keeps a large tree bounded and focuses an initially unmounted last file", as
   render(<TreeExplorer rootNode={largeRoot} selectedPath="" onSelect={vi.fn()} />);
   expect(screen.getAllByRole("treeitem").length).toBeLessThan(100);
   fireEvent.keyDown(screen.getByRole("tree"), { key: "End" });
-  expect(await screen.findByRole("treeitem", { name: "episode-9999.txt" })).toHaveFocus();
-  expect(screen.getByRole("treeitem", { name: "episode-9999.txt" })).toHaveAttribute(
+  expect(await screen.findByRole("treeitem", { name: "episode-9999.txt txt" })).toHaveFocus();
+  expect(screen.getByRole("treeitem", { name: "episode-9999.txt txt" })).toHaveAttribute(
     "aria-posinset",
     "10000",
   );
   fireEvent.keyDown(screen.getByRole("tree"), { key: "Home" });
-  expect(await screen.findByRole("treeitem", { name: "Archive" })).toHaveFocus();
+  expect(await screen.findByRole("treeitem", { name: "Archive Folder" })).toHaveFocus();
 });
 
 it("switches row density without losing selection or folder expansion", () => {
   render(<TreeExplorer rootNode={root} selectedPath="photos/cover.jpg" onSelect={vi.fn()} />);
-  fireEvent.click(screen.getByRole("treeitem", { name: "Photos" }));
+  fireEvent.click(screen.getByRole("treeitem", { name: "Photos Folder" }));
   const density = screen.getByRole("combobox", { name: "Row density" });
   expect(density).toHaveValue("compact");
   fireEvent.change(density, { target: { value: "comfortable" } });
   expect(screen.getByRole("tree")).toHaveAttribute("data-density", "comfortable");
-  expect(screen.getByRole("treeitem", { name: "Cover" })).toHaveAttribute("aria-selected", "true");
-  expect(screen.getByRole("treeitem", { name: "Cover" })).toHaveAttribute(
+  expect(screen.getByRole("treeitem", { name: "Cover jpg" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  expect(screen.getByRole("treeitem", { name: "Cover jpg" })).toHaveAttribute(
     "title",
     "photos/cover.jpg",
   );
@@ -205,7 +213,7 @@ it("does not restore a completed tree focus request after the user leaves the tr
   const onSelect = vi.fn();
   const { rerender } = render(<TreeExplorer rootNode={root} selectedPath="" onSelect={onSelect} />);
   fireEvent.keyDown(screen.getByRole("tree"), { key: "Home" });
-  expect(screen.getByRole("treeitem", { name: "Archive" })).toHaveFocus();
+  expect(screen.getByRole("treeitem", { name: "Archive Folder" })).toHaveFocus();
   const search = screen.getByRole("searchbox", {
     name: "Search explorer files",
   });

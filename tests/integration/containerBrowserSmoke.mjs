@@ -134,14 +134,22 @@ try {
     });
     await page.goto(origin);
     await page.getByRole("tab", { name: "Explore" }).click();
-    await page.getByRole("button", { name: "Open " + firstFilePath }).click();
+    await page
+      .getByRole("list", { name: "Sessions", exact: true })
+      .getByRole("button", { name: firstFilePath })
+      .click();
     if (file !== firstFilePath) {
       const folder = page.getByRole("treeitem", {
-        name: path.dirname(file),
+        name: `${path.dirname(file)} Folder`,
         exact: true,
       });
       if ((await folder.getAttribute("aria-expanded")) === "false") await folder.click();
-      await page.getByRole("treeitem", { name: path.basename(file), exact: true }).click();
+      await page
+        .getByRole("treeitem", {
+          name: `${path.basename(file)} ${path.extname(file).slice(1)}`,
+          exact: true,
+        })
+        .click();
     }
     const { defaultQuality } = (await (await qualitiesResponse).json()).json;
     const compatible = file !== "direct/unsupported-mpeg4.mp4";

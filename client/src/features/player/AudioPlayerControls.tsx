@@ -61,7 +61,7 @@ function AudioTransport({ player }: { player: AudioPlayback }) {
       <button
         className="ghost-button"
         type="button"
-        aria-label="Back 10 seconds"
+        aria-label="−10s, Back 10 seconds"
         disabled={!player.media.duration}
         onClick={() => player.seek(player.media.time - 10)}
       >
@@ -79,7 +79,7 @@ function AudioTransport({ player }: { player: AudioPlayback }) {
       <button
         className="ghost-button"
         type="button"
-        aria-label="Forward 10 seconds"
+        aria-label="+10s, Forward 10 seconds"
         disabled={!player.media.duration}
         onClick={() => player.seek(player.media.time + 10)}
       >

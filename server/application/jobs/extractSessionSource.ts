@@ -1,5 +1,5 @@
 import { createWriteStream } from "node:fs";
-import { mkdir, rename, stat } from "node:fs/promises";
+import { copyFile, mkdir, rename, stat } from "node:fs/promises";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Transform } from "node:stream";
@@ -102,13 +102,25 @@ async function extractZip(
   }
 }
 
-async function moveDirectMedia(archivePath: string, extractDir: string): Promise<ExtractedEntry> {
+async function moveDirectMedia(
+  archivePath: string,
+  extractDir: string,
+  preserveSource: boolean,
+  sourceName: string,
+): Promise<ExtractedEntry> {
   const mediaDir = path.join(extractDir, "direct");
   await mkdir(mediaDir, { recursive: true });
-  const mediaPath = path.join(mediaDir, path.basename(archivePath));
-  await rename(archivePath, mediaPath);
+  const mediaPath = path.join(mediaDir, sourceName);
+  if (preserveSource) {
+    const storage = reserveStorage(extractDir, (await stat(archivePath)).size);
+    try {
+      await copyFile(archivePath, mediaPath);
+    } finally {
+      storage.release();
+    }
+  } else await rename(archivePath, mediaPath);
   return {
-    relativePath: `direct/${path.basename(archivePath)}`,
+    relativePath: `direct/${sourceName}`,
     type: "file",
     size: (await stat(mediaPath)).size,
     modifiedAt: Date.now(),
@@ -123,7 +135,17 @@ export async function extractSessionSource(
 ): Promise<ExtractedEntry[]> {
   const detected = await fileTypeFromFile(archivePath).catch(() => undefined);
   const kind = classifyDetectedType(archivePath, detected);
-  if (kind !== "archive") return [await moveDirectMedia(archivePath, extractDir)];
+  if (kind !== "archive")
+    return [
+      await moveDirectMedia(
+        archivePath,
+        extractDir,
+        !!job.storageRoot,
+        job.sourceKind === "http"
+          ? path.basename(new URL(job.url).pathname) || "download.bin"
+          : path.basename(archivePath),
+      ),
+    ];
   if (await deps.detectEncryption(archivePath)) {
     throw new Error("Password-protected archives are not currently supported in this flow.");
   }

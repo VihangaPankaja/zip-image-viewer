@@ -37,7 +37,10 @@ function percentiles(samples: number[]) {
 async function resetPlayer(page: Page) {
   await page.reload();
   await page.getByRole("tab", { name: "Explore" }).click();
-  await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
+  await page
+    .getByRole("list", { name: "Sessions", exact: true })
+    .getByRole("button", { name: "multilingual.mkv" })
+    .click();
   await page.getByText("Video settings", { exact: true }).click();
   await page.getByRole("combobox", { name: "Audio language" }).selectOption({ label: "Spanish" });
   const video = page.getByLabel("Video preview");
@@ -65,7 +68,10 @@ test("cold hour seeks, crosses windows and preserves alternate audio on desktop 
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(fixture.origin);
     await page.getByRole("tab", { name: "Explore" }).click();
-    await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
+    await page
+      .getByRole("list", { name: "Sessions", exact: true })
+      .getByRole("button", { name: "multilingual.mkv" })
+      .click();
     await page.getByText("Video settings", { exact: true }).click();
     const video = page.getByLabel("Video preview");
     await expect

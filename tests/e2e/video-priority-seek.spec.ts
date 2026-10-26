@@ -23,7 +23,10 @@ test("retained short video is prepared before opening and plays near its end", a
       await expect.poll(() => entry.renditions.get(id)?.status, { timeout: 30_000 }).toBe("done");
     await page.goto(fixture.origin);
     await page.getByRole("tab", { name: "Explore" }).click();
-    await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
+    await page
+      .getByRole("list", { name: "Sessions", exact: true })
+      .getByRole("button", { name: "multilingual.mkv" })
+      .click();
     const video = page.getByLabel("Video preview");
     await expect
       .poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState), {
@@ -63,7 +66,10 @@ test("long video supports two viewers, pointer seeking and narrow touch/keyboard
     for (const viewer of [page, other]) {
       await viewer.goto(fixture.origin);
       await viewer.getByRole("tab", { name: "Explore" }).click();
-      await viewer.getByRole("button", { name: "Open multilingual.mkv" }).click();
+      await viewer
+        .getByRole("list", { name: "Sessions", exact: true })
+        .getByRole("button", { name: "multilingual.mkv" })
+        .click();
       await expect
         .poll(() => viewer.locator("video").evaluate((v: HTMLVideoElement) => v.readyState), {
           timeout: 30_000,

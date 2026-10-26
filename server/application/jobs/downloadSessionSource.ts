@@ -1,4 +1,9 @@
-import { rm } from "node:fs/promises";
+import { lstat } from "node:fs/promises";
+import {
+  hashDownloadFile,
+  rangeValidator,
+  type HttpCheckpoint,
+} from "../../infrastructure/downloads/httpCheckpoint.js";
 import { CONFIRM_SIZE_BYTES, PROGRESS_EMIT_INTERVAL_MS } from "../../config/runtimeConstants.js";
 import type { SessionJob } from "../../domain/models.js";
 import type { DownloadSettings } from "../downloads/downloadOptions.js";
@@ -30,6 +35,7 @@ export type DownloadSourceDependencies = {
     state: DownloadState;
     metadata: RemoteMetadata;
     confirmOversize: boolean;
+    checkpoint?: HttpCheckpoint;
   }) => Promise<void>;
 };
 
@@ -67,13 +73,11 @@ function isRetryable(error: unknown): boolean {
   return status ? status >= 500 || status === 408 || status === 429 : true;
 }
 
-async function pauseForConfirmation(
+function pauseForConfirmation(
   job: SessionJob,
-  workspaceDir: string,
   size: number,
   deps: DownloadSourceDependencies,
-): Promise<void> {
-  await rm(workspaceDir, { recursive: true, force: true });
+): void {
   deps.emitJob(
     job,
     {
@@ -117,6 +121,14 @@ async function retryDownload(
         state,
         metadata,
         confirmOversize: input.confirmOversize,
+        checkpoint: {
+          current: job.httpDownload,
+          save: (httpDownload) => {
+            deps.emitJob(job, { httpDownload });
+            if (job.status === "error" && job.abortController?.signal.aborted)
+              job.abortController.signal.throwIfAborted();
+          },
+        },
       });
       return "complete";
     } catch (error) {
@@ -126,12 +138,42 @@ async function retryDownload(
         !isRetryable(error)
       )
         throw error;
+      Object.assign(
+        metadata,
+        await fetchRemoteMetadata(input.url, job.abortController?.signal ?? AbortSignal.abort()),
+      );
+      if (metadata.size > CONFIRM_SIZE_BYTES && !input.confirmOversize) {
+        state.downloadedBytes = metadata.size;
+        return "paused";
+      }
       const delay = RETRY_BASE_DELAY_MS * 2 ** attempt + Math.floor(Math.random() * 400);
       state.statusText = `Download failed, retrying in ${(delay / 1_000).toFixed(1)}s`;
       await sleepWithSignal(delay, job.abortController?.signal ?? AbortSignal.abort());
     }
   }
   throw new Error("Download retries exhausted.");
+}
+
+async function reuseVerifiedSource(
+  job: SessionJob,
+  input: { zipPath: string; confirmOversize: boolean },
+  deps: DownloadSourceDependencies,
+): Promise<"complete" | "paused" | null> {
+  if (!job.httpDownload?.completedSha256) return null;
+  const source = await lstat(input.zipPath).catch(() => null);
+  if (
+    !source?.isFile() ||
+    (await hashDownloadFile(input.zipPath)) !== job.httpDownload.completedSha256
+  ) {
+    deps.emitJob(job, { httpDownload: undefined });
+    return null;
+  }
+  if (source.size > CONFIRM_SIZE_BYTES && !input.confirmOversize) {
+    pauseForConfirmation(job, source.size, deps);
+    return "paused";
+  }
+  deps.emitJob(job, { downloadedBytes: source.size, reportedSize: source.size, percent: 100 });
+  return "complete";
 }
 
 export async function downloadSessionSource(
@@ -145,6 +187,8 @@ export async function downloadSessionSource(
   },
   deps: DownloadSourceDependencies,
 ): Promise<"complete" | "paused"> {
+  const reused = await reuseVerifiedSource(job, input, deps);
+  if (reused) return reused;
   const state: DownloadState = {
     downloadedBytes: 0,
     reportedSize: 0,
@@ -161,25 +205,37 @@ export async function downloadSessionSource(
   const metadata = await fetchRemoteMetadata(input.url, signal);
   state.reportedSize = metadata.size;
   if (metadata.size > CONFIRM_SIZE_BYTES && !input.confirmOversize) {
-    await pauseForConfirmation(job, input.workspaceDir, metadata.size, deps);
+    deps.emitJob(job, {
+      httpDownload: job.httpDownload ?? {
+        originalUrl: input.url,
+        resolvedUrl: metadata.resolvedUrl || input.url,
+        size: metadata.size,
+        validator: rangeValidator(metadata),
+        completedSha256: "",
+        files: [{ index: -1, start: 0, end: metadata.size - 1, bytes: 0, sha256: "" }],
+      },
+    });
+    pauseForConfirmation(job, metadata.size, deps);
     return "paused";
   }
   job.threadMode =
     settings.threadMode === "auto"
-      ? settings.enableMultithread && metadata.acceptRanges
+      ? settings.enableMultithread && metadata.acceptRanges && Boolean(rangeValidator(metadata))
         ? "segmented"
         : "single"
       : settings.threadMode;
   job.threadCount = job.threadMode === "segmented" ? settings.threadCount : 1;
-  job.canResume = settings.enableResume && metadata.acceptRanges;
+  job.canResume =
+    settings.enableResume && metadata.acceptRanges && Boolean(rangeValidator(metadata));
   job.canPause = job.canResume;
   monitor.start();
   try {
     const result = await retryDownload(job, settings, state, metadata, input, deps);
     if (result === "paused") {
-      await pauseForConfirmation(job, input.workspaceDir, state.downloadedBytes, deps);
+      pauseForConfirmation(job, state.downloadedBytes, deps);
       return result;
     }
+    state.reportedSize = metadata.size || state.downloadedBytes;
     monitor.flush();
     deps.emitJob(job, {
       downloadedBytes: state.downloadedBytes,

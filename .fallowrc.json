@@ -5,6 +5,8 @@
     "server/index.ts",
     "server/runtimeComposition.ts",
     "client/src/main.tsx",
+    "tests/component/client/setup.ts",
+    "tests/benchmarks/scrubberHarness.ts",
     "tooling/ci-verification.mjs",
     "tests/integration/containerHlsSmoke.mjs",
     "tests/integration/containerBrowserFixture.mjs",
@@ -48,7 +50,12 @@
     "zones": [
       {
         "name": "client-shell",
-        "patterns": ["client/src/main.tsx", "client/src/App.tsx", "client/src/pages/**"]
+        "patterns": [
+          "client/index.html",
+          "client/src/main.tsx",
+          "client/src/App.tsx",
+          "client/src/pages/**"
+        ]
       },
       {
         "name": "client-features",

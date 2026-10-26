@@ -63,7 +63,10 @@ test("mobile file selection opens preview and retains it across queue visits and
   expect(sessionsToggle?.height).toBeGreaterThanOrEqual(44);
   expect(sessionsToggle?.height).toBeLessThanOrEqual(60);
   await page.getByRole("button", { name: "Show sessions" }).click();
-  await page.getByRole("button", { name: `Open ${filename}`, exact: true }).click();
+  await page
+    .getByRole("list", { name: "Sessions", exact: true })
+    .getByRole("button", { name: filename })
+    .click();
   await page.getByRole("button", { name: "Hide sessions" }).click();
   await page.getByRole("treeitem").click();
   await expect(page.getByRole("radio", { name: "Preview" })).toBeChecked();
@@ -274,10 +277,14 @@ async function openMobileVideo(page: Page, appOrigin: string) {
   await tapVisibleTarget(page.getByRole("tab", { name: "Explore" }));
   await tapVisibleTarget(page.getByRole("button", { name: "Show sessions" }));
   await tapVisibleTarget(
-    page.getByRole("button", { name: "Open Coastal collection", exact: true }),
+    page
+      .getByRole("list", { name: "Sessions", exact: true })
+      .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ }),
   );
   await tapVisibleTarget(page.getByRole("button", { name: "Hide sessions" }));
-  await tapVisibleTarget(page.getByRole("treeitem", { name: filename, exact: true }));
+  await tapVisibleTarget(
+    page.getByRole("treeitem", { name: `${filename} ${filename.split(".").at(-1)}`, exact: true }),
+  );
   await expect(page.getByRole("radio", { name: "Preview", exact: true })).toBeChecked();
   await expect(page.getByRole("heading", { name: filename, exact: true })).toBeVisible();
   await expect(page.getByRole("slider", { name: "Seek video" })).toHaveAttribute("max", "8");

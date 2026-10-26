@@ -1,7 +1,25 @@
 import { lstat, readdir, rm } from "node:fs/promises";
+import { createReadStream, createWriteStream } from "node:fs";
+import { pipeline } from "node:stream/promises";
 import path from "node:path";
 
-export async function reusableDownloadBytes(filePath: string, size: number, resume: boolean) {
+export async function mergeSegmentParts(
+  partPaths: string[],
+  targetPath: string,
+  signal: AbortSignal,
+): Promise<void> {
+  for (const [index, sourcePath] of partPaths.entries()) {
+    await pipeline(
+      createReadStream(sourcePath),
+      createWriteStream(targetPath, {
+        flags: index === 0 ? "w" : "a",
+      }),
+      { signal },
+    );
+  }
+}
+
+async function reusableDownloadBytes(filePath: string, size: number, resume: boolean) {
   const file = await lstat(filePath).catch(() => null);
   if (file && !file.isFile() && !file.isSymbolicLink())
     throw Object.assign(new Error("Download output path is not a regular file."), {

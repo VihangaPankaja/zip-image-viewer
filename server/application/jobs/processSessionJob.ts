@@ -17,6 +17,10 @@ import { extractSessionSource } from "./extractSessionSource.js";
 import { downloadTorrentSource } from "../torrents/downloadTorrentSource.js";
 import type { TorrentAdapter } from "../torrents/torrentDownloader.js";
 import { prepareTorrentEntries } from "../torrents/prepareTorrentEntries.js";
+import {
+  assertHttpWorkspace,
+  httpSourcePath,
+} from "../../infrastructure/downloads/httpWorkspace.js";
 
 type ProcessorDependencies = DownloadSourceDependencies & {
   prepareRetainedSession?: (_session: Session) => void;
@@ -100,9 +104,9 @@ function completeSession(
 ): void {
   session.jobId = job.id;
   deps.sessionStore.set(session.id, session);
-  if (job.sourceKind === "http")
+  if (job.sourceKind === "http" && !job.storageRoot)
     Object.assign(job, { workspaceDir: "", extractDir: "", zipPath: "" });
-  session.retained = job.sourceKind === "torrent";
+  session.retained = job.sourceKind === "torrent" || !!job.storageRoot;
   deps.emitJob(
     job,
     {
@@ -220,6 +224,10 @@ async function processHttpJob(
     deps,
   );
   if (result === "paused") return;
+  job.abortController?.signal.throwIfAborted();
+  // Extraction can be interrupted at any entry. Rebuild derived files from the verified source.
+  await rm(extractDir, { recursive: true, force: true });
+  await mkdir(extractDir, { recursive: true });
   const entries = await extractSessionSource(job, zipPath, extractDir, deps);
   const session = createSession(
     workspaceDir,
@@ -227,6 +235,7 @@ async function processHttpJob(
     new URL(job.url).pathname || "download",
     entries,
   );
+  session.id = job.sessionId || session.id;
   completeSession(job, session, "Archive is ready to browse.", deps);
 }
 
@@ -240,8 +249,13 @@ async function processSessionJob(
     job.workspaceDir || (await mkdtemp(path.join(os.tmpdir(), "zip-image-viewer-")));
   const zipPath =
     job.zipPath ||
-    (sourceUrl ? path.join(workspaceDir, path.basename(sourceUrl.pathname) || "download.bin") : "");
+    (sourceUrl
+      ? job.storageRoot
+        ? httpSourcePath({ ...job, workspaceDir })
+        : path.join(workspaceDir, path.basename(sourceUrl.pathname) || "download.bin")
+      : "");
   const extractDir = job.extractDir || path.join(workspaceDir, "extracted");
+  await assertHttpWorkspace({ ...job, workspaceDir });
   await mkdir(extractDir, { recursive: true });
   Object.assign(job, {
     workspaceDir,
@@ -258,7 +272,11 @@ async function processSessionJob(
       await processTorrentJob(job, confirmOversize, settings, deps);
     }
   } catch (error) {
-    const jobError = errorFromUnknown(error);
+    const abortReason: unknown = job.abortController?.signal.reason;
+    const jobError =
+      job.status === "error" && job.error
+        ? new Error(job.error)
+        : errorFromUnknown(abortReason instanceof Error ? abortReason : error);
     if (jobError.name === "AbortError" && job.pauseRequested && job.canResume) {
       deps.emitJob(
         job,
@@ -274,7 +292,8 @@ async function processSessionJob(
       );
       return;
     }
-    if (job.sourceKind === "http") await rm(workspaceDir, { recursive: true, force: true });
+    if (job.sourceKind === "http" && !job.storageRoot)
+      await rm(workspaceDir, { recursive: true, force: true });
     if (jobError.name !== "AbortError") {
       deps.logEvent("error", "session.create.failed", {
         jobId: job.id,

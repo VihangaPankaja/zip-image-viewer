@@ -1,0 +1,211 @@
+import { createServer } from "node:http";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { createHash } from "node:crypto";
+import { expect, it } from "vite-plus/test";
+import { downloadWithSegmentedManager } from "../../../../server/services/segmentedDownloader.js";
+import type { HttpDownloadState } from "../../../../shared/contracts.js";
+
+it.each([
+  "same",
+  "changed",
+  "corrupt",
+  "weak",
+  "last-modified",
+  "origin",
+  "fragment",
+  "unknown-size",
+])(
+  "reconciles partial bytes against source identity and disk hashes after restart (%s)",
+  async (scenario) => {
+    const directory = await mkdtemp(path.join(tmpdir(), "durable-http-"));
+    const targetPath = path.join(directory, "source.bin");
+    const original = Buffer.alloc(2 * 1024 * 1024, 17);
+    let payload = original;
+    let etag = scenario === "weak" || scenario === "last-modified" ? 'W/"v1"' : '"v1"';
+    const lastModified = "Wed, 21 Oct 2015 07:28:00 GMT";
+    const requests: { range?: string; validator?: string }[] = [];
+    let interrupted = false;
+    const controller = new AbortController();
+    let saved: HttpDownloadState | undefined;
+    const server = createServer((request, response) => {
+      requests.push({
+        range: request.headers.range,
+        validator:
+          typeof request.headers["if-range"] === "string" ? request.headers["if-range"] : undefined,
+      });
+      const match = /^bytes=(\d+)-(\d+)$/.exec(request.headers.range ?? "");
+      const start = match ? Number(match[1]) : 0;
+      const end = match ? Number(match[2]) : payload.length - 1;
+      response.writeHead(match ? 206 : 200, {
+        etag,
+        "last-modified": lastModified,
+        "content-length": end - start + 1,
+        ...(match ? { "content-range": `bytes ${start}-${end}/${payload.length}` } : {}),
+      });
+      response.end(payload.subarray(start, end + 1));
+    });
+    try {
+      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+      const address = server.address();
+      if (!address || typeof address === "string") throw new Error("Missing TCP port");
+      const url = `http://127.0.0.1:${address.port}/source.bin${scenario === "fragment" ? "#download" : ""}`;
+      const metadata = () => ({
+        size: scenario === "unknown-size" ? 0 : payload.length,
+        acceptRanges: true,
+        etag,
+        lastModified: scenario === "last-modified" ? lastModified : "",
+        resolvedUrl: url.split("#")[0],
+      });
+      const settings = {
+        enableResume: true,
+        enableMultithread: false,
+        threadCount: 1,
+        maxRetries: 0,
+      };
+      const checkpoint = {
+        current: saved,
+        save(value: HttpDownloadState) {
+          saved = structuredClone(value);
+          if (
+            !interrupted &&
+            value.files.some((file) => file.bytes > 0 && file.bytes < payload.length)
+          ) {
+            interrupted = true;
+            controller.abort();
+          }
+        },
+      };
+      await expect(
+        downloadWithSegmentedManager({
+          url,
+          targetPath,
+          metadata: metadata(),
+          settings,
+          state: { downloadedBytes: 0 },
+          signal: controller.signal,
+          checkpoint,
+        }),
+      ).rejects.toThrow();
+      expect(interrupted).toBe(true);
+      const retained = saved?.files[0].bytes ?? 0;
+      expect(retained).toBeGreaterThan(0);
+      if (scenario === "origin" && saved) {
+        saved.resolvedUrl = "https://previous.example/file";
+        payload = Buffer.alloc(original.length, 39);
+      }
+      if (scenario === "changed") {
+        payload = Buffer.alloc(original.length, 39);
+        etag = '"v2"';
+      }
+      if (scenario === "corrupt") await writeFile(targetPath, Buffer.alloc(retained, 88));
+      const before = requests.length;
+      const state = { downloadedBytes: 0 };
+      await downloadWithSegmentedManager({
+        url,
+        targetPath,
+        metadata: metadata(),
+        settings,
+        state,
+        signal: new AbortController().signal,
+        checkpoint: { ...checkpoint, current: saved },
+      });
+      expect(
+        createHash("sha256")
+          .update(await readFile(targetPath))
+          .digest("hex"),
+      ).toBe(createHash("sha256").update(payload).digest("hex"));
+      expect(state.downloadedBytes).toBe(payload.length);
+      const reused = scenario === "same" || scenario === "last-modified" || scenario === "fragment";
+      expect(requests[before]).toEqual(
+        reused
+          ? {
+              range: `bytes=${retained}-${payload.length - 1}`,
+              validator: scenario === "last-modified" ? lastModified : '"v1"',
+            }
+          : { range: undefined, validator: undefined },
+      );
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+);
+
+it.each(["resumed URL", "resumed validator", "segmented URL", "segmented validator"])(
+  "rejects a changed response identity before accepting bytes (%s)",
+  async (scenario) => {
+    const directory = await mkdtemp(path.join(tmpdir(), "http-response-identity-"));
+    const targetPath = path.join(directory, "source.bin");
+    const prefix = Buffer.from("old");
+    const payload = Buffer.from("new-data");
+    const segmented = scenario.startsWith("segmented");
+    const requests: string[] = [];
+    const server = createServer((request, response) => {
+      requests.push(request.headers.range ?? "full");
+      expect(request.headers["if-range"]).toBe('"v1"');
+      const match = /^bytes=(\d+)-(\d+)$/.exec(request.headers.range ?? "");
+      const start = Number(match?.[1]);
+      const end = Number(match?.[2]);
+      response
+        .writeHead(206, {
+          etag: scenario.endsWith("validator") ? '"v2"' : '"v1"',
+          "content-length": end - start + 1,
+          "content-range": `bytes ${start}-${end}/${payload.length}`,
+        })
+        .end(payload.subarray(start, end + 1));
+    });
+    try {
+      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+      const address = server.address();
+      if (!address || typeof address === "string") throw new Error("Missing TCP port");
+      const url = `http://127.0.0.1:${address.port}/source.bin`;
+      const resolvedUrl = scenario.endsWith("URL") ? `${url}?previous` : url;
+      const retained: HttpDownloadState = {
+        originalUrl: url,
+        resolvedUrl,
+        size: payload.length,
+        validator: '"v1"',
+        completedSha256: "",
+        files: [
+          {
+            index: -1,
+            start: 0,
+            end: payload.length - 1,
+            bytes: prefix.length,
+            sha256: createHash("sha256").update(prefix).digest("hex"),
+          },
+        ],
+      };
+      if (!segmented) await writeFile(targetPath, prefix);
+      const state = { downloadedBytes: 0 };
+      await expect(
+        downloadWithSegmentedManager({
+          url,
+          targetPath,
+          state,
+          signal: new AbortController().signal,
+          metadata: { size: payload.length, acceptRanges: true, etag: '"v1"', resolvedUrl },
+          settings: {
+            enableResume: true,
+            enableMultithread: segmented,
+            threadCount: 2,
+            maxRetries: 0,
+          },
+          checkpoint: segmented ? undefined : { current: retained, save() {} },
+        }),
+      ).rejects.toMatchObject({ code: "SOURCE_CHANGED" });
+      expect(requests.length).toBeGreaterThan(0);
+      expect(requests.every((range) => range !== "full")).toBe(true);
+      expect(state.downloadedBytes).toBe(segmented ? 0 : prefix.length);
+      if (!segmented) expect(await readFile(targetPath)).toEqual(prefix);
+      else await expect(readFile(targetPath)).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+);

@@ -61,6 +61,7 @@ function JobActions({ job, ...actions }: JobActionsProps) {
     }
   };
   const terminal = ["ready", "cancelled", "error"].includes(job.status);
+  const retained = job.sourceKind === "torrent" || job.retained;
   return (
     <div className="download-row-actions">
       <TorrentReviewAction
@@ -101,19 +102,15 @@ function JobActions({ job, ...actions }: JobActionsProps) {
         type="button"
         onClick={() =>
           terminal
-            ? (job.sourceKind !== "torrent" ||
+            ? (!retained ||
                 window.confirm(
-                  "Delete this torrent download and all its downloaded files? This cannot be undone.",
+                  "Delete this retained download and all its downloaded files? This cannot be undone.",
                 )) &&
               actions.onRemove(job.id)
             : actions.onCancel(job.id)
         }
       >
-        {terminal
-          ? job.sourceKind === "torrent"
-            ? "Delete files"
-            : "Remove from queue"
-          : "Cancel"}
+        {terminal ? (retained ? "Delete files" : "Remove from queue") : "Cancel"}
       </button>
     </div>
   );

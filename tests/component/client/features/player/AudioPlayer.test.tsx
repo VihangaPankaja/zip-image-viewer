@@ -71,8 +71,10 @@ it("seeks within known duration and controls volume and speed", () => {
     target: { value: "30" },
   });
   expect(audio.currentTime).toBe(30);
-  fireEvent.click(screen.getByRole("button", { name: "Forward 10 seconds" }));
+  fireEvent.click(screen.getByRole("button", { name: "+10s, Forward 10 seconds" }));
   expect(audio.currentTime).toBe(40);
+  fireEvent.click(screen.getByRole("button", { name: "−10s, Back 10 seconds" }));
+  expect(audio.currentTime).toBe(30);
   fireEvent.change(screen.getByRole("slider", { name: "Audio volume" }), {
     target: { value: "0.4" },
   });

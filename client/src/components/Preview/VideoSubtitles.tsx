@@ -8,7 +8,6 @@ function CaptionSettings(subtitles: ReturnType<typeof useVideoSubtitles>) {
       <button
         className="ghost-button"
         type="button"
-        aria-label="Captions"
         aria-pressed={subtitles.enabled}
         disabled={!subtitles.ready}
         onClick={() => subtitles.setEnabled(!subtitles.enabled)}

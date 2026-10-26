@@ -120,7 +120,7 @@ function StorageRetention({ data, actions }: { data: SessionStorage; actions: Ac
   if (data.retained)
     return (
       <p>
-        Retained torrent. Files survive viewer close, expiry and server restart until you delete
+        Retained download. Files survive viewer close, expiry and server restart until you delete
         them.
       </p>
     );
@@ -161,7 +161,7 @@ function StorageDeletion({ retained, actions }: { retained: boolean; actions: Ac
     <section aria-label="Confirm file deletion">
       <p>
         {retained
-          ? "This removes the retained torrent, its queue entry and all downloaded files, including files needed to download skipped items later."
+          ? "This removes the retained download, its queue entry and all downloaded files, including source data needed to resume later."
           : "This deletes all original files and generated media in this session."}{" "}
         This cannot be undone.
       </p>

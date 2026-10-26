@@ -47,15 +47,13 @@ export function SessionRail({ activeId, onSelect, onOpenDownloads, sessions }: S
                 className={`session-item ${session.id === activeId ? "active" : ""}`}
                 type="button"
                 aria-current={session.id === activeId ? "true" : undefined}
-                aria-label={`Open ${session.label}`}
                 title={session.label}
                 onClick={() => onSelect(session.id)}
               >
                 <span className={`session-state state-${session.state}`}>
                   {stateLabels[session.state]}
-                </span>
-                <strong>{session.label}</strong>
-                <span>{session.detail}</span>
+                </span>{" "}
+                <strong>{session.label}</strong> <span>{session.detail}</span>
               </button>
             </li>
           ))}

@@ -23,7 +23,9 @@ audioTest(
     for (const backLabel of ["Back to downloads", "Download first"]) {
       await page.getByRole("radio", { name: "Files", exact: true }).check({ force: true });
       await tapVisibleTarget(
-        page.getByRole("button", { name: `Open ${torrent.torrentFiles[0].path}`, exact: true }),
+        page
+          .getByRole("list", { name: "Sessions", exact: true })
+          .getByRole("button", { name: torrent.torrentFiles[0].path }),
       );
       const video = page.getByLabel("Early video preview", { exact: true });
       await expect(video).toHaveJSProperty("muted", false);
@@ -109,7 +111,9 @@ test("a newly opened ready session stays usable while the sessions list catches 
   await expect.poll(() => requests).toBeGreaterThan(2);
   await expect(page.getByRole("heading", { name: "01-coast.png", exact: true })).toBeVisible();
   const rail = page.getByRole("region", { name: "Sessions", exact: true });
-  await expect(rail.getByRole("button", { name: /^Open / })).toHaveCount(1);
+  await expect(
+    rail.getByRole("list", { name: "Sessions", exact: true }).getByRole("button"),
+  ).toHaveCount(1);
   listed = false;
   await expect(
     page.getByText("This session is no longer available.", { exact: true }),
@@ -143,7 +147,9 @@ test("preview rail filters transfers, opens verified video, recovers and dedupli
   await page.getByRole("tab", { name: "Explore" }).click();
   await page.getByRole("button", { name: "Show sessions" }).click();
   const rail = page.getByRole("region", { name: "Sessions", exact: true, includeHidden: true });
-  await expect(rail.getByRole("button", { name: /^Open / })).toHaveCount(0);
+  await expect(
+    rail.getByRole("list", { name: "Sessions", exact: true }).getByRole("button"),
+  ).toHaveCount(0);
   await rail.getByRole("button", { name: "View downloads" }).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { name: "Downloads", exact: true })).toBeVisible();
@@ -151,12 +157,13 @@ test("preview rail filters transfers, opens verified video, recovers and dedupli
   state.earlyVideo = "download-first";
   state.jobs = [torrent];
   await page.getByRole("tab", { name: "Explore" }).click();
-  await expect(rail.getByRole("button", { name: /^Open / })).toHaveCount(0);
+  await expect(
+    rail.getByRole("list", { name: "Sessions", exact: true }).getByRole("button"),
+  ).toHaveCount(0);
   state.earlyVideo = "ready";
-  const open = rail.getByRole("button", {
-    name: `Open ${torrent.torrentFiles[0].path}`,
-    exact: true,
-  });
+  const open = rail
+    .getByRole("list", { name: "Sessions", exact: true })
+    .getByRole("button", { name: torrent.torrentFiles[0].path });
   await expect(open).toBeVisible({ timeout: 20_000 });
   await open.focus();
   await page.keyboard.press("Enter");
@@ -202,17 +209,28 @@ test("preview rail filters transfers, opens verified video, recovers and dedupli
   ];
   // The Sessions response arrives while Jobs still has the live torrent without a session ID.
   await expect(page.getByRole("button", { name: "Open ready files" })).toBeVisible();
-  await expect(rail.getByRole("button", { name: /^Open /, includeHidden: true })).toHaveCount(1);
+  await expect(
+    rail
+      .getByRole("list", { name: "Sessions", exact: true, includeHidden: true })
+      .getByRole("button", { includeHidden: true }),
+  ).toHaveCount(1);
   await page.getByRole("button", { name: "Open ready files" }).click();
   state.jobs = [{ ...torrent, status: "ready", phase: "ready", sessionId }];
   await expect(page.getByLabel("Early video preview")).toHaveCount(0);
   await page.getByRole("radio", { name: "Files", exact: true }).check({ force: true });
-  await expect(rail.getByRole("button", { name: /^Open / })).toHaveCount(1);
+  await expect(
+    rail.getByRole("list", { name: "Sessions", exact: true }).getByRole("button"),
+  ).toHaveCount(1);
   await page.reload();
   await page.getByRole("tab", { name: "Explore" }).click();
   await page.getByRole("button", { name: "Show sessions" }).click();
-  await expect(rail.getByRole("button", { name: /^Open / })).toHaveCount(1);
-  await rail.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
+  await expect(
+    rail.getByRole("list", { name: "Sessions", exact: true }).getByRole("button"),
+  ).toHaveCount(1);
+  await rail
+    .getByRole("list", { name: "Sessions", exact: true })
+    .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
+    .click();
   await page.getByRole("radio", { name: "Preview", exact: true }).check({ force: true });
   sessions = [];
   await expect(
@@ -270,10 +288,16 @@ test("a failed session switch clears files, metadata and storage ownership", asy
   const rail = page.getByRole("region", { name: "Sessions", exact: true });
   for (const malformed of [false, true]) {
     invalid = malformed;
-    await rail.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
+    await rail
+      .getByRole("list", { name: "Sessions", exact: true })
+      .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
+      .click();
     await expect(page.getByRole("treeitem", { name: /01-coast.png/ })).toBeVisible();
     await expect(page.getByRole("button", { name: "Storage", exact: true })).toBeVisible();
-    await rail.getByRole("button", { name: "Open Unavailable collection", exact: true }).click();
+    await rail
+      .getByRole("list", { name: "Sessions", exact: true })
+      .getByRole("button", { name: /^Ready Unavailable collection \d+ files$/ })
+      .click();
     await expect(page.getByRole("status")).toHaveText(
       malformed
         ? "This session returned invalid data. Check Downloads or try again."
@@ -283,7 +307,10 @@ test("a failed session switch clears files, metadata and storage ownership", asy
     await expect(page.getByText("No file selected", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Storage", exact: true })).toHaveCount(0);
   }
-  await rail.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
+  await rail
+    .getByRole("list", { name: "Sessions", exact: true })
+    .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
+    .click();
   await expect(page.getByRole("heading", { name: "01-coast.png", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Storage", exact: true })).toBeVisible();
 });
@@ -299,9 +326,14 @@ test("invalid video capability and failed session loads offer recovery without o
   await page.goto("/");
   await page.getByRole("tab", { name: "Explore" }).click();
   const rail = page.getByRole("region", { name: "Sessions", exact: true });
-  await expect(rail.getByRole("button", { name: /^Open / })).toHaveCount(1);
+  await expect(
+    rail.getByRole("list", { name: "Sessions", exact: true }).getByRole("button"),
+  ).toHaveCount(1);
   await page.route("**/api/sessions/*/tree", (route) => route.fulfill({ status: 404 }));
-  await rail.getByRole("button", { name: "Open Coastal collection", exact: true }).click();
+  await rail
+    .getByRole("list", { name: "Sessions", exact: true })
+    .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
+    .click();
   await expect(
     page.getByText(
       "This preview is no longer available. Check Downloads or choose another session.",
