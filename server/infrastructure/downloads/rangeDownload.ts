@@ -67,11 +67,13 @@ export async function streamSingleRange({
     responseState.checked = true;
     try {
       const { encoded } = validateDownloadResponse(response, Boolean(headers.Range), strictRange);
-      assertRangeResponse(
-        response,
-        { requestedStart, requestedEnd, totalSize, validator, resolvedUrl },
-        Boolean(headers.Range),
-      );
+      if (headers.Range || file.bytes > 0) {
+        assertRangeResponse(
+          response,
+          { requestedStart, requestedEnd, totalSize, validator, resolvedUrl },
+          Boolean(headers.Range),
+        );
+      }
       if (encoded) allowedBytes = MAX_RESOURCE_BYTES;
       responseHeader?.(response, encoded);
     } catch (error) {

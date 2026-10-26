@@ -133,3 +133,79 @@ it.each([
     }
   },
 );
+
+it.each(["resumed URL", "resumed validator", "segmented URL", "segmented validator"])(
+  "rejects a changed response identity before accepting bytes (%s)",
+  async (scenario) => {
+    const directory = await mkdtemp(path.join(tmpdir(), "http-response-identity-"));
+    const targetPath = path.join(directory, "source.bin");
+    const prefix = Buffer.from("old");
+    const payload = Buffer.from("new-data");
+    const segmented = scenario.startsWith("segmented");
+    const requests: string[] = [];
+    const server = createServer((request, response) => {
+      requests.push(request.headers.range ?? "full");
+      expect(request.headers["if-range"]).toBe('"v1"');
+      const match = /^bytes=(\d+)-(\d+)$/.exec(request.headers.range ?? "");
+      const start = Number(match?.[1]);
+      const end = Number(match?.[2]);
+      response
+        .writeHead(206, {
+          etag: scenario.endsWith("validator") ? '"v2"' : '"v1"',
+          "content-length": end - start + 1,
+          "content-range": `bytes ${start}-${end}/${payload.length}`,
+        })
+        .end(payload.subarray(start, end + 1));
+    });
+    try {
+      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+      const address = server.address();
+      if (!address || typeof address === "string") throw new Error("Missing TCP port");
+      const url = `http://127.0.0.1:${address.port}/source.bin`;
+      const resolvedUrl = scenario.endsWith("URL") ? `${url}?previous` : url;
+      const retained: HttpDownloadState = {
+        originalUrl: url,
+        resolvedUrl,
+        size: payload.length,
+        validator: '"v1"',
+        completedSha256: "",
+        files: [
+          {
+            index: -1,
+            start: 0,
+            end: payload.length - 1,
+            bytes: prefix.length,
+            sha256: createHash("sha256").update(prefix).digest("hex"),
+          },
+        ],
+      };
+      if (!segmented) await writeFile(targetPath, prefix);
+      const state = { downloadedBytes: 0 };
+      await expect(
+        downloadWithSegmentedManager({
+          url,
+          targetPath,
+          state,
+          signal: new AbortController().signal,
+          metadata: { size: payload.length, acceptRanges: true, etag: '"v1"', resolvedUrl },
+          settings: {
+            enableResume: true,
+            enableMultithread: segmented,
+            threadCount: 2,
+            maxRetries: 0,
+          },
+          checkpoint: segmented ? undefined : { current: retained, save() {} },
+        }),
+      ).rejects.toMatchObject({ code: "SOURCE_CHANGED" });
+      expect(requests.length).toBeGreaterThan(0);
+      expect(requests.every((range) => range !== "full")).toBe(true);
+      expect(state.downloadedBytes).toBe(segmented ? 0 : prefix.length);
+      if (!segmented) expect(await readFile(targetPath)).toEqual(prefix);
+      else await expect(readFile(targetPath)).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+);
