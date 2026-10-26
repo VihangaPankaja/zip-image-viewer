@@ -225,3 +225,32 @@ it("makes bounded progress through runs of malformed UTF-8 continuation bytes", 
   expect(chunk.text).not.toBe("");
   expect(chunk.replacementCharacters).toBe(true);
 });
+
+it.each(["utf-16le", "utf-16be"])(
+  "preserves unpaired low surrogates at %s chunk boundaries",
+  async (encoding) => {
+    const { app, dir, endpoint } = await setup();
+    const bytes = Buffer.concat([
+      Buffer.from([0xff, 0xfe]),
+      Buffer.from("x".repeat(65535), "utf16le"),
+      Buffer.from([0, 0xdc]),
+    ]);
+    if (encoding === "utf-16be") bytes.swap16();
+    await writeFile(path.join(dir, "unpaired.txt"), bytes);
+    const response = await request(app)
+      .get(endpoint)
+      .query({ path: "unpaired.txt", textPreview: "1", offset: "131072" });
+    expect(response.body).toMatchObject({ text: "�", replacementCharacters: true });
+  },
+);
+it("preserves isolated malformed UTF-8 continuation bytes at chunk starts", async () => {
+  const { app, dir, endpoint } = await setup();
+  await writeFile(
+    path.join(dir, "isolated.txt"),
+    Buffer.concat([Buffer.alloc(131072, 0x61), Buffer.from([0x80]), Buffer.from("tail")]),
+  );
+  const response = await request(app)
+    .get(endpoint)
+    .query({ path: "isolated.txt", textPreview: "1", offset: "131072" });
+  expect(response.body).toMatchObject({ text: "�tail", replacementCharacters: true });
+});

@@ -1,11 +1,23 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
   buildTextRows,
+  findTextRows,
   formatPreviewJson,
   parsePreviewTable,
 } from "../../../../../client/src/features/workspace/textPreviewFormats";
 
 describe("bounded text formats", () => {
+  it("maps Unicode case-insensitive search to original character offsets", () => {
+    const text = "İ".repeat(8) + "\nneedle\nWRONG";
+    expect(findTextRows(text, buildTextRows(text, 4096), "NEEDLE")).toEqual([1]);
+    expect(findTextRows("a.b\naXb", buildTextRows("a.b\naXb", 4096), "a.b")).toEqual([0]);
+  });
+  it("wraps tabs and wide characters within visible columns", () => {
+    const tabs = buildTextRows("\t".repeat(100), 16, true);
+    const wide = buildTextRows("界".repeat(100), 16, true);
+    expect(tabs.every((row) => row.text.length <= 8)).toBe(true);
+    expect(wide.every((row) => row.text.length <= 8)).toBe(true);
+  });
   it("formats nested JSON without changing large numbers or string escapes", () => {
     const result = formatPreviewJson('{"id":9007199254740993,"nested":[{},"a\\\"b",true]}');
     expect(result.text).toBe(

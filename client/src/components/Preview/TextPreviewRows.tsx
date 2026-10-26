@@ -1,14 +1,19 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { buildTextRows, findTextRows } from "../../features/workspace/textPreviewFormats";
+import {
+  buildTextRows,
+  findTextRows,
+  textSearchPattern,
+} from "../../features/workspace/textPreviewFormats";
 
 function SearchText({ text, query }: { text: string; query: string }) {
-  const index = query ? text.toLowerCase().indexOf(query.toLowerCase()) : -1;
-  if (index < 0) return text;
+  const match = query ? textSearchPattern(query).exec(text) : null;
+  if (!match) return text;
+  const index = match.index;
   return (
     <>
       {text.slice(0, index)}
-      <mark>{text.slice(index, index + query.length)}</mark>
-      {text.slice(index + query.length)}
+      <mark>{match[0]}</mark>
+      {text.slice(index + match[0].length)}
     </>
   );
 }
@@ -31,7 +36,7 @@ function useTextWindow(text: string, wrap: boolean) {
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  const rows = useMemo(() => buildTextRows(text, wrap ? width : 4096), [text, wrap, width]);
+  const rows = useMemo(() => buildTextRows(text, wrap ? width : 4096, wrap), [text, wrap, width]);
   useLayoutEffect(() => {
     if (viewport.current) viewport.current.scrollTop = 0;
     setTop(0);
@@ -84,6 +89,7 @@ export function TextPreviewRows({
       <div
         ref={viewport}
         className="text-lines"
+        data-preview-scroll
         // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- The text viewport must support keyboard scrolling.
         tabIndex={0}
         role="region"

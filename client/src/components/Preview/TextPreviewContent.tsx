@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { PreviewFileNode } from "../../features/workspace/types";
 import type { TextPreviewState } from "../../hooks/useTextPreview";
-import { TEXT_PREVIEW_BYTES } from "../../../../shared/contracts";
+import { TextChunkNavigation } from "./TextChunkNavigation";
 import { formatPreviewJson } from "../../features/workspace/textPreviewFormats";
 import { TextPreviewRows } from "./TextPreviewRows";
 import { TextPreviewTable } from "./TextPreviewTable";
@@ -27,7 +27,11 @@ export function TextPreviewContent({
         <span>{(selectedNode.extension || "text").toUpperCase()} preview</span>
         <span>{formatDate(selectedNode.modifiedAt ?? 0)}</span>
       </div>
-      {loading && <p role="status">Loading bounded text chunk...</p>}
+      {loading && (
+        <p role="status">
+          Loading bounded text chunk. The previous chunk stays visible until it is ready.
+        </p>
+      )}
       {error && <p role="alert">Preview unavailable: {error}</p>}
       {chunk && (
         <>
@@ -43,40 +47,10 @@ export function TextPreviewContent({
               Invalid or unsupported encoded characters appear as �.
             </p>
           )}
-          <nav className="text-preview-actions" aria-label="Text chunks">
-            {[
-              { label: "First chunk", offset: 0, disabled: chunk.offset === 0 },
-              {
-                label: "Previous chunk",
-                offset: Math.max(0, chunk.offset - TEXT_PREVIEW_BYTES),
-                disabled: chunk.offset === 0,
-              },
-              {
-                label: "Next chunk",
-                offset: chunk.nextOffset,
-                disabled: chunk.nextOffset >= chunk.totalBytes,
-              },
-              {
-                label: "Last chunk",
-                offset: Math.max(0, chunk.totalBytes - TEXT_PREVIEW_BYTES),
-                disabled: chunk.nextOffset >= chunk.totalBytes,
-              },
-            ].map(({ label, offset, disabled }) => (
-              <button
-                type="button"
-                className="ghost-button"
-                key={label}
-                disabled={disabled}
-                onClick={() => loadOffset(offset)}
-              >
-                {label}
-              </button>
-            ))}
-          </nav>
+          <TextChunkNavigation chunk={chunk} loading={loading} loadOffset={loadOffset} />
           {chunk.binary ? (
             <p role="status">
-              Binary content detected. Text preview is hidden. Use Download original to read this
-              file.
+              Binary content detected. Text preview is hidden. Use Open raw to read this file.
             </p>
           ) : (
             <TextChunkView

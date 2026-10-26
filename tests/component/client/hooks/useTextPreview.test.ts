@@ -61,3 +61,32 @@ it("aborts pending work on reset and cache clear", () => {
   expect(result.current.textPreview.chunk).toBeNull();
   unmount();
 });
+
+it("keeps the current chunk visible while another chunk loads", async () => {
+  let finish = (_value: Response) => {};
+  vi.stubGlobal("fetch", (url: string) =>
+    url.includes("offset=0")
+      ? Promise.resolve(Response.json({ ...chunk, totalBytes: 300000 }))
+      : new Promise<Response>((resolve) => {
+          finish = resolve;
+        }),
+  );
+  const { result } = renderHook(useTextPreview, { initialProps: props });
+  await waitFor(() => expect(result.current.textPreview.chunk?.text).toBe("new content"));
+  act(() => result.current.textPreview.loadOffset(131072));
+  expect(result.current.textPreview.loading).toBe(true);
+  expect(result.current.textPreview.chunk?.text).toBe("new content");
+  await act(async () => {
+    finish(
+      Response.json({
+        ...chunk,
+        text: "next",
+        offset: 131072,
+        nextOffset: 131076,
+        totalBytes: 300000,
+      }),
+    );
+    await Promise.resolve();
+  });
+  await waitFor(() => expect(result.current.textPreview.chunk?.text).toBe("next"));
+});

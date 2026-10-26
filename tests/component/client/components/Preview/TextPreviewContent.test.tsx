@@ -92,3 +92,25 @@ it("finds a literal spanning long-line continuation rows", () => {
   fireEvent.change(screen.getByRole("searchbox"), { target: { value: "needle" } });
   expect(screen.getByText(/1 matching/)).toBeInTheDocument();
 });
+
+it("preserves the chunk navigation control during loading", () => {
+  const loaded = preview("hello", 300000);
+  if (!loaded.chunk) throw new Error("Missing test chunk");
+  const { rerender } = render(<TextPreviewContent {...base} textPreview={loaded} />);
+  const next = screen.getByRole("button", { name: "Next chunk" });
+  next.focus();
+  fireEvent.click(next);
+  rerender(<TextPreviewContent {...base} textPreview={{ ...loaded, loading: true }} />);
+  expect(next).toHaveFocus();
+  rerender(
+    <TextPreviewContent
+      {...base}
+      textPreview={{
+        ...loaded,
+        loading: false,
+        chunk: { ...loaded.chunk, offset: 131072, nextOffset: 300000 },
+      }}
+    />,
+  );
+  expect(screen.getByRole("button", { name: "Previous chunk" })).toHaveFocus();
+});

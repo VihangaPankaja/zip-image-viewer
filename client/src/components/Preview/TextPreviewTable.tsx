@@ -34,8 +34,14 @@ export function TextPreviewTable({
         <p role="alert">Malformed quoted table. Switch to Raw text to inspect the original.</p>
       )}
       {/* Keyboard users must be able to scroll wide tables. */}
-      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
-      <div className="text-table-scroll" tabIndex={0} role="region" aria-label="Table content">
+      <div
+        className="text-table-scroll"
+        data-preview-scroll
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- The table viewport must support keyboard scrolling.
+        tabIndex={0}
+        role="region"
+        aria-label="Table content"
+      >
         <table>
           <thead>
             <tr>

@@ -16,28 +16,64 @@ function detectEncoding(prefix: Buffer): TextPreviewChunk["encoding"] {
   return "utf-8";
 }
 
+function splitUtf8Prefix(previous: Buffer, bytes: Buffer): number {
+  for (let i = 0; i < previous.length; i++) {
+    const lead = previous[i];
+    const length =
+      lead >= 0xc2 && lead <= 0xdf
+        ? 2
+        : lead >= 0xe0 && lead <= 0xef
+          ? 3
+          : lead >= 0xf0 && lead <= 0xf4
+            ? 4
+            : 0;
+    const missing = length - (previous.length - i);
+    if (missing <= 0) continue;
+    try {
+      new TextDecoder("utf-8", { fatal: true }).decode(
+        Buffer.concat([previous.subarray(i), bytes.subarray(0, missing)]),
+      );
+      return missing;
+    } catch {
+      /* Malformed bytes must remain visible as replacement characters. */
+    }
+  }
+  return 0;
+}
+
 function characterRange(
   bytes: Buffer,
   offset: number,
   end: number,
   size: number,
   encoding: TextPreviewChunk["encoding"],
+  previous: Buffer,
 ): [number, number] {
   let start = 0;
   if (encoding === "utf-8") {
-    if (offset > 0) {
-      while (start < Math.min(3, bytes.length) && (bytes[start] & 0xc0) === 0x80) start++;
-      if ((bytes[start] & 0xc0) === 0x80) start = 0;
-    }
+    start = splitUtf8Prefix(previous, bytes);
     if (offset + end < size) {
       const boundary = end;
       while (end > start && boundary - end < 3 && (bytes[end] & 0xc0) === 0x80) end--;
       if ((bytes[end] & 0xc0) === 0x80) end = boundary;
     }
   } else {
+    const previousUnit =
+      previous.length < 2
+        ? 0
+        : encoding === "utf-16le"
+          ? previous.readUInt16LE(0)
+          : previous.readUInt16BE(0);
     const unit = (i: number) =>
       encoding === "utf-16le" ? bytes.readUInt16LE(i) : bytes.readUInt16BE(i);
-    if (offset > 0 && bytes.length >= 2 && unit(0) >= 0xdc00 && unit(0) <= 0xdfff) start = 2;
+    if (
+      previousUnit >= 0xd800 &&
+      previousUnit <= 0xdbff &&
+      bytes.length >= 2 &&
+      unit(0) >= 0xdc00 &&
+      unit(0) <= 0xdfff
+    )
+      start = 2;
     if (offset + end < size) {
       end -= end % 2;
       if (end >= 2 && unit(end - 2) >= 0xd800 && unit(end - 2) <= 0xdbff) end -= 2;
@@ -62,6 +98,8 @@ export async function readTextPreview(
     if (encoding !== "utf-8" && offset < size) offset -= offset % 2;
     const bytes = Buffer.alloc(Math.min(TEXT_PREVIEW_BYTES + 4, size - offset));
     const { bytesRead } = await file.read(bytes, 0, bytes.length, offset);
+    const previous = Buffer.alloc(Math.min(encoding === "utf-8" ? 3 : 2, offset));
+    await file.read(previous, 0, previous.length, offset - previous.length);
     signal.throwIfAborted();
     const [start, end] = characterRange(
       bytes.subarray(0, bytesRead),
@@ -69,6 +107,7 @@ export async function readTextPreview(
       Math.min(TEXT_PREVIEW_BYTES, bytesRead),
       size,
       encoding,
+      previous,
     );
     const text = new TextDecoder(encoding, { ignoreBOM: offset !== 0 }).decode(
       bytes.subarray(start, end),

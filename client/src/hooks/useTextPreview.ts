@@ -73,9 +73,10 @@ export function useTextPreview({
     );
     return () => controller.abort();
   }, [owner, selectedPreviewUrl, offset]);
-  const current = owner && result?.owner === owner && result.offset === offset ? result : null;
+  const selected = owner && result?.owner === owner ? result : null;
+  const current = selected?.offset === offset ? selected : null;
   const textPreview: TextPreviewState = {
-    chunk: current?.chunk ?? null,
+    chunk: (current ?? selected)?.chunk ?? null,
     error: current?.error ?? "",
     loading: !!owner && !current,
     loadOffset: (nextOffset) => setPage({ owner, offset: nextOffset }),

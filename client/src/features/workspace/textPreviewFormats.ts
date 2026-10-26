@@ -130,7 +130,29 @@ export function parsePreviewTable(source: string, delimiter: string, complete: b
   };
 }
 
-export function buildTextRows(text: string, width: number) {
+function rowEnd(line: string, start: number, width: number, wrap: boolean) {
+  if (!wrap) {
+    let end = Math.min(line.length, start + width);
+    const last = line.charCodeAt(end - 1);
+    if (end < line.length && last >= 0xd800 && last <= 0xdbff) end--;
+    return end;
+  }
+  let end = start;
+  let columns = 0;
+  for (const char of line.slice(start)) {
+    const wide =
+      /[\u1100-\u115f\u2329\u232a\u2e80-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe10-\ufe19\ufe30-\ufe6f\uff01-\uff60\uffe0-\uffe6]/u.test(
+        char,
+      ) || char.length === 2;
+    const cells = char === "\t" ? 2 - (columns % 2) : /\p{Mark}/u.test(char) ? 0 : wide ? 2 : 1;
+    if (end > start && (columns + cells > width || end - start + char.length > 4096)) break;
+    columns += cells;
+    end += char.length;
+  }
+  return end;
+}
+
+export function buildTextRows(text: string, width: number, wrap = false) {
   const rows: { text: string; line: number; continued: boolean; offset: number }[] = [];
   let offset = 0;
   text.split(/(\r\n|\r|\n)/).forEach((line, index) => {
@@ -141,9 +163,7 @@ export function buildTextRows(text: string, width: number) {
     const lineNumber = index / 2 + 1;
     if (!line) rows.push({ text: "", line: lineNumber, continued: false, offset });
     for (let start = 0; start < line.length;) {
-      let end = Math.min(line.length, start + width);
-      const last = line.charCodeAt(end - 1);
-      if (end < line.length && last >= 0xd800 && last <= 0xdbff) end--;
+      const end = rowEnd(line, start, width, wrap);
       rows.push({
         text: line.slice(start, end),
         line: lineNumber,
@@ -160,16 +180,15 @@ export function buildTextRows(text: string, width: number) {
 export function findTextRows(text: string, rows: ReturnType<typeof buildTextRows>, query: string) {
   if (!query) return [];
   const matches: number[] = [];
-  const source = text.toLowerCase();
-  const needle = query.toLowerCase();
   let row = 0;
-  for (
-    let index = source.indexOf(needle);
-    index >= 0;
-    index = source.indexOf(needle, index + Math.max(1, needle.length))
-  ) {
+  for (const match of text.matchAll(textSearchPattern(query))) {
+    const index = match.index;
     while (row + 1 < rows.length && rows[row + 1].offset <= index) row++;
     if (matches.at(-1) !== row) matches.push(row);
   }
   return matches;
+}
+
+export function textSearchPattern(query: string) {
+  return new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "giu");
 }

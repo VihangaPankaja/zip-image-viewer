@@ -47,6 +47,8 @@ async function writeTextFixtures(directory: string) {
     "06-long-line.txt": "x".repeat(70000) + "NEEDLE" + "y".repeat(70000),
     "07-binary.txt": Buffer.from([0, 1, 2, 3, 4, 5]),
     "08-tabs.tsv": 'name\tnote\n"a\tb"\t"quoted ""value"""\n',
+    "09-wide-lines.txt":
+      "\t".repeat(100) + "\n" + "界".repeat(100) + "\n" + "İ".repeat(8) + "\nNEEDLE\nWRONG",
   };
   await Promise.all(
     Object.entries(values).map(([name, data]) => writeFile(path.join(directory, name), data)),

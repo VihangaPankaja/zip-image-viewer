@@ -34,6 +34,11 @@ test("200 MB text stays bounded, scrolls, searches and navigates by chunk", asyn
     await openFile(page, "01-large-200MB.log");
     const content = page.getByRole("region", { name: "Text content", exact: true });
     await expect(content).toContainText("bounded preview");
+    expect(
+      await page
+        .locator(".text-preview")
+        .evaluate((element) => element.scrollHeight <= element.clientHeight + 1),
+    ).toBe(true);
     await expect(page.getByText(/Truncated preview$/)).toBeVisible();
     expect(await page.locator(".text-line").count()).toBeLessThan(100);
     await content.focus();
@@ -50,6 +55,11 @@ test("200 MB text stays bounded, scrolls, searches and navigates by chunk", asyn
     await expect(content).toContainText("FINAL LOG RECORD");
     await page.getByRole("button", { name: "First chunk" }).click();
     await expect(content).toContainText("bounded preview");
+    const next = page.getByRole("button", { name: "Next chunk" });
+    await next.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByText(/Bytes 131,072/)).toBeVisible();
+    await expect(next).toBeFocused();
     expect(sizes.length).toBeGreaterThan(0);
     expect(sizes.every((size) => size < 1024 * 1024)).toBe(true);
     expect((await new AxeBuilder({ page }).include(".text-preview").analyze()).violations).toEqual(
@@ -96,6 +106,23 @@ test("narrow text controls support touch, JSON, quoted tables, UTF-16 and binary
     expect(await page.locator(".text-line").count()).toBeLessThan(100);
     await openFile(page, "07-binary.txt");
     await expect(page.getByRole("status")).toContainText("Binary content detected");
+    await openFile(page, "08-tabs.tsv");
+    await tapVisibleTarget(page.getByRole("button", { name: "Table", exact: true }));
+    await expect(page.getByRole("cell", { name: /quoted "value"/ })).toBeVisible();
+    await openFile(page, "09-wide-lines.txt");
+    await page.getByRole("checkbox", { name: "Wrap lines" }).check();
+    const wideContent = page.getByRole("region", { name: "Text content", exact: true });
+    expect(
+      await wideContent.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+    ).toBe(true);
+    await wideContent.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(
+      page.getByRole("heading", { name: "09-wide-lines.txt", exact: true }),
+    ).toBeVisible();
+    await page.getByRole("searchbox", { name: "Search complete file" }).fill("needle");
+    await tapVisibleTarget(page.getByRole("button", { name: "Find next" }));
+    await expect(page.locator("mark")).toHaveText("NEEDLE");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );

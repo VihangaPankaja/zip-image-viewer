@@ -104,6 +104,10 @@
   color: var(--text);
 }
 
+.preview-panel:has(.text-preview) {
+  flex: 0 0 auto;
+}
+
 .text-preview-actions,
 .text-search-results {
   display: flex;
