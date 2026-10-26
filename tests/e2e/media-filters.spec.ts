@@ -242,18 +242,14 @@ test("profiles filtering and keyboard navigation with 10,000 files", async ({ pa
   const filtered = Date.now();
   await page.locator('[role="treeitem"]').first().focus();
   await page.keyboard.press("End");
-  await expect(page.locator('[role="treeitem"]:focus')).toHaveAttribute(
-    "aria-label",
-    files[files.length - 1].name,
+  await expect(page.locator('[role="treeitem"]:focus')).toHaveAccessibleName(
+    `${files[files.length - 1].name} txt`,
   );
   await expectRowFullyVisible(lastFile);
   const keyboardEndMs = Date.now() - filtered;
   await expect(page.locator('[role="treeitem"]:focus')).toHaveAttribute("aria-posinset", "5000");
   await page.keyboard.press("ArrowUp");
-  await expect(page.locator('[role="treeitem"]:focus')).toHaveAttribute(
-    "aria-label",
-    "file-09997.txt",
-  );
+  await expect(page.locator('[role="treeitem"]:focus')).toHaveAccessibleName("file-09997.txt txt");
   await page.keyboard.press("Home");
   await expect(
     page.getByRole("treeitem", { name: "Coastal collection Folder", exact: true }),
