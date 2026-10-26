@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -86,18 +87,64 @@ it.each([
       requests.push(range ?? "full");
       const match = /^bytes=(\d+)-(\d+)$/.exec(range ?? "");
       const body = match ? payload.subarray(Number(match[1]), Number(match[2]) + 1) : payload;
-      response.writeHead(match ? 206 : 200, { "content-length": body.length }).end(body);
+      response
+        .writeHead(match ? 206 : 200, {
+          etag: '"fixture"',
+          "content-length": body.length,
+          ...(match ? { "content-range": `bytes ${match[1]}-${match[2]}/${payload.length}` } : {}),
+        })
+        .end(body);
     });
     try {
       await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
       const address = server.address();
       if (!address || typeof address === "string") throw new Error("No TCP port");
+      const url = `http://127.0.0.1:${address.port}/file`;
+      const files = segmented
+        ? [
+            {
+              index: 0,
+              start: 0,
+              end: 59,
+              bytes: oversized ? 61 : 60,
+              sha256: createHash("sha256")
+                .update(oversized ? Buffer.alloc(61) : payload.subarray(0, 60))
+                .digest("hex"),
+            },
+            {
+              index: 1,
+              start: 60,
+              end: 119,
+              bytes: 20,
+              sha256: createHash("sha256").update(payload.subarray(60, 80)).digest("hex"),
+            },
+          ]
+        : [
+            {
+              index: -1,
+              start: 0,
+              end: 119,
+              bytes: 80,
+              sha256: createHash("sha256").update(payload.subarray(0, 80)).digest("hex"),
+            },
+          ];
       await downloadWithSegmentedManager({
+        checkpoint: {
+          current: {
+            originalUrl: url,
+            resolvedUrl: url,
+            validator: '"fixture"',
+            size: 120,
+            files,
+            completedSha256: "",
+          },
+          save: () => undefined,
+        },
         url: `http://127.0.0.1:${address.port}/file`,
         targetPath: target,
         signal: new AbortController().signal,
         state: { downloadedBytes: 0 },
-        metadata: { size: payload.length, acceptRanges: ranged },
+        metadata: { etag: '"fixture"', size: payload.length, acceptRanges: ranged },
         settings: {
           enableResume: resume,
           enableMultithread: segmented,

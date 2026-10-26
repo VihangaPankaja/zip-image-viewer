@@ -23,6 +23,35 @@ function job(overrides: Partial<Job> = {}): Job {
 }
 
 describe("DownloadManager", () => {
+  it("requires confirmation before removing a retained HTTP download and its files", async () => {
+    const remove = vi.fn();
+    const confirmation = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const user = userEvent.setup();
+    try {
+      render(
+        <DownloadManager
+          jobs={[job({ status: "ready", phase: "ready", canPause: false, retained: true })]}
+          onCancel={vi.fn()}
+          onSelectFiles={vi.fn()}
+          onFilePriority={vi.fn()}
+          onConfirm={vi.fn()}
+          onOpenSession={vi.fn()}
+          onPause={vi.fn()}
+          onRemove={remove}
+          onReorder={vi.fn()}
+          onResume={vi.fn()}
+          onRetry={vi.fn()}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: "Delete files" }));
+      expect(remove).not.toHaveBeenCalled();
+      confirmation.mockReturnValue(true);
+      await user.click(screen.getByRole("button", { name: "Delete files" }));
+      expect(remove).toHaveBeenCalledWith("2bf886fc-65bf-4e2f-b973-b607766b3131");
+    } finally {
+      confirmation.mockRestore();
+    }
+  });
   it("shows live work and exposes pause and priority controls", async () => {
     const onPause = vi.fn();
     const onReorder = vi.fn();

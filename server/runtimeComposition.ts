@@ -30,6 +30,7 @@ import {
 import { createJobManager } from "./application/jobs/jobManager.js";
 import { createRetainedTorrentStore } from "./repositories/retainedTorrents.js";
 import { restoreRetainedTorrents } from "./application/torrents/restoreRetainedTorrents.js";
+import { restoreHttpDownloads } from "./application/downloads/restoreHttpDownloads.js";
 import { createRuntimeJobActions } from "./bootstrap/runtimeJobActions.js";
 import {
   getLogEntries,
@@ -104,9 +105,12 @@ server.listen(PORT, "0.0.0.0");
 await restoreRetainedTorrents(retainedTorrents, jobStore, torrentAdapter, (job) =>
   restoreTorrentSession(job, processorDependencies),
 );
+await restoreHttpDownloads(retainedTorrents, jobStore, processSessionJob);
 
 const sessionJobQueue = createSessionJobQueue({
-  initialJobs: [...jobStore.values()],
+  initialJobs: [...jobStore.values()].sort(
+    (left, right) => left.queuePosition - right.queuePosition,
+  ),
   pendingSessionJobs,
   getActiveSessionJobCount,
   incrementActiveSessionJobCount,

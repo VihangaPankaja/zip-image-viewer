@@ -97,9 +97,9 @@ function registerCancelRoute(app: Express, deps: SessionJobRouteDependencies): v
   app.delete("/api/session-jobs/:id", async (req, res) => {
     const job = findJob(req.params.id, deps, res);
     if (!job) return;
-    if (job.sourceKind === "torrent") {
+    if (job.sourceKind === "torrent" || job.storageRoot) {
       if (req.query.release === "true") return res.status(204).end();
-      if (deps.removeJob) return deleteTorrentJob(job.id, deps.removeJob, res);
+      if (deps.removeJob) return deleteRetainedJob(job.id, deps.removeJob, res);
     }
     job.abortController?.abort();
     deps.emitJob(
@@ -119,7 +119,7 @@ function registerCancelRoute(app: Express, deps: SessionJobRouteDependencies): v
   });
 }
 
-async function deleteTorrentJob(
+async function deleteRetainedJob(
   id: string,
   remove: NonNullable<SessionJobRouteDependencies["removeJob"]>,
   res: Response,

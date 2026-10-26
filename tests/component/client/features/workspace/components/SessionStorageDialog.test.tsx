@@ -75,10 +75,10 @@ it("shows separate byte totals and refreshes after pinning and clearing only cac
 it("warns about retained torrent files and requires a separate destructive action", async () => {
   api.get.mockResolvedValue({ ...initial, retained: true });
   const { user, onDeleted } = setup();
-  await screen.findByText(/Retained torrent/);
+  await screen.findByText(/Retained download/);
   expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Delete session files…" }));
-  expect(screen.getByText(/files needed to download skipped items later/)).toBeVisible();
+  expect(screen.getByText(/source data needed to resume later/)).toBeVisible();
   expect(api.remove).not.toHaveBeenCalled();
   await user.click(screen.getByRole("button", { name: "Keep files" }));
   expect(screen.queryByRole("button", { name: "Delete permanently" })).not.toBeInTheDocument();

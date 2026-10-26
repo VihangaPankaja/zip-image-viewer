@@ -2,8 +2,7 @@
 
 The React client sends validated requests to an Express server. Downloads,
 extraction and media preparation run in the background while users browse ready
-sessions. HTTP sessions are temporary; torrents keep metadata and payloads
-across restarts. See [storage](../guides/storage.md) for lifecycle rules.
+sessions. HTTP downloads and torrents keep metadata and payloads across restarts. See [storage](../guides/storage.md) for lifecycle rules.
 
 ## Request flow
 
@@ -39,18 +38,18 @@ large collections. Resizable panels compose the desktop workspace.
 
 ## Server
 
-| Path under `server/`                | Responsibility                                       |
-| ----------------------------------- | ---------------------------------------------------- |
-| `index.ts`, `runtimeComposition.ts` | Process entry and dependency wiring.                 |
-| `bootstrap/`                        | Express setup, startup restoration and shutdown.     |
-| `domain/`                           | Job, session, file-tree and error models.            |
-| `application/`                      | Download, torrent, extraction and session workflows. |
-| `handlers/`, `rpc/`                 | HTTP media routes and RPC adapters.                  |
-| `infrastructure/`                   | File, archive, network and media operations.         |
-| `media/`                            | Rendition, playlist and process-limiting helpers.    |
-| `repositories/`                     | In-memory state and SQLite retained-torrent storage. |
-| `services/`, `realtime/`            | Segmented transfers and progress delivery.           |
-| `tui/`                              | Interactive terminal dashboard.                      |
+| Path under `server/`                | Responsibility                                        |
+| ----------------------------------- | ----------------------------------------------------- |
+| `index.ts`, `runtimeComposition.ts` | Process entry and dependency wiring.                  |
+| `bootstrap/`                        | Express setup, startup restoration and shutdown.      |
+| `domain/`                           | Job, session, file-tree and error models.             |
+| `application/`                      | Download, torrent, extraction and session workflows.  |
+| `handlers/`, `rpc/`                 | HTTP media routes and RPC adapters.                   |
+| `infrastructure/`                   | File, archive, network and media operations.          |
+| `media/`                            | Rendition, playlist and process-limiting helpers.     |
+| `repositories/`                     | In-memory state and SQLite retained-download storage. |
+| `services/`, `realtime/`            | Segmented transfers and progress delivery.            |
+| `tui/`                              | Interactive terminal dashboard.                       |
 
 Domain code has no HTTP or filesystem dependencies. Application workflows use
 typed dependencies; adapters handle I/O. Fallow checks these import boundaries.
