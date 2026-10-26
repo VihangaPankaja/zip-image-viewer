@@ -1,5 +1,5 @@
 import express from "express";
-import { once } from "node:events";
+import { listenFixtureApp, registerFixtureSession } from "./fixtureApp";
 import { mkdir, mkdtemp, open, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { registerFileRoutes } from "../../server/handlers/fileRoutes";
@@ -89,34 +89,18 @@ export async function startTextPreviewApp(baseURL: string, port = 0) {
     ensureThumbnail: () => Promise.reject(new Error("Not an image fixture")),
     ensureImagePreview: () => Promise.reject(new Error("Not an image fixture")),
   });
-  app.post("/rpc/sessions/list", (_req, res) =>
-    res.json({
-      json: {
-        items: [
-          {
-            id: sessionId,
-            firstFilePath: files[0].path,
-            fileCount: files.length,
-            lastAccessedAt: Date.now(),
-          },
-        ],
-      },
-    }),
-  );
-  app.post("/rpc/jobs/list", (_req, res) => res.json({ json: { items: [] } }));
+  registerFixtureSession(app, {
+    id: sessionId,
+    firstFilePath: files[0].path,
+    fileCount: files.length,
+  });
   app.use(proxyApp(baseURL));
-  const server = app.listen(port, "127.0.0.1");
-  await once(server, "listening");
-  const address = server.address();
-  if (!address || typeof address === "string") throw new Error("Text fixture did not bind.");
+  const server = await listenFixtureApp(app, port);
   return {
-    origin: `http://127.0.0.1:${address.port}`,
+    origin: server.origin,
     directory,
     close: async () => {
-      server.closeAllConnections();
-      await new Promise<void>((resolve, reject) =>
-        server.close((error) => (error ? reject(error) : resolve())),
-      );
+      await server.close();
       await rm(directory, { recursive: true, force: true });
     },
   };
