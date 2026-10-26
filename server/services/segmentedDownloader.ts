@@ -1,7 +1,6 @@
-import { createReadStream, createWriteStream } from "node:fs";
 import { rm, rename } from "node:fs/promises";
 import path from "node:path";
-import { pipeline } from "node:stream/promises";
+import { mergeSegmentParts } from "../infrastructure/downloads/downloadFiles.js";
 import { sleepWithSignal } from "../infrastructure/runtime/mediaClassification.js";
 import { streamSingleRange } from "../infrastructure/downloads/rangeDownload.js";
 import {
@@ -70,7 +69,7 @@ async function downloadSingleWithResume({
   signal,
   storage,
   validator,
-  file,
+  retained,
   save,
 }: {
   url: string;
@@ -81,9 +80,10 @@ async function downloadSingleWithResume({
   signal: AbortSignal;
   storage: ReturnType<typeof reserveStorage>;
   validator: string;
-  file: HttpFileCheckpoint;
+  retained: HttpDownloadState;
   save: () => void;
 }): Promise<void> {
+  const file = retained.files[0];
   const existingBytes = file.bytes;
 
   state.downloadedBytes = existingBytes;
@@ -106,33 +106,27 @@ async function downloadSingleWithResume({
     maxBytes: (metadata.size || MAX_RESOURCE_BYTES) - start,
     validator,
     totalSize: metadata.size,
-    resolvedUrl: metadata.resolvedUrl || url,
+    resolvedUrl: shouldRangeResume ? retained.resolvedUrl : metadata.resolvedUrl,
     file,
     save,
-    responseHeader: (_statusCode, encoded, length) => {
-      if (!shouldRangeResume) metadata.size = length;
+    responseHeader: (response, encoded) => {
+      if (!shouldRangeResume) {
+        metadata.size = Number(response.headers["content-length"]) || 0;
+        metadata.resolvedUrl = (response.url || metadata.resolvedUrl || url).split("#", 1)[0];
+        metadata.etag = response.headers.etag;
+        metadata.lastModified = response.headers["last-modified"];
+      }
       if (encoded) {
         storage.reserveAvailable();
         metadata.size = 0;
       }
+      retained.resolvedUrl = metadata.resolvedUrl || retained.resolvedUrl;
+      retained.size = metadata.size;
+      retained.validator = rangeValidator(metadata);
+      file.end = metadata.size ? metadata.size - 1 : null;
+      save();
     },
   });
-}
-
-async function mergeSegmentParts(
-  partPaths: string[],
-  targetPath: string,
-  signal: AbortSignal,
-): Promise<void> {
-  for (const [index, sourcePath] of partPaths.entries()) {
-    await pipeline(
-      createReadStream(sourcePath),
-      createWriteStream(targetPath, {
-        flags: index === 0 ? "w" : "a",
-      }),
-      { signal },
-    );
-  }
 }
 
 async function downloadSegmentWithRetry({
@@ -282,7 +276,7 @@ export async function downloadWithSegmentedManager({
         signal,
         storage,
         validator,
-        file: retained.files[0],
+        retained,
         save,
       });
       retained.size = metadata.size || state.downloadedBytes;

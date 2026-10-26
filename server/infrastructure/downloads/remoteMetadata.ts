@@ -13,6 +13,7 @@ const emptyMetadata: RemoteMetadata = {
   acceptRanges: false,
   etag: "",
   lastModified: "",
+  resolvedUrl: undefined,
 };
 
 export async function fetchRemoteMetadata(
@@ -25,7 +26,7 @@ export async function fetchRemoteMetadata(
       signal,
       headers: { "cache-control": "no-cache", "accept-encoding": "identity" },
     });
-    if (!response.ok) return emptyMetadata;
+    if (!response.ok) return { ...emptyMetadata };
     const encoding = response.headers.get("content-encoding");
     const encoded = Boolean(encoding && encoding.toLowerCase() !== "identity");
     const size = Number(response.headers.get("content-length"));
@@ -37,6 +38,6 @@ export async function fetchRemoteMetadata(
       lastModified: response.headers.get("last-modified") ?? "",
     };
   } catch {
-    return emptyMetadata;
+    return { ...emptyMetadata };
   }
 }

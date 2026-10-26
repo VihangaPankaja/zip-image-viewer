@@ -13,12 +13,12 @@ type RangeRequest = {
   state: DownloadState;
   signal: AbortSignal;
   strictRange: boolean;
-  responseHeader?: (_statusCode: number, _encoded: boolean, _length: number) => void;
+  responseHeader?: (_response: IncomingMessage, _encoded: boolean) => void;
   checkStorage: (_receivedBytes: number) => void;
   maxBytes: number;
   validator: string;
   totalSize: number;
-  resolvedUrl: string;
+  resolvedUrl?: string;
   file: HttpFileCheckpoint;
   save: () => void;
 };
@@ -66,18 +66,14 @@ export async function streamSingleRange({
   request.once("response", (response: IncomingMessage) => {
     responseState.checked = true;
     try {
-      const { statusCode, encoded } = validateDownloadResponse(
-        response,
-        Boolean(headers.Range),
-        strictRange,
-      );
+      const { encoded } = validateDownloadResponse(response, Boolean(headers.Range), strictRange);
       assertRangeResponse(
         response,
         { requestedStart, requestedEnd, totalSize, validator, resolvedUrl },
         Boolean(headers.Range),
       );
       if (encoded) allowedBytes = MAX_RESOURCE_BYTES;
-      responseHeader?.(statusCode, encoded, Number(response.headers["content-length"]) || 0);
+      responseHeader?.(response, encoded);
     } catch (error) {
       request.destroy(error instanceof Error ? error : new Error(String(error)));
     }
@@ -119,7 +115,7 @@ function assertRangeResponse(
     (validator &&
       (validator.startsWith('"') ? response.headers.etag : response.headers["last-modified"]) !==
         validator) ||
-    (response.url && response.url.split("#", 1)[0] !== resolvedUrl.split("#", 1)[0])
+    (resolvedUrl && response.url && response.url.split("#", 1)[0] !== resolvedUrl.split("#", 1)[0])
   )
     throw Object.assign(new Error("Download source identity changed."), {
       code: "SOURCE_CHANGED",
