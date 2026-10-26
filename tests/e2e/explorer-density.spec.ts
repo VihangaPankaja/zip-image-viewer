@@ -15,7 +15,7 @@ test("file rows change density and sidebar resizing stays bounded", async ({ pag
   await page.getByRole("tab", { name: "Explore" }).click();
   await page
     .getByRole("list", { name: "Sessions", exact: true })
-    .getByRole("button", { name: "Coastal collection" })
+    .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
     .click();
   const density = page.getByRole("combobox", { name: "Row density" });
   const rows = page.getByRole("treeitem");
@@ -95,7 +95,7 @@ test.describe("touch file drawer", () => {
     await tapVisibleTarget(
       page
         .getByRole("list", { name: "Sessions", exact: true })
-        .getByRole("button", { name: "Coastal collection" }),
+        .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ }),
     );
     await tapVisibleTarget(page.getByRole("button", { name: "Hide sessions" }));
     await page.getByRole("searchbox", { name: "Search explorer files" }).fill("a-long-filename");
@@ -168,7 +168,7 @@ test("10,000-file window follows density and responsive row heights", async ({ p
   await page.getByRole("tab", { name: "Explore" }).click();
   await page
     .getByRole("list", { name: "Sessions", exact: true })
-    .getByRole("button", { name: "Coastal collection" })
+    .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
     .click();
   const tree = page.getByRole("tree");
   const touchPointer = await page.evaluate(() => matchMedia("(any-pointer: coarse)").matches);

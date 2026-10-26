@@ -20,7 +20,7 @@ test("one timeline controls real playback, Settings, captions and native recover
   await page.getByRole("tab", { name: "Explore" }).click();
   await page
     .getByRole("list", { name: "Sessions", exact: true })
-    .getByRole("button", { name: "Coastal collection" })
+    .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
     .click();
   await page
     .getByRole("treeitem", {

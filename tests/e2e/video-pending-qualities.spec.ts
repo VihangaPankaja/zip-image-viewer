@@ -29,7 +29,7 @@ test("clears the playing video until the next file's qualities resolve", async (
     await page.getByRole("tab", { name: "Explore" }).click();
     await page
       .getByRole("list", { name: "Sessions", exact: true })
-      .getByRole("button", { name: "Coastal collection" })
+      .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
       .click();
     await page
       .getByRole("treeitem", {

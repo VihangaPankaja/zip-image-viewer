@@ -24,7 +24,7 @@ test("tablet video actions remain clickable above the player", async ({ page }) 
     await page.getByRole("tab", { name: "Explore" }).click();
     await page
       .getByRole("list", { name: "Sessions", exact: true })
-      .getByRole("button", { name: "Coastal collection" })
+      .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
       .click();
     await page.getByRole("treeitem", { name: "06-film.mkv mkv", exact: true }).click();
     await page.getByText("Video settings", { exact: true }).click();
@@ -74,7 +74,7 @@ for (const { width, hasTouch } of [
       await page.getByRole("tab", { name: "Explore" }).click();
       await page
         .getByRole("list", { name: "Sessions", exact: true })
-        .getByRole("button", { name: "Coastal collection" })
+        .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
         .click();
       await page.getByRole("treeitem").filter({ hasText: "01-coast.png" }).click();
       await expect(page.locator(".image-frame img")).toBeVisible();
@@ -225,7 +225,7 @@ test("slideshow reveal remains a full touch target with hidden controls", async 
   await page.getByRole("button", { name: "Show sessions" }).click();
   await page
     .getByRole("list", { name: "Sessions", exact: true })
-    .getByRole("button", { name: "Coastal collection" })
+    .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
     .click();
   await page.getByRole("button", { name: "Hide sessions" }).click();
   await page.getByRole("treeitem").filter({ hasText: "01-coast.png" }).click();

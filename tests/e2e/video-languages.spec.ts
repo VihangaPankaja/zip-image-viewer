@@ -199,7 +199,7 @@ mediaTest(
     await page.getByRole("button", { name: "Show sessions" }).click();
     await page
       .getByRole("list", { name: "Sessions", exact: true })
-      .getByRole("button", { name: "Coastal collection" })
+      .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
       .click();
     await page
       .getByRole("treeitem", {

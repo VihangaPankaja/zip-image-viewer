@@ -15,7 +15,7 @@ test("a pending session keeps the empty file area keyboard accessible", async ({
   await page.getByRole("button", { name: "Show sessions", exact: true }).click();
   await page
     .getByRole("list", { name: "Sessions", exact: true })
-    .getByRole("button", { name: "Coastal collection" })
+    .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
     .click();
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 });

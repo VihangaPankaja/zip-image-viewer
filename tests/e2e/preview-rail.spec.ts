@@ -229,7 +229,7 @@ test("preview rail filters transfers, opens verified video, recovers and dedupli
   ).toHaveCount(1);
   await rail
     .getByRole("list", { name: "Sessions", exact: true })
-    .getByRole("button", { name: "Coastal collection" })
+    .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
     .click();
   await page.getByRole("radio", { name: "Preview", exact: true }).check({ force: true });
   sessions = [];
@@ -290,13 +290,13 @@ test("a failed session switch clears files, metadata and storage ownership", asy
     invalid = malformed;
     await rail
       .getByRole("list", { name: "Sessions", exact: true })
-      .getByRole("button", { name: "Coastal collection" })
+      .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
       .click();
     await expect(page.getByRole("treeitem", { name: /01-coast.png/ })).toBeVisible();
     await expect(page.getByRole("button", { name: "Storage", exact: true })).toBeVisible();
     await rail
       .getByRole("list", { name: "Sessions", exact: true })
-      .getByRole("button", { name: "Unavailable collection" })
+      .getByRole("button", { name: /^Ready Unavailable collection \d+ files$/ })
       .click();
     await expect(page.getByRole("status")).toHaveText(
       malformed
@@ -309,7 +309,7 @@ test("a failed session switch clears files, metadata and storage ownership", asy
   }
   await rail
     .getByRole("list", { name: "Sessions", exact: true })
-    .getByRole("button", { name: "Coastal collection" })
+    .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
     .click();
   await expect(page.getByRole("heading", { name: "01-coast.png", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Storage", exact: true })).toBeVisible();
@@ -332,7 +332,7 @@ test("invalid video capability and failed session loads offer recovery without o
   await page.route("**/api/sessions/*/tree", (route) => route.fulfill({ status: 404 }));
   await rail
     .getByRole("list", { name: "Sessions", exact: true })
-    .getByRole("button", { name: "Coastal collection" })
+    .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
     .click();
   await expect(
     page.getByText(

@@ -272,7 +272,7 @@ async function openMobileVideo(page: Page, appOrigin: string) {
   await tapVisibleTarget(
     page
       .getByRole("list", { name: "Sessions", exact: true })
-      .getByRole("button", { name: "Coastal collection" }),
+      .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ }),
   );
   await tapVisibleTarget(page.getByRole("button", { name: "Hide sessions" }));
   await tapVisibleTarget(

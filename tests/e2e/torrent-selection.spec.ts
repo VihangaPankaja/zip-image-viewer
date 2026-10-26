@@ -68,7 +68,7 @@ test("keyboard adds a torrent, reviews files, starts selection, seeks and closes
     page,
     page
       .getByRole("list", { name: "Sessions", exact: true })
-      .getByRole("button", { name: "Coastal collection" }),
+      .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ }),
   );
   await page.getByRole("treeitem", { name: "Coastal collection Folder", exact: true }).focus();
   for (const name of filenames.slice(0, 3)) {

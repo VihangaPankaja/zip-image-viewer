@@ -31,7 +31,7 @@ async function openCollection(page: Page, mobile = false) {
   if (mobile) await page.getByRole("button", { name: "Show sessions" }).click();
   await page
     .getByRole("list", { name: "Sessions", exact: true })
-    .getByRole("button", { name: "Coastal collection" })
+    .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
     .click();
 }
 
@@ -202,7 +202,7 @@ test("profiles filtering and keyboard navigation with 10,000 files", async ({ pa
   const started = Date.now();
   await page
     .getByRole("list", { name: "Sessions", exact: true })
-    .getByRole("button", { name: "Coastal collection" })
+    .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
     .click();
 
   await expect(page.locator('[role="treeitem"]').first()).toBeVisible();

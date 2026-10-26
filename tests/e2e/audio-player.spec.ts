@@ -24,7 +24,7 @@ async function openAudio(page: Page, origin: string) {
   await page.getByRole("tab", { name: "Explore", exact: true }).click();
   await page
     .getByRole("list", { name: "Sessions", exact: true })
-    .getByRole("button", { name: "Coastal collection" })
+    .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
     .click();
   await page
     .getByRole("treeitem", {
@@ -181,7 +181,7 @@ test("a real decode failure offers retry and original download without auto-skip
   await page.getByRole("tab", { name: "Explore", exact: true }).click();
   await page
     .getByRole("list", { name: "Sessions", exact: true })
-    .getByRole("button", { name: "Coastal collection" })
+    .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
     .click();
   await page
     .getByRole("treeitem", {
