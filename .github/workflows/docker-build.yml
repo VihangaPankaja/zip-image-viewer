@@ -156,7 +156,7 @@ jobs:
             ${{ env.IMAGE_NAME }}:latest /app/tests/integration/containerHlsSmoke.mjs
 
       - name: Set up Vite+ for browser smoke checks
-        uses: voidzero-dev/setup-vp@v1.21.2
+        uses: voidzero-dev/setup-vp@v1.22.0
         with:
           cache: true
           run-install: false
