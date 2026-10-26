@@ -244,7 +244,6 @@ function ExplorerOverlay(props: ExplorerOverlayProps) {
       <div className="settings-sheet explorer-modal-sheet">
         <div className="panel-header">
           <div className="panel-title-group">
-            <p className="panel-label">Explorer modal</p>
             <h2 id="explorer-dialog-title" title={props.sortedTree.name}>
               {props.sortedTree.name}
             </h2>

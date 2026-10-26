@@ -13,7 +13,6 @@ export function WorkspacePreviewRecovery({
   return (
     <div className="empty-card">
       <strong role="status">{message}</strong>
-      <p>Manage the transfer in Downloads, or choose another available session.</p>
       {readySessionId ? (
         <button
           className="primary-button"

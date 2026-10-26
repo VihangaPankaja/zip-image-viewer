@@ -327,17 +327,19 @@ export function DownloadDialog({ defaultOptions, open, onClose, onSubmit }: Down
       >
         <header>
           <div>
-            <p className="panel-label">New transfer batch</p>
             <h2 id="download-dialog-title">Add downloads</h2>
           </div>
           <button type="button" className="ghost-button" onClick={onClose}>
             Close
           </button>
         </header>
-        <DownloadCompose source={source} setSource={setSource} addDrafts={addDrafts} />
-        <DraftList drafts={drafts} urlCounts={urlCounts} setDrafts={setDrafts} />
+        <div className="download-dialog-body">
+          <DownloadCompose source={source} setSource={setSource} addDrafts={addDrafts} />
+          <DraftList drafts={drafts} urlCounts={urlCounts} setDrafts={setDrafts} />
+        </div>
         {submitError ? (
-          <p className="download-submit-error" role="alert">
+          // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Long errors scroll independently and need keyboard access.
+          <p className="download-submit-error" role="alert" tabIndex={0}>
             {submitError}
           </p>
         ) : null}

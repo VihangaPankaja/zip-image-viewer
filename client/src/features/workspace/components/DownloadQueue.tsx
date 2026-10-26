@@ -255,15 +255,10 @@ export function DownloadManager(props: DownloadManagerProps) {
     <section className="download-manager" aria-labelledby="downloads-title">
       <header className="download-manager-header">
         <div>
-          <p className="panel-label">Queue control</p>
           <h2 id="downloads-title" tabIndex={-1}>
             Downloads
           </h2>
-          <p>
-            {jobs.length
-              ? "Drag downloads or use the arrows to change their priority."
-              : "Add links, track progress, and explore your files."}
-          </p>
+          {jobs.length ? <p>Drag downloads or use the arrows to change their priority.</p> : null}
         </div>
       </header>
       {jobs.length === 0 ? (

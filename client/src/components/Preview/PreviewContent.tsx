@@ -45,7 +45,6 @@ function PreviewHeader({
   return (
     <div className="panel-header">
       <div className="panel-title-group">
-        <p className="panel-label">Preview</p>
         <h2 title={selectedNode?.name || "Select a file"}>
           {selectedNode?.name || "Select a file"}
         </h2>
