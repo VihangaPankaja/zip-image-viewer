@@ -42,6 +42,12 @@ export function WorkspacePageView({ controller }: ViewProps) {
       files={controller.media.selection.explorerRows}
       selectedPath={state.selectedPath}
       filesVisible={state.mobilePane === "files"}
+      videoVisible={
+        state.activeView === "explore" &&
+        !controller.actions.error &&
+        (controller.media.selection.selectedKind === "video" ||
+          Boolean(controller.actions.livePreview))
+      }
       visible={
         state.activeView === "explore" &&
         controller.media.selection.selectedKind === "audio" &&
