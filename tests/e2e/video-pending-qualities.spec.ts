@@ -27,8 +27,16 @@ test("clears the playing video until the next file's qualities resolve", async (
   try {
     await page.goto(appOrigin);
     await page.getByRole("tab", { name: "Explore" }).click();
-    await page.getByRole("button", { name: "Open Coastal collection" }).click();
-    await page.getByRole("treeitem", { name: filenames[2], exact: true }).click();
+    await page
+      .getByRole("list", { name: "Sessions", exact: true })
+      .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ })
+      .click();
+    await page
+      .getByRole("treeitem", {
+        name: `${filenames[2]} ${filenames[2].split(".").at(-1)}`,
+        exact: true,
+      })
+      .click();
     const video = page.getByLabel("Video preview");
     await expect
       .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState))
@@ -40,7 +48,12 @@ test("clears the playing video until the next file's qualities resolve", async (
     await expect
       .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
       .toBeGreaterThan(0.25);
-    await page.getByRole("treeitem", { name: filenames[5], exact: true }).click();
+    await page
+      .getByRole("treeitem", {
+        name: `${filenames[5]} ${filenames[5].split(".").at(-1)}`,
+        exact: true,
+      })
+      .click();
     await expect.poll(() => probing).toBe(true);
     await expect(page.locator(".preview-panel h2")).toHaveText(filenames[5]);
     await expect
@@ -73,7 +86,12 @@ test("clears the playing video until the next file's qualities resolve", async (
     await page.route("**/rpc/video/qualities", (route) =>
       route.fulfill({ status: 500, json: { error: "Probe failed" } }),
     );
-    await page.getByRole("treeitem", { name: filenames[2], exact: true }).click();
+    await page
+      .getByRole("treeitem", {
+        name: `${filenames[2]} ${filenames[2].split(".").at(-1)}`,
+        exact: true,
+      })
+      .click();
     await page.getByText("Video settings", { exact: true }).click();
     await expect(page.getByText("Mode: Original file", { exact: true })).toBeVisible();
     await expect

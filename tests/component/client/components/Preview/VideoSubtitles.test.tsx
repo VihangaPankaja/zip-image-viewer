@@ -149,7 +149,10 @@ it("updates native cue times without drift and cleans up track resources", async
     const track = video.querySelector("track");
     if (!track) throw new Error("Subtitle track missing.");
     fireEvent.load(track);
-    expect(screen.getByRole("button", { name: "Captions" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: /^Captions (on|off)$/ })).toHaveAccessibleName(
+      "Captions on",
+    );
+    expect(screen.getByRole("button", { name: /^Captions (on|off)$/ })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
@@ -160,13 +163,16 @@ it("updates native cue times without drift and cleans up track resources", async
     expect(cues[0]).toEqual({ startTime: 0, endTime: 1 });
     fireEvent.change(offset, { target: { value: "0" } });
     expect(cues[0]).toEqual({ startTime: 1, endTime: 3 });
-    fireEvent.click(screen.getByRole("button", { name: "Captions" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Captions (on|off)$/ }));
+    expect(screen.getByRole("button", { name: /^Captions (on|off)$/ })).toHaveAccessibleName(
+      "Captions off",
+    );
     expect(nativeTrack.mode).toBe("disabled");
     act(() => {
       nativeTrack.mode = "showing";
       video.textTracks.dispatchEvent(new Event("change"));
     });
-    expect(screen.getByRole("button", { name: "Captions" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: /^Captions (on|off)$/ })).toHaveAttribute(
       "aria-pressed",
       "true",
     );

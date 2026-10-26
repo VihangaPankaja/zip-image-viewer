@@ -24,7 +24,10 @@ test("opt-in playback recovers when staged output outlasts the normal playlist r
     });
     await page.goto(fixture.origin);
     await page.getByRole("tab", { name: "Explore" }).click();
-    await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
+    await page
+      .getByRole("list", { name: "Sessions", exact: true })
+      .getByRole("button", { name: "multilingual.mkv" })
+      .click();
     const video = page.getByLabel("Video preview");
     await expect
       .poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState), {
@@ -69,7 +72,10 @@ for (const status of [404, 503]) {
       });
       await page.goto(fixture.origin);
       await page.getByRole("tab", { name: "Explore" }).click();
-      await page.getByRole("button", { name: "Open multilingual.mkv" }).click();
+      await page
+        .getByRole("list", { name: "Sessions", exact: true })
+        .getByRole("button", { name: "multilingual.mkv" })
+        .click();
       await expect(page.getByRole("alert")).toBeVisible({ timeout: 10_000 });
       expect(attempts).toBeLessThanOrEqual(3);
     } finally {

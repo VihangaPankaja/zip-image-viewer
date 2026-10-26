@@ -70,7 +70,6 @@ function TreeItem({
       }}
       type="button"
       role="treeitem"
-      aria-label={row.node.name}
       aria-level={row.depth + 1}
       data-row-index={index}
       aria-posinset={row.position}
@@ -97,8 +96,8 @@ function TreeItem({
       <span className="tree-item-icon" aria-hidden="true">
         {iconForNode(row.node)}
       </span>
-      <span className="tree-item-label">{row.node.name}</span>
-      <span className="tree-item-meta" aria-hidden="true">
+      <span className="tree-item-label">{row.node.name}</span>{" "}
+      <span className="tree-item-meta">
         {row.node.type === "directory" ? "Folder" : row.node.extension || "file"}
       </span>
     </button>

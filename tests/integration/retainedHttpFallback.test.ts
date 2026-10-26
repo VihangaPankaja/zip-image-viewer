@@ -66,9 +66,8 @@ it.each(["HEAD rejected", "HEAD original URL", "HEAD different validator"])(
             timeout: 15_000,
           })
           .toBe("ready");
-        expect(await readFile(path.join(directory, "sessions", id, "source.txt"))).toEqual(
-          payloads[index],
-        );
+        const contents = await readFile(path.join(directory, "sessions", id, "source.txt"));
+        expect(contents.equals(payloads[index])).toBe(true);
         const store = createRetainedTorrentStore(path.join(directory, "sessions"));
         try {
           expect(store.readHttp().find((job) => job.id === id)?.httpDownload).toMatchObject({

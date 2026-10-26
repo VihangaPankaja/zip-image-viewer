@@ -66,12 +66,16 @@ test("keyboard adds a torrent, reviews files, starts selection, seeks and closes
   await keyboardActivate(page, page.getByRole("button", { name: "Show sessions" }));
   await keyboardActivate(
     page,
-    page.getByRole("button", { name: "Open Coastal collection", exact: true }),
+    page
+      .getByRole("list", { name: "Sessions", exact: true })
+      .getByRole("button", { name: /^Ready Coastal collection \d+ files$/ }),
   );
-  await page.getByRole("treeitem", { name: "Coastal collection", exact: true }).focus();
+  await page.getByRole("treeitem", { name: "Coastal collection Folder", exact: true }).focus();
   for (const name of filenames.slice(0, 3)) {
     await page.keyboard.press("ArrowDown");
-    await expect(page.getByRole("treeitem", { name, exact: true })).toBeFocused();
+    await expect(
+      page.getByRole("treeitem", { name: `${name} ${name.split(".").at(-1)}`, exact: true }),
+    ).toBeFocused();
   }
   await page.keyboard.press("Enter");
   await expect(page.locator("video source")).toHaveAttribute("src", /\/api\/sessions\//);
