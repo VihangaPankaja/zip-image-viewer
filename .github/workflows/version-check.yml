@@ -24,7 +24,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Vite+ and the project Node.js version
-        uses: voidzero-dev/setup-vp@v1.21.2
+        uses: voidzero-dev/setup-vp@v1.22.0
         with:
           run-install: false
           node-version-file: .node-version

@@ -72,7 +72,7 @@ jobs:
           fetch-depth: 0
       - name: Validate GitHub Actions workflows
         uses: docker://rhysd/actionlint:1.7.12
-      - uses: voidzero-dev/setup-vp@v1.21.2
+      - uses: voidzero-dev/setup-vp@v1.22.0
         with:
           cache: true
           run-install: false
@@ -112,7 +112,7 @@ jobs:
             os: macos-15-intel
     steps:
       - uses: actions/checkout@v7
-      - uses: voidzero-dev/setup-vp@v1.21.2
+      - uses: voidzero-dev/setup-vp@v1.22.0
         with:
           cache: true
           run-install: false
@@ -144,7 +144,7 @@ jobs:
             os: macos-15-intel
     steps:
       - uses: actions/checkout@v7
-      - uses: voidzero-dev/setup-vp@v1.21.2
+      - uses: voidzero-dev/setup-vp@v1.22.0
         with:
           cache: true
           run-install: false
