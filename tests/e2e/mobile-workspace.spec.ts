@@ -94,7 +94,7 @@ test("mobile file selection opens preview and retains it across queue visits and
       preview.getByRole("heading", { name: filename, exact: true }),
       preview.locator(".preview-toolbar"),
       preview.locator(".panel-actions"),
-      preview.locator("pre"),
+      preview.getByRole("region", { name: "Text content", exact: true }),
     ]) {
       const [outer, inner] = await Promise.all([preview.boundingBox(), child.boundingBox()]);
       expect(outer).not.toBeNull();
@@ -104,7 +104,7 @@ test("mobile file selection opens preview and retains it across queue visits and
       expect(inner.x + inner.width).toBeLessThanOrEqual(outer.x + outer.width);
       expect(inner.y + inner.height).toBeLessThanOrEqual(outer.y + outer.height);
     }
-    const content = preview.locator("pre");
+    const content = preview.getByRole("region", { name: "Text content", exact: true });
     await content.evaluate((element) => element.scrollIntoView({ block: "center" }));
     await expect(content).toBeInViewport({ ratio: 0.99 });
     const [contentBounds, navBounds] = await Promise.all([
