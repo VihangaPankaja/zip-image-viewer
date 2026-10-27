@@ -33,7 +33,6 @@ export async function streamSingleRange(input: RangeRequest): Promise<void> {
     state,
     signal,
     responseHeader,
-    checkStorage,
     maxBytes,
     validator,
     file,
@@ -72,14 +71,7 @@ export async function streamSingleRange(input: RangeRequest): Promise<void> {
 
   const initialBytes = file.bytes;
   const received = { downloadedBytes: 0 };
-  const budget = createDownloadBudget(
-    () => allowedBytes,
-    received,
-    (bytes) => {
-      checkStorage(bytes);
-      state.downloadedBytes += bytes - received.downloadedBytes;
-    },
-  );
+  const budget = createRangeBudget(input, received, () => allowedBytes, Boolean(headers.Range));
 
   try {
     await pipeline(
@@ -105,6 +97,26 @@ export async function streamSingleRange(input: RangeRequest): Promise<void> {
     });
 
   if (!responseState.checked) throw new Error("Download failed before response was received.");
+}
+
+function createRangeBudget(
+  input: RangeRequest,
+  received: DownloadState,
+  maxBytes: () => number,
+  hasRange: boolean,
+) {
+  return createDownloadBudget(
+    () => (hasRange ? MAX_RESOURCE_BYTES : maxBytes()),
+    received,
+    (bytes) => {
+      if (hasRange && bytes > maxBytes())
+        throw Object.assign(new Error("Download body exceeds its requested range."), {
+          code: "RANGE_UNSUPPORTED",
+        });
+      input.checkStorage(bytes);
+      input.state.downloadedBytes += bytes - received.downloadedBytes;
+    },
+  );
 }
 
 function createRangeRequest(url: string, headers: Record<string, string>, signal: AbortSignal) {

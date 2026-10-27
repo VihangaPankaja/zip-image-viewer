@@ -94,6 +94,7 @@ async function retryDownload(
 ): Promise<"complete" | "paused"> {
   const budget = { retries: 0, waitedMs: 0 };
   for (;;) {
+    job.abortController?.signal.throwIfAborted();
     job.retryCount = budget.retries;
     try {
       state.statusText = "";
@@ -192,6 +193,7 @@ export async function downloadSessionSource(
   const signal = job.abortController?.signal ?? AbortSignal.abort();
   job.maxRetries = settings.maxRetries === -1 ? 8 : settings.maxRetries;
   const metadata = await fetchRemoteMetadata(input.url, signal);
+  signal.throwIfAborted();
   state.reportedSize = metadata.size;
   if (metadata.size > CONFIRM_SIZE_BYTES && !input.confirmOversize) {
     deps.emitJob(job, {

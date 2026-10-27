@@ -117,6 +117,7 @@ async function downloadSingleWithResume({
       if (encoded) {
         storage.reserveAvailable();
         metadata.size = 0;
+        metadata.acceptRanges = false;
       }
       retained.resolvedUrl = metadata.resolvedUrl || retained.resolvedUrl;
       retained.size = metadata.size;
@@ -159,9 +160,7 @@ async function downloadSegmentWithRetry({
   const partPath = `${targetPath}.part.${String(segment.index)}`;
 
   for (;;) {
-    if (signal.aborted) {
-      throw Object.assign(new Error("Aborted"), { name: "AbortError" });
-    }
+    signal.throwIfAborted();
 
     try {
       const previousBytes = file.bytes;
@@ -210,6 +209,7 @@ type DownloadInput = {
 };
 
 export async function downloadWithSegmentedManager(input: DownloadInput): Promise<void> {
+  input.signal.throwIfAborted();
   try {
     await downloadOnce(input);
   } catch (error) {

@@ -13,6 +13,21 @@ large download when prompted. Failed downloads offer **Retry**.
 Settings controls simultaneous downloads and HTTP threading. Torrent bandwidth
 limits apply across active torrents; HTTP thread settings do not affect peers.
 
+HTTP downloads probe a single byte when an origin does not support HEAD. They
+validate ranged responses before reusing retained bytes. If ranges, encoding or
+source identity change, they discard the partial transfer and restart with one
+fresh stream. A fresh GET establishes its own size and validators.
+
+Transient failures use exponential delay with jitter, capped at 30 seconds per
+wait and two minutes of waiting per run. HTTP retries stop at the configured
+count, with an eight-retry ceiling even for older unlimited settings. A valid
+Retry-After controls the wait; a value beyond either wait limit stops automatic
+retry. Cancel interrupts probing, streaming and retry waits.
+
+Authorization failures, missing files and detected login or error pages stop
+without automatic retry. For an expired or private link, add a fresh public
+download link. Ordinary HTML documents remain supported.
+
 ## Select torrent files
 
 Review the torrent's file list before starting the transfer. Search or filter

@@ -89,7 +89,7 @@ it("immediately closes an ignored probe without consuming a streaming body or tr
   );
 });
 
-it.each(["ignored", "malformed", "416", "length"])(
+it.each(["ignored", "malformed", "416", "length", "chunked short", "chunked long"])(
   "discards retained bytes before a single fresh stream when ranges are %s",
   async (scenario) => {
     const ranges: (string | undefined)[] = [];
@@ -104,13 +104,21 @@ it.each(["ignored", "malformed", "416", "length"])(
         response
           .writeHead(scenario === "ignored" ? 200 : 206, {
             etag: '"v1"',
-            "content-length": scenario === "length" ? 1 : payload.length,
+            ...(scenario.startsWith("chunked")
+              ? {}
+              : { "content-length": scenario === "length" ? 1 : payload.length }),
             "content-range":
               scenario === "malformed"
                 ? "bytes 3-8/*"
                 : `bytes 3-${payload.length - 1}/${payload.length}`,
           })
-          .end(scenario === "length" ? "x" : payload);
+          .end(
+            scenario === "length"
+              ? "x"
+              : scenario === "chunked short"
+                ? payload.subarray(4)
+                : payload,
+          );
       },
       async (url, targetPath) => {
         const prefix = Buffer.from("OLD");
@@ -675,6 +683,90 @@ it("accepts a validator-free chunked origin without reusing an existing prefix",
         settings,
         state: { downloadedBytes: 0 },
       });
+      expect(digest(await readFile(targetPath))).toBe(digest(payload));
+    },
+  );
+});
+
+it("honors a future HTTP-date Retry-After on a real 503 response", async () => {
+  let gets = 0;
+  let notBefore = 0;
+  await withOrigin(
+    (request, response) => {
+      if (request.method === "HEAD") return response.writeHead(200).end();
+      gets++;
+      if (gets === 1) {
+        notBefore = Math.ceil(Date.now() / 1000) * 1000 + 1000;
+        return response.writeHead(503, { "retry-after": new Date(notBefore).toUTCString() }).end();
+      }
+      expect(Date.now()).toBeGreaterThanOrEqual(notBefore);
+      response.writeHead(200).end(payload);
+    },
+    async (url, targetPath) => {
+      await runJob(url, targetPath, 1);
+      expect(gets).toBe(2);
+      expect(digest(await readFile(targetPath))).toBe(digest(payload));
+    },
+  );
+});
+
+it("stops rather than retrying before a Retry-After beyond its delay cap", async () => {
+  let gets = 0;
+  await withOrigin(
+    (request, response) => {
+      if (request.method === "HEAD") return response.writeHead(200).end();
+      gets++;
+      response.writeHead(429, { "retry-after": "31" }).end();
+    },
+    async (url, targetPath) => {
+      await expect(runJob(url, targetPath, 1)).rejects.toMatchObject({ statusCode: 429 });
+      expect(gets).toBe(1);
+    },
+  );
+});
+
+it("preserves retained bytes when cancellation interrupts metadata discovery", async () => {
+  const controller = new AbortController();
+  let gets = 0;
+  await withOrigin(
+    (request, response) => {
+      if (request.method === "HEAD") {
+        controller.abort();
+        return response.writeHead(200).end();
+      }
+      gets++;
+      response.end(payload);
+    },
+    async (url, targetPath) => {
+      await writeFile(targetPath, "owned partial");
+      await expect(runJob(url, targetPath, 0, controller)).rejects.toMatchObject({
+        name: "AbortError",
+      });
+      expect(await readFile(targetPath, "utf8")).toBe("owned partial");
+      expect(gets).toBe(0);
+    },
+  );
+});
+
+it("does not advertise encoded fresh bytes as resumable after identity HEAD metadata", async () => {
+  await withOrigin(
+    (request, response) => {
+      if (request.method === "HEAD")
+        return response
+          .writeHead(200, {
+            "content-length": payload.length,
+            "accept-ranges": "bytes",
+            etag: '"gzip"',
+          })
+          .end();
+      response
+        .writeHead(200, { "content-encoding": "gzip", etag: '"gzip"' })
+        .end(gzipSync(payload));
+    },
+    async (url, targetPath) => {
+      const job = await runJob(url, targetPath, 0);
+      expect(job.canResume).toBe(false);
+      expect(job.canPause).toBe(false);
       expect(digest(await readFile(targetPath))).toBe(digest(payload));
     },
   );
