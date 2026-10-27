@@ -537,6 +537,50 @@ it("preserves an extensionless HTML search form with an unrelated Log in navigat
 });
 
 it.each([
+  ['<form action="/search"><input type="text" data-type="password"></form>', false],
+  ['<form><input title=\'type="password"\' type="text"></form>', false],
+  [
+    '<form><label title=\'<input type="password">\'>Search</label><input type="text"></form>',
+    false,
+  ],
+  ['<form title=\'<input type="password">\'><input type="text"></form>', false],
+  ['<form><input type="text" type="password"></form>', false],
+  ['<form><textarea><input type="password"></textarea><input type="text"></form>', false],
+  [
+    '<form><script>const example = \'<input type="password">\';</script><input type="text"></form>',
+    false,
+  ],
+  ['<form><input data-type="text" title=\'type="text"\' TYPE="PASSWORD"></form>', true],
+  ["<form><input type=password></form>", true],
+  ['<form><input type="password" type="text"></form>', true],
+])("inspects actual HTML attribute names and quoted values (%s)", async (text, login) => {
+  const body = Buffer.from(text);
+  await withOrigin(
+    (_request, response) => response.writeHead(200, { "content-type": "text/html" }).end(body),
+    async (url, targetPath) => {
+      const state = { downloadedBytes: 0 };
+      const transfer = downloadWithSegmentedManager({
+        url: url.replace("archive.zip", "document"),
+        targetPath,
+        signal: new AbortController().signal,
+        settings,
+        state,
+        metadata: { size: 0, acceptRanges: false },
+      });
+      if (login) {
+        await expect(transfer).rejects.toMatchObject({ code: "DOWNLOAD_LOGIN" });
+        expect(state.downloadedBytes).toBe(0);
+        expect(await readFile(targetPath)).toHaveLength(0);
+      } else {
+        await transfer;
+        expect(await readFile(targetPath)).toEqual(body);
+        expect(digest(await readFile(targetPath))).toBe(digest(body));
+      }
+    },
+  );
+});
+
+it.each([
   "utf-8 BOM",
   "utf-16le BOM",
   "utf-16be BOM",

@@ -207,16 +207,36 @@ function decodeHtmlPrefix(prefix: Buffer, contentType: string) {
   }
 }
 
+function hasLoginForm(html: string) {
+  const markup = html.replace(
+    /<(script|style|textarea|title)\b(?:[^"'<>]|"[^"]*"|'[^']*')*>[\s\S]*?<\/\1\s*>/gi,
+    "",
+  );
+  let inForm = false;
+  for (const [tag, name, attributes] of markup.matchAll(
+    /<\/?([a-z][\w:-]*)\b((?:[^"'<>]|"[^"]*"|'[^']*')*)>/gi,
+  )) {
+    const closing = tag.startsWith("</");
+    if (name.toLowerCase() === "form") {
+      inForm = !closing;
+      continue;
+    }
+    if (!inForm || closing || name.toLowerCase() !== "input") continue;
+    const type = [
+      ...attributes.matchAll(/([^\s"'=<>`/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g),
+    ].find((attribute) => attribute[1].toLowerCase() === "type");
+    if (type && (type[2] || type[3] || type[4] || "").toLowerCase() === "password") return true;
+  }
+  return false;
+}
+
 function htmlGuard(contentType: () => string) {
   let prefix = Buffer.alloc(0);
   let checked = false;
   function check() {
     const html = decodeHtmlPrefix(prefix, contentType()).replace(/<!--[\s\S]*?(?:-->|$)/g, "");
-    const loginForm = [...html.matchAll(/<form\b[^>]*>([\s\S]*?)(?:<\/form\s*>|$)/gi)].some(
-      (form) => /<input\b[^>]*\btype\s*=\s*(?:["']password["']|password(?=[\s>]))/i.test(form[1]),
-    );
     if (
-      loginForm ||
+      hasLoginForm(html) ||
       /<(?:title|h1)\b[^>]*>\s*(?:access denied|(?:download |signed )?(?:link|request) (?:has )?expired)\b/i.test(
         html,
       )
