@@ -161,7 +161,13 @@ test("narrow text controls support touch, JSON, quoted tables, UTF-16 and binary
     await page.getByRole("checkbox", { name: "Wrap lines" }).check();
     await page.getByRole("searchbox", { name: "Search loaded chunk only" }).fill("NEEDLE");
     await tapVisibleTarget(page.getByRole("button", { name: "Find next" }));
-    await expect(page.locator(".text-line-code").filter({ hasText: "NEEDLE" })).toBeVisible();
+    const longContent = page.getByRole("region", { name: "Text content", exact: true });
+    await expect
+      .poll(async () => (await longContent.locator(".text-line-code").allTextContents()).join(""))
+      .toContain("NEEDLE");
+    await expect(longContent.locator(".text-line-code").filter({ hasText: "N" })).toBeVisible();
+    await expect(longContent.locator(".text-line-code").filter({ hasText: "N" })).toBeInViewport();
+    expect(await longContent.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
     expect(await page.locator(".text-line").count()).toBeLessThan(100);
     await openFile(page, "07-binary.txt");
     await expect(page.getByRole("status")).toContainText("Binary content detected");
