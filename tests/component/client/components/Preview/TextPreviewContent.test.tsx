@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useTextPreview } from "../../../../../client/src/hooks/useTextPreview";
 import { TextPreviewContent } from "../../../../../client/src/components/Preview/TextPreviewContent";
 import type { TextPreviewState } from "../../../../../client/src/hooks/useTextPreview";
 
@@ -117,4 +118,44 @@ it("preserves the chunk navigation control during loading", () => {
   fireEvent.click(screen.getByRole("button", { name: "First chunk" }));
   rerender(<TextPreviewContent {...base} textPreview={loaded} />);
   expect(screen.getByRole("button", { name: "Next chunk" })).toHaveFocus();
+});
+
+it("keeps text, navigation and focus after a failed chunk and retries Next", async () => {
+  const first = preview("original text", 300000).chunk;
+  vi.stubGlobal(
+    "fetch",
+    vi
+      .fn()
+      .mockResolvedValueOnce(Response.json(first))
+      .mockRejectedValueOnce(new Error("Temporary read failure"))
+      .mockResolvedValueOnce(
+        Response.json({ ...first, text: "recovered text", offset: 13, nextOffset: 27 }),
+      ),
+  );
+  function ConnectedPreview() {
+    const { textPreview } = useTextPreview({
+      selectedNode: base.selectedNode,
+      selectedKind: "text",
+      selectedPreviewUrl: "/file?path=notes.json",
+      sessionId: "one",
+    });
+    return <TextPreviewContent {...base} textPreview={textPreview} />;
+  }
+  try {
+    render(<ConnectedPreview />);
+    await screen.findByText("original text");
+    const next = screen.getByRole("button", { name: "Next chunk" });
+    next.focus();
+    fireEvent.click(next);
+    await screen.findByRole("alert");
+    expect(screen.getByText("original text")).toBeVisible();
+    expect(screen.getByRole("navigation", { name: "Text chunks" })).toBeVisible();
+    expect(next).toHaveFocus();
+    fireEvent.click(next);
+    await screen.findByText("recovered text");
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(next).toHaveFocus();
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

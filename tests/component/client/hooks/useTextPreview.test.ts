@@ -90,3 +90,71 @@ it("keeps the current chunk visible while another chunk loads", async () => {
   });
   await waitFor(() => expect(result.current.textPreview.chunk?.text).toBe("next"));
 });
+
+it("retains the selected chunk after failure and retries the same offset", async () => {
+  const fetch = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({ ...chunk, totalBytes: 300000 }))
+    .mockRejectedValueOnce(new Error("Temporary read failure"))
+    .mockResolvedValueOnce(
+      Response.json({
+        ...chunk,
+        text: "recovered",
+        offset: 131072,
+        nextOffset: 131081,
+        totalBytes: 300000,
+      }),
+    );
+  vi.stubGlobal("fetch", fetch);
+  const { result } = renderHook(useTextPreview, { initialProps: props });
+  await waitFor(() => expect(result.current.textPreview.chunk?.text).toBe("new content"));
+  act(() => result.current.textPreview.loadOffset(131072));
+  await waitFor(() => expect(result.current.textPreview.error).toBe("Temporary read failure"));
+  expect(result.current.textPreview.chunk?.text).toBe("new content");
+  expect(result.current.textPreview.loading).toBe(false);
+  act(() => result.current.textPreview.loadOffset(131072));
+  expect(result.current.textPreview.loading).toBe(true);
+  expect(result.current.textPreview.error).toBe("");
+  await waitFor(() => expect(result.current.textPreview.chunk?.text).toBe("recovered"));
+  expect(fetch).toHaveBeenCalledTimes(3);
+});
+
+it.each(["file", "session"])(
+  "does not retain another %s owner's chunk after failure",
+  async (selection) => {
+    let rejectPending = (_error: Error) => {};
+    let pendingSignal: AbortSignal | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(Response.json({ ...chunk, totalBytes: 300000 }))
+        .mockImplementationOnce((_url: string, init: RequestInit) => {
+          pendingSignal = init.signal as AbortSignal;
+          return new Promise<Response>((_resolve, reject) => {
+            rejectPending = reject;
+          });
+        })
+        .mockRejectedValueOnce(new Error("Selected file unavailable")),
+    );
+    const { result, rerender } = renderHook(useTextPreview, { initialProps: props });
+    await waitFor(() => expect(result.current.textPreview.chunk?.text).toBe("new content"));
+    act(() => result.current.textPreview.loadOffset(131072));
+    rerender(
+      selection === "session"
+        ? { ...props, sessionId: "two" }
+        : {
+            ...props,
+            selectedNode: { path: "second.txt" },
+            selectedPreviewUrl: "/file?path=second.txt",
+          },
+    );
+    expect(result.current.textPreview.chunk).toBeNull();
+    expect(pendingSignal?.aborted).toBe(true);
+    act(() => {
+      rejectPending(new Error("Stale navigation failed"));
+    });
+    await waitFor(() => expect(result.current.textPreview.error).toBe("Selected file unavailable"));
+    expect(result.current.textPreview.chunk).toBeNull();
+  },
+);

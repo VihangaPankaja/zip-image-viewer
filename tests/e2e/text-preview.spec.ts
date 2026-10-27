@@ -62,9 +62,33 @@ test("200 MB text stays bounded, scrolls, searches and navigates by chunk", asyn
     await expect(page.getByRole("button", { name: "First chunk" })).toBeDisabled();
     await expect(content).toContainText("bounded preview");
     const next = page.getByRole("button", { name: "Next chunk" });
+    let chunkAttempts = 0;
+    await page.route("**/file?*", async (route) => {
+      const url = new URL(route.request().url());
+      if (
+        url.searchParams.get("textPreview") === "1" &&
+        url.searchParams.get("offset") === "131072"
+      ) {
+        chunkAttempts++;
+        if (chunkAttempts === 1) {
+          await route.fulfill({ status: 503, body: "Temporary read failure" });
+          return;
+        }
+      }
+      await route.continue();
+    });
+    const firstLine = await content.locator(".text-line-code").first().textContent();
     await next.focus();
     await page.keyboard.press("Enter");
+    await expect(page.getByRole("alert")).toContainText("Preview unavailable");
+    await expect(content.locator(".text-line-code").first()).toHaveText(firstLine ?? "");
+    await expect(page.getByText(/Bytes 0–131,072/)).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Text chunks" })).toBeVisible();
+    await expect(next).toBeFocused();
+    await page.keyboard.press("Enter");
     await expect(page.getByText(/Bytes 131,072/)).toBeVisible();
+    await expect(page.getByRole("alert")).toHaveCount(0);
+    expect(chunkAttempts).toBe(2);
     await expect(next).toBeFocused();
     await page.evaluate(() =>
       Object.defineProperty(navigator, "clipboard", {

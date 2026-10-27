@@ -12,6 +12,7 @@ type UseTextPreviewParams = {
 type PreviewResult = {
   owner: string;
   offset: number;
+  attempt: number;
   chunk: TextPreviewChunk | null;
   error: string;
 };
@@ -32,15 +33,16 @@ export function useTextPreview({
     selectedKind === "text" && selectedNode && sessionId
       ? JSON.stringify([sessionId, selectedNode.path, selectedPreviewUrl])
       : "";
-  const [page, setPage] = useState({ owner: "", offset: 0 });
+  const [page, setPage] = useState({ owner: "", offset: 0, attempt: 0 });
   const [result, setResult] = useState<PreviewResult | null>(null);
   const cache = useRef(new Map<string, TextPreviewChunk>());
   const active = useRef<AbortController | null>(null);
   const offset = page.owner === owner ? page.offset : 0;
+  const attempt = page.owner === owner ? page.attempt : 0;
   const resetTextPreview = useCallback(() => {
     active.current?.abort();
     setResult(null);
-    setPage({ owner: "", offset: 0 });
+    setPage({ owner: "", offset: 0, attempt: 0 });
   }, []);
   const clearTextPreviewCache = useCallback(() => {
     active.current?.abort();
@@ -59,27 +61,29 @@ export function useTextPreview({
       signal: controller.signal,
     }).then(
       (chunk) => {
-        if (!controller.signal.aborted) setResult({ owner, offset, chunk, error: "" });
+        if (!controller.signal.aborted) setResult({ owner, offset, attempt, chunk, error: "" });
       },
       (error: unknown) => {
         if (!controller.signal.aborted)
-          setResult({
+          setResult((previous) => ({
             owner,
             offset,
-            chunk: null,
+            attempt,
+            chunk: previous?.owner === owner ? previous.chunk : null,
             error: error instanceof Error ? error.message : "Could not read this file.",
-          });
+          }));
       },
     );
     return () => controller.abort();
-  }, [owner, selectedPreviewUrl, offset]);
+  }, [owner, selectedPreviewUrl, offset, attempt]);
   const selected = owner && result?.owner === owner ? result : null;
-  const current = selected?.offset === offset ? selected : null;
+  const current = selected?.offset === offset && selected.attempt === attempt ? selected : null;
   const textPreview: TextPreviewState = {
     chunk: (current ?? selected)?.chunk ?? null,
     error: current?.error ?? "",
     loading: !!owner && !current,
-    loadOffset: (nextOffset) => setPage({ owner, offset: nextOffset }),
+    loadOffset: (nextOffset) =>
+      setPage((previous) => ({ owner, offset: nextOffset, attempt: previous.attempt + 1 })),
   };
   return { textPreview, resetTextPreview, clearTextPreviewCache };
 }
