@@ -495,7 +495,7 @@ it.each(["0", "date", "malformed"])(
   },
 );
 
-it.each([0, 2, -1])(
+it.each([0, 2, 8, -1])(
   "bounds repeated HTTP 429 at the configured retry budget %s",
   async (maxRetries) => {
     let gets = 0;
@@ -509,7 +509,160 @@ it.each([0, 2, -1])(
         await expect(runJob(url, targetPath, maxRetries)).rejects.toMatchObject({
           statusCode: 429,
         });
-        expect(gets).toBe((maxRetries === -1 ? 8 : maxRetries) + 1);
+        expect(gets).toBe(Math.min(maxRetries === -1 ? 8 : maxRetries + 1, 8));
+      },
+    );
+  },
+);
+
+it("preserves an extensionless HTML search form with an unrelated Log in navigation link", async () => {
+  const html = Buffer.from(
+    '<html><nav><a href="/login">Log in</a></nav><form action="/search"><input name="q"><button>Search</button></form><p>Grüße 😀</p></html>',
+  );
+  await withOrigin(
+    (_request, response) => response.writeHead(200, { "content-type": "text/html" }).end(html),
+    async (url, targetPath) => {
+      await downloadWithSegmentedManager({
+        url: url.replace("archive.zip", "document"),
+        targetPath,
+        signal: new AbortController().signal,
+        settings,
+        state: { downloadedBytes: 0 },
+        metadata: { size: 0, acceptRanges: false },
+      });
+      expect(await readFile(targetPath)).toEqual(html);
+      expect(digest(await readFile(targetPath))).toBe(digest(html));
+    },
+  );
+});
+
+it.each([
+  "utf-8 BOM",
+  "utf-16le BOM",
+  "utf-16be BOM",
+  "utf-16le charset",
+  "utf-16be charset",
+  "utf-8 charset",
+  "utf-8 split",
+])(
+  "classifies a bounded HTML prefix while preserving original split bytes (%s)",
+  async (encoding) => {
+    for (const login of [false, true]) {
+      const text = login
+        ? '<html><form><p>Grüße 😀</p><input type="password"></form></html>'
+        : '<html><form action="/search"><input name="q"></form><nav>Log in</nav><p>Grüße 😀</p></html>';
+      const utf16 = encoding.startsWith("utf-16");
+      const units = Buffer.from(text, utf16 ? "utf16le" : "utf8");
+      if (encoding.startsWith("utf-16be")) units.swap16();
+      const bom = encoding.endsWith("BOM")
+        ? Buffer.from(
+            encoding.startsWith("utf-16le")
+              ? [0xff, 0xfe]
+              : encoding.startsWith("utf-16be")
+                ? [0xfe, 0xff]
+                : [0xef, 0xbb, 0xbf],
+          )
+        : Buffer.alloc(0);
+      const body = Buffer.concat([bom, units]);
+      await withOrigin(
+        (_request, response) => {
+          response.writeHead(200, {
+            "content-type": `text/html${encoding.endsWith("charset") ? `; charset="${encoding.split(" ")[0]}"` : ""}`,
+          });
+          let offset = 0;
+          const send = () => {
+            if (response.destroyed) return;
+            if (offset === body.length) {
+              response.end();
+              return;
+            }
+            response.write(body.subarray(offset, ++offset));
+            setImmediate(send);
+          };
+          send();
+        },
+        async (url, targetPath) => {
+          const state = { downloadedBytes: 0 };
+          let saved: HttpDownloadState | undefined;
+          const transfer = downloadWithSegmentedManager({
+            url,
+            targetPath,
+            signal: new AbortController().signal,
+            settings,
+            state,
+            metadata: { size: 0, acceptRanges: false },
+            checkpoint: {
+              save(value) {
+                saved = structuredClone(value);
+              },
+            },
+          });
+          if (login) {
+            await expect(transfer).rejects.toMatchObject({ code: "DOWNLOAD_LOGIN" });
+            expect(state.downloadedBytes).toBe(0);
+            expect(saved?.completedSha256).toBe("");
+            expect(await readFile(targetPath)).toHaveLength(0);
+          } else {
+            await transfer;
+            expect(await readFile(targetPath)).toEqual(body);
+            expect(saved?.completedSha256).toBe(digest(body));
+          }
+        },
+      );
+    }
+  },
+);
+
+it.each(["utf-8", "utf-16le", "utf-16be"])(
+  "preserves Unicode crossing the 8192-byte inspection boundary (%s)",
+  async (encoding) => {
+    const utf16 = encoding !== "utf-8";
+    const bytes = Buffer.from(
+      `<html>${"x".repeat(utf16 ? 4088 : 8185)}😀</html>`,
+      utf16 ? "utf16le" : "utf8",
+    );
+    if (encoding === "utf-16be") bytes.swap16();
+    const body = utf16
+      ? Buffer.concat([Buffer.from(encoding === "utf-16be" ? [0xfe, 0xff] : [0xff, 0xfe]), bytes])
+      : bytes;
+    await withOrigin(
+      (_request, response) => response.writeHead(200, { "content-type": "text/html" }).end(body),
+      async (url, targetPath) => {
+        await downloadWithSegmentedManager({
+          url,
+          targetPath,
+          signal: new AbortController().signal,
+          settings,
+          state: { downloadedBytes: 0 },
+          metadata: { size: 0, acceptRanges: false },
+        });
+        expect(await readFile(targetPath)).toEqual(body);
+        expect(digest(await readFile(targetPath))).toBe(digest(body));
+      },
+    );
+  },
+);
+
+it.each(["Access denied", "Link has expired"])(
+  "retains explicit HTML error evidence (%s)",
+  async (title) => {
+    await withOrigin(
+      (_request, response) =>
+        response
+          .writeHead(200, { "content-type": "text/html; charset=utf-16le" })
+          .end(Buffer.from(`<html><h1>${title}</h1></html>`, "utf16le")),
+      async (url, targetPath) => {
+        await expect(
+          downloadWithSegmentedManager({
+            url,
+            targetPath,
+            signal: new AbortController().signal,
+            settings,
+            state: { downloadedBytes: 0 },
+            metadata: { size: 0, acceptRanges: false },
+          }),
+        ).rejects.toMatchObject({ code: "DOWNLOAD_LOGIN" });
+        expect(await readFile(targetPath)).toHaveLength(0);
       },
     );
   },

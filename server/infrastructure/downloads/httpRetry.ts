@@ -5,8 +5,9 @@ export function downloadErrorCode(error: unknown): string {
 }
 
 export type RetryBudget = { retries: number; waitedMs: number };
+export const MAX_HTTP_RETRIES = 7;
 
-// Legacy unlimited settings still stop after eight retries or two minutes of waiting.
+// Count the initial attempt toward the eight-attempt ceiling, including legacy unlimited settings.
 export function retryDelay(
   error: unknown,
   maxRetries: number,
@@ -29,7 +30,10 @@ export function retryDelay(
     return undefined;
   const status = typeof details.statusCode === "number" ? details.statusCode : 0;
   if (status && status < 500 && status !== 408 && status !== 429) return undefined;
-  if (budget.retries >= Math.min(8, maxRetries === -1 ? 8 : maxRetries)) return undefined;
+  if (
+    budget.retries >= Math.min(MAX_HTTP_RETRIES, maxRetries === -1 ? MAX_HTTP_RETRIES : maxRetries)
+  )
+    return undefined;
   const value = typeof details.retryAfter === "string" ? details.retryAfter.trim() : "";
   const seconds = /^\d+$/.test(value) ? Number(value) * 1_000 : Number.NaN;
   const date = new Date(value);

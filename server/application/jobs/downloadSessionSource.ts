@@ -14,7 +14,11 @@ import {
 } from "../../infrastructure/downloads/remoteMetadata.js";
 import { formatBytes } from "../../infrastructure/runtime/runtimePrimitives.js";
 import { sleepWithSignal } from "../../infrastructure/runtime/mediaClassification.js";
-import { downloadErrorCode, retryDelay } from "../../infrastructure/downloads/httpRetry.js";
+import {
+  downloadErrorCode,
+  retryDelay,
+  MAX_HTTP_RETRIES,
+} from "../../infrastructure/downloads/httpRetry.js";
 
 const STALL_THRESHOLD_MS = 4_000;
 export type DownloadState = {
@@ -191,7 +195,10 @@ export async function downloadSessionSource(
     error: "",
   });
   const signal = job.abortController?.signal ?? AbortSignal.abort();
-  job.maxRetries = settings.maxRetries === -1 ? 8 : settings.maxRetries;
+  job.maxRetries = Math.min(
+    MAX_HTTP_RETRIES,
+    settings.maxRetries === -1 ? MAX_HTTP_RETRIES : settings.maxRetries,
+  );
   const metadata = await fetchRemoteMetadata(input.url, signal);
   signal.throwIfAborted();
   state.reportedSize = metadata.size;

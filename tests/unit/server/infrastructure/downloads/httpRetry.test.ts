@@ -33,11 +33,11 @@ it.each(["bad", "-1", "1.5", "1e2"])(
 
 it("caps exponential delay before exponentiation and bounds legacy unlimited retries", () => {
   const budget = { retries: 0, waitedMs: 0 };
-  const delays = Array.from({ length: 9 }, () =>
+  const delays = Array.from({ length: 8 }, () =>
     retryDelay({ retryAfter: "0", statusCode: 429 }, -1, budget),
   );
-  expect(delays).toEqual([...Array<number>(8).fill(0), undefined]);
-  expect(retryDelay(new Error("offline"), -1, { retries: 7, waitedMs: 0 })).toBe(30_000);
+  expect(delays).toEqual([...Array<number>(7).fill(0), undefined]);
+  expect(retryDelay(new Error("offline"), -1, { retries: 6, waitedMs: 0 })).toBe(30_000);
 });
 
 it.each([

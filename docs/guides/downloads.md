@@ -20,7 +20,8 @@ fresh stream. A fresh GET establishes its own size and validators.
 
 Transient failures use exponential delay with jitter, capped at 30 seconds per
 wait and two minutes of waiting per run. HTTP retries stop at the configured
-count, with an eight-retry ceiling even for older unlimited settings. A valid
+count, with an eight-attempt ceiling including the first request, even for older
+unlimited settings. This permits at most seven retries. A valid
 Retry-After controls the wait; a value beyond either wait limit stops automatic
 retry. Cancel interrupts probing, streaming and retry waits.
 

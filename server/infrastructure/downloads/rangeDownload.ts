@@ -51,17 +51,19 @@ export async function streamSingleRange(input: RangeRequest): Promise<void> {
   let allowedBytes = maxBytes;
   let responseFailure: unknown;
   let expectedLength: number | undefined;
-  let inspectHtml = false;
+  let htmlContentType = "";
   request.once("response", (response: IncomingMessage) => {
     responseState.checked = true;
     try {
       const { encoded, length } = validateStreamResponse(response, input, Boolean(headers.Range));
       expectedLength = length;
       if (!headers.Range) allowedBytes = expectedLength ?? MAX_RESOURCE_BYTES;
-      inspectHtml =
+      htmlContentType =
         /text\/html|application\/xhtml\+xml/i.test(response.headers["content-type"] ?? "") &&
         !/\.html?$/i.test(new URL(url).pathname) &&
-        !/^attachment\b/i.test(response.headers["content-disposition"] ?? "");
+        !/^attachment\b/i.test(response.headers["content-disposition"] ?? "")
+          ? (response.headers["content-type"] ?? "")
+          : "";
       responseHeader?.(response, encoded);
     } catch (error) {
       responseFailure = error;
@@ -76,7 +78,7 @@ export async function streamSingleRange(input: RangeRequest): Promise<void> {
   try {
     await pipeline(
       request,
-      htmlGuard(() => inspectHtml),
+      htmlGuard(() => htmlContentType),
       budget,
       output,
       { signal },
@@ -188,14 +190,33 @@ function assertRangeResponse(
   }
 }
 
-function htmlGuard(inspect: () => boolean) {
+function decodeHtmlPrefix(prefix: Buffer, contentType: string) {
+  const bom =
+    prefix[0] === 0xff && prefix[1] === 0xfe
+      ? "utf-16le"
+      : prefix[0] === 0xfe && prefix[1] === 0xff
+        ? "utf-16be"
+        : prefix.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf]))
+          ? "utf-8"
+          : "";
+  const charset = /\bcharset\s*=\s*["']?([^\s;"']+)/i.exec(contentType)?.[1];
+  try {
+    return new TextDecoder(bom || charset || "utf-8").decode(prefix);
+  } catch {
+    return new TextDecoder("utf-8").decode(prefix);
+  }
+}
+
+function htmlGuard(contentType: () => string) {
   let prefix = Buffer.alloc(0);
   let checked = false;
   function check() {
-    const html = prefix.toString("utf8");
+    const html = decodeHtmlPrefix(prefix, contentType()).replace(/<!--[\s\S]*?(?:-->|$)/g, "");
+    const loginForm = [...html.matchAll(/<form\b[^>]*>([\s\S]*?)(?:<\/form\s*>|$)/gi)].some(
+      (form) => /<input\b[^>]*\btype\s*=\s*(?:["']password["']|password(?=[\s>]))/i.test(form[1]),
+    );
     if (
-      (/<form\b/i.test(html) &&
-        /<input\b[^>]*\btype\s*=\s*["']?password\b|sign[ -]?in|log[ -]?in/i.test(html)) ||
+      loginForm ||
       /<(?:title|h1)\b[^>]*>\s*(?:access denied|(?:download |signed )?(?:link|request) (?:has )?expired)\b/i.test(
         html,
       )
@@ -209,7 +230,7 @@ function htmlGuard(inspect: () => boolean) {
   return new Transform({
     transform(chunk: Buffer, _encoding, callback) {
       try {
-        if (checked || !inspect()) {
+        if (checked || !contentType()) {
           callback(null, chunk);
           return;
         }
