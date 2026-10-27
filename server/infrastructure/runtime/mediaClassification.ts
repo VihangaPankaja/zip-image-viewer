@@ -19,9 +19,13 @@ export function sleepWithSignal(milliseconds: number, signal: AbortSignal): Prom
     return Promise.resolve();
   }
   return new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(resolve, milliseconds);
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, milliseconds);
     const onAbort = (): void => {
       clearTimeout(timer);
+      signal.removeEventListener("abort", onAbort);
       reject(Object.assign(new Error("Aborted"), { name: "AbortError" }));
     };
     if (signal.aborted) onAbort();

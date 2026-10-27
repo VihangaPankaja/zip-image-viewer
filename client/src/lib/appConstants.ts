@@ -32,8 +32,8 @@ export const DOWNLOAD_RETRY_OPTIONS = [
   { value: 0, label: "No retry" },
   { value: 3, label: "3 retries" },
   { value: 5, label: "5 retries" },
-  { value: 8, label: "8 retries" },
-  { value: -1, label: "Unlimited" },
+  { value: 8, label: "7 HTTP retries / 8 torrent retries" },
+  { value: -1, label: "7 HTTP retries / unlimited torrents" },
 ];
 
 export const VIDEO_TRANSCODE_QUALITY_OPTIONS = [

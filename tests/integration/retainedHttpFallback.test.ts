@@ -83,9 +83,11 @@ it.each(["HEAD rejected", "HEAD original URL", "HEAD different validator"])(
       }
       expect(requests).toEqual([
         "HEAD /first.txt",
+        ...(scenario === "HEAD rejected" ? ["GET /first.txt", "GET /payload-first.txt"] : []),
         "GET /first.txt",
         "GET /payload-first.txt",
         "HEAD /second.txt",
+        ...(scenario === "HEAD rejected" ? ["GET /second.txt", "GET /payload-second.txt"] : []),
         "GET /second.txt",
         "GET /payload-second.txt",
       ]);

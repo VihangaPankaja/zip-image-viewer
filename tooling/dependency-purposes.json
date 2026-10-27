@@ -12,6 +12,7 @@
   "hls.js": "Browser adaptive HLS playback",
   "lucide-react": "Interface icons",
   "mime-types": "HTTP media MIME lookup",
+  "parse5": "Bounded HTML5 inspection of unexpected HTTP login and error responses",
   "react": "Interface components and state",
   "react-dom": "Browser rendering for React",
   "react-resizable-panels": "Resizable workspace panels",

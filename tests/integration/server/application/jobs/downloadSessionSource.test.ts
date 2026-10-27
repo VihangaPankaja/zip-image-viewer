@@ -169,7 +169,7 @@ it("stops at the retry budget and propagates the original failure", async () => 
   expect(mocks.sleep).toHaveBeenCalledOnce();
 });
 
-it("allows unlimited retries until success", async () => {
+it("accepts legacy unlimited settings within the bounded retry budget", async () => {
   const test = await setup({ maxRetries: -1 });
   test.download.mockRejectedValueOnce("offline").mockRejectedValueOnce("offline");
   await expect(test.run()).resolves.toBe("complete");
