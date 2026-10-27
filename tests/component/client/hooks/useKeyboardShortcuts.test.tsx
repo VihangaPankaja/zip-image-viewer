@@ -84,6 +84,24 @@ describe("useKeyboardShortcuts", () => {
     expect(setSelectedPath).toHaveBeenCalledWith("next.mp4");
   });
 
+  it("lets text and table scroll regions own their arrow keys", () => {
+    const { setSelectedPath } = renderShortcuts({ selectedKind: "text" });
+    const region = document.createElement("div");
+    region.dataset.previewScroll = "true";
+    region.tabIndex = 0;
+    document.body.append(region);
+    region.focus();
+    const right = new KeyboardEvent("keydown", {
+      key: "ArrowRight",
+      bubbles: true,
+      cancelable: true,
+    });
+    region.dispatchEvent(right);
+    expect(right.defaultPrevented).toBe(false);
+    expect(setSelectedPath).not.toHaveBeenCalled();
+    region.remove();
+  });
+
   it("does not navigate the background preview while an overlay is open", () => {
     const { setSelectedPath, video } = renderShortcuts();
     const dialog = document.createElement("dialog");

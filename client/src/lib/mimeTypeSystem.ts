@@ -9,6 +9,7 @@ const TEXT_EXTENSIONS = new Set([
   "md",
   "json",
   "csv",
+  "tsv",
   "log",
   "xml",
   "yml",
