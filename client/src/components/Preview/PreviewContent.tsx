@@ -142,6 +142,7 @@ function SelectedPreview({
   if (selectedKind === "text") {
     return (
       <TextPreviewContent
+        key={props.selectedFileUrl}
         selectedNode={selectedFile}
         formatBytes={formatBytes}
         formatDate={formatDate}

@@ -92,6 +92,7 @@ function handleKeyboardShortcut(event: KeyboardEvent, context: UseKeyboardShortc
 
 function isInteractiveTarget(element: Element | null): boolean {
   return Boolean(
+    element?.closest("[data-preview-scroll]") ||
     element?.matches(
       "a[href], audio, button, input, select, summary, textarea, video, [contenteditable]:not([contenteditable='false'])",
     ),

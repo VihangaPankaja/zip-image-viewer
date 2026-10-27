@@ -11,7 +11,7 @@ describe("PreviewContent", () => {
     selectedNode: { name: "notes.txt", path: "notes.txt", type: "file" },
     setExplorerModalOpen: vi.fn(),
     setSlideshowOpen: vi.fn(),
-    textPreview: "hello",
+    textPreview: { chunk: null, loading: true, error: "", loadOffset: vi.fn() },
   } as unknown as PreviewContentProps;
 
   afterEach(() => {

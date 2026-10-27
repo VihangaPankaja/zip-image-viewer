@@ -1,5 +1,5 @@
 import express from "express";
-import { once } from "node:events";
+import { listenFixtureApp, registerFixtureSession } from "./fixtureApp";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -189,21 +189,7 @@ export async function startMultilingualFixture(
     requests.push(req.originalUrl);
     next();
   });
-  app.post("/rpc/sessions/list", (_req, res) =>
-    res.json({
-      json: {
-        items: [
-          {
-            id: session.id,
-            firstFilePath: filename,
-            fileCount: 1,
-            lastAccessedAt: Date.now(),
-          },
-        ],
-      },
-    }),
-  );
-  app.post("/rpc/jobs/list", (_req, res) => res.json({ json: { items: [] } }));
+  registerFixtureSession(app, { id: session.id, firstFilePath: filename, fileCount: 1 });
   app.post("/rpc/scheduler/get", (_req, res) =>
     res.json({ json: { activeCount: 0, maxConcurrent: 2 } }),
   );
@@ -234,12 +220,9 @@ export async function startMultilingualFixture(
   registerVideoHlsRoutes(app, deps);
   registerVideoThumbnailRoute(app, deps);
   app.use(proxyApp(baseURL));
-  const server = app.listen(port, "127.0.0.1");
-  await once(server, "listening");
-  const address = server.address();
-  if (!address || typeof address === "string") throw new Error("Media fixture did not bind.");
+  const server = await listenFixtureApp(app, port);
   return {
-    origin: `http://127.0.0.1:${address.port}`,
+    origin: server.origin,
     requests,
     encoderEvents,
     runtime,
@@ -248,10 +231,7 @@ export async function startMultilingualFixture(
     directory,
     cache,
     async close() {
-      server.closeAllConnections();
-      await new Promise<void>((resolve, reject) =>
-        server.close((error) => (error ? reject(error) : resolve())),
-      );
+      await server.close();
       await runtime.cleanupVideoSession(session);
       await rm(directory, { recursive: true, force: true });
     },

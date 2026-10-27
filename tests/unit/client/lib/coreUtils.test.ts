@@ -120,6 +120,7 @@ describe("tree and media helpers", () => {
     expect(classifyExtension("mkv")).toBe("video");
     expect(classifyExtension("flac")).toBe("audio");
     expect(classifyExtension("md")).toBe("text");
+    expect(classifyExtension("TSV")).toBe("text");
     expect(classifyExtension("bin")).toBe("binary");
     expect(classifyNodeKind(null)).toBe("directory");
     expect(classifyNodeKind(tree.children[0])).toBe("image");

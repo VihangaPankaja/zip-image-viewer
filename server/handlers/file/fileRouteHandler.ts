@@ -4,6 +4,8 @@ import path from "node:path";
 import mime from "mime-types";
 import type { Request, RequestHandler, Response } from "express";
 import type { Session } from "../../domain/models.js";
+import { textPreviewInputSchema } from "../../../shared/contracts.js";
+import { readTextPreview } from "../../infrastructure/files/textPreview.js";
 import {
   applyByteRange,
   errorMessage,
@@ -226,7 +228,26 @@ export function createFileRouteHandler(deps: FileRouteDependencies): RequestHand
       contentType: context.contentType,
     });
     res.setHeader("cache-control", "no-store");
-    if (wantsPreview) {
+    if (req.query.textPreview === "1") {
+      const input = textPreviewInputSchema.safeParse({ offset: req.query.offset });
+      if (!input.success) {
+        res.status(400).json({ error: "Invalid text byte offset." });
+        return;
+      }
+      const controller = new AbortController();
+      const abort = () => controller.abort();
+      res.on("close", abort);
+      try {
+        const chunk = await readTextPreview(
+          context.targetPath,
+          input.data.offset,
+          controller.signal,
+        );
+        if (!controller.signal.aborted) res.json(chunk);
+      } finally {
+        res.off("close", abort);
+      }
+    } else if (wantsPreview) {
       res.type(context.contentType);
       res.send(await deps.readPreviewChunk(context.targetPath));
     } else if (wantsThumbnail) {
