@@ -5,6 +5,7 @@ import got from "got";
 import { assertPublicDownloadUrl, validateDownloadResponse } from "./publicDownload.js";
 import { checkpointWriter, type HttpFileCheckpoint } from "./httpCheckpoint.js";
 import { createDownloadBudget, MAX_RESOURCE_BYTES } from "../runtime/resourceLimits.js";
+import { hasHtmlFailure } from "./htmlResponse.js";
 type DownloadState = { downloadedBytes: number };
 type RangeRequest = {
   url: string;
@@ -190,65 +191,11 @@ function assertRangeResponse(
   }
 }
 
-function decodeHtmlPrefix(prefix: Buffer, contentType: string) {
-  const bom =
-    prefix[0] === 0xff && prefix[1] === 0xfe
-      ? "utf-16le"
-      : prefix[0] === 0xfe && prefix[1] === 0xff
-        ? "utf-16be"
-        : prefix.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf]))
-          ? "utf-8"
-          : "";
-  const charset = /\bcharset\s*=\s*["']?([^\s;"']+)/i.exec(contentType)?.[1];
-  try {
-    return new TextDecoder(bom || charset || "utf-8").decode(prefix);
-  } catch {
-    return new TextDecoder("utf-8").decode(prefix);
-  }
-}
-
-function hasHtmlFailure(html: string) {
-  const tags =
-    /<!--[\s\S]*?(?:-->|$)|<\/?([a-z][\w:-]*)\b((?:[^"'<>]|"[^"]*(?:"|$)|'[^']*(?:'|$))*)(>|$)/gi;
-  let inForm = false;
-  for (let match = tags.exec(html); match; match = tags.exec(html)) {
-    const [tag, rawName, attributes, complete] = match;
-    if (tag.startsWith("<!--") || !complete) continue;
-    const name = rawName.toLowerCase();
-    const closing = tag.startsWith("</");
-    if (
-      !closing &&
-      (name === "title" || name === "h1") &&
-      /^\s*(?:access denied|(?:download |signed )?(?:link|request) (?:has )?expired)\b/i.test(
-        html.slice(tags.lastIndex),
-      )
-    )
-      return true;
-    if (!closing && ["script", "style", "textarea", "title"].includes(name)) {
-      const end = new RegExp(`</${name}\\s*>`, "gi");
-      end.lastIndex = tags.lastIndex;
-      // Raw text may continue beyond the bounded prefix, so skip through its end.
-      tags.lastIndex = end.exec(html) ? end.lastIndex : html.length;
-      continue;
-    }
-    if (name === "form") {
-      inForm = !closing;
-      continue;
-    }
-    if (!inForm || closing || name !== "input") continue;
-    const type = [
-      ...attributes.matchAll(/([^\s"'=<>`/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g),
-    ].find((attribute) => attribute[1].toLowerCase() === "type");
-    if (type && (type[2] || type[3] || type[4] || "").toLowerCase() === "password") return true;
-  }
-  return false;
-}
-
 function htmlGuard(contentType: () => string) {
   let prefix = Buffer.alloc(0);
   let checked = false;
   function check() {
-    if (hasHtmlFailure(decodeHtmlPrefix(prefix, contentType())))
+    if (hasHtmlFailure(prefix, contentType()))
       throw Object.assign(
         new Error("The origin returned a login or error page. Add a fresh public download link."),
         { code: "DOWNLOAD_LOGIN" },

@@ -580,6 +580,118 @@ it.each([
   );
 });
 
+it.each([
+  [
+    '<form action="/search"><iframe><input type="password"></iframe><input type="text"></form>',
+    false,
+  ],
+  [
+    '<form action="/search"><script><!--<script></script><input type="password">--></script><input type="text"></form>',
+    false,
+  ],
+  ['<!--><form><input type="password"></form>', true],
+  ['<form><textarea>Example</textarea data-example="yes"><input type="password"></form>', true],
+])("uses HTML5 parsing contexts and recovery (%s)", async (text, login) => {
+  const body = Buffer.from(text);
+  await withOrigin(
+    (_request, response) => response.writeHead(200, { "content-type": "text/html" }).end(body),
+    async (url, targetPath) => {
+      const state = { downloadedBytes: 0 };
+      let saved: HttpDownloadState | undefined;
+      const transfer = downloadWithSegmentedManager({
+        url,
+        targetPath,
+        signal: new AbortController().signal,
+        settings,
+        state,
+        metadata: { size: 0, acceptRanges: false },
+        checkpoint: {
+          save(value) {
+            saved = structuredClone(value);
+          },
+        },
+      });
+      if (login) {
+        await expect(transfer).rejects.toMatchObject({ code: "DOWNLOAD_LOGIN" });
+        expect(state.downloadedBytes).toBe(0);
+        expect(saved?.completedSha256).toBe("");
+        expect(await readFile(targetPath)).toHaveLength(0);
+      } else {
+        await transfer;
+        expect(await readFile(targetPath)).toEqual(body);
+        expect(saved?.completedSha256).toBe(digest(body));
+      }
+    },
+  );
+});
+
+it.each([
+  ['<form id="login"></form><input form="login" type="password">', true],
+  ['<form><input form="missing" type="password"></form>', false],
+  ['<form><input form="" type="password"></form>', false],
+  ['<div id="login"></div><form id="login"></form><input form="login" type="password">', false],
+  ['<form id="login"></form><div id="login"></div><input form="login" type="password">', true],
+  ['<template><form><input type="password"></form></template>', false],
+  ['<form><noscript><input type="password"></noscript><input type="text"></form>', false],
+  ['<form><xmp><input type="password"></xmp><input type="text"></form>', false],
+  ['<form><input type="pass&#119;ord"></form>', true],
+  ["<h1><span>Access</span> denied</h1>", true],
+  ['<div title="<h1>Access denied</h1>">Saved document</div>', false],
+  ["<svg><title>Access denied</title></svg>", false],
+  ['<form><table><input type="password"></table></form>', true],
+])("uses parsed form association and actual heading evidence (%s)", async (text, login) => {
+  const body = Buffer.from(text);
+  await withOrigin(
+    (_request, response) => response.writeHead(200, { "content-type": "text/html" }).end(body),
+    async (url, targetPath) => {
+      const state = { downloadedBytes: 0 };
+      const transfer = downloadWithSegmentedManager({
+        url,
+        targetPath,
+        signal: new AbortController().signal,
+        settings,
+        state,
+        metadata: { size: 0, acceptRanges: false },
+      });
+      if (login) {
+        await expect(transfer).rejects.toMatchObject({ code: "DOWNLOAD_LOGIN" });
+        expect(state.downloadedBytes).toBe(0);
+        expect(await readFile(targetPath)).toHaveLength(0);
+      } else {
+        await transfer;
+        expect(await readFile(targetPath)).toEqual(body);
+        expect(digest(await readFile(targetPath))).toBe(digest(body));
+      }
+    },
+  );
+});
+
+it("parses HTML without executing scripts or requesting referenced resources", async () => {
+  let requests = 0;
+  await withOrigin(
+    (_request, response) => {
+      requests++;
+      response
+        .writeHead(200, { "content-type": "text/html" })
+        .end(
+          '<script src="/script.js"></script><img src="/image.png"><iframe src="/frame"></iframe><script>throw new Error("must not execute")</script>',
+        );
+    },
+    async (url, targetPath) => {
+      await downloadWithSegmentedManager({
+        url,
+        targetPath,
+        signal: new AbortController().signal,
+        settings,
+        state: { downloadedBytes: 0 },
+        metadata: { size: 0, acceptRanges: false },
+      });
+      expect(requests).toBe(1);
+      expect(await readFile(targetPath, "utf8")).toContain("must not execute");
+    },
+  );
+});
+
 it.each(["textarea", "script", "style", "title", "comment"])(
   "preserves literal inputs in raw content crossing the bounded prefix (%s)",
   async (tag) => {
