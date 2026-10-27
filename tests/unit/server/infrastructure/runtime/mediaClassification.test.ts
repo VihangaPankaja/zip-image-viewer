@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+import { getEventListeners } from "node:events";
 import {
   classifyDetectedType,
   classifyMimeType,
@@ -11,6 +12,15 @@ import {
 } from "../../../../../server/infrastructure/runtime/mediaClassification.js";
 
 describe("media classification", () => {
+  it("removes completed retry wait listeners before reusing a cancellation signal", async () => {
+    const controller = new AbortController();
+    await sleepWithSignal(1, controller.signal);
+    expect(getEventListeners(controller.signal, "abort")).toHaveLength(0);
+    const waiting = sleepWithSignal(30_000, controller.signal);
+    controller.abort();
+    await expect(waiting).rejects.toMatchObject({ name: "AbortError" });
+    expect(getEventListeners(controller.signal, "abort")).toHaveLength(0);
+  });
   it.each([
     ["bundle.ZIP", true],
     ["bundle", false],

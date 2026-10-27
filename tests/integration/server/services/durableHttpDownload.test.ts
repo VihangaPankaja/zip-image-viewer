@@ -135,7 +135,7 @@ it.each([
 );
 
 it.each(["resumed URL", "resumed validator", "segmented URL", "segmented validator"])(
-  "rejects a changed response identity before accepting bytes (%s)",
+  "discards changed ranged identity before accepting a fresh full response (%s)",
   async (scenario) => {
     const directory = await mkdtemp(path.join(tmpdir(), "http-response-identity-"));
     const targetPath = path.join(directory, "source.bin");
@@ -145,6 +145,10 @@ it.each(["resumed URL", "resumed validator", "segmented URL", "segmented validat
     const requests: string[] = [];
     const server = createServer((request, response) => {
       requests.push(request.headers.range ?? "full");
+      if (!request.headers.range) {
+        response.writeHead(200, { etag: '"v2"', "content-length": payload.length }).end(payload);
+        return;
+      }
       expect(request.headers["if-range"]).toBe('"v1"');
       const match = /^bytes=(\d+)-(\d+)$/.exec(request.headers.range ?? "");
       const start = Number(match?.[1]);
@@ -181,27 +185,24 @@ it.each(["resumed URL", "resumed validator", "segmented URL", "segmented validat
       };
       if (!segmented) await writeFile(targetPath, prefix);
       const state = { downloadedBytes: 0 };
-      await expect(
-        downloadWithSegmentedManager({
-          url,
-          targetPath,
-          state,
-          signal: new AbortController().signal,
-          metadata: { size: payload.length, acceptRanges: true, etag: '"v1"', resolvedUrl },
-          settings: {
-            enableResume: true,
-            enableMultithread: segmented,
-            threadCount: 2,
-            maxRetries: 0,
-          },
-          checkpoint: segmented ? undefined : { current: retained, save() {} },
-        }),
-      ).rejects.toMatchObject({ code: "SOURCE_CHANGED" });
+      await downloadWithSegmentedManager({
+        url,
+        targetPath,
+        state,
+        signal: new AbortController().signal,
+        metadata: { size: payload.length, acceptRanges: true, etag: '"v1"', resolvedUrl },
+        settings: {
+          enableResume: true,
+          enableMultithread: segmented,
+          threadCount: 2,
+          maxRetries: 0,
+        },
+        checkpoint: segmented ? undefined : { current: retained, save() {} },
+      });
       expect(requests.length).toBeGreaterThan(0);
-      expect(requests.every((range) => range !== "full")).toBe(true);
-      expect(state.downloadedBytes).toBe(segmented ? 0 : prefix.length);
-      if (!segmented) expect(await readFile(targetPath)).toEqual(prefix);
-      else await expect(readFile(targetPath)).rejects.toMatchObject({ code: "ENOENT" });
+      expect(requests.filter((range) => range === "full")).toHaveLength(1);
+      expect(state.downloadedBytes).toBe(payload.length);
+      expect(await readFile(targetPath)).toEqual(payload);
     } finally {
       server.closeAllConnections();
       await new Promise<void>((resolve) => server.close(() => resolve()));

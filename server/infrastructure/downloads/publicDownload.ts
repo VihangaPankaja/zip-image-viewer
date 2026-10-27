@@ -1,6 +1,5 @@
 import { publicHttpUrlSchema } from "../../../shared/contracts.js";
 import type { IncomingMessage } from "node:http";
-import { resourceLimitError } from "../runtime/resourceLimits.js";
 
 export function validateDownloadResponse(
   response: IncomingMessage,
@@ -15,14 +14,38 @@ export function validateDownloadResponse(
       header.toLowerCase() === "content-encoding" &&
       response.rawHeaders[index + 1].trim().toLowerCase() !== "identity",
   );
+  if (statusCode >= 400 && !(hasRange && statusCode === 416)) {
+    const auth = statusCode === 401 || statusCode === 403;
+    throw Object.assign(
+      new Error(
+        auth
+          ? `Download authorization failed (HTTP ${statusCode}). The link may have expired; add a fresh public link.`
+          : `Download failed with HTTP ${statusCode}`,
+      ),
+      {
+        statusCode,
+        retryAfter: response.headers["retry-after"],
+        code: auth
+          ? "DOWNLOAD_AUTH"
+          : statusCode < 500 && statusCode !== 408 && statusCode !== 429
+            ? "DOWNLOAD_PERMANENT"
+            : "DOWNLOAD_TRANSIENT",
+      },
+    );
+  }
   if (encoded && hasRange)
-    throw resourceLimitError("Encoded responses do not support ranged downloads.");
-  if (statusCode >= 400) throw new Error(`Download failed with HTTP ${String(statusCode)}`);
+    throw Object.assign(new Error("Encoded responses do not support ranged downloads."), {
+      code: "RANGE_UNSUPPORTED",
+    });
   if (strictRange && hasRange && statusCode !== 206)
     throw Object.assign(
       new Error("Server does not support range requests for segmented download."),
       { code: "RANGE_UNSUPPORTED" },
     );
+  if (!hasRange && (statusCode !== 200 || response.headers["content-range"] !== undefined))
+    throw Object.assign(new Error("Server returned an invalid full download response."), {
+      code: "DOWNLOAD_FATAL",
+    });
   return { statusCode, encoded };
 }
 

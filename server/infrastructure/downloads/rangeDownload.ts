@@ -1,5 +1,6 @@
 import type { IncomingMessage } from "node:http";
 import { pipeline } from "node:stream/promises";
+import { Transform } from "node:stream";
 import got from "got";
 import { assertPublicDownloadUrl, validateDownloadResponse } from "./publicDownload.js";
 import { checkpointWriter, type HttpFileCheckpoint } from "./httpCheckpoint.js";
@@ -23,23 +24,21 @@ type RangeRequest = {
   save: () => void;
 };
 
-export async function streamSingleRange({
-  url,
-  targetPath,
-  requestedStart,
-  requestedEnd,
-  state,
-  signal,
-  strictRange,
-  responseHeader,
-  checkStorage,
-  maxBytes,
-  validator,
-  totalSize,
-  resolvedUrl,
-  file,
-  save,
-}: RangeRequest): Promise<void> {
+export async function streamSingleRange(input: RangeRequest): Promise<void> {
+  const {
+    url,
+    targetPath,
+    requestedStart,
+    requestedEnd,
+    state,
+    signal,
+    responseHeader,
+    checkStorage,
+    maxBytes,
+    validator,
+    file,
+    save,
+  } = input;
   const headers: Record<string, string> = { "accept-encoding": "identity" };
   if (Number.isFinite(requestedStart) && Number.isFinite(requestedEnd)) {
     if (validator) headers["If-Range"] = validator;
@@ -47,36 +46,26 @@ export async function streamSingleRange({
   }
 
   const output = await checkpointWriter(targetPath, file, save);
-  const request = got.stream(url, {
-    headers,
-    retry: { limit: 0 },
-    throwHttpErrors: false,
-    signal,
-    hooks: {
-      beforeRedirect: [
-        (options) => {
-          if (options.url) assertPublicDownloadUrl(options.url);
-        },
-      ],
-    },
-  });
+  const request = createRangeRequest(url, headers, signal);
 
   const responseState = { checked: false };
   let allowedBytes = maxBytes;
+  let responseFailure: unknown;
+  let expectedLength: number | undefined;
+  let inspectHtml = false;
   request.once("response", (response: IncomingMessage) => {
     responseState.checked = true;
     try {
-      const { encoded } = validateDownloadResponse(response, Boolean(headers.Range), strictRange);
-      if (headers.Range || file.bytes > 0) {
-        assertRangeResponse(
-          response,
-          { requestedStart, requestedEnd, totalSize, validator, resolvedUrl },
-          Boolean(headers.Range),
-        );
-      }
-      if (encoded) allowedBytes = MAX_RESOURCE_BYTES;
+      const { encoded, length } = validateStreamResponse(response, input, Boolean(headers.Range));
+      expectedLength = length;
+      if (!headers.Range) allowedBytes = expectedLength ?? MAX_RESOURCE_BYTES;
+      inspectHtml =
+        /text\/html|application\/xhtml\+xml/i.test(response.headers["content-type"] ?? "") &&
+        !/\.html?$/i.test(new URL(url).pathname) &&
+        !/^attachment\b/i.test(response.headers["content-disposition"] ?? "");
       responseHeader?.(response, encoded);
     } catch (error) {
+      responseFailure = error;
       request.destroy(error instanceof Error ? error : new Error(String(error)));
     }
   });
@@ -93,15 +82,63 @@ export async function streamSingleRange({
   );
 
   try {
-    await pipeline(request, budget, output, { signal });
+    await pipeline(
+      request,
+      htmlGuard(() => inspectHtml),
+      budget,
+      output,
+      { signal },
+    );
+  } catch (error) {
+    throw responseFailure ?? error;
   } finally {
     state.downloadedBytes += file.bytes - initialBytes - received.downloadedBytes;
   }
   signal.throwIfAborted();
+  if (expectedLength !== undefined && received.downloadedBytes !== expectedLength)
+    throw Object.assign(new Error("Download length does not match its response."), {
+      code: headers.Range ? "RANGE_UNSUPPORTED" : "DOWNLOAD_FATAL",
+    });
   if (headers.Range && file.bytes !== requestedEnd - file.start + 1)
-    throw new Error("Download ended before the requested range was complete.");
+    throw Object.assign(new Error("Download ended before the requested range was complete."), {
+      code: "RANGE_UNSUPPORTED",
+    });
 
   if (!responseState.checked) throw new Error("Download failed before response was received.");
+}
+
+function createRangeRequest(url: string, headers: Record<string, string>, signal: AbortSignal) {
+  return got.stream(url, {
+    headers,
+    retry: { limit: 0 },
+    throwHttpErrors: false,
+    timeout: {
+      lookup: 30_000,
+      connect: 30_000,
+      secureConnect: 30_000,
+      response: 30_000,
+      socket: 30_000,
+    },
+    signal,
+    hooks: {
+      beforeRedirect: [
+        (options) => {
+          if (options.url) assertPublicDownloadUrl(options.url);
+        },
+      ],
+    },
+  });
+}
+
+function validateStreamResponse(response: IncomingMessage, input: RangeRequest, hasRange: boolean) {
+  const { encoded } = validateDownloadResponse(response, hasRange, input.strictRange);
+  const length = response.headers["content-length"];
+  if (length !== undefined && (!/^\d+$/.test(length) || !Number.isSafeInteger(Number(length))))
+    throw Object.assign(new Error("Invalid download length."), {
+      code: hasRange ? "RANGE_UNSUPPORTED" : "DOWNLOAD_FATAL",
+    });
+  if (hasRange || input.file.bytes > 0) assertRangeResponse(response, input, hasRange);
+  return { encoded, length: encoded || length === undefined ? undefined : Number(length) };
 }
 
 function assertRangeResponse(
@@ -129,5 +166,63 @@ function assertRangeResponse(
         code: "SOURCE_CHANGED",
       });
     }
+    if (
+      response.headers["content-length"] !== undefined &&
+      Number(response.headers["content-length"]) !== requestedEnd - requestedStart + 1
+    )
+      throw Object.assign(new Error("Download range length changed."), {
+        code: "RANGE_UNSUPPORTED",
+      });
   }
+}
+
+function htmlGuard(inspect: () => boolean) {
+  let prefix = Buffer.alloc(0);
+  let checked = false;
+  function check() {
+    const html = prefix.toString("utf8");
+    if (
+      (/<form\b/i.test(html) &&
+        /<input\b[^>]*\btype\s*=\s*["']?password\b|sign[ -]?in|log[ -]?in/i.test(html)) ||
+      /<(?:title|h1)\b[^>]*>\s*(?:access denied|(?:download |signed )?(?:link|request) (?:has )?expired)\b/i.test(
+        html,
+      )
+    )
+      throw Object.assign(
+        new Error("The origin returned a login or error page. Add a fresh public download link."),
+        { code: "DOWNLOAD_LOGIN" },
+      );
+    checked = true;
+  }
+  return new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      try {
+        if (checked || !inspect()) {
+          callback(null, chunk);
+          return;
+        }
+        const take = Math.min(8192 - prefix.length, chunk.length);
+        prefix = Buffer.concat([prefix, chunk.subarray(0, take)]);
+        if (prefix.length === 8192) {
+          check();
+          this.push(prefix);
+          prefix = Buffer.alloc(0);
+          callback(null, chunk.subarray(take));
+        } else callback();
+      } catch (error) {
+        callback(error instanceof Error ? error : new Error("Invalid download body."));
+      }
+    },
+    flush(callback) {
+      try {
+        if (prefix.length) {
+          check();
+          this.push(prefix);
+        }
+        callback();
+      } catch (error) {
+        callback(error instanceof Error ? error : new Error("Invalid download body."));
+      }
+    },
+  });
 }

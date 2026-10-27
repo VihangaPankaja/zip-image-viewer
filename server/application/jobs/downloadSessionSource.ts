@@ -13,10 +13,9 @@ import {
   type RemoteMetadata,
 } from "../../infrastructure/downloads/remoteMetadata.js";
 import { formatBytes } from "../../infrastructure/runtime/runtimePrimitives.js";
-import { isRecord, sleepWithSignal } from "../../infrastructure/runtime/mediaClassification.js";
+import { sleepWithSignal } from "../../infrastructure/runtime/mediaClassification.js";
+import { downloadErrorCode, retryDelay } from "../../infrastructure/downloads/httpRetry.js";
 
-const UNLIMITED_RETRIES = -1;
-const RETRY_BASE_DELAY_MS = 1_200;
 const STALL_THRESHOLD_MS = 4_000;
 export type DownloadState = {
   downloadedBytes: number;
@@ -61,18 +60,6 @@ function createMonitor(job: SessionJob, state: DownloadState, emitJob: EmitJob) 
   });
 }
 
-function errorCode(error: unknown): string {
-  return isRecord(error) && typeof error.code === "string" ? error.code : "";
-}
-
-function isRetryable(error: unknown): boolean {
-  if (error instanceof Error && error.name === "AbortError") return false;
-  const code = errorCode(error);
-  if (code === "OVERSIZE_CONFIRM" || code === "DOWNLOAD_FATAL") return false;
-  const status = isRecord(error) && typeof error.statusCode === "number" ? error.statusCode : 0;
-  return status ? status >= 500 || status === 408 || status === 429 : true;
-}
-
 function pauseForConfirmation(
   job: SessionJob,
   size: number,
@@ -105,26 +92,32 @@ async function retryDownload(
   input: { url: string; zipPath: string; confirmOversize: boolean },
   deps: DownloadSourceDependencies,
 ): Promise<"complete" | "paused"> {
-  for (
-    let attempt = 0;
-    settings.maxRetries === UNLIMITED_RETRIES || attempt <= settings.maxRetries;
-    attempt += 1
-  ) {
-    job.retryCount = attempt;
+  const budget = { retries: 0, waitedMs: 0 };
+  for (;;) {
+    job.retryCount = budget.retries;
     try {
       state.statusText = "";
       await deps.download({
         url: input.url,
         targetPath: input.zipPath,
         signal: job.abortController?.signal ?? AbortSignal.abort(),
-        settings,
+        // This job owns the retry budget; segment retries must not multiply it.
+        settings: { ...settings, maxRetries: 0 },
         state,
         metadata,
         confirmOversize: input.confirmOversize,
         checkpoint: {
           current: job.httpDownload,
           save: (httpDownload) => {
-            deps.emitJob(job, { httpDownload });
+            const canResume =
+              settings.enableResume && metadata.acceptRanges && Boolean(rangeValidator(metadata));
+            deps.emitJob(job, {
+              httpDownload,
+              threadMode: httpDownload.files.length > 1 ? "segmented" : "single",
+              threadCount: httpDownload.files.length,
+              canResume,
+              canPause: canResume,
+            });
             if (job.status === "error" && job.abortController?.signal.aborted)
               job.abortController.signal.throwIfAborted();
           },
@@ -132,12 +125,11 @@ async function retryDownload(
       });
       return "complete";
     } catch (error) {
-      if (errorCode(error) === "OVERSIZE_CONFIRM") return "paused";
-      if (
-        (settings.maxRetries !== UNLIMITED_RETRIES && attempt >= settings.maxRetries) ||
-        !isRetryable(error)
-      )
-        throw error;
+      if (downloadErrorCode(error) === "OVERSIZE_CONFIRM") return "paused";
+      const delay = retryDelay(error, settings.maxRetries, budget);
+      if (delay === undefined) throw error;
+      state.statusText = `Download failed, retrying in ${(delay / 1_000).toFixed(1)}s`;
+      await sleepWithSignal(delay, job.abortController?.signal ?? AbortSignal.abort());
       Object.assign(
         metadata,
         await fetchRemoteMetadata(input.url, job.abortController?.signal ?? AbortSignal.abort()),
@@ -146,12 +138,8 @@ async function retryDownload(
         state.downloadedBytes = metadata.size;
         return "paused";
       }
-      const delay = RETRY_BASE_DELAY_MS * 2 ** attempt + Math.floor(Math.random() * 400);
-      state.statusText = `Download failed, retrying in ${(delay / 1_000).toFixed(1)}s`;
-      await sleepWithSignal(delay, job.abortController?.signal ?? AbortSignal.abort());
     }
   }
-  throw new Error("Download retries exhausted.");
 }
 
 async function reuseVerifiedSource(
@@ -202,6 +190,7 @@ export async function downloadSessionSource(
     error: "",
   });
   const signal = job.abortController?.signal ?? AbortSignal.abort();
+  job.maxRetries = settings.maxRetries === -1 ? 8 : settings.maxRetries;
   const metadata = await fetchRemoteMetadata(input.url, signal);
   state.reportedSize = metadata.size;
   if (metadata.size > CONFIRM_SIZE_BYTES && !input.confirmOversize) {

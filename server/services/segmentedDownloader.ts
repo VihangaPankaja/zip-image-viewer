@@ -4,6 +4,11 @@ import { mergeSegmentParts } from "../infrastructure/downloads/downloadFiles.js"
 import { sleepWithSignal } from "../infrastructure/runtime/mediaClassification.js";
 import { streamSingleRange } from "../infrastructure/downloads/rangeDownload.js";
 import {
+  downloadErrorCode,
+  retryDelay,
+  type RetryBudget,
+} from "../infrastructure/downloads/httpRetry.js";
+import {
   assertResourceSize,
   MAX_RESOURCE_BYTES,
   reserveStorage,
@@ -18,9 +23,6 @@ import {
   type HttpCheckpoint,
   type HttpFileCheckpoint,
 } from "../infrastructure/downloads/httpCheckpoint.js";
-
-const UNLIMITED_RETRIES = -1;
-const RETRY_BASE_DELAY_MS = 1200;
 
 type DownloadState = { downloadedBytes: number };
 type RemoteMetadata = {
@@ -37,13 +39,6 @@ type DownloadSettings = {
   maxRetries: number;
 };
 type Segment = { index: number; start: number; end: number };
-
-function getErrorProperty(error: unknown, property: "name" | "code"): string {
-  if (error instanceof Error && property === "name") return error.name;
-  if (typeof error !== "object" || error === null) return "";
-  const value: unknown = Reflect.get(error, property);
-  return typeof value === "string" ? value : "";
-}
 
 function buildSegments(totalSize: number, segmentCount: number): Segment[] {
   const safeCount = Math.max(1, Math.min(totalSize, Math.floor(segmentCount)));
@@ -111,7 +106,10 @@ async function downloadSingleWithResume({
     save,
     responseHeader: (response, encoded) => {
       if (!shouldRangeResume) {
-        metadata.size = Number(response.headers["content-length"]) || 0;
+        const size = encoded ? 0 : Number(response.headers["content-length"]) || 0;
+        assertResourceSize(size);
+        if (!size || size > metadata.size) storage.reserveAvailable();
+        metadata.size = size;
         metadata.resolvedUrl = (response.url || metadata.resolvedUrl || url).split("#", 1)[0];
         metadata.etag = response.headers.etag;
         metadata.lastModified = response.headers["last-modified"];
@@ -142,6 +140,7 @@ async function downloadSegmentWithRetry({
   resolvedUrl,
   file,
   save,
+  retryBudget,
 }: {
   url: string;
   segment: Segment;
@@ -155,14 +154,11 @@ async function downloadSegmentWithRetry({
   resolvedUrl: string;
   file: HttpFileCheckpoint;
   save: () => void;
+  retryBudget: RetryBudget;
 }): Promise<string> {
   const partPath = `${targetPath}.part.${String(segment.index)}`;
 
-  for (
-    let attempt = 0;
-    settings.maxRetries === UNLIMITED_RETRIES || attempt <= settings.maxRetries;
-    attempt += 1
-  ) {
+  for (;;) {
     if (signal.aborted) {
       throw Object.assign(new Error("Aborted"), { name: "AbortError" });
     }
@@ -175,9 +171,7 @@ async function downloadSegmentWithRetry({
       const existingBytes = file.bytes;
 
       const start = segment.start + existingBytes;
-      if (start > segment.end) {
-        return partPath;
-      }
+      if (start > segment.end) return partPath;
 
       await streamSingleRange({
         url,
@@ -198,22 +192,11 @@ async function downloadSegmentWithRetry({
 
       return partPath;
     } catch (error) {
-      if (
-        getErrorProperty(error, "name") === "AbortError" ||
-        getErrorProperty(error, "code") === "RANGE_UNSUPPORTED" ||
-        getErrorProperty(error, "code") === "DOWNLOAD_FATAL" ||
-        getErrorProperty(error, "code") === "SOURCE_CHANGED" ||
-        (settings.maxRetries !== UNLIMITED_RETRIES && attempt >= settings.maxRetries)
-      ) {
-        throw error;
-      }
-
-      const delayMs = RETRY_BASE_DELAY_MS * 2 ** attempt + Math.floor(Math.random() * 500);
+      const delayMs = retryDelay(error, settings.maxRetries, retryBudget);
+      if (delayMs === undefined) throw error;
       await sleepWithSignal(delayMs, signal);
     }
   }
-
-  throw new Error("Segment download failed.");
 }
 
 type DownloadInput = {
@@ -226,7 +209,28 @@ type DownloadInput = {
   checkpoint?: HttpCheckpoint;
 };
 
-export async function downloadWithSegmentedManager({
+export async function downloadWithSegmentedManager(input: DownloadInput): Promise<void> {
+  try {
+    await downloadOnce(input);
+  } catch (error) {
+    input.signal.throwIfAborted();
+    if (!["RANGE_UNSUPPORTED", "SOURCE_CHANGED"].includes(downloadErrorCode(error))) throw error;
+    // All segment workers have drained before discarding the old identity and owned bytes.
+    Object.assign(input.metadata, {
+      size: 0,
+      acceptRanges: false,
+      etag: "",
+      lastModified: "",
+      resolvedUrl: undefined,
+    });
+    await downloadOnce({
+      ...input,
+      settings: { ...input.settings, enableResume: false, enableMultithread: false },
+    });
+  }
+}
+
+async function downloadOnce({
   url,
   targetPath,
   signal,
@@ -330,6 +334,7 @@ async function downloadSegments(
   } = input;
   const controller = new AbortController();
   const signal = AbortSignal.any([input.signal, controller.signal]);
+  const retryBudget = { retries: 0, waitedMs: 0 };
   const results = await Promise.allSettled(
     segments.map((segment) =>
       downloadSegmentWithRetry({
@@ -345,6 +350,7 @@ async function downloadSegments(
         resolvedUrl: metadata.resolvedUrl || url,
         file: retained.files[segment.index],
         save,
+        retryBudget,
       }).catch((error: unknown) => {
         controller.abort(error);
         throw error;
