@@ -9,6 +9,8 @@ be opened or downloaded. Images support a slideshow and preview-quality choices.
 Text previews load at most 128 KiB at a time. Use First, Previous, Next and Last
 chunk to navigate large files. The byte range and encoding stay visible. Line
 numbers restart in each chunk; the viewer does not scan the file to count lines.
+If navigation fails, the current chunk and controls stay available with an error.
+Use the same navigation action to retry the failed chunk.
 UTF-8 and UTF-16 byte orders support BOM detection, with a UTF-16 heuristic for
 ASCII-heavy files without a BOM. Malformed characters use the replacement symbol.
 Binary content has an explicit label and keeps the original-file actions.
