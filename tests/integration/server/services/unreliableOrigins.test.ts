@@ -580,6 +580,126 @@ it.each([
   );
 });
 
+it.each(["textarea", "script", "style", "title", "comment"])(
+  "preserves literal inputs in raw content crossing the bounded prefix (%s)",
+  async (tag) => {
+    for (const closed of [false, true]) {
+      const open = tag === "comment" ? "<!--" : `<${tag}>`;
+      const close = tag === "comment" ? "-->" : `</${tag}>`;
+      const body = Buffer.from(
+        `<form action="/search">${open}<input type="password">${"x".repeat(8300)}${closed ? close + '<input type="text"></form>' : ""}`,
+      );
+      await withOrigin(
+        (_request, response) => response.writeHead(200, { "content-type": "text/html" }).end(body),
+        async (url, targetPath) => {
+          await downloadWithSegmentedManager({
+            url,
+            targetPath,
+            signal: new AbortController().signal,
+            settings,
+            state: { downloadedBytes: 0 },
+            metadata: { size: 0, acceptRanges: false },
+          });
+          expect(await readFile(targetPath)).toEqual(body);
+          expect(digest(await readFile(targetPath))).toBe(digest(body));
+        },
+      );
+    }
+  },
+);
+
+it.each(["textarea", "script", "style", "title", "comment"])(
+  "rejects a real password input after closed raw content (%s)",
+  async (tag) => {
+    const body = Buffer.from(
+      `<form>${tag === "comment" ? "<!--" : `<${tag}>`}<input type="text">${tag === "comment" ? "-->" : `</${tag}>`}<input type="password"></form>`,
+    );
+    await withOrigin(
+      (_request, response) => response.writeHead(200, { "content-type": "text/html" }).end(body),
+      async (url, targetPath) => {
+        const state = { downloadedBytes: 0 };
+        await expect(
+          downloadWithSegmentedManager({
+            url,
+            targetPath,
+            signal: new AbortController().signal,
+            settings,
+            state,
+            metadata: { size: 0, acceptRanges: false },
+          }),
+        ).rejects.toMatchObject({ code: "DOWNLOAD_LOGIN" });
+        expect(state.downloadedBytes).toBe(0);
+        expect(await readFile(targetPath)).toHaveLength(0);
+      },
+    );
+  },
+);
+
+it("preserves input-like markup inside a quoted attribute cut by the inspection boundary", async () => {
+  const body = Buffer.from(
+    `<form><label title='<input type="password">${"x".repeat(8300)}'>Search</label><input type="text"></form>`,
+  );
+  await withOrigin(
+    (_request, response) => response.writeHead(200, { "content-type": "text/html" }).end(body),
+    async (url, targetPath) => {
+      await downloadWithSegmentedManager({
+        url,
+        targetPath,
+        signal: new AbortController().signal,
+        settings,
+        state: { downloadedBytes: 0 },
+        metadata: { size: 0, acceptRanges: false },
+      });
+      expect(await readFile(targetPath)).toEqual(body);
+      expect(digest(await readFile(targetPath))).toBe(digest(body));
+    },
+  );
+});
+
+it.each(["textarea", "script", "style", "title"])(
+  "preserves error-like text inside bounded raw content (%s)",
+  async (tag) => {
+    const body = Buffer.from(`<${tag}><h1>Access denied</h1>${"x".repeat(8300)}</${tag}>`);
+    await withOrigin(
+      (_request, response) => response.writeHead(200, { "content-type": "text/html" }).end(body),
+      async (url, targetPath) => {
+        await downloadWithSegmentedManager({
+          url,
+          targetPath,
+          signal: new AbortController().signal,
+          settings,
+          state: { downloadedBytes: 0 },
+          metadata: { size: 0, acceptRanges: false },
+        });
+        expect(await readFile(targetPath)).toEqual(body);
+        expect(digest(await readFile(targetPath))).toBe(digest(body));
+      },
+    );
+  },
+);
+
+it("does not let comment-like text in a quoted attribute hide a real password input", async () => {
+  await withOrigin(
+    (_request, response) =>
+      response
+        .writeHead(200, { "content-type": "text/html" })
+        .end('<form><input title="<!--" type="password"></form>'),
+    async (url, targetPath) => {
+      await expect(
+        downloadWithSegmentedManager({
+          url,
+          targetPath,
+          signal: new AbortController().signal,
+          settings,
+          state: { downloadedBytes: 0 },
+          metadata: { size: 0, acceptRanges: false },
+        }),
+      ).rejects.toMatchObject({ code: "DOWNLOAD_LOGIN" });
+      expect(await readFile(targetPath)).toHaveLength(0);
+    },
+  );
+});
+
 it.each([
   "utf-8 BOM",
   "utf-16le BOM",

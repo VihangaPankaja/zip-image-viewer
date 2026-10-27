@@ -207,21 +207,35 @@ function decodeHtmlPrefix(prefix: Buffer, contentType: string) {
   }
 }
 
-function hasLoginForm(html: string) {
-  const markup = html.replace(
-    /<(script|style|textarea|title)\b(?:[^"'<>]|"[^"]*"|'[^']*')*>[\s\S]*?<\/\1\s*>/gi,
-    "",
-  );
+function hasHtmlFailure(html: string) {
+  const tags =
+    /<!--[\s\S]*?(?:-->|$)|<\/?([a-z][\w:-]*)\b((?:[^"'<>]|"[^"]*(?:"|$)|'[^']*(?:'|$))*)(>|$)/gi;
   let inForm = false;
-  for (const [tag, name, attributes] of markup.matchAll(
-    /<\/?([a-z][\w:-]*)\b((?:[^"'<>]|"[^"]*"|'[^']*')*)>/gi,
-  )) {
+  for (let match = tags.exec(html); match; match = tags.exec(html)) {
+    const [tag, rawName, attributes, complete] = match;
+    if (tag.startsWith("<!--") || !complete) continue;
+    const name = rawName.toLowerCase();
     const closing = tag.startsWith("</");
-    if (name.toLowerCase() === "form") {
+    if (
+      !closing &&
+      (name === "title" || name === "h1") &&
+      /^\s*(?:access denied|(?:download |signed )?(?:link|request) (?:has )?expired)\b/i.test(
+        html.slice(tags.lastIndex),
+      )
+    )
+      return true;
+    if (!closing && ["script", "style", "textarea", "title"].includes(name)) {
+      const end = new RegExp(`</${name}\\s*>`, "gi");
+      end.lastIndex = tags.lastIndex;
+      // Raw text may continue beyond the bounded prefix, so skip through its end.
+      tags.lastIndex = end.exec(html) ? end.lastIndex : html.length;
+      continue;
+    }
+    if (name === "form") {
       inForm = !closing;
       continue;
     }
-    if (!inForm || closing || name.toLowerCase() !== "input") continue;
+    if (!inForm || closing || name !== "input") continue;
     const type = [
       ...attributes.matchAll(/([^\s"'=<>`/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g),
     ].find((attribute) => attribute[1].toLowerCase() === "type");
@@ -234,13 +248,7 @@ function htmlGuard(contentType: () => string) {
   let prefix = Buffer.alloc(0);
   let checked = false;
   function check() {
-    const html = decodeHtmlPrefix(prefix, contentType()).replace(/<!--[\s\S]*?(?:-->|$)/g, "");
-    if (
-      hasLoginForm(html) ||
-      /<(?:title|h1)\b[^>]*>\s*(?:access denied|(?:download |signed )?(?:link|request) (?:has )?expired)\b/i.test(
-        html,
-      )
-    )
+    if (hasHtmlFailure(decodeHtmlPrefix(prefix, contentType())))
       throw Object.assign(
         new Error("The origin returned a login or error page. Add a fresh public download link."),
         { code: "DOWNLOAD_LOGIN" },
