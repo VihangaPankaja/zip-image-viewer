@@ -11,6 +11,9 @@ or encoder values fail startup. Defaults live in `server/config/runtimeConstants
 | `FFMPEG_BIN`               | Bundled executable | Absolute path to a custom FFmpeg executable, supported by `ffmpeg-static`. |
 | `NODE_ENV`                 | Unset              | Use `production` for a deployed server.                                    |
 
+The Docker image sets `FFMPEG_BIN=/usr/bin/ffmpeg` and `USE_SYSTEM_7ZA=true`
+to use its maintained native tools. Source installs use the npm bundles by default.
+
 Download concurrency, HTTP transport options and torrent bandwidth limits are
 available in Settings. Appearance, sorting, visible columns and keyboard
 preferences are stored in the browser. The server listens on all interfaces.

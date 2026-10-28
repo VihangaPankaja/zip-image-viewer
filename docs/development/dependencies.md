@@ -40,12 +40,14 @@ Quality calls dependency maintenance on PRs and master pushes; it also runs
 weekly and on demand against the locked production dependency graph. Scheduled
 and manual maintenance calls the reusable container verification workflow, builds
 the current production image, and retains its BuildKit SPDX package/license SBOM plus a
-Grype JSON vulnerability report. The image scan fails container verification
-and prevents publication when it finds medium, high or critical vulnerabilities,
-including findings without an available fix. Reports are retained even when the
-scan fails. Tool crashes, invalid audit output, registry failures and missing
-artifacts also fail the job. The separate npm runtime audit remains a triage
-report. A green reporting job does not mean the app is free of vulnerabilities.
+Grype JSON vulnerability reports. The image gate fails container verification
+and prevents publication for medium, high or critical findings with an available
+fix according to Grype's package and distribution advisories. A separate full
+report retains all findings, including unfixed advisories;
+the gate's filtered report is retained alongside it. Both reports remain available
+when the gate fails. Tool crashes, invalid audit output, registry failures and
+missing artifacts also fail the job. The separate npm runtime audit remains a
+triage report. A green gate does not mean the app is free of vulnerabilities.
 
 For each finding, record the advisory, package and installed/fixed versions,
 dependency path, reachable input and affected app behavior in the PR or tracking
@@ -81,6 +83,16 @@ FFmpeg build configuration and applicable GPL/LGPL terms, 7-Zip notices, native
 image libraries and Debian package licenses before redistributing an image.
 The npm inventory and image SBOM are complementary evidence; retain required
 notices and source offers according to the components actually shipped.
+
+The production container uses Debian's FFmpeg package and checksum-pinned
+official 7-Zip binaries, including RAR support. The existing npm executable
+wrappers select these tools through `FFMPEG_BIN` and `USE_SYSTEM_7ZA`; their old
+bundled executables are removed from production dependencies. Local development
+continues to use the npm bundles unless those environment settings are supplied.
+The declared 7-Zip component in `tooling/7zip.cdx.json` supplements binary
+detection through BuildKit's SBOM cataloger. Keep its version and identifiers
+aligned with the pinned executable. The container smoke verifies the declared
+version, and CI requires both native tools in the attached SBOM.
 
 PR screenshots are direct PR attachments, separate from releases and image
 provenance. Follow the [screenshot skill](../../.agents/skills/pr-screenshots/SKILL.md)

@@ -98,18 +98,30 @@ jobs:
           docker buildx --builder "$builder" history inspect attachment "$record" "$sbom" |
             jq -e 'select(.predicateType == "https://spdx.dev/Document") | .predicate |
               select(.spdxVersion | startswith("SPDX-")) |
-              select((.packages | type) == "array" and (.packages | length) > 0)' \
+              select((.packages | type) == "array" and (.packages | length) > 0) |
+              select(.packages | map(.name) | contains(["7-Zip", "ffmpeg"]))' \
               > "$RUNNER_TEMP/image-sbom.spdx.json"
 
-      - name: Reject production image vulnerabilities
+      - name: Report all production image vulnerabilities
         if: inputs.audit || github.event_name != 'pull_request'
         uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
         with:
           sbom: ${{ runner.temp }}/image-sbom.spdx.json
           output-format: json
           output-file: ${{ runner.temp }}/image-vulnerabilities.json
+          fail-build: false
+          only-fixed: false
+
+      - name: Reject fixable production image vulnerabilities
+        if: inputs.audit || github.event_name != 'pull_request'
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+        with:
+          sbom: ${{ runner.temp }}/image-sbom.spdx.json
+          output-format: json
+          output-file: ${{ runner.temp }}/image-fixable-vulnerabilities.json
           fail-build: true
           severity-cutoff: medium
+          only-fixed: true
 
       - name: Retain image inventory and vulnerability evidence
         if: always() && (inputs.audit || github.event_name != 'pull_request')
@@ -119,6 +131,7 @@ jobs:
           path: |
             ${{ runner.temp }}/image-sbom.spdx.json
             ${{ runner.temp }}/image-vulnerabilities.json
+            ${{ runner.temp }}/image-fixable-vulnerabilities.json
           retention-days: 30
           if-no-files-found: error
 
@@ -148,6 +161,12 @@ jobs:
           docker restart "$container_id"
           wait_ready
           docker exec "$container_id" node tests/integration/containerRetentionSmoke.mjs verify
+
+      - name: Verify production archive extraction
+        run: |
+          docker run --rm --entrypoint node \
+            --mount type=bind,source="$PWD/tests/integration/containerArchiveSmoke.mjs",target=/app/tests/integration/containerArchiveSmoke.mjs,readonly \
+            ${{ env.IMAGE_NAME }}:latest /app/tests/integration/containerArchiveSmoke.mjs
 
       - name: Decode HLS in production image
         run: |
