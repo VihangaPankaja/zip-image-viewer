@@ -40,10 +40,12 @@ Quality calls dependency maintenance on PRs and master pushes; it also runs
 weekly and on demand against the locked production dependency graph. Scheduled
 and manual maintenance calls the reusable container verification workflow, builds
 the current production image, and retains its BuildKit SPDX package/license SBOM plus a
-Grype JSON vulnerability report. Reports include unfixed findings. Tool crashes,
-invalid audit output, registry failures and missing artifacts fail the job;
-reported advisories are review evidence, not an automatic severity-only gate.
-A green reporting job does not mean the app is free of vulnerabilities.
+Grype JSON vulnerability report. The image scan fails container verification
+and prevents publication when it finds medium, high or critical vulnerabilities,
+including findings without an available fix. Reports are retained even when the
+scan fails. Tool crashes, invalid audit output, registry failures and missing
+artifacts also fail the job. The separate npm runtime audit remains a triage
+report. A green reporting job does not mean the app is free of vulnerabilities.
 
 For each finding, record the advisory, package and installed/fixed versions,
 dependency path, reachable input and affected app behavior in the PR or tracking

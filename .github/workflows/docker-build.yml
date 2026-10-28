@@ -101,15 +101,15 @@ jobs:
               select((.packages | type) == "array" and (.packages | length) > 0)' \
               > "$RUNNER_TEMP/image-sbom.spdx.json"
 
-      - name: Report production image vulnerabilities for triage
+      - name: Reject production image vulnerabilities
         if: inputs.audit || github.event_name != 'pull_request'
         uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
         with:
           sbom: ${{ runner.temp }}/image-sbom.spdx.json
           output-format: json
           output-file: ${{ runner.temp }}/image-vulnerabilities.json
-          # Findings need exposure/fix review; scanner failures still fail the job.
-          fail-build: false
+          fail-build: true
+          severity-cutoff: medium
 
       - name: Retain image inventory and vulnerability evidence
         if: always() && (inputs.audit || github.event_name != 'pull_request')

@@ -105,6 +105,9 @@ container inputs, patches or CI/tooling also generate a BuildKit SBOM and scan
 it. Version-only package changes do not trigger that audit. Master, manual and
 scheduled maintenance runs always audit. The scanner reads the exact local
 build's SBOM; no second inventory scan is generated.
+Medium or higher image vulnerabilities fail container verification and block
+publication, including findings without a fix. Scan reports remain available
+after failure.
 Master pushes then publish that same image without rebuilding. PR, scheduled
 and manual maintenance runs do not publish images. The final `Verification`
 check requires successful verification or a proven reused PR run, plus
