@@ -21,7 +21,8 @@ permissions:
 
 concurrency:
   group: container-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  queue: ${{ github.event_name == 'pull_request' && 'single' || 'max' }}
 
 jobs:
   docker-build:
@@ -49,11 +50,17 @@ jobs:
           version: v0.38.1
           driver: docker
 
-      - name: Read app version
+      - name: Prepare image version
         id: app-version
         run: |
-          version=$(node -p "require('./package.json').version")
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          node --input-type=module <<'EOF'
+          import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+          import { imageVersion } from './tooling/release-version.mjs';
+          const manifest = JSON.parse(readFileSync('package.json', 'utf8'));
+          manifest.version = imageVersion(manifest.version, process.env.GITHUB_RUN_NUMBER, process.env.GITHUB_RUN_ATTEMPT);
+          writeFileSync('package.json', JSON.stringify(manifest, null, 2) + '\n');
+          appendFileSync(process.env.GITHUB_OUTPUT, `version=${manifest.version}\n`);
+          EOF
 
       - name: Extract Docker metadata
         id: meta
@@ -63,6 +70,8 @@ jobs:
           tags: |
             type=raw,value=latest
             type=raw,value=${{ steps.app-version.outputs.version }}
+          labels: |
+            org.opencontainers.image.version=${{ steps.app-version.outputs.version }}
 
       - name: Build the local candidate
         id: build
@@ -217,8 +226,18 @@ jobs:
         if: inputs.publish && github.event_name == 'push' && github.ref == 'refs/heads/master'
         env:
           VERSION: ${{ steps.app-version.outputs.version }}
+          VERIFIED_DIGEST: ${{ steps.build.outputs.digest }}
         run: |
           docker push "$IMAGE_NAME:$VERSION"
-          docker push "$IMAGE_NAME:latest"
-          docker buildx imagetools inspect "$IMAGE_NAME:$VERSION" --format '{{json .Provenance}}' | jq -e 'length > 0'
-          docker buildx imagetools inspect "$IMAGE_NAME:$VERSION" --format '{{json .SBOM}}' | jq -e 'length > 0'
+          digest=$(docker buildx imagetools inspect "$IMAGE_NAME:$VERSION" --format '{{json .Manifest}}' | jq -er '.digest')
+          test "$digest" = "$VERIFIED_DIGEST"
+          image="$IMAGE_NAME@$digest"
+          docker buildx imagetools inspect "$image" --format '{{json .Provenance}}' | jq -e 'length > 0'
+          docker buildx imagetools inspect "$image" --format '{{json .SBOM}}' | jq -e 'length > 0'
+          # A queued run or retry of an older commit must not replace the current release.
+          master=$(git ls-remote origin refs/heads/master | cut -f1)
+          if [ "$master" = "$GITHUB_SHA" ]; then
+            docker push "$IMAGE_NAME:latest"
+          fi
+          printf '### Published image\n\nVersion: %s\n\nCommit: %s\n\nDeploy: %s\n' \
+            "$VERSION" "$GITHUB_SHA" "$image" >> "$GITHUB_STEP_SUMMARY"

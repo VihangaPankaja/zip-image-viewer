@@ -33,7 +33,9 @@ ZIP Image Viewer uses React, Express and TypeScript. Start with the
   blocked, keep the UI delivery unfinished and report the exact blocker and
   capture paths; do not present the PR as complete or ready to merge. Keep
   screenshot capture out of CI, package scripts and releases.
-- Commit major steps separately. Bump `package.json` before opening a PR to `master`.
+- Commit major steps separately. App version bumps are optional; keep `package.json`
+  at a valid `major.minor.patch` version that does not decrease. CI assigns Docker
+  build versions without committing generated versions. See [deployment](docs/reference/deployment.md).
 - Label PRs from their title and description with one type (`bug`, `enhancement`,
   `documentation`, `refactor` or `maintenance`) and up to two areas (`downloads`,
   `archives-files`, `media-player`, `interface`, `tooling-ci` or `security`).

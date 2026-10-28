@@ -8,6 +8,7 @@
     "tests/component/client/setup.ts",
     "tests/benchmarks/scrubberHarness.ts",
     "tooling/ci-verification.mjs",
+    "tooling/release-version.mjs",
     "tests/integration/containerArchiveSmoke.mjs",
     "tests/integration/containerHlsSmoke.mjs",
     "tests/integration/containerBrowserFixture.mjs",

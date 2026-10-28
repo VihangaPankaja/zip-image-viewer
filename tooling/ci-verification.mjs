@@ -6,7 +6,7 @@ export function imageAuditNeeded(files, before, after) {
     "pnpm-workspace.yaml",
     ".node-version",
   ]);
-  // Every PR bumps the app version; that alone does not change installed packages.
+  // An optional app version bump does not change installed packages.
   return (
     files.some(
       (file) =>

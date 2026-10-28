@@ -28,6 +28,32 @@ app user can write to a bind-mounted directory.
 For environment variables and optional GPU access, see
 [configuration](configuration.md). The default image supports CPU encoding.
 
+## Image versions and rollback
+
+CI publishes verified master builds as
+`vihangapankaja/zip-image-viewer:<app-version>-build.<run-number>.<run-attempt>`.
+The app version in `package.json` is a stable numeric `major.minor.patch` prefix.
+PRs may leave it unchanged or increase it, including Dependabot updates. The
+workflow run number distinguishes builds and the attempt number distinguishes
+retries. These are Docker build versions; they do not create plain SemVer
+releases or require version-bump commits on master.
+
+The container job writes the generated version into its disposable build context
+before building. The image's package version and OCI version label therefore
+match its build-version tag. It verifies and publishes the same candidate,
+checks the published digest against the build output, and records its version,
+source commit and digest reference in the Actions job summary. It does not
+overwrite plain app-version tags. Only a run for the current master commit
+promotes `latest`; queued older commits and their retries publish their unique
+build-version tags without replacing the current release.
+
+Use the recorded `vihangapankaja/zip-image-viewer@sha256:...` reference for
+deployment and rollback. Docker tags can move; a digest identifies the exact
+image. Keep its digest and persistent data backups with deployment records.
+To roll back, stop the container and recreate it with the earlier digest and
+the same sessions volume. The [Docker digest guide](https://docs.docker.com/dhi/explore/security-concepts/digests/)
+explains digest references.
+
 ## Readiness and access
 
 `GET /health` returns HTTP 200 while retained downloads are being verified, with

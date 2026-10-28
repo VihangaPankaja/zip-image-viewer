@@ -24,7 +24,7 @@ development licenses because build and test tools also need review. Unknown
 license metadata needs investigation; an inventory is not a license approval.
 Machine paths are omitted from the inventory. Do not commit generated reports.
 
-Dependency PRs use the same version bump, quality, coverage, browser and
+Dependency PRs use the same version validation, quality, coverage, browser and
 production-container gates as application PRs. The existing HTTP, archive and
 contract suites run on every update. The release regression fixture follows an
 HTTP URL with a signed query, confirms the download through RPC and checks
@@ -69,7 +69,7 @@ alone does not. See [Docker's attestation guide](https://docs.docker.com/build/c
 The containerd image store retains attestations while the Docker driver builds
 the candidate locally. Every candidate passes real playback/retention and HLS
 checks. Dependency/container, patch, toolchain and CI/tooling PRs also produce
-an SBOM and vulnerability report; mandatory version-only manifest changes do
+an SBOM and vulnerability report; optional version-only manifest changes do
 not trigger the audit. All master and weekly/manual maintenance candidates are
 audited. Buildx extracts the SBOM from the exact local build record so the
 scanner uses the same inventory attached to the candidate, without generating

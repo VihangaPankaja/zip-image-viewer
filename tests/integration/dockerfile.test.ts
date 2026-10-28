@@ -46,4 +46,31 @@ describe("Docker runtime image", () => {
       workflow.indexOf("- name: Reject fixable production image vulnerabilities"),
     ).toBeLessThan(workflow.indexOf("- name: Publish the verified candidate without rebuilding"));
   });
+
+  it("queues master verification and publication while cancelling superseded PR runs", async () => {
+    for (const file of ["quality.yml", "docker-build.yml"]) {
+      const workflow = await readFile(`.github/workflows/${file}`, "utf8");
+
+      expect(workflow).toContain("cancel-in-progress: ${{ github.event_name == 'pull_request' }}");
+      expect(workflow).toContain(
+        "queue: ${{ github.event_name == 'pull_request' && 'single' || 'max' }}",
+      );
+    }
+  });
+
+  it("publishes only verified master candidates and records their immutable digest", async () => {
+    const workflow = await readFile(".github/workflows/docker-build.yml", "utf8");
+    const publish = workflow.split("- name: Publish the verified candidate without rebuilding")[1];
+
+    expect(publish).toContain(
+      "if: inputs.publish && github.event_name == 'push' && github.ref == 'refs/heads/master'",
+    );
+    expect(publish).toContain('test "$digest" = "$VERIFIED_DIGEST"');
+    expect(publish).toContain('image="$IMAGE_NAME@$digest"');
+    expect(publish).toContain('if [ "$master" = "$GITHUB_SHA" ]; then');
+    expect(publish.indexOf('test "$digest" = "$VERIFIED_DIGEST"')).toBeLessThan(
+      publish.indexOf('docker push "$IMAGE_NAME:latest"'),
+    );
+    expect(publish).toContain('"$VERSION" "$GITHUB_SHA" "$image" >> "$GITHUB_STEP_SUMMARY"');
+  });
 });
