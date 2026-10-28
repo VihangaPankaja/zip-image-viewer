@@ -1,0 +1,27 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "components": [
+    {
+      "type": "application",
+      "name": "7-Zip",
+      "version": "26.05",
+      "purl": "pkg:generic/7-zip@26.05",
+      "cpe": "cpe:2.3:a:7-zip:7-zip:26.05:*:*:*:*:*:*:*",
+      "licenses": [
+        { "license": { "id": "LGPL-2.1-or-later" } },
+        { "license": { "id": "BSD-3-Clause" } },
+        {
+          "license": {
+            "name": "unRAR license restriction",
+            "url": "https://www.7-zip.org/license.txt"
+          }
+        }
+      ],
+      "externalReferences": [
+        { "type": "distribution", "url": "https://github.com/ip7z/7zip/releases/tag/26.05" }
+      ]
+    }
+  ]
+}

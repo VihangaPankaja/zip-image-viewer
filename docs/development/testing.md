@@ -89,6 +89,9 @@ run once on Linux.
 PRs also gate new Fallow findings against their base commit. Dead-code,
 dependency, architecture and duplication checks remain blocking; the aggregate
 health score is advisory. The roadmap TODO document has no dedicated checker.
+The `version-bump` check validates a stable numeric `major.minor.patch` app
+version and rejects decreases. An unchanged version passes, including on
+Dependabot PRs. Its check name is retained for existing required-check settings.
 
 Successful PR runs retain a small verification record for 14 days. After a
 squash merge, a read-only planning job checks that the push contains exactly
@@ -105,11 +108,20 @@ container inputs, patches or CI/tooling also generate a BuildKit SBOM and scan
 it. Version-only package changes do not trigger that audit. Master, manual and
 scheduled maintenance runs always audit. The scanner reads the exact local
 build's SBOM; no second inventory scan is generated.
+Medium or higher image vulnerabilities with an available fix fail container
+verification and block publication. Full reports retain unfixed findings too;
+both full and fixable-only reports remain available after failure. The production
+container also verifies native archive extraction, encryption detection, literal
+filenames, RAR, concatenated gzip and link rejection.
 Master pushes then publish that same image without rebuilding. PR, scheduled
 and manual maintenance runs do not publish images. The final `Verification`
 check requires successful verification or a proven reused PR run, plus
 successful container verification. The release image is built and verified
 on master even when the source checks are reused.
+Master Quality and container runs queue without cancelling earlier pushes;
+PR runs still cancel superseded runs. GitHub allows up to 100 pending runs per
+concurrency group. Each verified master image receives a unique build version;
+see [deployment](../reference/deployment.md#image-versions-and-rollback).
 Chromium and Firefox E2E run on Linux; WebKit runs on macOS to exercise Safari's
 platform media support. WebKit uses Playwright's browser build rather than released Safari.
 The WebKit browser job enables keyboard navigation through all controls so Tab

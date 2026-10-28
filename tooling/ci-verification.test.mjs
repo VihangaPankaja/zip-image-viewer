@@ -6,7 +6,7 @@ import {
   verificationPassed,
 } from "./ci-verification.mjs";
 
-test("image audits skip unrelated PRs and mandatory version-only manifest changes", () => {
+test("image audits skip unrelated PRs and optional version-only manifest changes", () => {
   const before = { version: "1.0.0", dependencies: { express: "5" }, scripts: { build: "tsc" } };
   const after = { ...before, version: "1.0.1" };
   assert.equal(

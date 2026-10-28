@@ -24,7 +24,7 @@ development licenses because build and test tools also need review. Unknown
 license metadata needs investigation; an inventory is not a license approval.
 Machine paths are omitted from the inventory. Do not commit generated reports.
 
-Dependency PRs use the same version bump, quality, coverage, browser and
+Dependency PRs use the same version validation, quality, coverage, browser and
 production-container gates as application PRs. The existing HTTP, archive and
 contract suites run on every update. The release regression fixture follows an
 HTTP URL with a signed query, confirms the download through RPC and checks
@@ -40,10 +40,14 @@ Quality calls dependency maintenance on PRs and master pushes; it also runs
 weekly and on demand against the locked production dependency graph. Scheduled
 and manual maintenance calls the reusable container verification workflow, builds
 the current production image, and retains its BuildKit SPDX package/license SBOM plus a
-Grype JSON vulnerability report. Reports include unfixed findings. Tool crashes,
-invalid audit output, registry failures and missing artifacts fail the job;
-reported advisories are review evidence, not an automatic severity-only gate.
-A green reporting job does not mean the app is free of vulnerabilities.
+Grype JSON vulnerability reports. The image gate fails container verification
+and prevents publication for medium, high or critical findings with an available
+fix according to Grype's package and distribution advisories. A separate full
+report retains all findings, including unfixed advisories;
+the gate's filtered report is retained alongside it. Both reports remain available
+when the gate fails. Tool crashes, invalid audit output, registry failures and
+missing artifacts also fail the job. The separate npm runtime audit remains a
+triage report. A green gate does not mean the app is free of vulnerabilities.
 
 For each finding, record the advisory, package and installed/fixed versions,
 dependency path, reachable input and affected app behavior in the PR or tracking
@@ -65,7 +69,7 @@ alone does not. See [Docker's attestation guide](https://docs.docker.com/build/c
 The containerd image store retains attestations while the Docker driver builds
 the candidate locally. Every candidate passes real playback/retention and HLS
 checks. Dependency/container, patch, toolchain and CI/tooling PRs also produce
-an SBOM and vulnerability report; mandatory version-only manifest changes do
+an SBOM and vulnerability report; optional version-only manifest changes do
 not trigger the audit. All master and weekly/manual maintenance candidates are
 audited. Buildx extracts the SBOM from the exact local build record so the
 scanner uses the same inventory attached to the candidate, without generating
@@ -79,6 +83,16 @@ FFmpeg build configuration and applicable GPL/LGPL terms, 7-Zip notices, native
 image libraries and Debian package licenses before redistributing an image.
 The npm inventory and image SBOM are complementary evidence; retain required
 notices and source offers according to the components actually shipped.
+
+The production container uses Debian's FFmpeg package and checksum-pinned
+official 7-Zip binaries, including RAR support. The existing npm executable
+wrappers select these tools through `FFMPEG_BIN` and `USE_SYSTEM_7ZA`; their old
+bundled executables are removed from production dependencies. Local development
+continues to use the npm bundles unless those environment settings are supplied.
+The declared 7-Zip component in `tooling/7zip.cdx.json` supplements binary
+detection through BuildKit's SBOM cataloger. Keep its version and identifiers
+aligned with the pinned executable. The container smoke verifies the declared
+version, and CI requires both native tools in the attached SBOM.
 
 PR screenshots are direct PR attachments, separate from releases and image
 provenance. Follow the [screenshot skill](../../.agents/skills/pr-screenshots/SKILL.md)

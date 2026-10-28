@@ -11,7 +11,8 @@ permissions:
 
 concurrency:
   group: quality-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  queue: ${{ github.event_name == 'pull_request' && 'single' || 'max' }}
 
 jobs:
   prepare:
@@ -71,7 +72,8 @@ jobs:
         with:
           fetch-depth: 0
       - name: Validate GitHub Actions workflows
-        uses: docker://rhysd/actionlint:1.7.12
+        # This maintained fork validates GitHub's concurrency.queue without suppressions.
+        uses: docker://ghcr.io/kjanat/actionlint:1.17.0
       - uses: voidzero-dev/setup-vp@v1.22.0
         with:
           cache: true
