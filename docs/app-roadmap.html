@@ -316,6 +316,8 @@
         font-size: 13px;
         color: var(--muted);
       }
+      /* The standalone status node shares its stable ID with script updates. */
+      /* stylelint-disable-next-line selector-max-id */
       #notice {
         font-size: 13px;
         color: var(--green);
@@ -559,6 +561,8 @@
         aside,
         .controls,
         .toolbar,
+        /* Keep the same status selector in the print override. */
+        /* stylelint-disable-next-line selector-max-id */
         #notice,
         .card-foot {
           display: none;
@@ -1547,7 +1551,7 @@
           depends: "N01, B03",
           note: "",
           evidence:
-            "package.json; pnpm-lock.yaml; vite.config.ts; .vite-hooks/; docs/development/README.md; .github/workflows/quality.yml; stylelint.config.mjs; tests/integration/cssLint.test.ts; client/src/styles/; https://stylelint.io/user-guide/get-started/",
+            "package.json; pnpm-lock.yaml; vite.config.ts; .vite-hooks/; docs/development/README.md; .github/workflows/quality.yml; stylelint.config.mjs; tests/integration/cssLint.test.ts; docs/app-roadmap.html; client/src/styles/; https://stylelint.io/user-guide/get-started/",
         },
         {
           id: "B05",

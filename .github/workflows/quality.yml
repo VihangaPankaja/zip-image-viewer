@@ -120,6 +120,7 @@ jobs:
           run-install: false
           node-version-file: .node-version
       - run: vp install --frozen-lockfile
+      - run: vpr lint:css
       - run: vpr build
 
   dependencies:

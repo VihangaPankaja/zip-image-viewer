@@ -9,7 +9,7 @@ Run commands from the repository root.
 | --------------- | ------------------------------------------------------ |
 | `vpr dev`       | Start the API and client with reload.                  |
 | `vpr check`     | Check formatting, typed lint and types.                |
-| `vpr lint:css`  | Check app CSS and theme tokens.                        |
+| `vpr lint:css`  | Check app CSS, theme tokens and embedded roadmap CSS.  |
 | `vpr format`    | Format the repository.                                 |
 | `vpr typecheck` | Check the client, server and test TypeScript projects. |
 | `vpr test`      | Run unit, component and integration tests.             |
@@ -30,7 +30,8 @@ Playwright and Fallow have their own configuration files.
 
 CSS rules also live in `vite.config.ts`; `stylelint.config.mjs` adapts them for
 Stylelint. `vpr lint`, `vpr check`, `vpr quality`, commit/push hooks and CI run
-the CSS check. The standalone roadmap remains a TODO document outside these checks.
+the CSS check. The standalone roadmap uses an HTML parser to check its embedded
+CSS, without checking task contents or completion percentages.
 Oxfmt owns formatting; Stylelint checks CSS validity, duplicate declarations
 and selector specificity. Intentional cascades have local, explained exceptions.
 

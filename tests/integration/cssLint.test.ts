@@ -94,3 +94,49 @@ it("allows palette definitions only in the token stylesheet", async () => {
   );
   expect((await lint(":root { --accent: #5ed4c4; }")).status).toBe(2);
 });
+
+it("parses roadmap HTML without linting markup or script text as CSS", async () => {
+  const result = await lint(
+    `<!doctype html><html><head>
+<style>:root { --paper: #fffef9; } .panel { color: var(--paper); }</style>
+</head><body><p>Roadmap</p><script>const label = "not CSS {";</script></body></html>`,
+    "docs/app-roadmap.html",
+  );
+  expect(result.diagnostics).toBe("[]");
+  expect(result.status).toBe(0);
+});
+
+it("rejects invalid CSS in roadmap style elements and attributes", async () => {
+  const result = await lint(
+    `<html><head><style>.panel { colr: red; }</style></head>
+<body><p style="width: nope">Roadmap</p></body></html>`,
+    "docs/app-roadmap.html",
+  );
+  expect(result.status).toBe(2);
+  expect(result.diagnostics).toContain("property-no-unknown");
+  expect(result.diagnostics).toContain("declaration-property-value-no-unknown");
+  expect(result.diagnostics).not.toContain("CssSyntaxError");
+});
+
+it("returns a failing CLI exit code for invalid embedded roadmap CSS", () => {
+  const result = spawnSync(
+    process.execPath,
+    [
+      "node_modules/stylelint/bin/stylelint.mjs",
+      "--stdin",
+      "--stdin-filename",
+      "docs/app-roadmap.html",
+      "--max-warnings",
+      "0",
+    ],
+    {
+      input: "<!doctype html><style>.panel { colr: red; }</style>",
+      encoding: "utf8",
+      timeout: 60_000,
+    },
+  );
+  expect(result.error).toBeUndefined();
+  expect(result.status).toBe(2);
+  expect(result.stdout + result.stderr).toContain("property-no-unknown");
+  expect(result.stdout + result.stderr).not.toContain("CssSyntaxError");
+}, 90_000);
