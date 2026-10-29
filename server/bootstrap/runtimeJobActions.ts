@@ -21,7 +21,7 @@ export function createRuntimeJobActions(
     return job;
   };
   const retrySessionJob = (previous: SessionJob) => {
-    if (previous.sourceKind === "http" && previous.storageRoot) {
+    if (previous.storageRoot && (previous.sourceKind === "http" || previous.archive)) {
       manager.emitJob(previous, {
         status: "queued",
         phase: "queued",

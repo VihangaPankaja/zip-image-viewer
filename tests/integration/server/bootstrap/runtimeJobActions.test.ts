@@ -6,6 +6,7 @@ import type { Session, SessionJob } from "../../../../server/domain/models.js";
 import { createJobManager } from "../../../../server/application/jobs/jobManager.js";
 import { createSessionJobQueue } from "../../../../server/application/jobs/sessionJobQueue.js";
 import { createRuntimeJobActions } from "../../../../server/bootstrap/runtimeJobActions.js";
+import { createRetainedTorrentStore } from "../../../../server/repositories/retainedTorrents.js";
 
 it.each([
   { sourceKind: "http", expired: false },
@@ -130,6 +131,66 @@ it.each(["pending", "active"])(
       finish();
       await queue.stopSessionJobs();
       await rm(workspaceDir, { recursive: true, force: true });
+    }
+  },
+);
+
+it.each(["cancelled", "error"] as const)(
+  "retries a %s torrent ZIP extraction with the same source, selection and job",
+  async (status) => {
+    const directory = await mkdtemp(path.join(tmpdir(), "retry-zip-job-"));
+    const store = createRetainedTorrentStore(directory);
+    try {
+      const jobs = new Map<string, SessionJob>();
+      const manager = createJobManager(jobs, vi.fn(), store);
+      const previous = manager.createJob(`magnet:?xt=urn:btih:${"a".repeat(40)}`);
+      const fingerprint = "a".repeat(64);
+      manager.emitJob(previous, {
+        status,
+        phase: status,
+        error: "Insufficient storage",
+        archive: {
+          fingerprint,
+          sourceBytes: 32,
+          compressedBytes: 8,
+          expandedBytes: 16,
+          fileCount: 2,
+          extractedCount: 1,
+        },
+        zipSelection: { fingerprint, selectedIds: ["0", "1"], extractedIds: ["0"] },
+      });
+      const create = vi.spyOn(manager, "createJob");
+      const queue = createSessionJobQueue({
+        initialJobs: [previous],
+        pendingSessionJobs: [],
+        getActiveSessionJobCount: () => 1,
+        incrementActiveSessionJobCount: vi.fn(),
+        decrementActiveSessionJobCount: vi.fn(),
+        maxActiveSessionJobs: 1,
+        processSessionJob: vi.fn(),
+        emitJob: manager.emitJob,
+        logEvent: vi.fn(),
+      });
+      const actions = createRuntimeJobActions(
+        jobs,
+        new Map(),
+        new Map(),
+        manager,
+        queue,
+        vi.fn(),
+        () => Promise.resolve(),
+      );
+      const selection = previous.zipSelection;
+      expect(actions.retrySessionJob(previous)).toBe(previous);
+      expect(create).not.toHaveBeenCalled();
+      expect(jobs.size).toBe(1);
+      expect(queue.getOrderedJobs()).toEqual([previous]);
+      expect(previous.zipSelection).toBe(selection);
+      expect(previous.status).toBe("queued");
+      expect(previous.error).toBe("");
+    } finally {
+      store.close();
+      await rm(directory, { recursive: true, force: true });
     }
   },
 );

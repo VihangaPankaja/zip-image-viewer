@@ -33,6 +33,17 @@ for (const width of [390, 1440]) {
       ).toBeVisible();
       for (const theme of ["light", "dark"] as const) {
         await page.emulateMedia({ colorScheme: theme });
+        await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+        // Audit the settled palette rather than an intermediate theme transition.
+        await page.evaluate(async () => {
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+          await Promise.all(
+            document
+              .getAnimations()
+              .filter((animation) => animation instanceof CSSTransition)
+              .map((animation) => animation.finished.catch(() => undefined)),
+          );
+        });
         expect((await new AxeBuilder({ page }).include("dialog").analyze()).violations).toEqual([]);
       }
       await page.keyboard.press("Escape");

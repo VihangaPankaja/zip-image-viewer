@@ -162,6 +162,44 @@ it.each([3, 10_001])(
   },
 );
 
+it.each([
+  { field: "compressedSize", offset: 20 },
+  { field: "offsetToLocalFileHeader", offset: 42 },
+])("rejects invalid ZIP64 $field values before publishing a manifest", async ({ offset }) => {
+  const { archive } = await fixture();
+  const original = zipBytes([{ name: "one.txt", data: Buffer.from("source") }]);
+  const central = original.readUInt32LE(original.length - 6);
+  for (const value of [null, 1n << 63n, 5000n]) {
+    const bytes = Buffer.from(original);
+    bytes.writeUInt32LE(0xffffffff, central + offset);
+    let payload = bytes;
+    if (value !== null) {
+      const extra = Buffer.alloc(12);
+      extra.writeUInt16LE(1);
+      extra.writeUInt16LE(8, 2);
+      extra.writeBigUInt64LE(value, 4);
+      bytes.writeUInt16LE(12, central + 30);
+      const end = Buffer.from(bytes.subarray(-22));
+      end.writeUInt32LE(end.readUInt32LE(12) + extra.length, 12);
+      payload = Buffer.concat([bytes.subarray(0, -22), extra, end]);
+    }
+    await writeFile(archive, payload);
+    await expect(inspectZip(archive)).rejects.toThrow(/ZIP|size|limit|bounds/);
+  }
+});
+
+it("rejects compressed-byte claims that exceed the entire ZIP source", async () => {
+  const { archive } = await fixture();
+  const bytes = zipBytes([{ name: "a.txt", data: Buffer.alloc(200) }, { name: "b.txt" }]);
+  const first = bytes.readUInt32LE(bytes.length - 6);
+  const second = first + 46 + bytes.readUInt16LE(first + 28);
+  const secondOffset = bytes.readUInt32LE(second + 42);
+  bytes.writeUInt32LE(bytes.length - 40, first + 20);
+  bytes.writeUInt32LE(bytes.length - secondOffset - 40, second + 20);
+  await writeFile(archive, bytes);
+  await expect(inspectZip(archive)).rejects.toThrow(/ZIP|size|limit|bounds/);
+});
+
 it("reviews before extraction and adds skipped entries without losing the earlier selection", async () => {
   const { archive, output, job, deps } = await fixture();
   expect(await prepareZipArchive(job, archive, deps.emitJob)).toBe(false);

@@ -6,7 +6,11 @@ import { open, stat, realpath } from "node:fs/promises";
 import unzipper from "unzipper";
 import type { ArchiveManifest } from "../../../shared/contracts.js";
 import { validateArchiveEntries } from "./archiveLimits.js";
-import { assertResourceEntryCount, resourceLimitError } from "../runtime/resourceLimits.js";
+import {
+  assertResourceEntryCount,
+  assertResourceSize,
+  resourceLimitError,
+} from "../runtime/resourceLimits.js";
 import { sanitizeEntryPath } from "../runtime/runtimePrimitives.js";
 
 async function checkDirectorySize(filename: string) {
@@ -84,7 +88,19 @@ export async function openZip(filename: string) {
   );
   const names = new Map<string, "file" | "directory">();
   const offsets = new Set<number>();
+  const sourceBytes = (await stat(filename)).size;
+  let compressedBytes = 0;
   for (const entry of directory.files) {
+    assertResourceSize(entry.compressedSize);
+    compressedBytes += entry.compressedSize;
+    if (
+      !Number.isSafeInteger(entry.offsetToLocalFileHeader) ||
+      entry.offsetToLocalFileHeader < 0 ||
+      entry.offsetToLocalFileHeader + 30 + entry.fileNameLength + entry.compressedSize >
+        sourceBytes ||
+      compressedBytes > sourceBytes
+    )
+      throw resourceLimitError("Invalid ZIP entry bounds.");
     const name = sanitizeEntryPath(entry.path);
     const key = name.normalize("NFC").toLowerCase();
     if (
