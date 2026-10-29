@@ -429,21 +429,34 @@ const storageContract = {
   pin: oc.input(storageInputSchema.extend({ pinned: z.boolean() })).output(z.void()),
 };
 
+const archiveSelectionFields = {
+  fingerprint: zipSelectionSchema.shape.fingerprint,
+  fileIds: z
+    .array(z.string().min(1))
+    .min(1)
+    .max(10_000)
+    .refine((ids) => new Set(ids).size === ids.length, "File IDs must be unique."),
+};
+
 export const serverContract = {
-  archives: {
-    get: oc.input(jobControlInputSchema).output(archiveManifestSchema),
-    select: oc
+  nestedArchives: {
+    inspect: oc
+      .input(z.object({ id: z.uuid(), path: safeRelativePathSchema }))
+      .output(archiveManifestSchema),
+    open: oc
       .input(
-        jobControlInputSchema.extend({
-          fingerprint: zipSelectionSchema.shape.fingerprint,
-          fileIds: z
-            .array(z.string().min(1))
-            .min(1)
-            .max(10_000)
-            .refine((ids) => new Set(ids).size === ids.length, "File IDs must be unique."),
+        z.object({
+          id: z.uuid(),
+          path: safeRelativePathSchema,
+          ...archiveSelectionFields,
         }),
       )
-      .output(jobSchema),
+      .output(z.object({ id: z.uuid() })),
+    cancel: oc.input(z.object({ id: z.uuid(), path: safeRelativePathSchema })).output(z.void()),
+  },
+  archives: {
+    get: oc.input(jobControlInputSchema).output(archiveManifestSchema),
+    select: oc.input(jobControlInputSchema.extend(archiveSelectionFields)).output(jobSchema),
   },
   storage: storageContract,
   video: { qualities: videoQualitiesContract },

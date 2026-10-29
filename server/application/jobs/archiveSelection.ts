@@ -8,7 +8,10 @@ import { assertHttpWorkspace } from "../../infrastructure/downloads/httpWorkspac
 
 export class ArchiveSelectionRequired extends Error {}
 
-export async function getArchiveManifest(job: SessionJob): Promise<ArchiveManifest> {
+export async function getArchiveManifest(
+  job: SessionJob,
+  signal?: AbortSignal,
+): Promise<ArchiveManifest> {
   if (!job.archive)
     throw new ApplicationError("CONFLICT", "No ZIP contents are available for this download.", 409);
   await assertHttpWorkspace(job);
@@ -24,7 +27,7 @@ export async function getArchiveManifest(job: SessionJob): Promise<ArchiveManife
       "Archive source is outside its owning workspace.",
       400,
     );
-  const manifest = await inspectZip(source);
+  const manifest = await inspectZip(source, signal);
   if (manifest.fingerprint !== job.archive.fingerprint)
     throw new ApplicationError(
       "CONFLICT",
@@ -73,7 +76,9 @@ export async function prepareZipArchive(
   const detected = await fileTypeFromFile(source).catch(() => undefined);
   signal?.throwIfAborted();
   if (detected?.ext !== "zip" && !/\.zip$/i.test(source)) return true;
-  const manifest = await inspectZip(source);
+  const indexingStarted = Date.now();
+  const manifest = await inspectZip(source, signal);
+  job.archiveProcessingMs = (job.archiveProcessingMs ?? 0) + Date.now() - indexingStarted;
   signal?.throwIfAborted();
   const { entries, ...summary } = manifest;
   if (!summary.fileCount) throw new Error("This ZIP contains no files to extract.");

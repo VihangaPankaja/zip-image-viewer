@@ -68,9 +68,13 @@ it.each(["cancelled", "error"] as const)(
       });
       jobs.clear();
       const process = vi.fn();
-      await restoreHttpDownloads(store, jobs, process, (restored) =>
-        restorePublishedArchiveSession(restored, { sessionStore: sessions, listExtractedEntries }),
-      );
+      await restoreHttpDownloads(store, jobs, process, (restored) => {
+        restored.archiveProcessingMs = 1_000;
+        return restorePublishedArchiveSession(restored, {
+          sessionStore: sessions,
+          listExtractedEntries,
+        });
+      });
       expect(process).not.toHaveBeenCalled();
       expect(jobs.get(job.id)).toMatchObject({
         status,
@@ -79,6 +83,10 @@ it.each(["cancelled", "error"] as const)(
       });
       expect(sessions.get(job.sessionId)?.firstFilePath).toBe("one.txt");
       expect(sessions.get(job.sessionId)?.stats.fileCount).toBe(1);
+      expect(sessions.get(job.sessionId)?.archiveProcessingMs).toBeGreaterThanOrEqual(1_000);
+      expect(sessions.get(job.sessionId)?.archiveProcessingMs).toBe(
+        jobs.get(job.id)?.archiveProcessingMs,
+      );
       expect(await readFile(path.join(job.extractDir, "one.txt"), "utf8")).toBe("published");
     } finally {
       store.close();

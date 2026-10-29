@@ -42,15 +42,17 @@ export function extractRuntimeArchive(
   path7za: string,
   archivePath: string,
   extractDir: string,
+  signal?: AbortSignal,
 ): Promise<void> {
-  return extractArchiveWith7zip(path7za, archivePath, extractDir);
+  return extractArchiveWith7zip(path7za, archivePath, extractDir, { signal });
 }
 
 export function detectRuntimeArchiveEncryption(
   path7za: string,
   archivePath: string,
+  signal?: AbortSignal,
 ): Promise<boolean> {
-  return inspectArchiveEncryption(path7za, archivePath);
+  return inspectArchiveEncryption(path7za, archivePath, signal);
 }
 
 export async function downloadRuntimeSource({

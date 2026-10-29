@@ -18,8 +18,12 @@ import { reserveStorage, resourceLimitError } from "../../infrastructure/runtime
 
 type ExtractDependencies = {
   emitJob: (_job: SessionJob, _patch: Partial<SessionJob>) => void;
-  detectEncryption: (_archivePath: string) => Promise<boolean>;
-  extractWith7zip: (_archivePath: string, _extractDir: string) => Promise<void>;
+  detectEncryption: (_archivePath: string, _signal?: AbortSignal) => Promise<boolean>;
+  extractWith7zip: (
+    _archivePath: string,
+    _extractDir: string,
+    _signal?: AbortSignal,
+  ) => Promise<void>;
   listExtractedEntries: (_extractDir: string) => Promise<ExtractedEntry[]>;
 };
 
@@ -48,7 +52,7 @@ async function extractZip(
 ): Promise<void> {
   const root = path.resolve(extractDir);
   job.abortController?.signal.throwIfAborted();
-  const manifest = await inspectZip(archivePath);
+  const manifest = await inspectZip(archivePath, job.abortController?.signal);
   const selection = job.zipSelection;
   if (selection && selection.fingerprint !== manifest.fingerprint)
     throw new Error("Archive changed. Review its contents again.");
@@ -58,7 +62,7 @@ async function extractZip(
   );
   if (selected && (!selected.size || [...selected].some((id) => !known.has(id))))
     throw new Error("Invalid archive selection.");
-  const directory = await openZip(archivePath);
+  const directory = await openZip(archivePath, job.abortController?.signal);
   const files = directory.files.filter((entry) =>
     selected ? selected.has(zipEntryId(entry)) : true,
   );
@@ -149,7 +153,23 @@ export async function extractSessionSource(
   extractDir: string,
   deps: ExtractDependencies,
 ): Promise<ExtractedEntry[]> {
+  const started = Date.now();
+  try {
+    return await extractSource(job, archivePath, extractDir, deps);
+  } finally {
+    job.archiveProcessingMs = (job.archiveProcessingMs ?? 0) + Date.now() - started;
+  }
+}
+
+async function extractSource(
+  job: SessionJob,
+  archivePath: string,
+  extractDir: string,
+  deps: ExtractDependencies,
+): Promise<ExtractedEntry[]> {
+  job.abortController?.signal.throwIfAborted();
   const detected = await fileTypeFromFile(archivePath).catch(() => undefined);
+  job.abortController?.signal.throwIfAborted();
   const kind = classifyDetectedType(archivePath, detected);
   if (kind !== "archive")
     return [
@@ -162,9 +182,10 @@ export async function extractSessionSource(
           : path.basename(archivePath),
       ),
     ];
-  if (await deps.detectEncryption(archivePath)) {
+  if (await deps.detectEncryption(archivePath, job.abortController?.signal)) {
     throw new Error("Password-protected archives are not currently supported in this flow.");
   }
+  job.abortController?.signal.throwIfAborted();
   deps.emitJob(job, {
     status: "extracting",
     phase: "extracting",
@@ -174,7 +195,8 @@ export async function extractSessionSource(
   const entries: ExtractedEntry[] = [];
   const progress = createProgress(job, entries, deps);
   if (detected?.ext !== "zip" && isArchiveByName(archivePath) && !/\.zip$/i.test(archivePath)) {
-    await deps.extractWith7zip(archivePath, extractDir);
+    await deps.extractWith7zip(archivePath, extractDir, job.abortController?.signal);
+    job.abortController?.signal.throwIfAborted();
     entries.push(...(await deps.listExtractedEntries(extractDir)));
   } else {
     await extractZip(job, archivePath, extractDir, entries, progress);

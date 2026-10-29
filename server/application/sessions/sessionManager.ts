@@ -19,10 +19,17 @@ export function createSessionManager(
     if ((session.retained || session.pinned) && (reason === "expired" || reason === "viewer"))
       return;
     if (session.retained && reason === "shutdown") {
+      await drainArchiveOperations(session);
       await cleanupVideoSession(session);
       return;
     }
     sessions.delete(sessionId);
+    const operations = [...(session.archiveOperations ?? [])];
+    for (const operation of operations) operation.controller.abort();
+    for (const child of sessions.values()) {
+      if (child.parentSessionId === sessionId) await removeSession(child.id, "parent");
+    }
+    if (operations.length) await Promise.allSettled(operations.map((operation) => operation.done));
     await cleanupVideoSession(session);
     for (const [key, entry] of transcodes.entries()) {
       if (entry.sessionId !== sessionId) continue;
@@ -38,9 +45,16 @@ export function createSessionManager(
 
   function touchSession(sessionId: string): Session | undefined {
     const session = sessions.get(sessionId);
+    if (session?.parentSessionId && !touchSession(session.parentSessionId)) return undefined;
     if (session) session.lastAccessedAt = Date.now();
     return session;
   }
 
   return { removeSession, touchSession };
+}
+
+async function drainArchiveOperations(session: Session) {
+  const operations = [...(session.archiveOperations ?? [])];
+  for (const operation of operations) operation.controller.abort();
+  await Promise.allSettled(operations.map((operation) => operation.done));
 }

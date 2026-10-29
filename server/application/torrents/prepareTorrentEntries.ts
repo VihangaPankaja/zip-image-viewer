@@ -9,6 +9,7 @@ import { torrentSiblingFolder } from "./torrentSiblingFolder.js";
 const ARCHIVE_EXTENSION = /\.(zip|rar|7z|tar|gz|tgz)$/i;
 
 type EntryDependencies = Parameters<typeof extractSessionSource>[3] & {
+  admitArchiveEntries?: (_entries: Awaited<ReturnType<typeof extractSessionSource>>) => void;
   logEvent: (_level: "warn", _event: string, _details: Record<string, unknown>) => void;
 };
 
@@ -39,7 +40,10 @@ export async function prepareTorrentEntries(
       ? file.relativePath === job.torrentArchivePath
       : ARCHIVE_EXTENSION.test(file.relativePath),
   );
-  if (!archive) return { entries: files, sessionDir: torrentDir };
+  if (!archive) {
+    deps.admitArchiveEntries?.(files);
+    return { entries: files, sessionDir: torrentDir };
+  }
   if (path.resolve(extractDir) !== path.resolve(job.workspaceDir, "extracted"))
     throw new Error("Invalid retained extraction directory.");
   job.torrentArchivePath = archive.relativePath;
@@ -76,6 +80,7 @@ export async function prepareTorrentEntries(
       });
       entries.push({ ...file, relativePath });
     }
+    deps.admitArchiveEntries?.(entries);
     const hadPrevious = existsSync(extractDir);
     job.abortController?.signal.throwIfAborted();
     if (hadPrevious) await rename(extractDir, previous);

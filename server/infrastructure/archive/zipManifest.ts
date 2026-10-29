@@ -6,6 +6,7 @@ import { open, stat, realpath } from "node:fs/promises";
 import unzipper from "unzipper";
 import type { ArchiveManifest } from "../../../shared/contracts.js";
 import { validateArchiveEntries } from "./archiveLimits.js";
+import { summarizeArchive } from "./archiveSummary.js";
 import {
   assertResourceEntryCount,
   assertResourceSize,
@@ -71,7 +72,8 @@ async function checkDirectorySize(filename: string) {
   }
 }
 
-export async function openZip(filename: string) {
+export async function openZip(filename: string, signal?: AbortSignal) {
+  signal?.throwIfAborted();
   const tailSize = await checkDirectorySize(filename);
   // unzipper supports tailSize, but its published types omit the options argument.
   const openFile: (
@@ -79,6 +81,7 @@ export async function openZip(filename: string) {
     _options: { tailSize: number },
   ) => Promise<unzipper.CentralDirectory> = unzipper.Open.file;
   const directory = await openFile(filename, { tailSize });
+  signal?.throwIfAborted();
   validateArchiveEntries(
     directory.files.map((entry) => ({
       path: entry.path,
@@ -135,8 +138,8 @@ export function zipEntryId(entry: unzipper.File) {
   return String(entry.offsetToLocalFileHeader);
 }
 
-export async function inspectZip(filename: string): Promise<ArchiveManifest> {
-  const directory = await openZip(filename);
+export async function inspectZip(filename: string, signal?: AbortSignal): Promise<ArchiveManifest> {
+  const directory = await openZip(filename, signal);
   const sourceBytes = (await stat(filename)).size;
   const fingerprint = createHash("sha256")
     .update(
@@ -164,10 +167,7 @@ export async function inspectZip(filename: string): Promise<ArchiveManifest> {
     fingerprint,
     sourceBytes,
     entries,
-    compressedBytes: entries.reduce((total, entry) => total + entry.compressedBytes, 0),
-    expandedBytes: entries.reduce((total, entry) => total + entry.expandedBytes, 0),
-    fileCount: entries.filter((entry) => entry.type === "file").length,
-    extractedCount: 0,
+    ...summarizeArchive(entries),
   };
 }
 
@@ -175,18 +175,20 @@ export async function verifyZipOutput(
   filename: string,
   directory: string,
   selectedIds: readonly string[],
+  signal?: AbortSignal,
 ) {
-  const archive = await openZip(filename);
+  const archive = await openZip(filename, signal);
   const ids = new Set(selectedIds);
   const root = await realpath(directory);
   for (const entry of archive.files.filter((file) => ids.has(zipEntryId(file)))) {
+    signal?.throwIfAborted();
     const target = path.join(directory, sanitizeEntryPath(entry.path));
     const resolved = await realpath(target);
     if (!resolved.startsWith(`${root}${path.sep}`))
       throw resourceLimitError("Published ZIP file is outside its extraction directory.");
     let checksum = 0;
     let bytes = 0;
-    for await (const chunk of createReadStream(target)) {
+    for await (const chunk of createReadStream(target, { signal })) {
       bytes += (chunk as Buffer).length;
       if (bytes > entry.uncompressedSize) throw new Error("Published ZIP file has changed.");
       checksum = crc32(chunk as Buffer, checksum);

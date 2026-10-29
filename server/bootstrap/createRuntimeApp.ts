@@ -13,6 +13,7 @@ import type { ServerRpcDependencies } from "../rpc/serverRouter.js";
 import { getArchiveManifest } from "../application/jobs/archiveSelection.js";
 
 type Dependencies = {
+  nestedArchives?: ServerRpcDependencies["nestedArchives"];
   storage: ServerRpcDependencies["storage"];
   videoQualities: (_input: VideoQualitiesInput) => Promise<VideoQualities>;
   metrics: { getSessionCount: () => number; getJobCount: () => number };
@@ -65,13 +66,15 @@ function getSessionSummary(sessions: Map<string, Session>, id: string) {
 
 export function createRuntimeApp(deps: Dependencies) {
   const listJobs = () => deps.listOrderedJobs().map(deps.sanitizeJob);
-  const listSessions = () => Array.from(deps.sessions.values(), summarizeSession);
+  const listSessions = () =>
+    [...deps.sessions.values()].filter((session) => !session.parentSessionId).map(summarizeSession);
   return createApp({
     ...deps.metrics,
     distDir: deps.distDir,
     listJobs,
     listSessions,
     rpc: {
+      nestedArchives: deps.nestedArchives,
       archives: {
         get: (id) => {
           const job = deps.jobs.get(id);
