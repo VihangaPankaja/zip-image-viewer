@@ -34,7 +34,13 @@ test("the PR version workflow accepts an unchanged Dependabot manifest and rejec
     );
     const manifest = path.join(directory, "package.json");
     await writeFile(manifest, JSON.stringify({ version: "3.31.1" }));
-    const git = (...args) => execFileSync("git", args, { cwd: directory, stdio: "pipe" });
+    // Simulate a hook's repository selection without pointing at the real checkout.
+    const env = { ...process.env, GIT_DIR: path.join(directory, "foreign.git") };
+    const localVariables = execFileSync("git", ["rev-parse", "--local-env-vars"], {
+      encoding: "utf8",
+    });
+    for (const name of localVariables.trim().split(/\s+/)) env[name] = undefined;
+    const git = (...args) => execFileSync("git", args, { cwd: directory, env, stdio: "pipe" });
     git("init", "--quiet");
     git("add", "package.json");
     git(
@@ -55,7 +61,7 @@ test("the PR version workflow accepts an unchanged Dependabot manifest and rejec
         cwd: directory,
         input: script,
         encoding: "utf8",
-        env: { ...process.env, BASE_REF: "master" },
+        env: { ...env, BASE_REF: "master" },
         stdio: "pipe",
       });
     assert.match(run(), /3\.31\.1 -> 3\.31\.1/);

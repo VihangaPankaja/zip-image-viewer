@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig, lazyPlugins } from "vite-plus";
 import react from "@vitejs/plugin-react";
+import htmlSyntax from "postcss-html";
 import type { Config as StylelintConfig } from "stylelint";
 
 // Stylelint's adapter reads this alongside the other project checks.
@@ -19,6 +20,10 @@ export const cssLintConfig: StylelintConfig = {
     "selector-max-id": 0,
   },
   overrides: [
+    {
+      files: ["docs/app-roadmap.html"],
+      customSyntax: htmlSyntax,
+    },
     {
       files: ["client/src/**/*.css"],
       rules: {
@@ -109,6 +114,7 @@ export default defineConfig({
   staged: {
     "*": "vp check --fix",
     "*.css": "vp exec stylelint --max-warnings 0",
+    "docs/app-roadmap.html": "vp exec stylelint --max-warnings 0",
     "{vite.config.ts,stylelint.config.mjs}": () => "vpr lint:css",
   },
   lint: {
