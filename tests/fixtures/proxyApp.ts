@@ -1,5 +1,6 @@
 import type { RequestHandler } from "express";
 import { request } from "node:http";
+import express from "express";
 
 export function proxyApp(baseURL: string): RequestHandler {
   return (req, res) => {
@@ -20,4 +21,14 @@ export function proxyApp(baseURL: string): RequestHandler {
     });
     req.pipe(upstream);
   };
+}
+
+export function workspaceProxy(frontend: string, apiOrigin: () => string) {
+  const app = express();
+  app.use((request, response, next) =>
+    proxyApp(
+      request.path.startsWith("/api") || request.path.startsWith("/rpc") ? apiOrigin() : frontend,
+    )(request, response, next),
+  );
+  return app;
 }

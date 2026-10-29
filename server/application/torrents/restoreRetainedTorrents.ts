@@ -4,6 +4,7 @@ import type { RetainedTorrentStore } from "../../repositories/retainedTorrents.j
 import { saveRetainedTorrent } from "../../repositories/retainedTorrents.js";
 import type { TorrentAdapter } from "./torrentDownloader.js";
 import { normalizeDownloadOptions } from "../downloads/downloadOptions.js";
+import { ArchiveSelectionRequired } from "../jobs/archiveSelection.js";
 
 export async function restoreRetainedTorrents(
   store: RetainedTorrentStore,
@@ -49,6 +50,10 @@ export async function restoreRetainedTorrents(
       }
       saveRetainedTorrent(store, job);
     } catch (error) {
+      if (error instanceof ArchiveSelectionRequired) {
+        saveRetainedTorrent(store, job);
+        continue;
+      }
       Object.assign(job, {
         status: "error",
         phase: "error",

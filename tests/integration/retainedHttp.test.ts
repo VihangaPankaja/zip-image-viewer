@@ -6,7 +6,11 @@ import { createHash } from "node:crypto";
 import { path7za } from "7zip-bin";
 import { expect, it } from "vite-plus/test";
 import { runCommand } from "../../server/infrastructure/process/commandRunner.js";
-import { startHttpRestartServer, stopHttpRestartServer } from "../fixtures/httpRestartServer.js";
+import {
+  startHttpRestartServer,
+  stopHttpRestartServer,
+  selectAllZipFiles,
+} from "../fixtures/httpRestartServer.js";
 
 it.each(["transfer", "changed", "origin", "corrupt", "assembly", "extraction"])(
   "recovers an actual killed server during %s without corrupting bytes or deleting another owner",
@@ -79,12 +83,22 @@ it.each(["transfer", "changed", "origin", "corrupt", "assembly", "extraction"])(
       });
       const id = result.items[0].id;
       const workspace = path.join(directory, "sessions", id);
+      if (stage === "extraction") {
+        const client = server.client;
+        await expect
+          .poll(
+            async () => (await client.jobs.list()).items.find((item) => item.id === id)?.status,
+            { timeout: 20_000 },
+          )
+          .toBe("awaiting_selection");
+        await selectAllZipFiles(client, id);
+      }
       const sourcePath = path.join(workspace, "source.zip");
       const interrupted =
         stage === "assembly"
           ? `${sourcePath}.assembling`
           : stage === "extraction"
-            ? path.join(workspace, "extracted", "notes.txt")
+            ? path.join(workspace, "extracted.staging", "notes.txt")
             : sourcePath;
       await expect
         .poll(async () => (await stat(interrupted).catch(() => null))?.size ?? 0, {
@@ -119,6 +133,15 @@ it.each(["transfer", "changed", "origin", "corrupt", "assembly", "extraction"])(
         await server.client.jobs.resume({ id });
       }
       const client = server.client;
+      if (stage !== "extraction") {
+        await expect
+          .poll(
+            async () => (await client.jobs.list()).items.find((item) => item.id === id)?.status,
+            { timeout: 30_000 },
+          )
+          .toBe("awaiting_selection");
+        await selectAllZipFiles(client, id);
+      }
       await expect
         .poll(async () => (await client.jobs.list()).items.find((item) => item.id === id)?.status, {
           timeout: 30_000,

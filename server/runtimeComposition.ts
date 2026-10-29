@@ -27,6 +27,7 @@ import {
   createProcessSessionJob,
   restoreTorrentSession,
 } from "./application/jobs/processSessionJob.js";
+import { restorePublishedArchiveSession } from "./application/jobs/restorePublishedArchiveSession.js";
 import { createJobManager } from "./application/jobs/jobManager.js";
 import { createRetainedTorrentStore } from "./repositories/retainedTorrents.js";
 import { restoreRetainedTorrents } from "./application/torrents/restoreRetainedTorrents.js";
@@ -103,9 +104,13 @@ const processSessionJob = createProcessSessionJob(processorDependencies);
 server.listen(PORT, "0.0.0.0");
 
 await restoreRetainedTorrents(retainedTorrents, jobStore, torrentAdapter, (job) =>
-  restoreTorrentSession(job, processorDependencies),
+  job.archive && ["awaiting_selection", "cancelled", "error"].includes(job.status)
+    ? restorePublishedArchiveSession(job, processorDependencies)
+    : restoreTorrentSession(job, processorDependencies),
 );
-await restoreHttpDownloads(retainedTorrents, jobStore, processSessionJob);
+await restoreHttpDownloads(retainedTorrents, jobStore, processSessionJob, (job) =>
+  restorePublishedArchiveSession(job, processorDependencies),
+);
 
 const sessionJobQueue = createSessionJobQueue({
   initialJobs: [...jobStore.values()].sort(
@@ -167,6 +172,7 @@ const app = createRuntimeApp({
   enqueueJob: enqueueSessionJob,
   confirmJob: sessionJobQueue.confirmSessionJob,
   selectTorrentFiles: sessionJobQueue.selectTorrentFiles,
+  selectArchiveFiles: sessionJobQueue.selectArchiveFiles,
   ...torrentControls,
   listOrderedJobs: sessionJobQueue.getOrderedJobs,
   pauseJob: sessionJobQueue.pauseSessionJob,

@@ -3,6 +3,8 @@ import { copyFile, link, mkdir, rename, rm } from "node:fs/promises";
 import path from "node:path";
 import type { SessionJob } from "../../domain/models.js";
 import { extractSessionSource } from "../jobs/extractSessionSource.js";
+import { ArchiveSelectionRequired, prepareZipArchive } from "../jobs/archiveSelection.js";
+import { torrentSiblingFolder } from "./torrentSiblingFolder.js";
 
 const ARCHIVE_EXTENSION = /\.(zip|rar|7z|tar|gz|tgz)$/i;
 
@@ -41,6 +43,8 @@ export async function prepareTorrentEntries(
   if (path.resolve(extractDir) !== path.resolve(job.workspaceDir, "extracted"))
     throw new Error("Invalid retained extraction directory.");
   job.torrentArchivePath = archive.relativePath;
+  if (!(await prepareZipArchive(job, path.join(torrentDir, archive.relativePath), deps.emitJob)))
+    throw new ArchiveSelectionRequired("Choose archive files before extraction.");
   const staging = `${extractDir}.staging`;
   const previous = `${extractDir}.previous`;
   if (existsSync(previous)) {
@@ -56,14 +60,10 @@ export async function prepareTorrentEntries(
       staging,
       deps,
     );
-    let siblingFolder = "Torrent files";
-    while (
-      entries.some(
-        (entry) => entry.relativePath.split("/")[0]?.toLowerCase() === siblingFolder.toLowerCase(),
-      )
-    )
-      siblingFolder += "-";
+    job.abortController?.signal.throwIfAborted();
+    const siblingFolder = torrentSiblingFolder(entries.map((entry) => entry.relativePath));
     for (const file of files) {
+      job.abortController?.signal.throwIfAborted();
       if (file === archive) continue;
       const relativePath = `${siblingFolder}/${file.relativePath}`;
       const source = path.join(torrentDir, file.relativePath);
@@ -77,8 +77,10 @@ export async function prepareTorrentEntries(
       entries.push({ ...file, relativePath });
     }
     const hadPrevious = existsSync(extractDir);
+    job.abortController?.signal.throwIfAborted();
     if (hadPrevious) await rename(extractDir, previous);
     try {
+      job.abortController?.signal.throwIfAborted();
       await rename(staging, extractDir);
     } catch (error) {
       if (hadPrevious) await rename(previous, extractDir);

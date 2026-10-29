@@ -17,6 +17,7 @@ export async function restoreHttpDownloads(
   store: RetainedTorrentStore,
   jobs: Map<string, SessionJob>,
   processJob: (_job: SessionJob, _confirmed: boolean) => Promise<void>,
+  restorePublished: (_job: SessionJob) => Promise<void>,
 ) {
   for (const snapshot of store.readHttp()) {
     const job = hydrateHttpJob(snapshot, store.directory);
@@ -42,8 +43,14 @@ export async function restoreHttpDownloads(
           job.downloadedBytes = await reconcileHttpFiles(job.zipPath, job.httpDownload);
         } else job.downloadedBytes = 0;
         await rm(`${job.zipPath}.assembling`, { force: true });
-        job.sessionId = "";
-        if (!["awaiting_confirmation", "cancelled", "error"].includes(job.status))
+        if (complete && job.sessionId && job.zipSelection?.extractedIds.length)
+          await restorePublished(job);
+        else job.sessionId = "";
+        if (
+          !["awaiting_confirmation", "awaiting_selection", "cancelled", "error"].includes(
+            job.status,
+          )
+        )
           Object.assign(job, {
             status: "paused",
             phase: "paused",

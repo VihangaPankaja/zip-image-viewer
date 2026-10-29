@@ -1,7 +1,7 @@
 import { chmodSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { jobSchema, httpDownloadStateSchema } from "../../shared/contracts.js";
+import { jobSchema, httpDownloadStateSchema, zipSelectionSchema } from "../../shared/contracts.js";
 import { z } from "zod";
 import { sanitizeEntryPath } from "../infrastructure/runtime/runtimePrimitives.js";
 import type { SessionJob } from "../domain/models.js";
@@ -10,6 +10,7 @@ const retainedHttpJobSchema = jobSchema.extend({
   downloadOptions: z.unknown(),
   httpDownload: httpDownloadStateSchema.optional(),
   oversizeConfirmed: z.boolean().default(false),
+  zipSelection: zipSelectionSchema.optional(),
 });
 
 export function createRetainedTorrentStore(directory: string) {
@@ -45,6 +46,7 @@ export function createRetainedTorrentStore(directory: string) {
           ? httpDownloadStateSchema.parse(job.httpDownload)
           : undefined,
         oversizeConfirmed: job.oversizeConfirmed ?? false,
+        zipSelection: job.zipSelection,
       };
       database.exec("BEGIN IMMEDIATE");
       try {
@@ -65,6 +67,7 @@ export function createRetainedTorrentStore(directory: string) {
             .extend({
               downloadOptions: z.unknown(),
               torrentArchivePath: z.string().transform(sanitizeEntryPath).optional(),
+              zipSelection: zipSelectionSchema.optional(),
             })
             .parse(JSON.parse(String(row.snapshot))),
           metadata: row.metadata instanceof Uint8Array ? row.metadata : undefined,

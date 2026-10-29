@@ -345,6 +345,15 @@ it("preserves extracted archive paths when adding siblings and restoring offline
       fileIds: [archiveFile.id],
     });
     await expect
+      .poll(async () => (await client.jobs.list()).items[0].archive, { timeout: 20_000 })
+      .toBeTruthy();
+    const manifest = await client.archives.get({ id: items[0].id });
+    await client.archives.select({
+      id: items[0].id,
+      fingerprint: manifest.fingerprint,
+      fileIds: manifest.entries.filter((entry) => entry.type === "file").map((entry) => entry.id),
+    });
+    await expect
       .poll(async () => (await client.jobs.list()).items[0].status, {
         timeout: 20_000,
       })

@@ -43,8 +43,26 @@ For early video playback and its limits, see [media playback](playback.md).
 
 ## Browse an archive
 
-The server extracts supported archives after download. Encrypted archives are
-not supported. Open the completed session in **Explore**, search by filename or
+ZIP downloads pause at **Review ZIP contents** after their source finishes
+downloading. Inspect the file list, search by path, and choose files or folders.
+Folder choices include matching files across pages. **Select all** and **Select
+none** include files hidden by search. Nothing is extracted until you choose
+**Extract selected files**.
+
+The dialog separates retained source bytes, compressed and expanded contents,
+and free space needed for a staged extraction. The source already occupies disk;
+staging needs space for the complete selected output plus the safety margin.
+Existing extracted files remain available while a new selection is prepared.
+
+Use **Extract more** in Downloads to add skipped ZIP files. The server reuses the
+verified source and keeps earlier selections. Selection survives restart.
+Cancellation, corrupt entries or insufficient storage leave the last published
+selection intact; **Retry** retries the pending selection. Deleting the download
+removes its source and extracted files together.
+
+Other supported archives still extract in full after download. Solid 7z/RAR
+archives may require reading data before the desired entry. Encrypted archives
+are not supported. Open the completed session in **Explore**, search by filename or
 path, and filter by media type. Matching folders keep their surrounding path
 visible. Arrow keys move through files; selecting a file opens its preview.
 

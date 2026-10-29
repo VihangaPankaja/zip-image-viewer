@@ -48,5 +48,10 @@ verified source before the server becomes ready. Torrents verify existing pieces
 before restoring their sessions. Pause and size-confirmation decisions survive
 restart; confirmation is still required for an oversized unconfirmed download.
 
+ZIP contents wait for explicit file selection before extraction. The ZIP source,
+chosen files and last published selection are retained together. **Extract more**
+reuses that source. If adding files fails or is cancelled, restart restores the
+previously published library independently of the pending request.
+
 Back up the whole directory while the server is stopped. For Docker volume and
 readiness details, see [deployment](../reference/deployment.md).

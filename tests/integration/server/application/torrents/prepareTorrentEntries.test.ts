@@ -72,6 +72,16 @@ it("keeps the live extraction after rebuild failure and recovers interrupted swa
     expect(await readFile(path.join(extractDir, "notes.txt"), "utf8")).toBe("original notes");
     expect(await readFile(path.join(torrentDir, "sibling.txt"), "utf8")).toBe("added sibling");
     expect((await readdir(workspace)).sort()).toEqual(["extracted", "torrent"]);
+    job.abortController = new AbortController();
+    extractWith7zip.mockImplementation(async (_archive, destination) => {
+      await writeFile(path.join(destination, "notes.txt"), "cancelled replacement");
+      job.abortController?.abort();
+    });
+    await expect(prepareTorrentEntries(job, torrentDir, extractDir, deps)).rejects.toMatchObject({
+      name: "AbortError",
+    });
+    expect(await readFile(path.join(extractDir, "notes.txt"), "utf8")).toBe("original notes");
+    expect((await readdir(workspace)).sort()).toEqual(["extracted", "torrent"]);
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }

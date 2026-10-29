@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from "vite-plus/test";
 import { createJobManager } from "../../../../../server/application/jobs/jobManager.js";
 import { extractSessionSource } from "../../../../../server/application/jobs/extractSessionSource.js";
 import { listExtractedEntries } from "../../../../../server/infrastructure/archive/listExtractedEntries.js";
+import { zipBytes as zip } from "../../../../fixtures/zipBytes.js";
 
 const workspaces: string[] = [];
 afterEach(async () => {
@@ -12,37 +13,6 @@ afterEach(async () => {
     workspaces.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
   );
 });
-
-function zip(entries: { name: string; size?: number; mode?: number }[]) {
-  const locals: Buffer[] = [];
-  const headers: Buffer[] = [];
-  let offset = 0;
-  for (const { name, size = 0, mode = 0 } of entries) {
-    const filename = Buffer.from(name);
-    const local = Buffer.alloc(30);
-    local.writeUInt32LE(0x04034b50);
-    local.writeUInt32LE(size, 22);
-    local.writeUInt16LE(filename.length, 26);
-    const header = Buffer.alloc(46);
-    header.writeUInt32LE(0x02014b50);
-    header.writeUInt16LE(3 << 8, 4);
-    header.writeUInt32LE(size, 24);
-    header.writeUInt16LE(filename.length, 28);
-    header.writeUInt32LE((mode << 16) >>> 0, 38);
-    header.writeUInt32LE(offset, 42);
-    locals.push(local, filename);
-    headers.push(header, filename);
-    offset += local.length + filename.length;
-  }
-  const central = Buffer.concat(headers);
-  const end = Buffer.alloc(22);
-  end.writeUInt32LE(0x06054b50);
-  end.writeUInt16LE(entries.length, 8);
-  end.writeUInt16LE(entries.length, 10);
-  end.writeUInt32LE(central.length, 12);
-  end.writeUInt32LE(offset, 16);
-  return Buffer.concat([...locals, central, end]);
-}
 
 it.each([
   { entries: [{ name: "../outside.txt" }], error: "Unsafe" },

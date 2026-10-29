@@ -20,6 +20,10 @@ import { listExtractedEntries } from "../../server/infrastructure/archive/listEx
 import { runCommand } from "../../server/infrastructure/process/commandRunner.js";
 import { downloadRuntimeSource, extractRuntimeArchive } from "../../server/runtimeAdapters.js";
 import { serverContract } from "../../shared/contracts.js";
+import {
+  getArchiveManifest,
+  getZipSelection,
+} from "../../server/application/jobs/archiveSelection.js";
 
 const cleanupPaths: string[] = [];
 
@@ -98,6 +102,16 @@ describe("real download flows", () => {
         torrentAdapter: { download: vi.fn(), close: vi.fn() },
       });
 
+      await processJob(job);
+
+      expect(job.status).toBe("awaiting_selection");
+      expect(sessions.size).toBe(0);
+      const manifest = await getArchiveManifest(job);
+      job.zipSelection = await getZipSelection(
+        job,
+        manifest.fingerprint,
+        manifest.entries.filter((entry) => entry.type === "file").map((entry) => entry.id),
+      );
       await processJob(job);
 
       expect(job.status).toBe("ready");
@@ -273,6 +287,7 @@ describe("real download flows", () => {
       enqueueJob: queue.enqueueSessionJob,
       confirmJob: queue.confirmSessionJob,
       selectTorrentFiles: queue.selectTorrentFiles,
+      selectArchiveFiles: queue.selectArchiveFiles,
       setTorrentFilePriority: vi.fn(),
       listOrderedJobs: queue.getOrderedJobs,
       pauseJob: queue.pauseSessionJob,
@@ -317,6 +332,13 @@ describe("real download flows", () => {
         phase: "queued",
         message: "Confirmation accepted. Waiting to start.",
         requiresConfirmation: false,
+      });
+      await waitUntil(() => createdJob.status === "awaiting_selection", changes);
+      const manifest = await rpc.archives.get({ id: createdJob.id });
+      await rpc.archives.select({
+        id: createdJob.id,
+        fingerprint: manifest.fingerprint,
+        fileIds: manifest.entries.filter((entry) => entry.type === "file").map((entry) => entry.id),
       });
       await waitUntil(() => createdJob.status === "ready", changes);
       await waitUntil(() => activeCount === 0, changes);

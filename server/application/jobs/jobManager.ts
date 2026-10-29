@@ -115,6 +115,7 @@ class JobManager {
       sourcePreference: job.sourcePreference,
       status: job.status,
       torrentFiles: job.torrentFiles,
+      archive: job.archive,
       phase: job.phase,
       downloadedBytes: job.downloadedBytes,
       reportedSize: job.reportedSize,

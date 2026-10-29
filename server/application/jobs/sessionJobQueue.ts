@@ -1,4 +1,5 @@
 import { ApplicationError, type SessionJob } from "../../domain/models.js";
+import { getZipSelection } from "./archiveSelection.js";
 
 type QueueItem = { job: SessionJob; confirmOversize: boolean };
 const deletionConflict =
@@ -247,6 +248,34 @@ function selectTorrentFiles(state: QueueState, jobId: string, fileIds: string[])
   return item.job;
 }
 
+async function selectArchiveFiles(
+  state: QueueState,
+  jobId: string,
+  fingerprint: string,
+  fileIds: string[],
+): Promise<SessionJob> {
+  const item = state.jobs.get(jobId);
+  if (!item) throw new ApplicationError("NOT_FOUND", "Job not found.", 404);
+  const selection = await getZipSelection(item.job, fingerprint, fileIds);
+  if (state.jobs.get(jobId) !== item || !["awaiting_selection", "ready"].includes(item.job.status))
+    throw new ApplicationError(
+      "CONFLICT",
+      "Wait for this job to finish before selecting archive files.",
+      409,
+    );
+  Object.assign(item.job, {
+    zipSelection: selection,
+    status: "queued",
+    phase: "queued",
+    cleanupAt: 0,
+    error: "",
+    canPause: false,
+    message: "Archive selection accepted. Waiting to extract.",
+  });
+  enqueueSessionJob(state, item.job, item.confirmOversize);
+  return item.job;
+}
+
 function cancelSessionJob(state: QueueState, jobId: string): SessionJob {
   const item = state.jobs.get(jobId);
   if (!item) throw new Error("Job not found.");
@@ -305,6 +334,8 @@ export function createSessionJobQueue(deps: SessionJobQueueDeps) {
     confirmSessionJob: (jobId: string) => confirmSessionJob(state, jobId),
     selectTorrentFiles: (jobId: string, fileIds: string[]) =>
       selectTorrentFiles(state, jobId, fileIds),
+    selectArchiveFiles: (jobId: string, fingerprint: string, fileIds: string[]) =>
+      selectArchiveFiles(state, jobId, fingerprint, fileIds),
     enqueueSessionJob: (job: SessionJob, confirmOversize: boolean) =>
       enqueueSessionJob(state, job, confirmOversize),
     getSchedulerState: () => ({
