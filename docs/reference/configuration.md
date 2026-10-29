@@ -49,6 +49,7 @@ output on your machine. Confirm the actual encoder before interpreting timings.
 | ----------------------------- | -------------------------------------------------------------------- |
 | Batch                         | 50 download entries.                                                 |
 | Download or extracted content | 10 GiB and 10,000 entries.                                           |
+| ZIP directory metadata        | 64 MiB, checked before parsing entries.                              |
 | Free disk headroom            | 64 MiB beyond active reservations.                                   |
 | Temporary session inactivity  | 30 minutes, checked every five minutes.                              |
 | Inline text preview           | 128 KiB per chunk; 2 MiB retained client cache.                      |

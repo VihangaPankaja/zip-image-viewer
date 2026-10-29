@@ -1,12 +1,12 @@
 import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import type { Job, TorrentFile } from "../../../../../shared/contracts";
+import type { Job } from "../../../../../shared/contracts";
 import type { Selection } from "./TorrentFileDialog";
 import { FileGroup, FileStatusGroup } from "./TorrentFileGroups";
 
 const filesPerPage = 200;
 
-function groupFiles(files: TorrentFile[]) {
-  const groups = new Map<string, TorrentFile[]>();
+export function groupFiles<File extends { path: string }>(files: File[]) {
+  const groups = new Map<string, File[]>();
   for (const file of files) {
     const folder = file.path.includes("/") ? file.path.slice(0, file.path.lastIndexOf("/")) : "";
     const group = groups.get(folder) ?? [];

@@ -1,4 +1,5 @@
 import { TorrentReviewAction } from "./TorrentFileDialog";
+import { ArchiveReviewAction } from "./ArchiveFileDialog";
 import { Download } from "lucide-react";
 import { useMemo, useState, type DragEvent } from "react";
 import type { Job, TorrentPriority } from "../../../../../shared/contracts";
@@ -64,6 +65,7 @@ function JobActions({ job, ...actions }: JobActionsProps) {
   const retained = job.sourceKind === "torrent" || job.retained;
   return (
     <div className="download-row-actions">
+      <ArchiveReviewAction job={job} />
       <TorrentReviewAction
         job={job}
         onSubmit={actions.onSelectFiles}

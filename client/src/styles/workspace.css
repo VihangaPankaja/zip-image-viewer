@@ -1207,6 +1207,16 @@
 .torrent-file-sheet {
   grid-template-rows: auto auto minmax(80px, 1fr) auto auto;
 }
+.archive-file-sheet {
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+}
+.archive-file-body {
+  min-height: 0;
+  overflow: auto;
+}
+.archive-file-sheet > footer {
+  padding: 12px var(--space-6);
+}
 .torrent-file-browser {
   display: contents;
 }

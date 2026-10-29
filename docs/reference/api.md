@@ -1,12 +1,22 @@
 # API
 
-The client uses oRPC for queue, torrent, settings, storage and video-quality
+The client uses oRPC for queue, archive, torrent, settings, storage and video-quality
 operations. `shared/contracts.ts` defines validated inputs, results and errors;
 `server/rpc/serverRouter.ts` implements them. Use these definitions when adding
 client calls rather than duplicating request types.
 
 RPC requests use `/rpc`. Raw files and media use HTTP routes so browsers can
 request byte ranges, playlists and segments.
+
+## ZIP selection
+
+`archives.get({ id })` returns the retained job's validated ZIP manifest, stable
+entry IDs, compressed/expanded sizes and previously extracted entries.
+`archives.select({ id, fingerprint, fileIds })` accepts file IDs from that current
+manifest while the job awaits selection or is ready. It keeps previously
+published files and queues extraction of the combined selection. Directory
+choices expand to their matching file IDs in the client. See
+[Downloads and archives](../guides/downloads.md#browse-an-archive) for the user flow.
 
 ## HTTP routes
 

@@ -4,7 +4,7 @@ import { formatTransferBytes } from "../../../lib/formatterUtils";
 import { fileState, fileStates } from "./TorrentFileContents";
 import { classifyExtension } from "../../../lib/mimeTypeSystem";
 
-export function FileGroup({
+export function FileGroup<File extends { id: string; path: string; size: number }>({
   folder,
   files,
   matchingFiles,
@@ -12,10 +12,10 @@ export function FileGroup({
   onChange,
 }: {
   folder: string;
-  files: TorrentFile[];
-  matchingFiles: TorrentFile[];
+  files: File[];
+  matchingFiles: File[];
   selected: Set<string>;
-  onChange: (files: TorrentFile[], checked: boolean) => void;
+  onChange: (files: File[], checked: boolean) => void;
 }) {
   const count = matchingFiles.filter((file) => selected.has(file.id)).length;
   return (

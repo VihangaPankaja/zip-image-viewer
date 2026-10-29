@@ -1,11 +1,10 @@
-import express from "express";
 import { once } from "node:events";
 import { createServer } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { startHttpRestartServer, stopHttpRestartServer } from "./httpRestartServer";
-import { proxyApp } from "./proxyApp";
+import { workspaceProxy } from "./proxyApp";
 
 export async function startUnreliableOriginApp(baseURL: string, retrySeconds = 3) {
   const directory = await mkdtemp(path.join(tmpdir(), "unreliable-browser-"));
@@ -43,12 +42,7 @@ export async function startUnreliableOriginApp(baseURL: string, retrySeconds = 3
   source.listen(0, "127.0.0.1");
   await once(source, "listening");
   const api = await startHttpRestartServer(directory);
-  const app = express();
-  app.use((request, response, next) =>
-    proxyApp(
-      request.path.startsWith("/api") || request.path.startsWith("/rpc") ? api.origin : baseURL,
-    )(request, response, next),
-  );
+  const app = workspaceProxy(baseURL, () => api.origin);
   const ui = app.listen(0, "127.0.0.1");
   await once(ui, "listening");
   const sourceAddress = source.address();

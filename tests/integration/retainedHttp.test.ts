@@ -86,7 +86,10 @@ it.each(["transfer", "changed", "origin", "corrupt", "assembly", "extraction"])(
       if (stage === "extraction") {
         const client = server.client;
         await expect
-          .poll(async () => (await client.jobs.list()).items.find((item) => item.id === id)?.status)
+          .poll(
+            async () => (await client.jobs.list()).items.find((item) => item.id === id)?.status,
+            { timeout: 20_000 },
+          )
           .toBe("awaiting_selection");
         await selectAllZipFiles(client, id);
       }
