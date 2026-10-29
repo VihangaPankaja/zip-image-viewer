@@ -112,7 +112,7 @@ it("retains the selected chunk after failure and retries the same offset", async
   await waitFor(() => expect(result.current.textPreview.error).toBe("Temporary read failure"));
   expect(result.current.textPreview.chunk?.text).toBe("new content");
   expect(result.current.textPreview.loading).toBe(false);
-  act(() => result.current.textPreview.loadOffset(131072));
+  act(() => result.current.textPreview.loadOffset());
   expect(result.current.textPreview.loading).toBe(true);
   expect(result.current.textPreview.error).toBe("");
   await waitFor(() => expect(result.current.textPreview.chunk?.text).toBe("recovered"));

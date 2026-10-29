@@ -44,6 +44,12 @@ export type TreeExplorerProps = {
   rootNode: ExplorerNode | null;
   selectedPath: string;
   onSelect: (_node: ExplorerNode) => void;
+  filters?: {
+    search: string;
+    mediaType: string;
+    onSearch: (value: string) => void;
+    onMediaType: (value: string) => void;
+  };
 };
 
 function TreeItem({
@@ -120,10 +126,12 @@ function filterMediaTree(
   return children.length ? { ...node, children } : null;
 }
 
-export function TreeExplorer({ rootNode, selectedPath, onSelect }: TreeExplorerProps) {
+export function TreeExplorer({ rootNode, selectedPath, onSelect, filters }: TreeExplorerProps) {
   const [density, setDensity] = useState("compact");
-  const [mediaType, setMediaType] = useState("all");
-  const [search, setSearch] = useState("");
+  const [localMediaType, setMediaType] = useState("all");
+  const [localSearch, setSearch] = useState("");
+  const mediaType = filters?.mediaType ?? localMediaType;
+  const search = filters?.search ?? localSearch;
   const query = search.trim().toLowerCase();
   const filteredRoot = useMemo(
     () =>
@@ -146,26 +154,16 @@ export function TreeExplorer({ rootNode, selectedPath, onSelect }: TreeExplorerP
   const { rows, ...itemNavigation } = navigation;
   const windowed = rows.length > 500;
   const [start, end] = range(rows.length);
-  const items = rows
-    .slice(start, end)
-    .map((row, offset) => (
-      <TreeItem
-        key={row.id}
-        row={row}
-        index={start + offset}
-        selectedPath={selectedPath}
-        navigation={itemNavigation}
-      />
-    ));
+  const items = renderTreeItems(rows, start, end, selectedPath, itemNavigation);
   if (!rootNode) return null;
 
   return (
     <div className="tree-browser">
       <ExplorerTools
         search={search}
-        onSearch={setSearch}
+        onSearch={filters?.onSearch ?? setSearch}
         mediaType={mediaType}
-        onMediaType={setMediaType}
+        onMediaType={filters?.onMediaType ?? setMediaType}
         density={density}
         onDensity={setDensity}
       />
@@ -262,4 +260,24 @@ function ExplorerTools({
       </label>
     </div>
   );
+}
+
+function renderTreeItems(
+  rows: FlatTreeItem[],
+  start: number,
+  end: number,
+  selectedPath: string,
+  itemNavigation: Omit<TreeNavigation, "rows">,
+) {
+  return rows
+    .slice(start, end)
+    .map((row, offset) => (
+      <TreeItem
+        key={row.id}
+        row={row}
+        index={start + offset}
+        selectedPath={selectedPath}
+        navigation={itemNavigation}
+      />
+    ));
 }

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { ImagePreviewContent } from "../../../../../client/src/components/Preview/ImagePreviewContent";
 
 describe("ImagePreviewContent", () => {
@@ -25,5 +25,12 @@ describe("ImagePreviewContent", () => {
     );
 
     expect(screen.getByText("Folder thumbnails").closest("details")).toBeInTheDocument();
+    fireEvent.error(screen.getAllByRole("img", { name: "one.jpg" })[0]);
+    expect(screen.getByRole("alert")).toHaveTextContent("Image preview unavailable");
+    fireEvent.click(screen.getByRole("button", { name: "Retry preview" }));
+    expect(screen.getAllByRole("img", { name: "one.jpg" })[0]).toHaveAttribute(
+      "src",
+      expect.stringContaining("retry="),
+    );
   });
 });

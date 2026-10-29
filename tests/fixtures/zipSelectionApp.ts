@@ -14,12 +14,19 @@ export const zipSelectionNames = [
   "leave-compressed.txt",
 ];
 
-export async function startZipSelectionApp(baseURL: string) {
+export async function startZipSelectionApp(baseURL: string, nested = false) {
   const directory = await mkdtemp(path.join(tmpdir(), "zip-browser-"));
   const contents = path.join(directory, "contents");
   await mkdir(path.join(contents, "album"), { recursive: true });
   for (const [index, filename] of zipSelectionNames.entries())
     await writeFile(path.join(contents, filename), `Selected file ${index}`);
+  if (nested) {
+    const inner = path.join(directory, "inner");
+    await mkdir(inner);
+    await writeFile(path.join(inner, "read-me.txt"), "Text inside a selected nested 7z archive.");
+    await writeFile(path.join(inner, "leave-inside.txt"), "This entry must stay compressed.");
+    await runCommand(path7za, ["a", "-t7z", path.join(contents, "inside.7z"), "."], { cwd: inner });
+  }
   const archive = path.join(directory, "collection.zip");
   await runCommand(path7za, ["a", "-tzip", archive, "."], { cwd: contents });
   const payload = await readFile(archive);

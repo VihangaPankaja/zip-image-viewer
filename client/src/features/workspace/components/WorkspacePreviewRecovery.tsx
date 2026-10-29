@@ -13,6 +13,29 @@ export function WorkspacePreviewRecovery({
   return (
     <div className="empty-card">
       <strong role="status">{message}</strong>
+      {controller.state.navigationSessionId ? (
+        <button
+          className="ghost-button"
+          type="button"
+          onClick={() => {
+            const state = controller.state;
+            if (state.navigationSessionId)
+              void controller.actions.openSession(state.navigationSessionId, {
+                location: {
+                  view: "explore",
+                  sessionId: state.navigationSessionId,
+                  path: state.selectedPath,
+                  search: state.search,
+                  media: state.mediaType,
+                  sort: state.sortMode,
+                  parents: state.parents,
+                },
+              });
+          }}
+        >
+          Retry preview
+        </button>
+      ) : null}
       {readySessionId ? (
         <button
           className="primary-button"

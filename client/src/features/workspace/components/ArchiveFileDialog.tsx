@@ -1,3 +1,5 @@
+import { ArchiveInspectionFeedback } from "./ArchiveInspectionFeedback";
+import { archiveFiles, changeArchiveSelection } from "../archiveChoices";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ArchiveManifest, Job } from "../../../../../shared/contracts";
@@ -19,13 +21,7 @@ function useArchiveChoices({
   job: Job;
   onClose: () => void;
 }) {
-  const files = useMemo(
-    () =>
-      manifest.entries
-        .filter((entry) => entry.type === "file")
-        .map((entry) => ({ ...entry, size: entry.expandedBytes })),
-    [manifest],
-  );
+  const files = useMemo(() => archiveFiles(manifest), [manifest]);
   const available = useMemo(() => files.filter((file) => !file.extracted), [files]);
   const [selected, setSelected] = useState(() => new Set(available.map((file) => file.id)));
   const [search, setSearch] = useState("");
@@ -46,14 +42,7 @@ function useArchiveChoices({
   const groups = groupFiles(visible.slice(page * pageSize, (page + 1) * pageSize));
   const matchingGroups = useMemo(() => groupFiles(visible), [visible]);
   const change = (entries: ArchiveFile[], checked: boolean) =>
-    setSelected((current) => {
-      const next = new Set(current);
-      for (const entry of entries) {
-        if (checked) next.add(entry.id);
-        else next.delete(entry.id);
-      }
-      return next;
-    });
+    setSelected((current) => changeArchiveSelection(current, entries, checked));
   const chosen = useMemo(
     () => available.filter((file) => selected.has(file.id)),
     [available, selected],
@@ -304,15 +293,12 @@ function ArchiveFileDialog({ job, onClose }: { job: Job; onClose: () => void }) 
             Close
           </button>
         </header>
-        {manifest.isPending ? <p role="status">Reading ZIP contents…</p> : null}
-        {manifest.error ? (
-          <div>
-            <p role="alert">{manifest.error.message}</p>
-            <button type="button" onClick={() => void manifest.refetch()}>
-              Retry inspection
-            </button>
-          </div>
-        ) : null}
+        <ArchiveInspectionFeedback
+          pending={manifest.isPending}
+          error={manifest.error?.message}
+          onRetry={() => void manifest.refetch()}
+          label="ZIP"
+        />
         {manifest.data ? (
           <ArchiveChoices
             key={manifest.data.fingerprint}

@@ -1,3 +1,4 @@
+import { BrowserPreferencesReset } from "./BrowserPreferencesReset";
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { useModalDialog } from "../hooks/useModalDialog";
 import { AppearanceConfiguration } from "./AppearanceConfiguration";
@@ -14,6 +15,7 @@ type DropdownOption = {
 };
 
 type GlobalSettingsSheetProps = {
+  onResetDevicePreferences?: () => void;
   accent: Accent;
   setAccent: (value: Accent) => void;
   accentSaveError: boolean;
@@ -146,7 +148,9 @@ function DownloadConfiguration(props: DownloadConfigurationProps) {
   return (
     <fieldset className="settings-group">
       <legend>Downloads</legend>
-      <ConcurrencyConfiguration {...props} />
+      <p className="settings-hint">
+        The remaining defaults apply to new downloads added from this browser.
+      </p>
       <p className="settings-hint">
         Thread controls below apply to HTTP downloads only. Torrent peers and file priority are
         managed separately.
@@ -326,6 +330,10 @@ export function GlobalSettingsSheet(props: GlobalSettingsSheetProps) {
         <div className="download-settings-grid">
           <AppearanceConfiguration {...props} />
           <DownloadConfiguration {...props} />
+          <fieldset className="settings-group">
+            <legend>Server transfers</legend>
+            <ConcurrencyConfiguration {...props} />
+          </fieldset>
           <TorrentBandwidthSettings
             key={`${props.torrentLimits.downloadBytesPerSec}-${props.torrentLimits.uploadBytesPerSec}`}
             {...props}
@@ -333,6 +341,9 @@ export function GlobalSettingsSheet(props: GlobalSettingsSheetProps) {
           <PreviewConfiguration {...props} />
           <KeyboardConfiguration {...props} />
           <ToggleConfiguration {...props} />
+          {props.onResetDevicePreferences ? (
+            <BrowserPreferencesReset onReset={props.onResetDevicePreferences} />
+          ) : null}
         </div>
       </div>
     </dialog>

@@ -200,6 +200,33 @@ const archiveManifestSchema = archiveSummarySchema.extend({
 });
 export type ArchiveManifest = z.infer<typeof archiveManifestSchema>;
 
+const workspaceMediaSchema = z.enum(["all", "image", "video", "audio", "text", "binary"]);
+export const workspaceLocationSchema = z.object({
+  live: z
+    .object({ jobId: z.string().min(1).max(200), fileId: z.string().min(1).max(200) })
+    .optional(),
+  view: z.enum(["downloads", "explore"]).default("downloads"),
+  sessionId: z.uuid().optional(),
+  path: z.string().max(4_096).default(""),
+  search: z.string().max(200).default(""),
+  media: workspaceMediaSchema.default("all"),
+  sort: z.string().max(40).default("natural-tail"),
+  parents: z
+    .array(
+      z.object({
+        sessionId: z.uuid(),
+        path: z.string().max(4_096),
+        name: z.string().max(4_096),
+        search: z.string().max(200).default(""),
+        media: workspaceMediaSchema.default("all"),
+        sort: z.string().max(40).default("natural-tail"),
+      }),
+    )
+    .max(8)
+    .default([]),
+});
+export type WorkspaceLocation = z.infer<typeof workspaceLocationSchema>;
+
 export const jobSchema = z.object({
   id: z.uuid(),
   url: downloadSourceSchema,

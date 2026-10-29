@@ -116,6 +116,9 @@ function PreviewActions({
           Slideshow
         </button>
       ) : null}
+      <a className="ghost-button inline-link" href={selectedFileUrl} download>
+        Download original
+      </a>
       <a
         className="ghost-button inline-link"
         href={selectedFileUrl}
@@ -137,7 +140,9 @@ function SelectedPreview({
 }) {
   const { selectedKind, formatBytes, formatDate, textPreview } = props;
   if (selectedKind === "image") {
-    return <ImagePreviewContent {...props} selectedNode={selectedFile} />;
+    return (
+      <ImagePreviewContent key={props.selectedFileUrl} {...props} selectedNode={selectedFile} />
+    );
   }
   if (selectedKind === "text") {
     return (
