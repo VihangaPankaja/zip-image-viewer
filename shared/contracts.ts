@@ -169,6 +169,37 @@ export const torrentVideoInfoSchema = z.object({
 });
 export type TorrentVideoInfo = z.infer<typeof torrentVideoInfoSchema>;
 
+export const zipSelectionSchema = z.object({
+  fingerprint: z.string().regex(/^[a-f\d]{64}$/),
+  selectedIds: z.array(z.string().min(1)).max(10_000),
+  extractedIds: z.array(z.string().min(1)).max(10_000),
+});
+export type ZipSelection = z.infer<typeof zipSelectionSchema>;
+
+const archiveSummarySchema = z.object({
+  fingerprint: z.string().regex(/^[a-f\d]{64}$/),
+  sourceBytes: z.number().int().nonnegative(),
+  compressedBytes: z.number().int().nonnegative(),
+  expandedBytes: z.number().int().nonnegative(),
+  fileCount: z.number().int().nonnegative().max(10_000),
+  extractedCount: z.number().int().nonnegative(),
+});
+const archiveManifestSchema = archiveSummarySchema.extend({
+  entries: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        path: safeRelativePathSchema,
+        type: z.enum(["file", "directory"]),
+        compressedBytes: z.number().int().nonnegative(),
+        expandedBytes: z.number().int().nonnegative(),
+        extracted: z.boolean(),
+      }),
+    )
+    .max(10_000),
+});
+export type ArchiveManifest = z.infer<typeof archiveManifestSchema>;
+
 export const jobSchema = z.object({
   id: z.uuid(),
   url: downloadSourceSchema,
@@ -177,6 +208,7 @@ export const jobSchema = z.object({
   sourcePreference: sourcePreferenceSchema.default("auto"),
   status: jobStatusSchema,
   torrentFiles: z.array(torrentFileSchema).default([]),
+  archive: archiveSummarySchema.optional(),
   phase: jobPhaseSchema,
   percent: z.number().min(0).max(100).nullable(),
   downloadedBytes: z.number().nonnegative().default(0),
@@ -398,6 +430,21 @@ const storageContract = {
 };
 
 export const serverContract = {
+  archives: {
+    get: oc.input(jobControlInputSchema).output(archiveManifestSchema),
+    select: oc
+      .input(
+        jobControlInputSchema.extend({
+          fingerprint: zipSelectionSchema.shape.fingerprint,
+          fileIds: z
+            .array(z.string().min(1))
+            .min(1)
+            .max(10_000)
+            .refine((ids) => new Set(ids).size === ids.length, "File IDs must be unique."),
+        }),
+      )
+      .output(jobSchema),
+  },
   storage: storageContract,
   video: { qualities: videoQualitiesContract },
   sessions: {

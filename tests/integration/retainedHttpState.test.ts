@@ -58,7 +58,7 @@ it.each(["paused", "awaiting_confirmation", "error", "corrupt", "suffix"])(
       store.close();
       store = createRetainedTorrentStore(directory);
       jobs.clear();
-      await restoreHttpDownloads(store, jobs, vi.fn());
+      await restoreHttpDownloads(store, jobs, vi.fn(), vi.fn());
       const restored = jobs.get(job.id);
       expect(restored).toMatchObject({
         status: job.status,
@@ -85,7 +85,7 @@ it.each(["paused", "awaiting_confirmation", "error", "corrupt", "suffix"])(
         queue.confirmSessionJob(job.id);
         store.close();
         store = createRetainedTorrentStore(directory);
-        await restoreHttpDownloads(store, jobs, vi.fn());
+        await restoreHttpDownloads(store, jobs, vi.fn(), vi.fn());
         expect(jobs.get(job.id)).toMatchObject({
           status: "paused",
           requiresConfirmation: false,
@@ -110,7 +110,7 @@ it("rejects a replaced workspace junction before startup reconciliation or expli
     await mkdir(other);
     await writeFile(path.join(other, "source.bin"), "keep me");
     await symlink(other, job.workspaceDir, process.platform === "win32" ? "junction" : "dir");
-    await restoreHttpDownloads(store, jobs, vi.fn());
+    await restoreHttpDownloads(store, jobs, vi.fn(), vi.fn());
     expect(jobs.get(job.id)).toMatchObject({ status: "error", sessionId: "" });
     await expect(manager.cleanupJob(job.id, "removed")).rejects.toThrow("owned directory");
     expect(await readFile(path.join(other, "source.bin"), "utf8")).toBe("keep me");

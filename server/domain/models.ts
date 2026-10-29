@@ -1,4 +1,10 @@
-import type { TorrentFile, VideoMediaTrack, HttpDownloadState } from "../../shared/contracts.js";
+import type {
+  TorrentFile,
+  VideoMediaTrack,
+  HttpDownloadState,
+  ZipSelection,
+  Job,
+} from "../../shared/contracts.js";
 import type { Response } from "express";
 import type { WebSocket } from "ws";
 import type { ChildProcess } from "node:child_process";
@@ -82,6 +88,8 @@ export type SessionJob = {
   torrentFiles: TorrentFile[];
   torrentMetadata?: Uint8Array;
   torrentArchivePath?: string;
+  archive?: Job["archive"];
+  zipSelection?: ZipSelection;
   httpDownload?: HttpDownloadState;
   oversizeConfirmed?: boolean;
   storageRoot?: string;

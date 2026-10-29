@@ -14,6 +14,8 @@ import {
 } from "../downloads/downloadOptions.js";
 import { downloadSessionSource, type DownloadSourceDependencies } from "./downloadSessionSource.js";
 import { extractSessionSource } from "./extractSessionSource.js";
+import { ArchiveSelectionRequired, prepareZipArchive } from "./archiveSelection.js";
+import { stageExtraction } from "../../infrastructure/archive/stagedExtraction.js";
 import { downloadTorrentSource } from "../torrents/downloadTorrentSource.js";
 import type { TorrentAdapter } from "../torrents/torrentDownloader.js";
 import { prepareTorrentEntries } from "../torrents/prepareTorrentEntries.js";
@@ -60,7 +62,7 @@ function configureJob(job: SessionJob): ReturnType<typeof normalizeDownloadSetti
   return settings;
 }
 
-function createSession(
+export function createSession(
   workspaceDir: string,
   extractDir: string,
   sourceName: string,
@@ -102,9 +104,14 @@ function completeSession(
   message: string,
   deps: ProcessorDependencies,
 ): void {
+  job.abortController?.signal.throwIfAborted();
+  if (job.zipSelection && job.archive) {
+    job.zipSelection.extractedIds = [...job.zipSelection.selectedIds];
+    job.archive.extractedCount = job.zipSelection.extractedIds.length;
+  }
   session.jobId = job.id;
   deps.sessionStore.set(session.id, session);
-  if (job.sourceKind === "http" && !job.storageRoot)
+  if (job.sourceKind === "http" && !job.storageRoot && !job.archive)
     Object.assign(job, { workspaceDir: "", extractDir: "", zipPath: "" });
   session.retained = job.sourceKind === "torrent" || !!job.storageRoot;
   deps.emitJob(
@@ -225,6 +232,35 @@ async function processHttpJob(
   );
   if (result === "paused") return;
   job.abortController?.signal.throwIfAborted();
+  if (!(await prepareZipArchive(job, zipPath, deps.emitJob))) return;
+  if (job.archive) {
+    const entries = await stageExtraction(extractDir, async (staging) => {
+      const extracted = await extractSessionSource(job, zipPath, staging, deps);
+      job.abortController?.signal.throwIfAborted();
+      return extracted;
+    });
+    const session = createSession(
+      workspaceDir,
+      extractDir,
+      new URL(job.url).pathname || "download",
+      entries,
+    );
+    session.id = job.sessionId || session.id;
+    const existing = deps.sessionStore.get(session.id);
+    completeSession(
+      job,
+      existing
+        ? Object.assign(existing, {
+            tree: session.tree,
+            firstFilePath: session.firstFilePath,
+            stats: session.stats,
+          })
+        : session,
+      "Selected ZIP files are ready to browse.",
+      deps,
+    );
+    return;
+  }
   // Extraction can be interrupted at any entry. Rebuild derived files from the verified source.
   await rm(extractDir, { recursive: true, force: true });
   await mkdir(extractDir, { recursive: true });
@@ -256,7 +292,7 @@ async function processSessionJob(
       : "");
   const extractDir = job.extractDir || path.join(workspaceDir, "extracted");
   await assertHttpWorkspace({ ...job, workspaceDir });
-  await mkdir(extractDir, { recursive: true });
+  await mkdir(job.archive ? workspaceDir : extractDir, { recursive: true });
   Object.assign(job, {
     workspaceDir,
     zipPath,
@@ -272,6 +308,7 @@ async function processSessionJob(
       await processTorrentJob(job, confirmOversize, settings, deps);
     }
   } catch (error) {
+    if (error instanceof ArchiveSelectionRequired) return;
     const abortReason: unknown = job.abortController?.signal.reason;
     const jobError =
       job.status === "error" && job.error
@@ -292,7 +329,7 @@ async function processSessionJob(
       );
       return;
     }
-    if (job.sourceKind === "http" && !job.storageRoot)
+    if (job.sourceKind === "http" && !job.storageRoot && !job.archive)
       await rm(workspaceDir, { recursive: true, force: true });
     if (jobError.name !== "AbortError") {
       deps.logEvent("error", "session.create.failed", {

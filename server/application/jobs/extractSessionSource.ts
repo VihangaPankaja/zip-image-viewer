@@ -3,8 +3,8 @@ import { copyFile, mkdir, rename, stat } from "node:fs/promises";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Transform } from "node:stream";
+import { crc32 } from "node:zlib";
 import { fileTypeFromFile } from "file-type";
-import unzipper from "unzipper";
 import { PROGRESS_EMIT_INTERVAL_MS } from "../../config/runtimeConstants.js";
 import type { ExtractedEntry } from "../../domain/explorerTree.js";
 import type { SessionJob } from "../../domain/models.js";
@@ -13,7 +13,7 @@ import {
   isArchiveByName,
 } from "../../infrastructure/runtime/mediaClassification.js";
 import { sanitizeEntryPath } from "../../infrastructure/runtime/runtimePrimitives.js";
-import { validateArchiveEntries } from "../../infrastructure/archive/archiveLimits.js";
+import { inspectZip, openZip, zipEntryId } from "../../infrastructure/archive/zipManifest.js";
 import { reserveStorage, resourceLimitError } from "../../infrastructure/runtime/resourceLimits.js";
 
 type ExtractDependencies = {
@@ -40,23 +40,33 @@ function createProgress(job: SessionJob, entries: ExtractedEntry[], deps: Extrac
 }
 
 async function extractZip(
+  job: SessionJob,
   archivePath: string,
   extractDir: string,
   entries: ExtractedEntry[],
   progress: (_force?: boolean) => void,
 ): Promise<void> {
   const root = path.resolve(extractDir);
-  const directory = await unzipper.Open.file(archivePath);
-  const bytes = validateArchiveEntries(
-    directory.files.map((entry) => ({
-      path: entry.path,
-      size: entry.uncompressedSize,
-      isLink: ((entry.externalFileAttributes >>> 16) & 0xf000) === 0xa000,
-    })),
+  job.abortController?.signal.throwIfAborted();
+  const manifest = await inspectZip(archivePath);
+  const selection = job.zipSelection;
+  if (selection && selection.fingerprint !== manifest.fingerprint)
+    throw new Error("Archive changed. Review its contents again.");
+  const selected = selection ? new Set(selection.selectedIds) : null;
+  const known = new Set(
+    manifest.entries.filter((entry) => entry.type === "file").map((entry) => entry.id),
   );
+  if (selected && (!selected.size || [...selected].some((id) => !known.has(id))))
+    throw new Error("Invalid archive selection.");
+  const directory = await openZip(archivePath);
+  const files = directory.files.filter((entry) =>
+    selected ? selected.has(zipEntryId(entry)) : true,
+  );
+  const bytes = files.reduce((total, entry) => total + entry.uncompressedSize, 0);
   const storage = reserveStorage(extractDir, bytes);
   try {
-    for (const entry of directory.files) {
+    for (const entry of files) {
+      job.abortController?.signal.throwIfAborted();
       const relativePath = sanitizeEntryPath(entry.path);
       const destination = path.join(extractDir, relativePath);
       const resolved = path.resolve(destination);
@@ -74,10 +84,12 @@ async function extractZip(
       } else {
         await mkdir(path.dirname(destination), { recursive: true });
         let written = 0;
+        let checksum = 0;
         const budget = new Transform({
           transform(chunk: Buffer, _encoding, callback) {
             try {
               written += chunk.length;
+              checksum = crc32(chunk, checksum);
               if (written > entry.uncompressedSize)
                 throw resourceLimitError("Archive entry exceeds its declared size.");
               storage.check();
@@ -87,7 +99,11 @@ async function extractZip(
             }
           },
         });
-        await pipeline(entry.stream(), budget, createWriteStream(destination, { flags: "wx" }));
+        await pipeline(entry.stream(), budget, createWriteStream(destination, { flags: "wx" }), {
+          signal: job.abortController?.signal,
+        });
+        if (written !== entry.uncompressedSize || checksum !== entry.crc32)
+          throw new Error(`Archive entry failed integrity verification: ${relativePath}`);
         entries.push({
           relativePath,
           type: "file",
@@ -157,11 +173,11 @@ export async function extractSessionSource(
   });
   const entries: ExtractedEntry[] = [];
   const progress = createProgress(job, entries, deps);
-  if (isArchiveByName(archivePath) && !/\.zip$/i.test(archivePath)) {
+  if (detected?.ext !== "zip" && isArchiveByName(archivePath) && !/\.zip$/i.test(archivePath)) {
     await deps.extractWith7zip(archivePath, extractDir);
     entries.push(...(await deps.listExtractedEntries(extractDir)));
   } else {
-    await extractZip(archivePath, extractDir, entries, progress);
+    await extractZip(job, archivePath, extractDir, entries, progress);
   }
   progress(true);
   return entries;

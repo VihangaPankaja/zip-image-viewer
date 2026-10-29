@@ -26,6 +26,7 @@ function job(id = "2bf886fc-65bf-4e2f-b973-b607766b3131"): Job {
 
 function dependencies(): ServerRpcDependencies {
   return {
+    archives: { get: vi.fn(), select: vi.fn() },
     storage: {
       get: () =>
         Promise.resolve({

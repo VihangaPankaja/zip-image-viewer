@@ -80,3 +80,15 @@ export async function stopHttpRestartServer(child: ChildProcess, force = false) 
     clearTimeout(timeout);
   }
 }
+
+export async function selectAllZipFiles(
+  client: ContractRouterClient<typeof serverContract>,
+  id: string,
+) {
+  const manifest = await client.archives.get({ id });
+  return client.archives.select({
+    id,
+    fingerprint: manifest.fingerprint,
+    fileIds: manifest.entries.filter((entry) => entry.type === "file").map((entry) => entry.id),
+  });
+}

@@ -11,11 +11,16 @@ import {
   type VideoQualities,
   type VideoQualitiesInput,
   type SessionStorage,
+  type ArchiveManifest,
 } from "../../shared/contracts.js";
 
 import { ApplicationError } from "../domain/models.js";
 
 export type ServerRpcDependencies = {
+  archives: {
+    get: (_id: string) => Promise<ArchiveManifest>;
+    select: (_id: string, _fingerprint: string, _fileIds: string[]) => Promise<Job>;
+  };
   storage: {
     get: (_id: string) => Promise<SessionStorage>;
     clear: (_id: string) => Promise<void>;
@@ -46,6 +51,14 @@ export type ServerRpcDependencies = {
 export function createServerRpcRouter(deps: ServerRpcDependencies) {
   const contract = implement(serverContract);
   return contract.router({
+    archives: {
+      get: contract.archives.get.handler(({ input }) =>
+        applicationResult(() => deps.archives.get(input.id)),
+      ),
+      select: contract.archives.select.handler(({ input }) =>
+        applicationResult(() => deps.archives.select(input.id, input.fingerprint, input.fileIds)),
+      ),
+    },
     storage: createStorageRouter(deps.storage),
     video: {
       qualities: contract.video.qualities.handler(({ input }) =>

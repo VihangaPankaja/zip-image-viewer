@@ -10,6 +10,7 @@ import type {
   TorrentPriority,
 } from "../../shared/contracts.js";
 import type { ServerRpcDependencies } from "../rpc/serverRouter.js";
+import { getArchiveManifest } from "../application/jobs/archiveSelection.js";
 
 type Dependencies = {
   storage: ServerRpcDependencies["storage"];
@@ -27,6 +28,11 @@ type Dependencies = {
   enqueueJob: (_job: SessionJob, _confirmOversize: boolean) => void;
   confirmJob: (_id: string) => SessionJob;
   selectTorrentFiles: (_id: string, _fileIds: string[]) => SessionJob;
+  selectArchiveFiles: (
+    _id: string,
+    _fingerprint: string,
+    _fileIds: string[],
+  ) => Promise<SessionJob>;
   setTorrentFilePriority: (_id: string, _fileId: string, _priority: TorrentPriority) => SessionJob;
   listOrderedJobs: () => readonly SessionJob[];
   pauseJob: (_id: string) => Promise<SessionJob>;
@@ -66,6 +72,16 @@ export function createRuntimeApp(deps: Dependencies) {
     listJobs,
     listSessions,
     rpc: {
+      archives: {
+        get: (id) => {
+          const job = deps.jobs.get(id);
+          if (!job) throw new ApplicationError("NOT_FOUND", "Job not found.", 404);
+          return getArchiveManifest(job);
+        },
+        select: async (id, fingerprint, fileIds) => {
+          return deps.sanitizeJob(await deps.selectArchiveFiles(id, fingerprint, fileIds));
+        },
+      },
       storage: deps.storage,
       videoQualities: deps.videoQualities,
       listJobs,
