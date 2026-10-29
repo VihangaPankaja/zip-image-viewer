@@ -5,6 +5,7 @@ import { path7za } from "7zip-bin";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 import { createJobManager } from "../../../../../server/application/jobs/jobManager.js";
 import { inspectZip } from "../../../../../server/infrastructure/archive/zipManifest.js";
+import * as zipManifest from "../../../../../server/infrastructure/archive/zipManifest.js";
 import { extractSessionSource } from "../../../../../server/application/jobs/extractSessionSource.js";
 import { listExtractedEntries } from "../../../../../server/infrastructure/archive/listExtractedEntries.js";
 import { runCommand } from "../../../../../server/infrastructure/process/commandRunner.js";
@@ -108,6 +109,36 @@ it("honors an already cancelled extraction before writing any entry", async () =
   });
   expect(await readdir(output)).toEqual([]);
 });
+
+it.each(["detection", "manifest"])(
+  "keeps cancellation during ZIP %s from reopening review",
+  async (stage) => {
+    const { archive, job, deps } = await fixture();
+    job.abortController = new AbortController();
+    const cancel = () => {
+      job.abortController?.abort();
+      job.status = "cancelled";
+    };
+    const realInspect = zipManifest.inspectZip;
+    const inspection =
+      stage === "manifest"
+        ? vi.spyOn(zipManifest, "inspectZip").mockImplementationOnce(async (source) => {
+            const manifest = await realInspect(source);
+            cancel();
+            return manifest;
+          })
+        : undefined;
+    try {
+      const prepare = prepareZipArchive(job, archive, deps.emitJob);
+      if (stage === "detection") cancel();
+      await expect(prepare).rejects.toMatchObject({ name: "AbortError" });
+      expect(job.status).toBe("cancelled");
+      expect(job.archive).toBeUndefined();
+    } finally {
+      inspection?.mockRestore();
+    }
+  },
+);
 
 it("inspects and extracts a ZIP with a long archive comment", async () => {
   const { archive, output, job, deps } = await fixture();

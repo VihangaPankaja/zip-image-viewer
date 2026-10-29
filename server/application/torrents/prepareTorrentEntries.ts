@@ -4,6 +4,7 @@ import path from "node:path";
 import type { SessionJob } from "../../domain/models.js";
 import { extractSessionSource } from "../jobs/extractSessionSource.js";
 import { ArchiveSelectionRequired, prepareZipArchive } from "../jobs/archiveSelection.js";
+import { torrentSiblingFolder } from "./torrentSiblingFolder.js";
 
 const ARCHIVE_EXTENSION = /\.(zip|rar|7z|tar|gz|tgz)$/i;
 
@@ -60,13 +61,7 @@ export async function prepareTorrentEntries(
       deps,
     );
     job.abortController?.signal.throwIfAborted();
-    let siblingFolder = "Torrent files";
-    while (
-      entries.some(
-        (entry) => entry.relativePath.split("/")[0]?.toLowerCase() === siblingFolder.toLowerCase(),
-      )
-    )
-      siblingFolder += "-";
+    const siblingFolder = torrentSiblingFolder(entries.map((entry) => entry.relativePath));
     for (const file of files) {
       job.abortController?.signal.throwIfAborted();
       if (file === archive) continue;

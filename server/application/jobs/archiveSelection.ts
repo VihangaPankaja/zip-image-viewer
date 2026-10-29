@@ -68,9 +68,13 @@ export async function prepareZipArchive(
   source: string,
   emitJob: (_job: SessionJob, _patch: Partial<SessionJob>) => void,
 ): Promise<boolean> {
+  const signal = job.abortController?.signal;
+  signal?.throwIfAborted();
   const detected = await fileTypeFromFile(source).catch(() => undefined);
+  signal?.throwIfAborted();
   if (detected?.ext !== "zip" && !/\.zip$/i.test(source)) return true;
   const manifest = await inspectZip(source);
+  signal?.throwIfAborted();
   const { entries, ...summary } = manifest;
   if (!summary.fileCount) throw new Error("This ZIP contains no files to extract.");
   if (job.zipSelection?.fingerprint === manifest.fingerprint) {

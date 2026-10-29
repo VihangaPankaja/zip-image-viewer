@@ -5,6 +5,7 @@ import type { listExtractedEntries } from "../../infrastructure/archive/listExtr
 import { verifyZipOutput } from "../../infrastructure/archive/zipManifest.js";
 import { createSession } from "./processSessionJob.js";
 import { getArchiveManifest } from "./archiveSelection.js";
+import { torrentSiblingFolder } from "../torrents/torrentSiblingFolder.js";
 
 export async function restorePublishedArchiveSession(
   job: SessionJob,
@@ -26,6 +27,13 @@ export async function restorePublishedArchiveSession(
       await rename(previous, directory);
     await verifyZipOutput(source, directory, [...ids]);
     paths = new Set(selected.map((entry) => entry.path));
+    if (job.sourceKind === "torrent") {
+      const folder = torrentSiblingFolder([...paths]);
+      for (const file of job.torrentFiles) {
+        if (file.complete && file.selected && file.path !== job.torrentArchivePath)
+          paths.add(`${folder}/${file.path}`);
+      }
+    }
   } else {
     if (job.sourceKind !== "torrent")
       throw new Error("No published archive selection is available.");
