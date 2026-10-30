@@ -240,6 +240,7 @@ describe("createProcessSessionJob", () => {
     });
     const prepareRetainedSession = vi.fn((session: Session) => {
       expect(session.jobId).toBe(job.id);
+      expect(session.archiveProcessingMs).toBe(job.archiveProcessingMs ?? 0);
     });
     const processJob = createProcessSessionJob({
       prepareRetainedSession,

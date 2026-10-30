@@ -81,3 +81,43 @@ When a torrent contains archives, the first selected archive keeps its extracted
 paths when you add more files. Added sibling files appear under **Torrent files**.
 
 See [storage and retention](storage.md) before closing or deleting a session.
+
+## Open an archive inside an archive
+
+Select an extracted archive in Explore and choose **Open archive**. Inspect its
+file list, search and select files or folders, then choose **Open selected files**.
+Files left unchecked stay compressed. Folder choices include matching files
+across pages; **Select all** and **Select none** also include hidden files.
+Solid 7z/RAR sources may need to read preceding data to reach a selected entry.
+
+The archive breadcrumbs return to the selected archive file in its parent,
+including that parent's filters. Open the same archive again to add files.
+Previously extracted files remain available, and reopening an unchanged
+selection reuses its existing output.
+
+Nested archives share their parent's limits: 10 GiB of expanded output, 10,000
+indexed entries including implied folders, eight nested levels and five minutes
+of archive processing. Extraction also checks free disk space and keeps a
+64 MiB safety margin. Unsafe paths, links, encryption and changed sources are
+rejected. Closing the review cancels pending inspection or extraction.
+
+Child contents belong to their parent session. Deleting the parent removes
+its nested indexes and files too. **Extract more** on the root archive clears
+its nested indexes and child sessions before preparing the replacement selection;
+reopen nested archives from that root afterward. A server restart expires child session IDs;
+use the parent breadcrumb to reopen the archive from the retained source.
+
+## Return to a preview
+
+Browser Back and Forward restore the selected session, file, sort order and
+explorer filters. The address can also restore an available session after a
+reload. It contains session IDs, paths and filters, so share it only when you
+intend to share those names. Opening an address never adds a download.
+
+**Help and shortcuts** lists navigation and playback keys. Escape closes a
+dialog and returns focus to its opener. Failed previews offer a retry, and
+**Download original** saves the selected file without preview conversion.
+
+Settings separates server transfer limits from browser defaults. **Reset browser
+preferences** resets appearance, download defaults, shortcuts and explorer
+preferences. It preserves downloaded files, playback positions and server limits.

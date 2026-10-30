@@ -200,6 +200,33 @@ const archiveManifestSchema = archiveSummarySchema.extend({
 });
 export type ArchiveManifest = z.infer<typeof archiveManifestSchema>;
 
+const workspaceMediaSchema = z.enum(["all", "image", "video", "audio", "text", "binary"]);
+export const workspaceLocationSchema = z.object({
+  live: z
+    .object({ jobId: z.string().min(1).max(200), fileId: z.string().min(1).max(200) })
+    .optional(),
+  view: z.enum(["downloads", "explore"]).default("downloads"),
+  sessionId: z.uuid().optional(),
+  path: z.string().max(4_096).default(""),
+  search: z.string().max(200).default(""),
+  media: workspaceMediaSchema.default("all"),
+  sort: z.string().max(40).default("natural-tail"),
+  parents: z
+    .array(
+      z.object({
+        sessionId: z.uuid(),
+        path: z.string().max(4_096),
+        name: z.string().max(4_096),
+        search: z.string().max(200).default(""),
+        media: workspaceMediaSchema.default("all"),
+        sort: z.string().max(40).default("natural-tail"),
+      }),
+    )
+    .max(8)
+    .default([]),
+});
+export type WorkspaceLocation = z.infer<typeof workspaceLocationSchema>;
+
 export const jobSchema = z.object({
   id: z.uuid(),
   url: downloadSourceSchema,
@@ -429,21 +456,34 @@ const storageContract = {
   pin: oc.input(storageInputSchema.extend({ pinned: z.boolean() })).output(z.void()),
 };
 
+const archiveSelectionFields = {
+  fingerprint: zipSelectionSchema.shape.fingerprint,
+  fileIds: z
+    .array(z.string().min(1))
+    .min(1)
+    .max(10_000)
+    .refine((ids) => new Set(ids).size === ids.length, "File IDs must be unique."),
+};
+
 export const serverContract = {
-  archives: {
-    get: oc.input(jobControlInputSchema).output(archiveManifestSchema),
-    select: oc
+  nestedArchives: {
+    inspect: oc
+      .input(z.object({ id: z.uuid(), path: safeRelativePathSchema }))
+      .output(archiveManifestSchema),
+    open: oc
       .input(
-        jobControlInputSchema.extend({
-          fingerprint: zipSelectionSchema.shape.fingerprint,
-          fileIds: z
-            .array(z.string().min(1))
-            .min(1)
-            .max(10_000)
-            .refine((ids) => new Set(ids).size === ids.length, "File IDs must be unique."),
+        z.object({
+          id: z.uuid(),
+          path: safeRelativePathSchema,
+          ...archiveSelectionFields,
         }),
       )
-      .output(jobSchema),
+      .output(z.object({ id: z.uuid() })),
+    cancel: oc.input(z.object({ id: z.uuid(), path: safeRelativePathSchema })).output(z.void()),
+  },
+  archives: {
+    get: oc.input(jobControlInputSchema).output(archiveManifestSchema),
+    select: oc.input(jobControlInputSchema.extend(archiveSelectionFields)).output(jobSchema),
   },
   storage: storageContract,
   video: { qualities: videoQualitiesContract },

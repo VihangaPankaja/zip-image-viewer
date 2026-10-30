@@ -33,6 +33,11 @@ export function TextPreviewContent({
         </p>
       )}
       {error && <p role="alert">Preview unavailable: {error}</p>}
+      {error ? (
+        <button className="ghost-button" type="button" onClick={() => loadOffset()}>
+          Retry preview
+        </button>
+      ) : null}
       {chunk && (
         <>
           <p className="text-preview-note">

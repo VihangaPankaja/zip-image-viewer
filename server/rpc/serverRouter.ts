@@ -17,6 +17,16 @@ import {
 import { ApplicationError } from "../domain/models.js";
 
 export type ServerRpcDependencies = {
+  nestedArchives?: {
+    inspect: (_id: string, _path: string) => Promise<ArchiveManifest>;
+    open: (
+      _id: string,
+      _path: string,
+      _fingerprint: string,
+      _fileIds: string[],
+    ) => Promise<{ id: string }>;
+    cancel: (_id: string, _path: string) => Promise<void>;
+  };
   archives: {
     get: (_id: string) => Promise<ArchiveManifest>;
     select: (_id: string, _fingerprint: string, _fileIds: string[]) => Promise<Job>;
@@ -51,6 +61,19 @@ export type ServerRpcDependencies = {
 export function createServerRpcRouter(deps: ServerRpcDependencies) {
   const contract = implement(serverContract);
   return contract.router({
+    nestedArchives: {
+      inspect: contract.nestedArchives.inspect.handler(({ input }) =>
+        applicationResult(() => nestedArchives(deps).inspect(input.id, input.path)),
+      ),
+      open: contract.nestedArchives.open.handler(({ input }) =>
+        applicationResult(() =>
+          nestedArchives(deps).open(input.id, input.path, input.fingerprint, input.fileIds),
+        ),
+      ),
+      cancel: contract.nestedArchives.cancel.handler(({ input }) =>
+        applicationResult(() => nestedArchives(deps).cancel(input.id, input.path)),
+      ),
+    },
     archives: {
       get: contract.archives.get.handler(({ input }) =>
         applicationResult(() => deps.archives.get(input.id)),
@@ -115,6 +138,12 @@ export function createServerRpcRouter(deps: ServerRpcDependencies) {
   });
 }
 
+function nestedArchives(deps: ServerRpcDependencies) {
+  if (!deps.nestedArchives)
+    throw new ApplicationError("NOT_FOUND", "Nested archives are unavailable.", 404);
+  return deps.nestedArchives;
+}
+
 function createStorageRouter(deps: ServerRpcDependencies["storage"]) {
   const contract = implement(serverContract.storage);
   return contract.router({
@@ -132,6 +161,8 @@ async function applicationResult<Result>(
   try {
     return await operation();
   } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "DOWNLOAD_FATAL")
+      throw new ORPCError("INVALID_INPUT", { status: 400, message: error.message });
     if (error instanceof ApplicationError)
       throw new ORPCError(error.code, {
         status: error.status,

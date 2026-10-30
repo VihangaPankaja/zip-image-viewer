@@ -44,7 +44,19 @@ export type ExplorerNode = {
   children?: ExplorerNode[];
 };
 
+export type ArchiveOperation = { controller: AbortController; done: Promise<unknown> };
+
 export type Session = {
+  archiveRefreshing?: boolean;
+  archiveLifecycle?: {
+    remaining: (_processingMs: number) => number;
+    invalidate: (_operation?: ArchiveOperation) => Promise<void>;
+    admit: (_tree: ExplorerNode, _processingMs: number) => void;
+    finish: (_processingMs: number) => void;
+  };
+  archiveProcessingMs?: number;
+  parentSessionId?: string;
+  archiveOperations?: Set<ArchiveOperation>;
   jobId?: string;
   retained?: boolean;
   pinned?: boolean;
@@ -80,6 +92,7 @@ export type DownloadOptions = {
 };
 
 export type SessionJob = {
+  archiveProcessingMs?: number;
   id: string;
   url: string;
   sourceKind: "http" | "torrent";

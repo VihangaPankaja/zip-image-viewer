@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import crypto from "node:crypto";
-import { buildTree } from "../../domain/explorerTree.js";
+import { buildTree, type ExtractedEntry } from "../../domain/explorerTree.js";
 import type { Session, SessionJob } from "../../domain/models.js";
 import {
   VIDEO_EXTENSIONS,
@@ -19,6 +19,7 @@ import { stageExtraction } from "../../infrastructure/archive/stagedExtraction.j
 import { downloadTorrentSource } from "../torrents/downloadTorrentSource.js";
 import type { TorrentAdapter } from "../torrents/torrentDownloader.js";
 import { prepareTorrentEntries } from "../torrents/prepareTorrentEntries.js";
+import { refreshArchiveSession } from "../sessions/refreshArchiveSession.js";
 import {
   assertHttpWorkspace,
   httpSourcePath,
@@ -28,8 +29,12 @@ type ProcessorDependencies = DownloadSourceDependencies & {
   prepareRetainedSession?: (_session: Session) => void;
   torrentAdapter: TorrentAdapter;
   sessionStore: Map<string, Session>;
-  detectEncryption: (_archivePath: string) => Promise<boolean>;
-  extractWith7zip: (_archivePath: string, _extractDir: string) => Promise<void>;
+  detectEncryption: (_archivePath: string, _signal?: AbortSignal) => Promise<boolean>;
+  extractWith7zip: (
+    _archivePath: string,
+    _extractDir: string,
+    _signal?: AbortSignal,
+  ) => Promise<void>;
   listExtractedEntries: (
     _extractDir: string,
   ) => Promise<import("../../domain/explorerTree.js").ExtractedEntry[]>;
@@ -110,6 +115,7 @@ function completeSession(
     job.archive.extractedCount = job.zipSelection.extractedIds.length;
   }
   session.jobId = job.id;
+  session.archiveProcessingMs = job.archiveProcessingMs ?? 0;
   deps.sessionStore.set(session.id, session);
   if (job.sourceKind === "http" && !job.storageRoot && !job.archive)
     Object.assign(job, { workspaceDir: "", extractDir: "", zipPath: "" });
@@ -191,30 +197,33 @@ export async function restoreTorrentSession(
   job: SessionJob,
   deps: ProcessorDependencies,
 ): Promise<Session> {
-  const prepared = await prepareTorrentEntries(
-    job,
-    path.join(job.workspaceDir, "torrent"),
-    job.extractDir,
-    deps,
-  );
-  const session = createSession(
-    job.workspaceDir,
-    prepared.sessionDir,
-    torrentDisplayName(job.url),
-    prepared.entries,
-  );
-  session.id = job.sessionId || session.id;
-  session.jobId = job.id;
-  session.availablePaths = new Set(
-    prepared.entries.filter((entry) => entry.type === "file").map((entry) => entry.relativePath),
-  );
-  session.retained = true;
-  const existing = deps.sessionStore.get(session.id);
-  // Keep the session object that owns active viewers and cancellable media work.
-  const retainedSession = existing ? Object.assign(existing, session) : session;
-  deps.sessionStore.set(session.id, retainedSession);
-  deps.prepareRetainedSession?.(retainedSession);
-  return retainedSession;
+  return refreshArchiveSession(deps.sessionStore.get(job.sessionId), job, async (admit) => {
+    const prepared = await prepareTorrentEntries(
+      job,
+      path.join(job.workspaceDir, "torrent"),
+      job.extractDir,
+      { ...deps, admitArchiveEntries: admit },
+    );
+    const session = createSession(
+      job.workspaceDir,
+      prepared.sessionDir,
+      torrentDisplayName(job.url),
+      prepared.entries,
+    );
+    session.id = job.sessionId || session.id;
+    session.jobId = job.id;
+    session.archiveProcessingMs = job.archiveProcessingMs ?? 0;
+    session.availablePaths = new Set(
+      prepared.entries.filter((entry) => entry.type === "file").map((entry) => entry.relativePath),
+    );
+    session.retained = true;
+    const existing = deps.sessionStore.get(session.id);
+    // Keep the session object that owns active viewers and cancellable media work.
+    const retainedSession = existing ? Object.assign(existing, session) : session;
+    deps.sessionStore.set(session.id, retainedSession);
+    deps.prepareRetainedSession?.(retainedSession);
+    return retainedSession;
+  });
 }
 
 async function processHttpJob(
@@ -223,7 +232,7 @@ async function processHttpJob(
   settings: ReturnType<typeof normalizeDownloadSettings>,
   deps: ProcessorDependencies,
 ): Promise<void> {
-  const { workspaceDir, extractDir, zipPath } = job;
+  const { workspaceDir, zipPath } = job;
   const result = await downloadSessionSource(
     job,
     settings,
@@ -232,47 +241,49 @@ async function processHttpJob(
   );
   if (result === "paused") return;
   job.abortController?.signal.throwIfAborted();
+  const existing = deps.sessionStore.get(job.sessionId);
+  await refreshArchiveSession(existing, job, (admit) =>
+    publishHttpSource(job, deps, existing, admit),
+  );
+}
+
+async function publishHttpSource(
+  job: SessionJob,
+  deps: ProcessorDependencies,
+  existing: Session | undefined,
+  admit: (_entries: ExtractedEntry[]) => void,
+) {
+  const { workspaceDir, extractDir, zipPath } = job;
   if (!(await prepareZipArchive(job, zipPath, deps.emitJob))) return;
-  if (job.archive) {
-    const entries = await stageExtraction(extractDir, async (staging) => {
+  let entries: ExtractedEntry[];
+  if (job.archive || existing) {
+    entries = await stageExtraction(extractDir, async (staging) => {
       const extracted = await extractSessionSource(job, zipPath, staging, deps);
       job.abortController?.signal.throwIfAborted();
+      admit(extracted);
       return extracted;
     });
-    const session = createSession(
-      workspaceDir,
-      extractDir,
-      new URL(job.url).pathname || "download",
-      entries,
-    );
-    session.id = job.sessionId || session.id;
-    const existing = deps.sessionStore.get(session.id);
-    completeSession(
-      job,
-      existing
-        ? Object.assign(existing, {
-            tree: session.tree,
-            firstFilePath: session.firstFilePath,
-            stats: session.stats,
-          })
-        : session,
-      "Selected ZIP files are ready to browse.",
-      deps,
-    );
-    return;
+  } else {
+    // Extraction can be interrupted at any entry. Rebuild derived files from the verified source.
+    await rm(extractDir, { recursive: true, force: true });
+    await mkdir(extractDir, { recursive: true });
+    entries = await extractSessionSource(job, zipPath, extractDir, deps);
   }
-  // Extraction can be interrupted at any entry. Rebuild derived files from the verified source.
-  await rm(extractDir, { recursive: true, force: true });
-  await mkdir(extractDir, { recursive: true });
-  const entries = await extractSessionSource(job, zipPath, extractDir, deps);
-  const session = createSession(
-    workspaceDir,
-    extractDir,
-    new URL(job.url).pathname || "download",
-    entries,
-  );
+  const sourceName = new URL(job.url).pathname || "download";
+  const session = createSession(workspaceDir, extractDir, sourceName, entries);
   session.id = job.sessionId || session.id;
-  completeSession(job, session, "Archive is ready to browse.", deps);
+  completeSession(
+    job,
+    existing
+      ? Object.assign(existing, {
+          tree: session.tree,
+          firstFilePath: session.firstFilePath,
+          stats: session.stats,
+        })
+      : session,
+    job.archive ? "Selected ZIP files are ready to browse." : "Archive is ready to browse.",
+    deps,
+  );
 }
 
 async function processSessionJob(
@@ -329,7 +340,12 @@ async function processSessionJob(
       );
       return;
     }
-    if (job.sourceKind === "http" && !job.storageRoot && !job.archive)
+    if (
+      job.sourceKind === "http" &&
+      !job.storageRoot &&
+      !job.archive &&
+      !deps.sessionStore.has(job.sessionId)
+    )
       await rm(workspaceDir, { recursive: true, force: true });
     if (jobError.name !== "AbortError") {
       deps.logEvent("error", "session.create.failed", {

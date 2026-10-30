@@ -25,7 +25,11 @@ export function useWorkspacePageEffects(
 
 function useSelectionFallback(state: WorkspacePageState, selection: SelectionModel): void {
   useEffect(() => {
-    if (!selection.flatData || !selection.sortedTree) {
+    if (
+      !selection.flatData ||
+      !selection.sortedTree ||
+      (state.navigationSessionId && state.session?.id !== state.navigationSessionId)
+    ) {
       return;
     }
     if (!state.selectedPath || !selection.flatData.nodesByPath.has(state.selectedPath)) {

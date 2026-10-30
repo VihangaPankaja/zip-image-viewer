@@ -223,6 +223,8 @@ test("preview rail filters transfers, opens verified video, recovers and dedupli
   ).toHaveCount(1);
   await page.reload();
   await page.getByRole("tab", { name: "Explore" }).click();
+  await expect(page.getByRole("radio", { name: "Preview", exact: true })).toBeChecked();
+  await page.getByRole("button", { name: "Back to files", exact: true }).click();
   await page.getByRole("button", { name: "Show sessions" }).click();
   await expect(
     rail.getByRole("list", { name: "Sessions", exact: true }).getByRole("button"),

@@ -20,7 +20,7 @@ export type TextPreviewState = {
   chunk: TextPreviewChunk | null;
   error: string;
   loading: boolean;
-  loadOffset: (offset: number) => void;
+  loadOffset: (offset?: number) => void;
 };
 
 export function useTextPreview({
@@ -83,7 +83,11 @@ export function useTextPreview({
     error: current?.error ?? "",
     loading: !!owner && !current,
     loadOffset: (nextOffset) =>
-      setPage((previous) => ({ owner, offset: nextOffset, attempt: previous.attempt + 1 })),
+      setPage((previous) => ({
+        owner,
+        offset: nextOffset ?? offset,
+        attempt: previous.attempt + 1,
+      })),
   };
   return { textPreview, resetTextPreview, clearTextPreviewCache };
 }

@@ -18,6 +18,20 @@ published files and queues extraction of the combined selection. Directory
 choices expand to their matching file IDs in the client. See
 [Downloads and archives](../guides/downloads.md#browse-an-archive) for the user flow.
 
+## Nested archives
+
+`nestedArchives.inspect({ id, path })` inspects an archive file owned by a parent
+session and returns its manifest without extracting it. `nestedArchives.open({
+id, path, fingerprint, fileIds })` extracts selected file IDs and returns the
+child session ID. Existing child contents are kept when adding selections.
+`nestedArchives.cancel({ id, path })` aborts and drains that archive's pending work.
+
+Child sessions use the usual tree, file and media routes. They stay out of the
+top-level session list and belong to the parent that owns their archive source.
+Their IDs expire on server restart; reopening from a retained parent rebuilds
+the child. Nested limits apply across the owning chain, rather than independently
+at each level. See [nested archive browsing](../guides/downloads.md#open-an-archive-inside-an-archive).
+
 ## HTTP routes
 
 | Route                                               | Purpose                                                           |

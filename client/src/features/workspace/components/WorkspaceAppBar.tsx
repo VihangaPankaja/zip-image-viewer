@@ -1,4 +1,4 @@
-import { Download, FolderTree, Plus, Settings } from "lucide-react";
+import { Download, FolderTree, Plus, Settings, CircleHelp } from "lucide-react";
 
 export type WorkspaceView = "downloads" | "explore";
 type WorkspaceAppBarProps = {
@@ -6,6 +6,7 @@ type WorkspaceAppBarProps = {
   onAddDownloads: () => void;
   onOpenSettings: () => void;
   onOpenStorage?: () => void;
+  onOpenHelp?: () => void;
   onSelectView: (view: WorkspaceView) => void;
 };
 
@@ -14,6 +15,7 @@ export function WorkspaceAppBar({
   onAddDownloads,
   onOpenSettings,
   onOpenStorage,
+  onOpenHelp,
   onSelectView,
 }: WorkspaceAppBarProps) {
   return (
@@ -49,43 +51,75 @@ export function WorkspaceAppBar({
           Explore
         </button>
       </div>
-      <div className="workspace-appbar-actions">
-        {onOpenStorage ? (
-          <button
-            className="ghost-button compact-button"
-            type="button"
-            onClick={(event) => {
-              event.currentTarget.focus();
-              onOpenStorage();
-            }}
-          >
-            Storage
-          </button>
-        ) : null}
-        <button
-          className="primary-button compact-button"
-          type="button"
-          onClick={(event) => {
-            // WebKit pointer clicks need explicit focus for native dialog return.
-            event.currentTarget.focus();
-            onAddDownloads();
-          }}
-        >
-          <Plus size={18} aria-hidden="true" />
-          Add downloads
-        </button>
+      <WorkspaceActions
+        onOpenHelp={onOpenHelp}
+        onOpenStorage={onOpenStorage}
+        onAddDownloads={onAddDownloads}
+        onOpenSettings={onOpenSettings}
+      />
+    </div>
+  );
+}
+
+function WorkspaceActions({
+  onOpenHelp,
+  onOpenStorage,
+  onAddDownloads,
+  onOpenSettings,
+}: Pick<
+  WorkspaceAppBarProps,
+  "onOpenHelp" | "onOpenStorage" | "onAddDownloads" | "onOpenSettings"
+>) {
+  return (
+    <div className="workspace-appbar-actions">
+      {onOpenHelp ? (
         <button
           className="icon-button"
           type="button"
-          aria-label="Settings"
+          aria-label="Help and shortcuts"
           onClick={(event) => {
             event.currentTarget.focus();
-            onOpenSettings();
+            onOpenHelp();
           }}
         >
-          <Settings size={18} aria-hidden="true" />
+          <CircleHelp size={18} aria-hidden="true" />
         </button>
-      </div>
+      ) : null}
+      {onOpenStorage ? (
+        <button
+          className="ghost-button compact-button"
+          type="button"
+          onClick={(event) => {
+            event.currentTarget.focus();
+            onOpenStorage();
+          }}
+        >
+          Storage
+        </button>
+      ) : null}
+      <button
+        className="primary-button compact-button"
+        type="button"
+        onClick={(event) => {
+          // WebKit pointer clicks need explicit focus for native dialog return.
+          event.currentTarget.focus();
+          onAddDownloads();
+        }}
+      >
+        <Plus size={18} aria-hidden="true" />
+        Add downloads
+      </button>
+      <button
+        className="icon-button"
+        type="button"
+        aria-label="Settings"
+        onClick={(event) => {
+          event.currentTarget.focus();
+          onOpenSettings();
+        }}
+      >
+        <Settings size={18} aria-hidden="true" />
+      </button>
     </div>
   );
 }

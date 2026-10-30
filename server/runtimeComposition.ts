@@ -50,6 +50,7 @@ import {
 import { readPreviewChunk } from "./infrastructure/media/imagePreviews.js";
 import { createRuntimeMedia } from "./bootstrap/runtimeMedia.js";
 import { createSessionStorage } from "./application/sessions/sessionStorage.js";
+import { createNestedArchives } from "./application/sessions/nestedArchives.js";
 import { listExtractedEntries } from "./infrastructure/archive/listExtractedEntries.js";
 import {
   detectRuntimeArchiveEncryption,
@@ -92,9 +93,10 @@ const processorDependencies = {
   emitJob,
   closeJob,
   download: downloadRuntimeSource,
-  detectEncryption: (archivePath: string) => detectRuntimeArchiveEncryption(path7za, archivePath),
-  extractWith7zip: (archivePath: string, extractDir: string) =>
-    extractRuntimeArchive(path7za, archivePath, extractDir),
+  detectEncryption: (archivePath: string, signal?: AbortSignal) =>
+    detectRuntimeArchiveEncryption(path7za, archivePath, signal),
+  extractWith7zip: (archivePath: string, extractDir: string, signal?: AbortSignal) =>
+    extractRuntimeArchive(path7za, archivePath, extractDir, signal),
   listExtractedEntries,
   logEvent,
   torrentAdapter,
@@ -154,6 +156,11 @@ const { cancelSessionJob, retrySessionJob, removeSessionJob, removeSession, touc
   );
 
 const app = createRuntimeApp({
+  nestedArchives: createNestedArchives({
+    sessions: sessionStore,
+    executable: path7za,
+    removeSession,
+  }),
   storage: createSessionStorage(touchSession, { storage, clearMediaCache }),
   videoQualities: (input) =>
     getVideoQualities(input, {

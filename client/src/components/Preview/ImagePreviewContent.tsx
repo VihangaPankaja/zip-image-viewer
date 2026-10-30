@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { CustomDropdown } from "../Common/CustomDropdown";
 import type { ImagePreviewProps } from "../../features/workspace/types";
 
@@ -55,13 +55,37 @@ function ThumbnailStrip(props: ImagePreviewProps) {
 }
 
 export function ImagePreviewContent(props: ImagePreviewProps) {
+  const [attempt, setAttempt] = useState(0);
+  const [failedSource, setFailedSource] = useState("");
+  const source = attempt
+    ? `${props.selectedImagePreviewUrl}${props.selectedImagePreviewUrl.includes("?") ? "&" : "?"}retry=${attempt}`
+    : props.selectedImageSrc || props.selectedImagePreviewUrl;
+  const failed = Boolean(failedSource) && failedSource === source;
   return (
     <div className="preview-stage">
       <ImagePreviewToolbar {...props} />
       <div className="image-frame">
+        {failed ? (
+          <div className="empty-card" role="alert">
+            <p>Image preview unavailable. Retry or download the original.</p>
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={() => {
+                setFailedSource("");
+                setAttempt((value) => value + 1);
+              }}
+            >
+              Retry preview
+            </button>
+          </div>
+        ) : null}
         <img
-          src={props.selectedImageSrc || props.selectedImagePreviewUrl}
+          key={source}
+          hidden={failed}
+          src={source}
           alt={props.selectedNode.name}
+          onError={() => setFailedSource(source)}
         />
       </div>
       <ThumbnailStrip {...props} />

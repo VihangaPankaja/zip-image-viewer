@@ -18,6 +18,8 @@ const disk = vi.hoisted(() => ({
   outputBytes: 0,
   hold: false,
   aborted: false,
+  extractionClosed: false,
+  onExtractionSpawn: undefined as (() => void) | undefined,
 }));
 vi.mock("node:fs", async (importOriginal) => ({
   ...(await importOriginal<typeof import("node:fs")>()),
@@ -34,11 +36,17 @@ vi.mock("node:child_process", async (importOriginal) => {
           ? `process.stdout.write('----------\\nPath = child.bin\\nSize = ${disk.size}\\n\\n')`
           : disk.fail
             ? "process.stdout.write('a'); setInterval(() => {}, 1000)"
-            : `process.stdout.write(Buffer.alloc(${disk.outputBytes}));${disk.hold ? "setTimeout(() => process.exit(0), 300)" : ""}`;
+            : `process.stdout.write(Buffer.alloc(${disk.outputBytes}));${disk.hold ? "setInterval(() => {}, 1000)" : ""}`;
       const child = actual.spawn(process.execPath, ["-e", script], options);
       child.once("error", (error) => {
         if (error.name === "AbortError") disk.aborted = true;
       });
+      if (args[0] === "x") {
+        child.once("spawn", () => disk.onExtractionSpawn?.());
+        child.once("close", () => {
+          disk.extractionClosed = true;
+        });
+      }
       if (args[0] === "x" && disk.fail)
         child.once("spawn", () => {
           disk.free = 0;
@@ -110,6 +118,39 @@ test("rejects missing output for an ordinary declared archive entry", async () =
     );
   } finally {
     disk.fail = true;
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("propagates external cancellation and drains the extraction subprocess", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "extraction-cancel-"));
+  disk.fail = false;
+  disk.size = 512;
+  disk.outputBytes = 512;
+  disk.hold = true;
+  disk.extractionClosed = false;
+  const controller = new AbortController();
+  const started = new Promise<void>((resolve) => {
+    disk.onExtractionSpawn = resolve;
+  });
+  try {
+    const cancelled = extractWith7zip("storage-extractor", "fixture.7z", directory, {
+      signal: controller.signal,
+    }).catch((error: unknown) => error);
+    await started;
+    controller.abort();
+    expect(await cancelled).toMatchObject({ name: "AbortError" });
+    expect(disk.aborted).toBe(true);
+    expect(disk.extractionClosed).toBe(true);
+  } finally {
+    controller.abort();
+    disk.size = 1;
+    disk.fail = true;
+    disk.outputBytes = 0;
+    disk.hold = false;
+    disk.aborted = false;
+    disk.extractionClosed = false;
+    disk.onExtractionSpawn = undefined;
     await rm(directory, { recursive: true, force: true });
   }
 });

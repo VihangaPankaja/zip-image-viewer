@@ -13,6 +13,7 @@ import { useWorkspaceQueue } from "./useWorkspaceQueue";
 import { buildWorkspaceRailItems } from "./workspaceRail";
 import { useWorkspaceLivePreviews } from "./useWorkspaceLivePreviews";
 import { useWorkspacePreviewNavigation } from "./useWorkspacePreviewNavigation";
+import { useWorkspaceHistory } from "./useWorkspaceHistory";
 
 function useWorkspaceMedia(state: WorkspacePageState) {
   const selection = usePreviewSelection({
@@ -109,6 +110,7 @@ export function useWorkspacePageController() {
   const livePreviews = useWorkspaceLivePreviews(queue.jobs, queue.sessions);
   const railItems = buildWorkspaceRailItems(queue.jobs, queue.sessions, livePreviews);
   const actions = useWorkspacePreviewNavigation(state, railItems);
+  useWorkspaceHistory(state, actions);
   return {
     actions,
     downloadSettings,

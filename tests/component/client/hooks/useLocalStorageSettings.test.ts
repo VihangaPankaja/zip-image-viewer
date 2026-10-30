@@ -1,10 +1,46 @@
 import { act, renderHook } from "@testing-library/react";
 import { useLocalStorageSettings } from "../../../../client/src/hooks/useLocalStorageSettings";
 import { useWorkspacePageState } from "../../../../client/src/features/workspace/useWorkspacePageState";
+import { useWorkspaceHistory } from "../../../../client/src/features/workspace/useWorkspaceHistory";
 
 afterEach(() => {
+  window.history.replaceState(null, "", "/");
   localStorage.clear();
   vi.restoreAllMocks();
+});
+
+it("keeps a saved sort order when opening the workspace without a route", () => {
+  window.history.replaceState(null, "", "/");
+  localStorage.setItem("zip-explorer-sort", "name-desc");
+  const { result } = renderHook(() => {
+    const state = useWorkspacePageState();
+    useWorkspaceHistory(state, {
+      openSession: vi.fn().mockResolvedValue(undefined),
+      abortNavigation: vi.fn(),
+      setError: vi.fn(),
+      isOpening: false,
+    });
+    return state;
+  });
+  expect(result.current.sortMode).toBe("name-desc");
+  expect(localStorage.getItem("zip-explorer-sort")).toBe("name-desc");
+});
+
+it("resets device preferences without deleting content metadata or playback positions", () => {
+  localStorage.setItem("zip-video-resume-session-file", "45");
+  localStorage.setItem("unrelated-content", "keep");
+  const { result } = renderHook(useLocalStorageSettings);
+  act(() => {
+    result.current.setTheme("dark");
+    result.current.setAccent("rose");
+    result.current.setKeyboardSettings({ jumpSeconds: 20, rateStep: 0.5 });
+  });
+  act(() => result.current.resetDevicePreferences());
+  expect(result.current.theme).toBe("system");
+  expect(result.current.accent).toBe("teal");
+  expect(result.current.keyboardSettings).toEqual({ jumpSeconds: 5, rateStep: 0.25 });
+  expect(localStorage.getItem("zip-video-resume-session-file")).toBe("45");
+  expect(localStorage.getItem("unrelated-content")).toBe("keep");
 });
 
 it("follows system appearance, persists overrides, and removes its media listener", () => {

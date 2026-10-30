@@ -9,6 +9,7 @@ import {
   type KeyboardSettings,
 } from "../features/workspace/settingsStorage";
 import type { DownloadOptions } from "../types/download";
+import { DEFAULT_DOWNLOAD_OPTIONS } from "../lib/appConstants";
 
 export type DarkSurface = "charcoal" | "amoled";
 
@@ -73,6 +74,14 @@ export function useLocalStorageSettings() {
   }, [keyboardSettings]);
 
   return {
+    resetDevicePreferences: () => {
+      setTheme("system");
+      setDarkSurface("charcoal");
+      setAccent("teal");
+      setKeyboardSettings({ jumpSeconds: 5, rateStep: 0.25 });
+      setExplorerColumns({ type: true, size: true, date: true, path: true });
+      setDownloadOptions(DEFAULT_DOWNLOAD_OPTIONS);
+    },
     theme,
     setTheme,
     darkSurface,

@@ -36,6 +36,15 @@ schemas rather than maintaining separate client and server definitions.
 TanStack Query owns server state. The file tree renders a window of rows for
 large collections. Resizable panels compose the desktop workspace.
 
+`workspaceLocation.ts` validates the address fragment through shared contracts.
+History records session, file and nested-parent transitions; edits to search,
+media filters and sort replace the current entry. Downloads preserves the
+current preview, and parent breadcrumbs restore its selected archive and filters.
+Early torrent previews record their job and file identity. Route restoration
+only reads existing content and never enqueues downloads. There is no discovery
+view yet; a future discovery view must preserve its return location when opening
+a preview, using the same history boundary.
+
 ## Server
 
 | Path under `server/`                | Responsibility                                        |
