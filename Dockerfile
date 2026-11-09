@@ -34,7 +34,7 @@ FROM debian:trixie-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production FFMPEG_BIN=/usr/bin/ffmpeg USE_SYSTEM_7ZA=true
 RUN apt-get update \
-  && apt-get install --yes --no-install-recommends tini ca-certificates libstdc++6 libatomic1 ffmpeg \
+  && apt-get install --yes --no-install-recommends tini ca-certificates libstdc++6 libatomic1 ffmpeg zlib1g \
   && rm -rf /var/lib/apt/lists/* \
   && groupadd --system app \
   && useradd --system --gid app --home-dir /app app
