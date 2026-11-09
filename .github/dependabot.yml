@@ -8,6 +8,10 @@ updates:
       time: "04:00"
       timezone: Asia/Colombo
     open-pull-requests-limit: 5
+    ignore:
+      # Firefox label lookups crash in 1.65.0: https://github.com/microsoft/playwright/issues/43967
+      - dependency-name: "@playwright/test"
+        versions: ["1.65.0"]
     groups:
       runtime-compatible:
         dependency-type: production
