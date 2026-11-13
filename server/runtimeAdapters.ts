@@ -1,4 +1,5 @@
 import type { HttpCheckpoint } from "./infrastructure/downloads/httpCheckpoint.js";
+import type { ExtractionProgress } from "../shared/contracts.js";
 import type { Session } from "./domain/models.js";
 import type { DownloadSettings } from "./application/downloads/downloadOptions.js";
 import type { RemoteMetadata } from "./infrastructure/downloads/remoteMetadata.js";
@@ -43,8 +44,9 @@ export function extractRuntimeArchive(
   archivePath: string,
   extractDir: string,
   signal?: AbortSignal,
+  onProgress?: (_progress: ExtractionProgress) => void,
 ): Promise<void> {
-  return extractArchiveWith7zip(path7za, archivePath, extractDir, { signal });
+  return extractArchiveWith7zip(path7za, archivePath, extractDir, { signal, onProgress });
 }
 
 export function detectRuntimeArchiveEncryption(

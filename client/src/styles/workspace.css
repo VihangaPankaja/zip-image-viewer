@@ -555,6 +555,10 @@
   overflow-wrap: anywhere;
 }
 
+.download-current-entry {
+  grid-column: 1 / -1;
+}
+
 .download-row-main code {
   display: block;
   color: var(--text-dim);

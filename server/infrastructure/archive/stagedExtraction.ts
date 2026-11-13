@@ -4,6 +4,7 @@ import { mkdir, rename, rm } from "node:fs/promises";
 export async function stageExtraction<Result>(
   directory: string,
   extract: (_staging: string) => Promise<Result>,
+  signal?: AbortSignal,
 ): Promise<Result> {
   const staging = `${directory}.staging`;
   const previous = `${directory}.previous`;
@@ -15,9 +16,11 @@ export async function stageExtraction<Result>(
   await mkdir(staging, { recursive: true });
   try {
     const result = await extract(staging);
+    signal?.throwIfAborted();
     const hadPrevious = existsSync(directory);
     if (hadPrevious) await rename(directory, previous);
     try {
+      signal?.throwIfAborted();
       await rename(staging, directory);
     } catch (error) {
       if (hadPrevious) await rename(previous, directory);

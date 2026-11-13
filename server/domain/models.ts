@@ -102,6 +102,7 @@ export type SessionJob = {
   torrentMetadata?: Uint8Array;
   torrentArchivePath?: string;
   archive?: Job["archive"];
+  extraction?: Job["extraction"];
   zipSelection?: ZipSelection;
   httpDownload?: HttpDownloadState;
   oversizeConfirmed?: boolean;

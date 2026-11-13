@@ -284,11 +284,18 @@ function cancelSessionJob(state: QueueState, jobId: string): SessionJob {
   state.requeueAfterActive.delete(jobId);
   item.job.pauseRequested = false;
   item.job.abortController?.abort();
+  const cancellingExtraction =
+    state.activeItems.has(jobId) && item.job.status === "extracting" && item.job.extraction;
   Object.assign(item.job, {
-    status: "cancelled",
-    phase: "cancelled",
+    status: cancellingExtraction ? "extracting" : "cancelled",
+    phase: cancellingExtraction ? "extracting" : "cancelled",
+    extraction: cancellingExtraction
+      ? { ...cancellingExtraction, stage: "cancelling" }
+      : item.job.extraction,
     canPause: false,
-    message: "Cancelled",
+    message: cancellingExtraction
+      ? "Cancelling extraction and removing partial files"
+      : "Cancelled",
   });
   return item.job;
 }

@@ -16,33 +16,8 @@ export function createRuntimeJobActions(
   const sessionManager = createSessionManager(sessions, transcodes, logEvent, cleanupVideoSession);
   const cancelSessionJob = (job: SessionJob) => {
     queue.cancelSessionJob(job.id);
-    manager.closeJob(job, "cancelled");
-    manager.emitJob(job, { phase: "cancelled", message: "Cancelled" }, "cancelled");
-    return job;
-  };
-  const retrySessionJob = (previous: SessionJob) => {
-    if (previous.storageRoot && (previous.sourceKind === "http" || previous.archive)) {
-      manager.emitJob(previous, {
-        status: "queued",
-        phase: "queued",
-        error: "",
-        message: "Waiting to retry",
-      });
-      queue.enqueueSessionJob(previous, !!previous.oversizeConfirmed);
-      return previous;
-    }
-    const job = manager.createJob(
-      previous.url,
-      previous.downloadOptions,
-      previous.sourcePreference,
-    );
-    job.torrentFiles = previous.torrentFiles.map((file) => ({
-      ...file,
-      downloadedBytes: 0,
-      complete: false,
-    }));
-    job.torrentMetadata = previous.torrentMetadata;
-    queue.enqueueSessionJob(job, false);
+    manager.closeJob(job, job.status);
+    manager.emitJob(job, {}, job.status === "cancelled" ? "cancelled" : "progress");
     return job;
   };
   async function removeSession(id: string, reason: string) {
@@ -77,9 +52,39 @@ export function createRuntimeJobActions(
   }
   return {
     cancelSessionJob,
-    retrySessionJob,
+    retrySessionJob: (job: SessionJob) => retrySessionJob(job, manager, queue),
     removeSessionJob,
     removeSession,
     touchSession: sessionManager.touchSession,
   };
+}
+
+function retrySessionJob(
+  previous: SessionJob,
+  manager: ReturnType<typeof createJobManager>,
+  queue: ReturnType<typeof createSessionJobQueue>,
+): SessionJob {
+  const retainedSource =
+    previous.archive || previous.torrentArchivePath || previous.sourceKind === "http";
+  if (previous.storageRoot && retainedSource) {
+    manager.emitJob(previous, {
+      status: "queued",
+      phase: "queued",
+      error: "",
+      extraction: undefined,
+      percent: null,
+      message: "Waiting to retry",
+    });
+    queue.enqueueSessionJob(previous, !!previous.oversizeConfirmed);
+    return previous;
+  }
+  const job = manager.createJob(previous.url, previous.downloadOptions, previous.sourcePreference);
+  job.torrentFiles = previous.torrentFiles.map((file) => ({
+    ...file,
+    downloadedBytes: 0,
+    complete: false,
+  }));
+  job.torrentMetadata = previous.torrentMetadata;
+  queue.enqueueSessionJob(job, false);
+  return job;
 }

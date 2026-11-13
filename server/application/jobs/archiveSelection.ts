@@ -5,6 +5,7 @@ import type { ArchiveManifest, ZipSelection } from "../../../shared/contracts.js
 import { ApplicationError, type SessionJob } from "../../domain/models.js";
 import { inspectZip } from "../../infrastructure/archive/zipManifest.js";
 import { assertHttpWorkspace } from "../../infrastructure/downloads/httpWorkspace.js";
+import { startArchiveInspection } from "./extractionProgress.js";
 
 export class ArchiveSelectionRequired extends Error {}
 
@@ -77,6 +78,7 @@ export async function prepareZipArchive(
   signal?.throwIfAborted();
   if (detected?.ext !== "zip" && !/\.zip$/i.test(source)) return true;
   const indexingStarted = Date.now();
+  if (job.status !== "ready") startArchiveInspection(job, emitJob, "indexing");
   const manifest = await inspectZip(source, signal);
   job.archiveProcessingMs = (job.archiveProcessingMs ?? 0) + Date.now() - indexingStarted;
   signal?.throwIfAborted();
@@ -100,6 +102,7 @@ export async function prepareZipArchive(
     zipSelection: undefined,
     status: "awaiting_selection",
     phase: "selecting",
+    extraction: undefined,
     percent: null,
     canPause: false,
     canResume: false,

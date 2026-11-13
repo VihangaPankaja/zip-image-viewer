@@ -39,7 +39,9 @@ export async function startHttpRestartServer(directory: string, slowStage = "") 
         if ((stage === "assembly" && String(filename).endsWith(".assembling")) ||
             (stage === "extraction" && String(filename).includes("extracted"))) {
           const write = output._write;
-          output._write = function(chunk, encoding, callback) { setTimeout(() => write.call(this, chunk, encoding, callback), 25); };
+          output._write = function(chunk, encoding, callback) {
+            setTimeout(() => this.destroyed ? callback() : write.call(this, chunk, encoding, callback), 25);
+          };
         }
         return output;
       };

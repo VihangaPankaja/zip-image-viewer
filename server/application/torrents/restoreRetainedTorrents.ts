@@ -5,6 +5,7 @@ import { saveRetainedTorrent } from "../../repositories/retainedTorrents.js";
 import type { TorrentAdapter } from "./torrentDownloader.js";
 import { normalizeDownloadOptions } from "../downloads/downloadOptions.js";
 import { ArchiveSelectionRequired } from "../jobs/archiveSelection.js";
+import { restoreExtractionCancellation } from "../jobs/extractionProgress.js";
 
 export async function restoreRetainedTorrents(
   store: RetainedTorrentStore,
@@ -21,16 +22,21 @@ export async function restoreRetainedTorrents(
       downloadedBytes: 0,
     }));
     try {
+      await restoreExtractionCancellation(job);
+      const savedStatus = job.status;
+      const savedPhase = job.phase;
       await checkTorrent(job, snapshot.torrentFiles, adapter);
       const selected = job.torrentFiles.filter(({ selected }) => selected);
       if (job.sessionId && selected.some(({ complete }) => complete)) await restoreSession(job);
-      Object.assign(job, { status: snapshot.status, phase: snapshot.phase });
+      Object.assign(job, { status: savedStatus, phase: savedPhase });
       if (
-        snapshot.status === "ready" &&
+        savedStatus === "ready" &&
         metadata &&
         selected.length &&
         selected.every(({ complete }) => complete)
       ) {
+        job.percent = 100;
+        job.extraction = undefined;
         job.message = "Retained torrent files are verified and ready to browse.";
       } else if (
         !["awaiting_selection", "awaiting_confirmation", "error", "cancelled"].includes(job.status)

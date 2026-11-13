@@ -980,17 +980,17 @@
           area: "Archives",
           priority: "P0",
           effort: "M",
-          status: "Proposed",
+          status: "In progress",
           title: "Show truthful extraction progress and recovery",
           summary:
             "Separate indexing, checking and extraction so a large archive never looks frozen.",
-          now: "createProgress derives both completed and total counts from the growing extracted entries array.",
+          now: "Validated job snapshots separate indexing, checking, extraction and publication. ZIP and 7zip extraction stream expanded bytes against fixed selected-file totals, count only verified entries and show the current path. Gzip keeps unreliable expanded totals unknown. All HTTP archive output is staged; retained HTTP and torrent archive retries keep their verified sources.",
           plan: "Use manifest totals and expanded bytes. Report current entry, completed entries and cancel state. Extract to staging and publish atomically. Retain a verified source on recoverable failure; retry safely and expose partial entries only if explicitly marked.",
           done: "A throttled ZIP reports monotonic progress against a fixed total and never claims early completion. Cancel is prompt; disk-full and interrupted-worker retries cannot expose truncated files as ready.",
           depends: "A01",
-          note: "",
+          note: "Implementation covers CRC and write failures, cancellation before publication, cancellation intent across restart, retained-source retry and ready-torrent restoration. Targeted desktop/phone captures are inspected; required GitHub editor attachments and final PR delivery are pending.",
           evidence:
-            "server/application/jobs/extractSessionSource.ts; server/infrastructure/archive/archiveLimits.ts; server/infrastructure/archive/listExtractedEntries.ts; server/application/jobs/processSessionJob.ts",
+            "shared/contracts.ts; server/application/jobs/extractionProgress.ts; server/infrastructure/archive/extractZip.ts; server/infrastructure/process/commandRunner.ts; server/application/jobs/processSessionJob.ts; server/infrastructure/archive/stagedExtraction.ts; tests/integration/server/application/jobs/extractionProgress.test.ts; tests/integration/server/application/jobs/torrentExtractionRecovery.test.ts; tests/e2e/extraction-progress.spec.ts; docs/guides/downloads.md",
         },
         {
           id: "A06",

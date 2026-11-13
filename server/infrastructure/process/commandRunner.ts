@@ -12,6 +12,7 @@ import {
   resourceLimitError,
 } from "../runtime/resourceLimits.js";
 import { sanitizeEntryPath } from "../runtime/runtimePrimitives.js";
+import type { ExtractionProgress } from "../../../shared/contracts.js";
 
 const MAX_COMMAND_OUTPUT_BYTES = 10 * 1024 ** 2;
 
@@ -119,6 +120,7 @@ async function writeArchiveEntry({
   state,
   signal,
   remainingBytes,
+  onBytes,
 }: {
   executable: string;
   archivePath: string;
@@ -129,6 +131,7 @@ async function writeArchiveEntry({
   state: { downloadedBytes: number };
   signal?: AbortSignal;
   remainingBytes?: number;
+  onBytes?: (_bytes: number) => void;
 }) {
   const controller = new AbortController();
   const child = spawn(
@@ -156,7 +159,10 @@ async function writeArchiveEntry({
   const budget = createDownloadBudget(
     () => Math.min(gzip ? MAX_RESOURCE_BYTES : entry.size, remainingBytes ?? MAX_RESOURCE_BYTES),
     state,
-    (received) => storage.check(before + received),
+    (received) => {
+      storage.check(before + received);
+      onBytes?.(before + received);
+    },
   );
   const timer = setInterval(() => {
     try {
@@ -259,6 +265,7 @@ export async function extractWith7zip(
     filePaths?: readonly string[];
     index?: Awaited<ReturnType<typeof inspect7zip>>;
     maxBytes?: number;
+    onProgress?: (_progress: ExtractionProgress) => void;
   } = {},
 ): Promise<void> {
   const index = options.index ?? (await inspect7zip(executable, archivePath, options.signal));
@@ -270,7 +277,18 @@ export async function extractWith7zip(
   const storage = reserveStorage(extractDirectory, bytes);
   const gzip = index.gzip;
   const state = { downloadedBytes: 0 };
+  const progress: ExtractionProgress = {
+    stage: "extracting",
+    completedEntries: 0,
+    totalEntries: entries.filter((entry) => !entry.directory).length,
+    expandedBytes: 0,
+    totalExpandedBytes: gzip ? null : bytes,
+    currentEntry: "",
+  };
+  const report = (expandedBytes = state.downloadedBytes) =>
+    options.onProgress?.({ ...progress, expandedBytes });
   try {
+    report();
     // Gzip listings can report only one member's modulo-32-bit output size.
     if (gzip) storage.reserveAvailable();
     for (const entry of entries) {
@@ -278,6 +296,8 @@ export async function extractWith7zip(
       const destination = path.join(extractDirectory, sanitizeEntryPath(entry.path));
       if (entry.directory) await mkdir(destination, { recursive: true });
       else {
+        progress.currentEntry = sanitizeEntryPath(entry.path);
+        report();
         await mkdir(path.dirname(destination), { recursive: true });
         await writeArchiveEntry({
           executable,
@@ -287,17 +307,27 @@ export async function extractWith7zip(
           gzip,
           storage,
           state,
+          onBytes: report,
           signal: options.signal,
           remainingBytes:
             options.maxBytes === undefined ? undefined : options.maxBytes - state.downloadedBytes,
         });
+        progress.completedEntries++;
+        report();
       }
     }
     for (const entry of [...entries].reverse()) {
+      options.signal?.throwIfAborted();
       if (!Number.isFinite(entry.modifiedAt)) continue;
       const destination = path.join(extractDirectory, sanitizeEntryPath(entry.path));
       await utimes(destination, new Date(entry.modifiedAt), new Date(entry.modifiedAt));
     }
+    options.onProgress?.({
+      ...progress,
+      expandedBytes: state.downloadedBytes,
+      stage: "publishing",
+      currentEntry: "",
+    });
   } finally {
     storage.release();
   }

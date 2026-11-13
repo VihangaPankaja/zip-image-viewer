@@ -54,6 +54,16 @@ and free space needed for a staged extraction. The source already occupies disk;
 staging needs space for the complete selected output plus the safety margin.
 Existing extracted files remain available while a new selection is prepared.
 
+During extraction, Downloads separates indexing and checking from streamed
+output. It shows verified files against the selected total, expanded bytes and
+the current path. Gzip expanded totals stay unknown when the archive listing
+cannot provide a reliable size. Network speed and ETA give way to extraction
+details. Progress stays below 100% until checked output is published.
+
+**Cancel** stops extraction and removes its staging files before **Retry** becomes
+available. Cancellation survives a restart during cleanup. ZIP and other archive
+formats publish staged output together; incomplete output is never a ready library.
+
 Use **Extract more** in Downloads to add skipped ZIP files. The server reuses the
 verified source and keeps earlier selections. Selection survives restart.
 Cancellation, corrupt entries or insufficient storage leave the last published

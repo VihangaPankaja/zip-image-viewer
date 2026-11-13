@@ -1,6 +1,7 @@
 import { lstat, rm } from "node:fs/promises";
 import path from "node:path";
 import type { SessionJob } from "../../domain/models.js";
+import { restoreExtractionCancellation } from "../jobs/extractionProgress.js";
 import type { RetainedTorrentStore } from "../../repositories/retainedTorrents.js";
 import { saveRetainedTorrent } from "../../repositories/retainedTorrents.js";
 import { normalizeDownloadOptions } from "./downloadOptions.js";
@@ -24,6 +25,7 @@ export async function restoreHttpDownloads(
     jobs.set(job.id, job);
     try {
       await assertHttpWorkspace(job);
+      await restoreExtractionCancellation(job);
       const source = await lstat(job.zipPath).catch(() => null);
       const complete =
         source?.isFile() &&

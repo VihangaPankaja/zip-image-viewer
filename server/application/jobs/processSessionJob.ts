@@ -25,25 +25,17 @@ import {
   httpSourcePath,
 } from "../../infrastructure/downloads/httpWorkspace.js";
 
-type ProcessorDependencies = DownloadSourceDependencies & {
-  prepareRetainedSession?: (_session: Session) => void;
-  torrentAdapter: TorrentAdapter;
-  sessionStore: Map<string, Session>;
-  detectEncryption: (_archivePath: string, _signal?: AbortSignal) => Promise<boolean>;
-  extractWith7zip: (
-    _archivePath: string,
-    _extractDir: string,
-    _signal?: AbortSignal,
-  ) => Promise<void>;
-  listExtractedEntries: (
-    _extractDir: string,
-  ) => Promise<import("../../domain/explorerTree.js").ExtractedEntry[]>;
-  logEvent: (
-    _level: "info" | "warn" | "error",
-    _event: string,
-    _details?: Record<string, unknown>,
-  ) => void;
-};
+type ProcessorDependencies = DownloadSourceDependencies &
+  Parameters<typeof extractSessionSource>[3] & {
+    prepareRetainedSession?: (_session: Session) => void;
+    torrentAdapter: TorrentAdapter;
+    sessionStore: Map<string, Session>;
+    logEvent: (
+      _level: "info" | "warn" | "error",
+      _event: string,
+      _details?: Record<string, unknown>,
+    ) => void;
+  };
 
 function parseSourceUrl(value: string): URL {
   if (!URL.canParse(value)) throw new Error("Enter a valid public URL.");
@@ -125,6 +117,7 @@ function completeSession(
     {
       status: "ready",
       phase: "ready",
+      extraction: undefined,
       sessionId: session.id,
       percent: 100,
       message,
@@ -151,7 +144,10 @@ function emitFailure(job: SessionJob, error: Error, deps: ProcessorDependencies)
         status: "cancelled",
         phase: "cancelled",
         error: "",
-        message: "Archive loading was cancelled.",
+        extraction: job.extraction ? { ...job.extraction, stage: "cancelling" } : undefined,
+        message: job.extraction
+          ? "Extraction cancelled. Partial output was removed; the source is kept for Retry."
+          : "Archive loading was cancelled.",
       },
       "cancelled",
     );
@@ -255,20 +251,16 @@ async function publishHttpSource(
 ) {
   const { workspaceDir, extractDir, zipPath } = job;
   if (!(await prepareZipArchive(job, zipPath, deps.emitJob))) return;
-  let entries: ExtractedEntry[];
-  if (job.archive || existing) {
-    entries = await stageExtraction(extractDir, async (staging) => {
+  const entries = await stageExtraction(
+    extractDir,
+    async (staging) => {
       const extracted = await extractSessionSource(job, zipPath, staging, deps);
       job.abortController?.signal.throwIfAborted();
       admit(extracted);
       return extracted;
-    });
-  } else {
-    // Extraction can be interrupted at any entry. Rebuild derived files from the verified source.
-    await rm(extractDir, { recursive: true, force: true });
-    await mkdir(extractDir, { recursive: true });
-    entries = await extractSessionSource(job, zipPath, extractDir, deps);
-  }
+    },
+    job.abortController?.signal,
+  );
   const sourceName = new URL(job.url).pathname || "download";
   const session = createSession(workspaceDir, extractDir, sourceName, entries);
   session.id = job.sessionId || session.id;
