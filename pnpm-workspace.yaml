@@ -21,9 +21,9 @@ allowBuilds:
 patchedDependencies:
   hls.js@1.7.2: patches/hls.js@1.7.2.patch
 catalog:
-  vite: npm:@voidzero-dev/vite-plus-core@1.5.0
+  vite: npm:@voidzero-dev/vite-plus-core@1.5.1
   vitest: 5.1.0
-  vite-plus: 1.5.0
+  vite-plus: 1.5.1
   "@vitest/coverage-v8": 5.1.0
 overrides:
   # Match the runner pinned for https://github.com/microsoft/playwright/issues/43967.
