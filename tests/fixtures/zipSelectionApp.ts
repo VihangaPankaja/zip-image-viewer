@@ -17,7 +17,7 @@ export const zipSelectionNames = [
 export async function startZipSelectionApp(
   baseURL: string,
   nested = false,
-  slowExtraction = false,
+  pausedExtraction = false,
 ) {
   const directory = await mkdtemp(path.join(tmpdir(), "zip-browser-"));
   const contents = path.join(directory, "contents");
@@ -25,7 +25,9 @@ export async function startZipSelectionApp(
   for (const [index, filename] of zipSelectionNames.entries())
     await writeFile(
       path.join(contents, filename),
-      slowExtraction && index === 0 ? Buffer.alloc(4 * 1024 * 1024, 65) : `Selected file ${index}`,
+      pausedExtraction && index === 0
+        ? Buffer.alloc(4 * 1024 * 1024, 65)
+        : `Selected file ${index}`,
     );
   if (nested) {
     const inner = path.join(directory, "inner");
@@ -50,7 +52,7 @@ export async function startZipSelectionApp(
   await once(source, "listening");
   const sourceAddress = source.address();
   if (!sourceAddress || typeof sourceAddress === "string") throw new Error("Missing source port");
-  let api = await startHttpRestartServer(directory, slowExtraction ? "extraction" : "");
+  let api = await startHttpRestartServer(directory, pausedExtraction ? "paused-extraction" : "");
   const app = workspaceProxy(baseURL, () => api.origin);
   const ui = app.listen(0, "127.0.0.1");
   await once(ui, "listening");

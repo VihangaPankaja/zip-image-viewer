@@ -36,7 +36,15 @@ export async function startHttpRestartServer(directory: string, slowStage = "") 
       fs.createWriteStream = function(filename, ...args) {
         const output = create.call(this, filename, ...args);
         const stage = ${JSON.stringify(slowStage)};
-        if ((stage === "assembly" && String(filename).endsWith(".assembling")) ||
+        if (stage === "paused-extraction" && String(filename).includes("extracted")) {
+          const write = output._write;
+          // Report real bytes across the progress throttle, then hold until cancellation.
+          output._writev = undefined;
+          output._write = function(chunk, encoding, callback) {
+            if (this.bytesWritten >= 128 * 1024) this.once("close", () => callback());
+            else setTimeout(() => this.destroyed ? callback() : write.call(this, chunk, encoding, callback), 1100);
+          };
+        } else if ((stage === "assembly" && String(filename).endsWith(".assembling")) ||
             (stage === "extraction" && String(filename).includes("extracted"))) {
           const write = output._write;
           output._write = function(chunk, encoding, callback) {
