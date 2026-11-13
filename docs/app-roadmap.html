@@ -980,7 +980,7 @@
           area: "Archives",
           priority: "P0",
           effort: "M",
-          status: "In progress",
+          status: "Done",
           title: "Show truthful extraction progress and recovery",
           summary:
             "Separate indexing, checking and extraction so a large archive never looks frozen.",
@@ -988,7 +988,7 @@
           plan: "Use manifest totals and expanded bytes. Report current entry, completed entries and cancel state. Extract to staging and publish atomically. Retain a verified source on recoverable failure; retry safely and expose partial entries only if explicitly marked.",
           done: "A throttled ZIP reports monotonic progress against a fixed total and never claims early completion. Cancel is prompt; disk-full and interrupted-worker retries cannot expose truncated files as ready.",
           depends: "A01",
-          note: "Implementation covers CRC and write failures, cancellation before publication, cancellation intent across restart, retained-source retry and ready-torrent restoration. Targeted desktop/phone captures are inspected; required GitHub editor attachments and final PR delivery are pending.",
+          note: "Verified CRC and write failures, cancellation before publication, cancellation intent across restart, retained-source retry, legacy ZIP migration and ready-torrent restoration. Desktop and phone keyboard/touch checks cover fixed totals, source reuse and publication; targeted dark captures show progress and recovery.",
           evidence:
             "shared/contracts.ts; server/application/jobs/extractionProgress.ts; server/infrastructure/archive/extractZip.ts; server/infrastructure/process/commandRunner.ts; server/application/jobs/processSessionJob.ts; server/infrastructure/archive/stagedExtraction.ts; tests/integration/server/application/jobs/extractionProgress.test.ts; tests/integration/server/application/jobs/torrentExtractionRecovery.test.ts; tests/e2e/extraction-progress.spec.ts; docs/guides/downloads.md",
         },
