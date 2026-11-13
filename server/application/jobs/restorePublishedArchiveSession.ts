@@ -16,11 +16,14 @@ export async function restorePublishedArchiveSession(
   return refreshArchiveSession(existing, job, async (admit) => {
     const started = Date.now();
     let directory = job.extractDir;
-    let paths: Set<string>;
+    let paths: Set<string> | undefined;
     const source =
       job.sourceKind === "http"
         ? job.zipPath
         : path.join(job.workspaceDir, "torrent", job.torrentArchivePath ?? "");
+    const previous = `${directory}.previous`;
+    if (!(await stat(directory).catch(() => null)) && (await stat(previous).catch(() => null)))
+      await rename(previous, directory);
     if (job.zipSelection?.extractedIds.length) {
       const manifest = await getArchiveManifest(job, job.abortController?.signal);
       const ids = new Set(job.zipSelection.extractedIds);
@@ -28,9 +31,6 @@ export async function restorePublishedArchiveSession(
         (entry) => entry.type === "file" && ids.has(entry.id),
       );
       if (selected.length !== ids.size) throw new Error("Published ZIP selection is invalid.");
-      const previous = `${directory}.previous`;
-      if (!(await stat(directory).catch(() => null)) && (await stat(previous).catch(() => null)))
-        await rename(previous, directory);
       await verifyZipOutput(source, directory, [...ids], job.abortController?.signal);
       paths = new Set(selected.map((entry) => entry.path));
       if (job.sourceKind === "torrent") {
@@ -40,6 +40,14 @@ export async function restorePublishedArchiveSession(
             paths.add(`${folder}/${file.path}`);
         }
       }
+    } else if (
+      job.sourceKind === "torrent" &&
+      job.torrentArchivePath &&
+      !job.archive &&
+      (await stat(directory).catch(() => null))?.isDirectory()
+    ) {
+      // Non-ZIP torrent output is published as a whole by the same staging boundary.
+      paths = undefined;
     } else {
       if (job.sourceKind !== "torrent")
         throw new Error("No published archive selection is available.");
@@ -53,7 +61,7 @@ export async function restorePublishedArchiveSession(
     if (!(await realpath(directory)).startsWith(`${await realpath(job.workspaceDir)}${path.sep}`))
       throw new Error("Published archive is outside its owning workspace.");
     const entries = (await deps.listExtractedEntries(directory)).filter(
-      (entry) => entry.type === "file" && paths.has(entry.relativePath),
+      (entry) => entry.type === "file" && (!paths || paths.has(entry.relativePath)),
     );
     job.archiveProcessingMs = (job.archiveProcessingMs ?? 0) + Date.now() - started;
     admit(entries);

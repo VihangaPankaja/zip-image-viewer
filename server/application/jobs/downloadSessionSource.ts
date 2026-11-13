@@ -153,10 +153,24 @@ async function reuseVerifiedSource(
   deps: DownloadSourceDependencies,
 ): Promise<"complete" | "paused" | null> {
   if (!job.httpDownload?.completedSha256) return null;
+  // Legacy published ZIPs use ready status to recover their original file selection.
+  deps.emitJob(job, {
+    status: job.status === "ready" ? "ready" : "downloading",
+    phase: "indexing",
+    percent: null,
+    extraction: undefined,
+    error: "",
+    canPause: false,
+    canResume: false,
+    etaSeconds: null,
+    downloadSpeedBytesPerSec: 0,
+    message: "Checking retained source before extraction",
+  });
   const source = await lstat(input.zipPath).catch(() => null);
   if (
     !source?.isFile() ||
-    (await hashDownloadFile(input.zipPath)) !== job.httpDownload.completedSha256
+    (await hashDownloadFile(input.zipPath, undefined, job.abortController?.signal)) !==
+      job.httpDownload.completedSha256
   ) {
     deps.emitJob(job, { httpDownload: undefined });
     return null;
@@ -193,6 +207,7 @@ export async function downloadSessionSource(
     phase: "downloading",
     message: state.statusText,
     error: "",
+    extraction: undefined,
   });
   const signal = job.abortController?.signal ?? AbortSignal.abort();
   job.maxRetries = Math.min(

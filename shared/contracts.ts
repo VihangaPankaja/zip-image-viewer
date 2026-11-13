@@ -227,6 +227,16 @@ export const workspaceLocationSchema = z.object({
 });
 export type WorkspaceLocation = z.infer<typeof workspaceLocationSchema>;
 
+const extractionProgressSchema = z.object({
+  stage: z.enum(["indexing", "checking", "extracting", "publishing", "cancelling"]),
+  completedEntries: z.number().int().nonnegative(),
+  totalEntries: z.number().int().nonnegative().nullable(),
+  expandedBytes: z.number().int().nonnegative(),
+  totalExpandedBytes: z.number().int().nonnegative().nullable(),
+  currentEntry: safeRelativePathSchema.or(z.literal("")),
+});
+export type ExtractionProgress = z.infer<typeof extractionProgressSchema>;
+
 export const jobSchema = z.object({
   id: z.uuid(),
   url: downloadSourceSchema,
@@ -236,6 +246,7 @@ export const jobSchema = z.object({
   status: jobStatusSchema,
   torrentFiles: z.array(torrentFileSchema).default([]),
   archive: archiveSummarySchema.optional(),
+  extraction: extractionProgressSchema.optional(),
   phase: jobPhaseSchema,
   percent: z.number().min(0).max(100).nullable(),
   downloadedBytes: z.number().nonnegative().default(0),

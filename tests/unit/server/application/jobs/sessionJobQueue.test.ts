@@ -563,6 +563,36 @@ describe("createSessionJobQueue", () => {
     expect(queue.getOrderedJobs().map(({ id }) => id)).toEqual([first.id]);
   });
 
+  it("keeps active extraction in cancelling state until its worker finishes cleanup", async () => {
+    let release: (() => void) | undefined;
+    const dependencies = queueDependencies(1);
+    dependencies.processSessionJob.mockImplementation(
+      () => new Promise<void>((resolve) => (release = resolve)),
+    );
+    const queue = createSessionJobQueue(dependencies);
+    const job = createJob("extracting");
+    job.abortController = new AbortController();
+    queue.enqueueSessionJob(job, false);
+    job.status = "extracting";
+    job.extraction = {
+      stage: "extracting",
+      completedEntries: 0,
+      totalEntries: 2,
+      expandedBytes: 10,
+      totalExpandedBytes: 100,
+      currentEntry: "large.txt",
+    };
+    queue.cancelSessionJob(job.id);
+    expect(job.abortController.signal.aborted).toBe(true);
+    expect(job.status).toBe("extracting");
+    expect(job.extraction.stage).toBe("cancelling");
+    expect(() => queue.removeSessionJob(job.id)).toThrow(/wait for it to stop/);
+    job.status = "cancelled";
+    release?.();
+    await vi.waitFor(() => expect(dependencies.getActiveSessionJobCount()).toBe(0));
+    expect(queue.removeSessionJob(job.id).status).toBe("cancelled");
+  });
+
   it("logs rejected jobs and continues draining the queue", async () => {
     const dependencies = queueDependencies(1);
     dependencies.processSessionJob

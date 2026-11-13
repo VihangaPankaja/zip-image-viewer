@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { expect, it, vi } from "vite-plus/test";
@@ -16,10 +16,62 @@ import { inspectZip } from "../../../../../server/infrastructure/archive/zipMani
 import { listExtractedEntries } from "../../../../../server/infrastructure/archive/listExtractedEntries.js";
 import { zipBytes } from "../../../../fixtures/zipBytes.js";
 import type { TorrentAdapter } from "../../../../../server/application/torrents/torrentDownloader.js";
+import { downloadSessionSource } from "../../../../../server/application/jobs/downloadSessionSource.js";
+import { normalizeDownloadSettings } from "../../../../../server/application/downloads/downloadOptions.js";
+import { prepareZipArchive } from "../../../../../server/application/jobs/archiveSelection.js";
 
-it.each(["cancelled", "error"] as const)(
+it("keeps a verified legacy ready HTTP ZIP recognizable when restoring its published selection", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "legacy-zip-ready-"));
+  const store = createRetainedTorrentStore(directory);
+  try {
+    const manager = createJobManager(new Map(), vi.fn(), store);
+    const job = manager.createJob("https://example.com/library.zip");
+    job.zipPath = path.join(job.workspaceDir, "source.zip");
+    job.extractDir = path.join(job.workspaceDir, "extracted");
+    await mkdir(job.extractDir, { recursive: true });
+    const payload = zipBytes([{ name: "ready.txt", data: Buffer.from("ready") }]);
+    await writeFile(job.zipPath, payload);
+    await writeFile(path.join(job.extractDir, "ready.txt"), "ready");
+    const hash = createHash("sha256").update(payload).digest("hex");
+    Object.assign(job, {
+      status: "ready",
+      phase: "ready",
+      sessionId: randomUUID(),
+      httpDownload: {
+        originalUrl: job.url,
+        resolvedUrl: job.url,
+        size: payload.length,
+        validator: '"v1"',
+        completedSha256: hash,
+        files: [
+          { index: -1, start: 0, end: payload.length - 1, bytes: payload.length, sha256: hash },
+        ],
+      },
+    });
+    await downloadSessionSource(
+      job,
+      normalizeDownloadSettings({}),
+      {
+        url: job.url,
+        zipPath: job.zipPath,
+        workspaceDir: job.workspaceDir,
+        confirmOversize: false,
+      },
+      { emitJob: manager.emitJob, closeJob: manager.closeJob, download: vi.fn() },
+    );
+    expect(await prepareZipArchive(job, job.zipPath, manager.emitJob)).toBe(true);
+    expect(job.zipSelection?.extractedIds).toHaveLength(1);
+    expect(await readFile(path.join(job.extractDir, "ready.txt"), "utf8")).toBe("ready");
+  } finally {
+    store.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+it.each(["cancelled", "error", "cancelling"] as const)(
   "restores the published HTTP ZIP library independently of a %s Extract more request",
   async (status) => {
+    const expectedStatus = status === "cancelling" ? "cancelled" : status;
     const directory = await mkdtemp(path.join(tmpdir(), "zip-published-"));
     const store = createRetainedTorrentStore(directory);
     try {
@@ -51,8 +103,19 @@ it.each(["cancelled", "error"] as const)(
       const hash = createHash("sha256").update(payload).digest("hex");
       job.zipSelection.selectedIds.push(next.id);
       manager.emitJob(job, {
-        status,
-        phase: status,
+        status: status === "cancelling" ? "extracting" : status,
+        phase: status === "cancelling" ? "extracting" : status,
+        extraction:
+          status === "cancelling"
+            ? {
+                stage: "cancelling",
+                completedEntries: 0,
+                totalEntries: 2,
+                expandedBytes: 1,
+                totalExpandedBytes: 16,
+                currentEntry: "two.txt",
+              }
+            : undefined,
         sessionId: randomUUID(),
         archive: { ...manifest, extractedCount: 1 },
         httpDownload: {
@@ -66,6 +129,8 @@ it.each(["cancelled", "error"] as const)(
           completedSha256: hash,
         },
       });
+      await mkdir(`${job.extractDir}.staging`);
+      await writeFile(path.join(`${job.extractDir}.staging`, "two.txt"), "partial");
       jobs.clear();
       const process = vi.fn();
       await restoreHttpDownloads(store, jobs, process, (restored) => {
@@ -77,7 +142,7 @@ it.each(["cancelled", "error"] as const)(
       });
       expect(process).not.toHaveBeenCalled();
       expect(jobs.get(job.id)).toMatchObject({
-        status,
+        status: expectedStatus,
         sessionId: job.sessionId,
         zipSelection: { selectedIds: [first.id, next.id], extractedIds: [first.id] },
       });
@@ -88,6 +153,8 @@ it.each(["cancelled", "error"] as const)(
         jobs.get(job.id)?.archiveProcessingMs,
       );
       expect(await readFile(path.join(job.extractDir, "one.txt"), "utf8")).toBe("published");
+      if (status === "cancelling")
+        expect(await readdir(job.workspaceDir)).not.toContain("extracted.staging");
     } finally {
       store.close();
       await rm(directory, { recursive: true, force: true });

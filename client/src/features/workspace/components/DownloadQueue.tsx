@@ -102,6 +102,7 @@ function JobActions({ job, ...actions }: JobActionsProps) {
       ) : null}
       <button
         type="button"
+        disabled={job.status === "extracting" && job.extraction?.stage === "cancelling"}
         onClick={() =>
           terminal
             ? (!retained ||
@@ -112,13 +113,46 @@ function JobActions({ job, ...actions }: JobActionsProps) {
             : actions.onCancel(job.id)
         }
       >
-        {terminal ? (retained ? "Delete files" : "Remove from queue") : "Cancel"}
+        {terminal
+          ? retained
+            ? "Delete files"
+            : "Remove from queue"
+          : job.extraction?.stage === "cancelling"
+            ? "Cancelling…"
+            : "Cancel"}
       </button>
     </div>
   );
 }
 
 function DownloadTelemetry({ job }: { job: Job }) {
+  const extraction = job.extraction;
+  if (extraction)
+    return (
+      <dl className="download-telemetry">
+        <div>
+          <dt>Verified entries</dt>
+          <dd>
+            {extraction.completedEntries} / {extraction.totalEntries ?? "unknown"} files
+          </dd>
+        </div>
+        <div>
+          <dt>Expanded</dt>
+          <dd>
+            {formatTransferBytes(extraction.expandedBytes)} /{" "}
+            {extraction.totalExpandedBytes === null
+              ? "unknown"
+              : formatTransferBytes(extraction.totalExpandedBytes)}
+          </dd>
+        </div>
+        {extraction.currentEntry ? (
+          <div className="download-current-entry">
+            <dt>Current entry</dt>
+            <dd>{extraction.currentEntry}</dd>
+          </div>
+        ) : null}
+      </dl>
+    );
   return (
     <dl className="download-telemetry">
       <div>
@@ -221,7 +255,7 @@ function DownloadRow({
         <div className="download-progress-line">
           <progress
             aria-label={`${downloadTitle(job)} progress`}
-            value={job.percent ?? 0}
+            value={job.percent ?? undefined}
             max="100"
           />
           <b>{job.percent == null ? "—" : `${Math.floor(job.percent)}%`}</b>

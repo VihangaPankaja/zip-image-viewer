@@ -116,6 +116,7 @@ class JobManager {
       status: job.status,
       torrentFiles: job.torrentFiles,
       archive: job.archive,
+      extraction: job.extraction,
       phase: job.phase,
       downloadedBytes: job.downloadedBytes,
       reportedSize: job.reportedSize,

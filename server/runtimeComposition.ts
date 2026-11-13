@@ -95,8 +95,7 @@ const processorDependencies = {
   download: downloadRuntimeSource,
   detectEncryption: (archivePath: string, signal?: AbortSignal) =>
     detectRuntimeArchiveEncryption(path7za, archivePath, signal),
-  extractWith7zip: (archivePath: string, extractDir: string, signal?: AbortSignal) =>
-    extractRuntimeArchive(path7za, archivePath, extractDir, signal),
+  extractWith7zip: extractRuntimeArchive.bind(null, path7za),
   listExtractedEntries,
   logEvent,
   torrentAdapter,
@@ -106,7 +105,8 @@ const processSessionJob = createProcessSessionJob(processorDependencies);
 server.listen(PORT, "0.0.0.0");
 
 await restoreRetainedTorrents(retainedTorrents, jobStore, torrentAdapter, (job) =>
-  job.archive && ["awaiting_selection", "cancelled", "error"].includes(job.status)
+  (job.archive || job.torrentArchivePath) &&
+  ["awaiting_selection", "cancelled", "error"].includes(job.status)
     ? restorePublishedArchiveSession(job, processorDependencies)
     : restoreTorrentSession(job, processorDependencies),
 );

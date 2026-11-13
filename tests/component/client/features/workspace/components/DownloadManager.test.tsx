@@ -23,6 +23,54 @@ function job(overrides: Partial<Job> = {}): Job {
 }
 
 describe("DownloadManager", () => {
+  it.each([null, 1024])(
+    "shows extraction work and an honest total of %s bytes",
+    async (totalExpandedBytes) => {
+      const cancel = vi.fn<(_id: string) => void>();
+      const user = userEvent.setup();
+      render(
+        <DownloadManager
+          jobs={[
+            job({
+              status: "extracting",
+              phase: "extracting",
+              canPause: false,
+              percent: totalExpandedBytes === null ? null : 25,
+              extraction: {
+                stage: "extracting",
+                completedEntries: 1,
+                totalEntries: 3,
+                expandedBytes: 256,
+                totalExpandedBytes,
+                currentEntry: "album/a-very-long-filename.txt",
+              },
+            }),
+          ]}
+          onCancel={cancel}
+          onSelectFiles={vi.fn()}
+          onFilePriority={vi.fn()}
+          onConfirm={vi.fn()}
+          onOpenSession={vi.fn()}
+          onPause={vi.fn()}
+          onRemove={vi.fn()}
+          onReorder={vi.fn()}
+          onResume={vi.fn()}
+          onRetry={vi.fn()}
+        />,
+      );
+      expect(screen.getByText("1 / 3 files")).toBeVisible();
+      expect(screen.getByText("album/a-very-long-filename.txt")).toBeVisible();
+      expect(screen.queryByText("Speed")).not.toBeInTheDocument();
+      expect(screen.queryByText("ETA")).not.toBeInTheDocument();
+      const progress = screen.getByRole("progressbar");
+      if (totalExpandedBytes === null) expect(progress).not.toHaveAttribute("value");
+      else expect(progress).toHaveAttribute("value", "25");
+      const button = screen.getByRole("button", { name: "Cancel" });
+      button.focus();
+      await user.keyboard("{Enter}");
+      expect(cancel).toHaveBeenCalledWith("2bf886fc-65bf-4e2f-b973-b607766b3131");
+    },
+  );
   it("requires confirmation before removing a retained HTTP download and its files", async () => {
     const remove = vi.fn();
     const confirmation = vi.spyOn(window, "confirm").mockReturnValue(false);

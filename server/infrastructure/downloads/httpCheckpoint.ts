@@ -23,10 +23,14 @@ export function rangeValidator(metadata: { etag?: string; lastModified?: string 
     : "";
 }
 
-export async function hashDownloadFile(filename: string, bytes?: number) {
+export async function hashDownloadFile(filename: string, bytes?: number, signal?: AbortSignal) {
+  signal?.throwIfAborted();
   const hash = createHash("sha256");
   if (bytes !== 0) {
-    for await (const chunk of createReadStream(filename, bytes ? { end: bytes - 1 } : undefined))
+    for await (const chunk of createReadStream(filename, {
+      ...(bytes ? { end: bytes - 1 } : {}),
+      signal,
+    }))
       hash.update(chunk as Buffer);
   }
   return hash.digest("hex");
