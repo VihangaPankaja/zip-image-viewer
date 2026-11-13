@@ -153,8 +153,9 @@ async function reuseVerifiedSource(
   deps: DownloadSourceDependencies,
 ): Promise<"complete" | "paused" | null> {
   if (!job.httpDownload?.completedSha256) return null;
+  // Legacy published ZIPs use ready status to recover their original file selection.
   deps.emitJob(job, {
-    status: "downloading",
+    status: job.status === "ready" ? "ready" : "downloading",
     phase: "indexing",
     percent: null,
     extraction: undefined,
