@@ -20,6 +20,26 @@ const server = createServer((req, res) => {
   if (req.url === "/error") return res.writeHead(403).end("denied");
   if (req.url === "/slow") return;
   res.setHeader("content-type", "text/html; charset=utf-8");
+  if (req.url === "/meta-charset") {
+    res.setHeader("content-type", "text/html");
+    return res.end(
+      Buffer.from(
+        '<!doctype html><meta charset="windows-1252"><a href="/café.zip">Café</a>',
+        "latin1",
+      ),
+    );
+  }
+  if (req.url === "/meta-pragma") {
+    res.setHeader("content-type", "text/html");
+    return res.end(
+      Buffer.from(
+        '<!doctype html><meta content="text/html; charset=windows-1252" http-equiv="Content-Type"><a href="/café.zip">Café</a>',
+        "latin1",
+      ),
+    );
+  }
+  if (req.url === "/http-charset")
+    return res.end('<!doctype html><meta charset="windows-1252"><a href="/café.zip">Café</a>');
   if (req.url === "/large") return res.end("x".repeat(2 * 1024 ** 2 + 1));
   if (req.url === "/compressed") {
     res.setHeader("content-encoding", "gzip");
@@ -56,6 +76,13 @@ afterAll(async () => {
 });
 
 describe("bounded HTML inspection", () => {
+  it.each(["meta-charset", "meta-pragma", "http-charset"])(
+    "decodes %s links without changing their Unicode target",
+    async (route) => {
+      const result = await inspectPage(`${origin}/${route}`, { lookup: fixtureLookup });
+      expect(result.items[0]).toMatchObject({ name: "Café", url: `${origin}/caf%C3%A9.zip` });
+    },
+  );
   it("honors a UTF-16 BOM ahead of the HTTP charset", async () => {
     const result = await inspectPage(`${origin}/utf16`, { lookup: fixtureLookup });
     expect(result.items[0]).toMatchObject({ name: "Résumé", url: `${origin}/unicode.zip` });

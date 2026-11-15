@@ -2,6 +2,7 @@ import got, { type Response } from "got";
 import type { LookupFunction } from "node:net";
 import { parsePage } from "./parsePage.js";
 import { assertPublicPageUrl, publicPageLookup } from "./publicPageUrl.js";
+import { decodePage } from "./decodePage.js";
 
 const MAX_HTML_BYTES = 2 * 1024 ** 2;
 
@@ -50,20 +51,7 @@ export async function inspectPage(
     }
     signal.throwIfAborted();
     const body = Buffer.concat(chunks);
-    const charset =
-      body[0] === 0xff && body[1] === 0xfe
-        ? "utf-16le"
-        : body[0] === 0xfe && body[1] === 0xff
-          ? "utf-16be"
-          : body.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf]))
-            ? "utf-8"
-            : (/\bcharset\s*=\s*["']?([^\s;"']+)/i.exec(contentType)?.[1] ?? "utf-8");
-    let markup: string;
-    try {
-      markup = new TextDecoder(charset).decode(body);
-    } catch {
-      throw new Error("This page uses an unsupported text encoding.");
-    }
+    const markup = decodePage(body, contentType);
     return await parsePage(markup, sourcePage, signal);
   } finally {
     request.destroy();

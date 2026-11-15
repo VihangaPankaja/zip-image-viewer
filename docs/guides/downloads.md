@@ -34,6 +34,9 @@ stop waiting. Malformed HTML uses ordinary browser parsing recovery; broken
 links are ignored. Inspection does not run scripts, sign in, fetch linked files
 or crawl other pages. Use a direct public file link for those cases.
 
+Text decoding uses the byte-order mark first, then the HTTP charset, then HTML
+encoding declarations in the first 1024 bytes. Undeclared pages default to UTF-8.
+
 HTTP downloads probe a single byte when an origin does not support HEAD. They
 validate ranged responses before reusing retained bytes. If ranges, encoding or
 source identity change, they discard the partial transfer and restart with one
