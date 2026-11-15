@@ -40,7 +40,7 @@ are transient and must be supplied again after a restart. See
 
 `nestedArchives.inspect({ id, path, password? })` inspects an archive file owned by a parent
 session and returns its manifest without extracting it. `nestedArchives.open({
-id, path, fingerprint, fileIds })` extracts selected file IDs and returns the
+id, path, fingerprint, fileIds, password? })` extracts selected file IDs and returns the
 child session ID. Existing child contents are kept when adding selections.
 `nestedArchives.cancel({ id, path })` aborts and drains that archive's pending work.
 

@@ -21,7 +21,12 @@ for (const width of [390, 1440]) {
         headers: true,
       });
       const urls: string[] = [];
-      page.on("request", (request) => urls.push(request.url()));
+      const passwordMethods: string[] = [];
+      page.on("request", (request) => {
+        urls.push(decodeURIComponent(request.url()));
+        if (new URL(request.url()).pathname === "/rpc/jobs/password")
+          passwordMethods.push(request.method());
+      });
       try {
         await page.setViewportSize({ width, height: 850 });
         await page.emulateMedia({ colorScheme: "dark" });
@@ -71,6 +76,7 @@ for (const width of [390, 1440]) {
         ).toBe("Selected file 1");
         expect(app.requests).toBe(1);
         expect(urls.join(" ")).not.toContain(password);
+        expect(passwordMethods).toEqual(["POST", "POST"]);
         expect(app.logs()).not.toContain(password);
         expect(
           await page.evaluate(() =>
