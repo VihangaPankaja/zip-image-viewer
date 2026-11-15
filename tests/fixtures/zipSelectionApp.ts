@@ -75,19 +75,20 @@ export async function startZipSelectionApp(
       },
     ],
   });
-  return Object.assign(api, {
+  const fixture = Object.assign(api, {
     origin: `http://127.0.0.1:${address.port}`,
     directory,
     id: items[0].id,
-    get requests() {
-      return requests;
-    },
+    requests,
     close: async () => {
       await api.stop();
       await closeFixtureServers([source, ui]);
       await rm(directory, { recursive: true, force: true });
     },
   });
+  // Object.assign copies values; keep the transfer counter live for reuse assertions.
+  Object.defineProperty(fixture, "requests", { get: () => requests });
+  return fixture;
 }
 
 async function createArchive(
