@@ -117,6 +117,8 @@ See [storage and retention](storage.md) before closing or deleting a session.
 
 ## Password-protected archives
 
+For supported formats and multipart recovery, see [archive formats and volumes](archives.md).
+
 Encrypted ZIP and 7z archives, including 7z with encrypted filenames, pause at
 **Enter password**. ZIP files keep the same contents-selection step first.
 Enter the password and choose **Unlock archive**. A rejected password returns to

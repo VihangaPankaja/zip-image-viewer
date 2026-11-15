@@ -17,11 +17,20 @@ import process from "node:process";
 import { pathToFileURL } from "node:url";
 import { gzipSync } from "node:zlib";
 import { path7za } from "7zip-bin";
+import { verifyArchiveMatrix } from "../fixtures/archives/matrix.mjs";
 
 const builtModule = pathToFileURL(
   path.join(process.cwd(), "build/server/infrastructure/process/commandRunner.js"),
 ).href;
-const { detectArchiveEncryption, extractWith7zip, runCommandCapture } = await import(builtModule);
+const { detectArchiveEncryption, extractWith7zip, inspect7zip, runCommandCapture } = await import(
+  builtModule
+);
+const { extractZip } = await import(
+  pathToFileURL(path.resolve("build/server/infrastructure/archive/extractZip.js")).href
+);
+const { extractSessionSource } = await import(
+  pathToFileURL(path.resolve("build/server/application/jobs/extractSessionSource.js")).href
+);
 assert.equal(path7za, "7za", "Production must use the maintained system extractor");
 const info = execFileSync(path7za, ["i"], { encoding: "utf8" });
 assert.match(info, /Rar5/, "The production extractor must retain RAR support");
@@ -43,6 +52,13 @@ const source = path.join(directory, "source");
 const members = ["Folder/note[1].txt", "@list.txt", "-option.txt", "日本語.txt"];
 const modifiedAt = new Date("2020-01-02T03:04:05Z");
 try {
+  await verifyArchiveMatrix(path.join(directory, "matrix"), {
+    executable: path7za,
+    extractZip,
+    extractWith7zip,
+    inspect7zip,
+    extractSessionSource,
+  });
   await mkdir(path.join(source, "Folder"), { recursive: true });
   await mkdir(path.join(source, "empty"));
   for (const member of members) {

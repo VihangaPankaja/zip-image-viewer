@@ -67,6 +67,12 @@ torrent files. Public job serialization and SQLite snapshots contain only the
 password-protected flag. Nested inspection and extraction receive independent
 transient passwords.
 
+Numbered archive parts share a source identity in `shared/archiveVolumes.ts`.
+HTTP multipart jobs retain independent verified transfer checkpoints per URL.
+Archive preflight checks volume gaps, source ownership and portable path
+collisions before publishing staged output. Nested fingerprints include every
+volume so changing a sibling invalidates the cached manifest.
+
 Domain code has no HTTP or filesystem dependencies. Application workflows use
 typed dependencies; adapters handle I/O. Fallow checks these import boundaries.
 

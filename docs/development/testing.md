@@ -112,7 +112,11 @@ Medium or higher image vulnerabilities with an available fix fail container
 verification and block publication. Full reports retain unfixed findings too;
 both full and fixable-only reports remain available after failure. The production
 container also verifies native archive extraction, encryption detection, literal
-filenames, RAR, concatenated gzip and link rejection.
+filenames, ZIP Store/Deflate and ZIP64, 7z LZMA/LZMA2, TAR, RAR4 multipart and RAR5,
+split 7z, Unicode/timestamps, missing parts, unsupported ZIP methods, case
+collisions, concatenated gzip and link rejection. Its format matrix fixtures live
+in `tests/fixtures/archives/`; the [compatibility matrix](../guides/archives.md)
+describes tested support.
 Master pushes then publish that same image without rebuilding. PR, scheduled
 and manual maintenance runs do not publish images. The final `Verification`
 check requires successful verification or a proven reused PR run, plus
