@@ -12,11 +12,13 @@ import {
   type VideoQualitiesInput,
   type SessionStorage,
   type ArchiveManifest,
+  type PageDiscovery,
 } from "../../shared/contracts.js";
 
 import { ApplicationError } from "../domain/models.js";
 
 export type ServerRpcDependencies = {
+  discoverPage: (_url: string, _signal?: AbortSignal) => Promise<PageDiscovery>;
   nestedArchives?: {
     inspect: (_id: string, _path: string) => Promise<ArchiveManifest>;
     open: (
@@ -61,6 +63,7 @@ export type ServerRpcDependencies = {
 export function createServerRpcRouter(deps: ServerRpcDependencies) {
   const contract = implement(serverContract);
   return contract.router({
+    discovery: createDiscoveryRouter(deps.discoverPage),
     nestedArchives: {
       inspect: contract.nestedArchives.inspect.handler(({ input }) =>
         applicationResult(() => nestedArchives(deps).inspect(input.id, input.path)),
@@ -135,6 +138,15 @@ export function createServerRpcRouter(deps: ServerRpcDependencies) {
       get: contract.torrentLimits.get.handler(() => deps.getTorrentLimits()),
       update: contract.torrentLimits.update.handler(({ input }) => deps.updateTorrentLimits(input)),
     },
+  });
+}
+
+function createDiscoveryRouter(discover: ServerRpcDependencies["discoverPage"]) {
+  const contract = implement(serverContract.discovery);
+  return contract.router({
+    inspect: contract.inspect.handler(({ input, signal }) =>
+      applicationResult(() => discover(input.url, signal)),
+    ),
   });
 }
 

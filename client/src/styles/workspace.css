@@ -742,6 +742,51 @@
   border-block-start: 1px solid var(--border);
 }
 
+.discovery-results {
+  padding: 0 var(--space-6) var(--space-6);
+  overflow-wrap: anywhere;
+}
+
+.discovery-candidate {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-3);
+  padding-block: var(--space-3);
+  min-height: var(--control-height);
+  border-block-end: 1px solid var(--border);
+}
+
+.discovery-candidate-content {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.discovery-url {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.discovery-meta {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.discovery-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-block-start: var(--space-3);
+}
+
 .download-draft {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr) auto;

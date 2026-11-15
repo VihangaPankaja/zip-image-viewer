@@ -4,6 +4,7 @@
   "entry": [
     "server/index.ts",
     "server/runtimeComposition.ts",
+    "server/infrastructure/discovery/pageLinksWorker.ts",
     "client/src/main.tsx",
     "tests/component/client/setup.ts",
     "tests/benchmarks/scrubberHarness.ts",

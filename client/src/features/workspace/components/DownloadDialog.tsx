@@ -1,6 +1,8 @@
 import { useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { DownloadOptions } from "../../../types/download";
 import { useModalDialog } from "../../../hooks/useModalDialog";
+import { PageDiscoveryForm } from "./PageDiscoveryForm";
+import { DownloadDialogFooter } from "./DownloadDialogFooter";
 
 type DownloadItem = {
   url: string;
@@ -224,35 +226,6 @@ function DraftList({
   );
 }
 
-function DialogFooter({
-  readyCount,
-  invalidCount,
-  duplicateCount,
-  isSubmitting,
-}: {
-  readyCount: number;
-  invalidCount: number;
-  duplicateCount: number;
-  isSubmitting: boolean;
-}) {
-  return (
-    <footer>
-      <span role="status" aria-atomic="true">
-        {readyCount} of 50 ready
-        {invalidCount ? ` · ${invalidCount} invalid` : ""}
-        {duplicateCount ? ` · ${duplicateCount} duplicates` : ""}
-      </span>
-      <button
-        className="primary-button"
-        type="submit"
-        disabled={isSubmitting || !readyCount || invalidCount > 0 || duplicateCount > 0}
-      >
-        {isSubmitting ? "Adding to queue…" : "Add to queue"}
-      </button>
-    </footer>
-  );
-}
-
 // The state and native dialog lifecycle stay together so submit failures preserve drafts.
 // oxlint-disable-next-line max-lines-per-function
 export function DownloadDialog({ defaultOptions, open, onClose, onSubmit }: DownloadDialogProps) {
@@ -260,6 +233,7 @@ export function DownloadDialog({ defaultOptions, open, onClose, onSubmit }: Down
   const [drafts, setDrafts] = useState<DownloadDraft[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [fromPage, setFromPage] = useState(false);
   const nextDraftId = useRef(0);
   const dialogRef = useModalDialog(open);
   if (!open) return null;
@@ -316,40 +290,52 @@ export function DownloadDialog({ defaultOptions, open, onClose, onSubmit }: Down
       aria-labelledby="download-dialog-title"
       onClose={onClose}
     >
-      <form
-        className="download-dialog-sheet"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!invalidCount && !duplicateCount && submissionDrafts.length) {
-            void submit();
-          }
-        }}
-      >
-        <header>
-          <div>
-            <h2 id="download-dialog-title">Add downloads</h2>
-          </div>
-          <button type="button" className="ghost-button" onClick={onClose}>
-            Close
-          </button>
-        </header>
-        <div className="download-dialog-body">
-          <DownloadCompose source={source} setSource={setSource} addDrafts={addDrafts} />
-          <DraftList drafts={drafts} urlCounts={urlCounts} setDrafts={setDrafts} />
-        </div>
-        {submitError ? (
-          // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Long errors scroll independently and need keyboard access.
-          <p className="download-submit-error" role="alert" tabIndex={0}>
-            {submitError}
-          </p>
-        ) : null}
-        <DialogFooter
-          readyCount={submissionDrafts.length}
-          invalidCount={invalidCount}
-          duplicateCount={duplicateCount}
-          isSubmitting={isSubmitting}
+      {fromPage ? (
+        <PageDiscoveryForm
+          defaultOptions={defaultOptions}
+          onSubmit={onSubmit}
+          onBack={() => setFromPage(false)}
+          onClose={onClose}
         />
-      </form>
+      ) : (
+        <form
+          className="download-dialog-sheet"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!invalidCount && !duplicateCount && submissionDrafts.length) {
+              void submit();
+            }
+          }}
+        >
+          <header>
+            <div>
+              <h2 id="download-dialog-title">Add downloads</h2>
+            </div>
+            <button type="button" className="ghost-button" onClick={() => setFromPage(true)}>
+              From a page
+            </button>
+            <button type="button" className="ghost-button" onClick={onClose}>
+              Close
+            </button>
+          </header>
+          <div className="download-dialog-body">
+            <DownloadCompose source={source} setSource={setSource} addDrafts={addDrafts} />
+            <DraftList drafts={drafts} urlCounts={urlCounts} setDrafts={setDrafts} />
+          </div>
+          {submitError ? (
+            // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Long errors scroll independently and need keyboard access.
+            <p className="download-submit-error" role="alert" tabIndex={0}>
+              {submitError}
+            </p>
+          ) : null}
+          <DownloadDialogFooter
+            readyCount={submissionDrafts.length}
+            invalidCount={invalidCount}
+            duplicateCount={duplicateCount}
+            isSubmitting={isSubmitting}
+          />
+        </form>
+      )}
     </dialog>
   );
 }

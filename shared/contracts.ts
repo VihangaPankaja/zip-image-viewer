@@ -1,6 +1,7 @@
 import "zod/compile";
 import { oc } from "@orpc/contract";
 import { z } from "zod";
+import { isPublicHttpUrl } from "./publicUrl.js";
 
 export const TEXT_PREVIEW_BYTES = 128 * 1024;
 export const textPreviewInputSchema = z.object({
@@ -26,26 +27,6 @@ export const textPreviewSchema = z
   );
 export type TextPreviewChunk = z.infer<typeof textPreviewSchema>;
 
-const blockedHostnames = new Set(["localhost", "localhost.localdomain"]);
-
-function isPrivateIpv4(hostname: string): boolean {
-  const octets = hostname.split(".").map(Number);
-  if (octets.length !== 4 || octets.some((part) => !Number.isInteger(part))) {
-    return false;
-  }
-  const first = octets[0] ?? -1;
-  const second = octets[1] ?? -1;
-  return (
-    first === 0 ||
-    first === 10 ||
-    first === 127 ||
-    (first === 169 && second === 254) ||
-    (first === 172 && second >= 16 && second <= 31) ||
-    (first === 192 && second === 168) ||
-    first >= 224
-  );
-}
-
 export const publicHttpUrlSchema = z
   .url()
   .max(2_048)
@@ -53,18 +34,7 @@ export const publicHttpUrlSchema = z
     if (!URL.canParse(value)) {
       return;
     }
-    const url = new URL(value);
-    const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-    const invalidProtocol = url.protocol !== "http:" && url.protocol !== "https:";
-    const invalidHost =
-      blockedHostnames.has(hostname) ||
-      hostname.endsWith(".localhost") ||
-      hostname === "::1" ||
-      hostname.startsWith("fc") ||
-      hostname.startsWith("fd") ||
-      hostname.startsWith("fe80:") ||
-      isPrivateIpv4(hostname);
-    if (invalidProtocol || invalidHost || url.username || url.password) {
+    if (!isPublicHttpUrl(value)) {
       context.addIssue({
         code: "custom",
         message: "A public HTTP(S) URL is required.",
@@ -476,7 +446,29 @@ const archiveSelectionFields = {
     .refine((ids) => new Set(ids).size === ids.length, "File IDs must be unique."),
 };
 
+export const pageDiscoverySchema = z.object({
+  sourcePage: publicHttpUrlSchema,
+  truncated: z.boolean(),
+  items: z
+    .array(
+      z.object({
+        url: publicHttpUrlSchema,
+        name: z.string().min(1).max(300),
+        type: z.string().min(1).max(100),
+        kind: z.enum(["file", "page"]),
+        confidence: z.enum(["high", "low"]),
+        sizeBytes: z.number().int().nonnegative().nullable(),
+        sourcePage: publicHttpUrlSchema,
+      }),
+    )
+    .max(500),
+});
+export type PageDiscovery = z.infer<typeof pageDiscoverySchema>;
+
 export const serverContract = {
+  discovery: {
+    inspect: oc.input(z.object({ url: publicHttpUrlSchema })).output(pageDiscoverySchema),
+  },
   nestedArchives: {
     inspect: oc
       .input(z.object({ id: z.uuid(), path: safeRelativePathSchema }))

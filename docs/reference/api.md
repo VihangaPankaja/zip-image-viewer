@@ -8,6 +8,16 @@ client calls rather than duplicating request types.
 RPC requests use `/rpc`. Raw files and media use HTTP routes so browsers can
 request byte ranges, playlists and segments.
 
+## Page link discovery
+
+`discovery.inspect({ url })` reads one public HTML page and returns its resolved
+`sourcePage`, `items` and a `truncated` flag. Each item has its URL, name, type,
+file/page classification, confidence, source page and nullable size. The client
+submits reviewed file URLs through the existing `jobs.enqueue` contract.
+Inspection never creates jobs. Initial URLs, redirects and socket DNS results
+must use public addresses. The bounded request follows the caller's abort signal;
+see [page inspection limits](../guides/downloads.md#find-downloads-on-a-page).
+
 ## ZIP selection
 
 `archives.get({ id })` returns the retained job's validated ZIP manifest, stable

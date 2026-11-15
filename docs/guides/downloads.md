@@ -13,6 +13,30 @@ large download when prompted. Failed downloads offer **Retry**.
 Settings controls simultaneous downloads and HTTP threading. Torrent bandwidth
 limits apply across active torrents; HTTP thread settings do not affect peers.
 
+## Find downloads on a page
+
+In **Add downloads**, choose **From a page**, paste a public page URL and choose
+**Inspect page**. Review names, file types, source page and confidence, then select
+up to 50 files and choose **Add selected**. Nothing is queued while inspecting.
+**Direct links** returns to the ordinary URL composer.
+
+Inspection reads one HTML page, follows up to five public redirects, and resolves
+relative links using the page's first base URL. Duplicate links share one row;
+different query strings stay distinct. Download attributes and MIME hints can
+identify extensionless files. Types and confidence are hints, not verification
+of the destination. Sizes remain unknown until downloading starts. Unconfirmed
+page links are shown separately from selectable file candidates.
+
+Each inspection has a 10-second and 2 MiB decoded HTML limit. At most two pages
+can be inspected at once. Results contain at most 500 distinct public links,
+with a notice when more were found. Cancel inspection or close the dialog to
+stop waiting. Malformed HTML uses ordinary browser parsing recovery; broken
+links are ignored. Inspection does not run scripts, sign in, fetch linked files
+or crawl other pages. Use a direct public file link for those cases.
+
+Text decoding uses the byte-order mark first, then the HTTP charset, then HTML
+encoding declarations in the first 1024 bytes. Undeclared pages default to UTF-8.
+
 HTTP downloads probe a single byte when an origin does not support HEAD. They
 validate ranged responses before reusing retained bytes. If ranges, encoding or
 source identity change, they discard the partial transfer and restart with one

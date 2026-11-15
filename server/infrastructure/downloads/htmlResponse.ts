@@ -1,6 +1,6 @@
 import { html, parse, type DefaultTreeAdapterMap } from "parse5";
+import { htmlNodes as descendants, htmlAttribute as attribute } from "./htmlParsing.js";
 
-type Node = DefaultTreeAdapterMap["node"];
 type Element = DefaultTreeAdapterMap["element"];
 const HTML_NAMESPACE = html.NS.HTML;
 
@@ -19,21 +19,6 @@ function decodePrefix(prefix: Buffer, contentType: string) {
   } catch {
     return new TextDecoder("utf-8").decode(prefix);
   }
-}
-
-function* descendants(root: Node): Generator<Node> {
-  const pending = [root];
-  while (pending.length) {
-    const node = pending.pop();
-    if (!node) continue;
-    yield node;
-    if ("tagName" in node && ["script", "style", "template"].includes(node.tagName)) continue;
-    if ("childNodes" in node) pending.push(...node.childNodes.slice().reverse());
-  }
-}
-
-function attribute(element: Element, name: string) {
-  return element.attrs.find((item) => item.name === name)?.value;
 }
 
 function hasForm(input: Element, elements: Element[]) {
