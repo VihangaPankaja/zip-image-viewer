@@ -92,7 +92,7 @@ export async function writeArchiveEntry(options: ArchiveEntryOptions) {
     });
     const code = await closed;
     controller.signal.throwIfAborted();
-    if (code !== 0) checkArchiveFailure(errors(), password !== undefined);
+    if (code !== 0) checkArchiveFailure(errors(), password !== undefined, archivePath);
     if (!gzip && state.downloadedBytes - before !== entry.size)
       throw resourceLimitError("Archive entry does not match its declared size.");
   } catch (error) {

@@ -105,7 +105,7 @@ export async function inspect7zip(
   );
   const encrypted = encryptedArchiveListing(stdout);
   if (encrypted && password === undefined) throw new ArchivePasswordRequired();
-  if (stderr.trim()) checkArchiveFailure(stderr, password !== undefined);
+  if (stderr.trim()) checkArchiveFailure(stderr, password !== undefined, archivePath);
   const listing = stdout.split(/^----------\r?$/m).at(-1) ?? "";
   const entries = listing
     .trim()
