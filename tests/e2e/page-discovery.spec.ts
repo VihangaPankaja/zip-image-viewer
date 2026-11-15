@@ -1,5 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { setCssViewport } from "./helpers/viewport";
+import { tapVisibleTarget } from "./touch";
 
 test("reviews page links before queueing once, with keyboard and narrow layouts", async ({
   page,
@@ -33,7 +35,7 @@ test("reviews page links before queueing once, with keyboard and narrow layouts"
     submitted = route.request().postDataJSON();
     await route.fulfill({ json: { json: { items: [] } } });
   });
-  await page.setViewportSize({ width: 360, height: 740 });
+  await setCssViewport(page, 360, 740);
   await page.goto("/");
   await page.getByRole("button", { name: "Add downloads" }).click();
   await page.getByRole("button", { name: "From a page" }).click();
@@ -78,6 +80,7 @@ test("shows inspection failures and supports touch selection", async ({ browser 
     hasTouch: true,
   });
   const page = await context.newPage();
+  await setCssViewport(page, 390, 844);
   let attempts = 0;
   await page.route("**/rpc/discovery/inspect", async (route) => {
     attempts++;
@@ -106,13 +109,13 @@ test("shows inspection failures and supports touch selection", async ({ browser 
     });
   });
   await page.goto("/");
-  await page.getByRole("button", { name: "Add downloads" }).tap();
-  await page.getByRole("button", { name: "From a page" }).tap();
+  await tapVisibleTarget(page.getByRole("button", { name: "Add downloads" }));
+  await tapVisibleTarget(page.getByRole("button", { name: "From a page" }));
   await page.getByRole("textbox", { name: "Page URL" }).fill("https://example.com/");
-  await page.getByRole("button", { name: "Inspect page" }).tap();
+  await tapVisibleTarget(page.getByRole("button", { name: "Inspect page" }));
   await expect(page.getByRole("dialog").getByRole("alert")).toBeVisible();
-  await page.getByRole("button", { name: "Inspect page" }).tap();
-  await page.getByRole("checkbox", { name: "Photo" }).tap();
+  await tapVisibleTarget(page.getByRole("button", { name: "Inspect page" }));
+  await tapVisibleTarget(page.getByRole("checkbox", { name: "Photo" }));
   await expect(page.getByRole("button", { name: "Add selected" })).toBeEnabled();
   await page.getByRole("dialog").press("Escape");
   await expect(page.getByRole("dialog")).toBeHidden();
