@@ -288,6 +288,7 @@ describe("real download flows", () => {
       confirmJob: queue.confirmSessionJob,
       selectTorrentFiles: queue.selectTorrentFiles,
       selectArchiveFiles: queue.selectArchiveFiles,
+      submitArchivePassword: queue.submitArchivePassword,
       setTorrentFilePriority: vi.fn(),
       listOrderedJobs: queue.getOrderedJobs,
       pauseJob: queue.pauseSessionJob,

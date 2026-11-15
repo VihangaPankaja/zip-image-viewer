@@ -1,5 +1,6 @@
 import { ApplicationError, type SessionJob } from "../../domain/models.js";
 import { getZipSelection } from "./archiveSelection.js";
+import { archivePasswordAction, takeArchivePassword } from "./archivePasswords.js";
 
 type QueueItem = { job: SessionJob; confirmOversize: boolean };
 const deletionConflict =
@@ -283,6 +284,7 @@ function cancelSessionJob(state: QueueState, jobId: string): SessionJob {
   if (pendingIndex >= 0) state.pendingSessionJobs.splice(pendingIndex, 1);
   state.requeueAfterActive.delete(jobId);
   item.job.pauseRequested = false;
+  takeArchivePassword(item.job);
   item.job.abortController?.abort();
   const cancellingExtraction =
     state.activeItems.has(jobId) && item.job.status === "extracting" && item.job.extraction;
@@ -331,6 +333,7 @@ export function createSessionJobQueue(deps: SessionJobQueueDeps) {
   return {
     stopSessionJobs: async () => {
       state.stopping = true;
+      for (const { job } of state.jobs.values()) takeArchivePassword(job);
       for (const { job } of state.activeItems.values()) {
         job.pauseRequested = true;
         job.abortController?.abort();
@@ -338,6 +341,9 @@ export function createSessionJobQueue(deps: SessionJobQueueDeps) {
       await Promise.all(state.running);
     },
     cancelSessionJob: (jobId: string) => cancelSessionJob(state, jobId),
+    submitArchivePassword: archivePasswordAction(state.jobs, (job, confirmed) =>
+      enqueueSessionJob(state, job, confirmed),
+    ),
     confirmSessionJob: (jobId: string) => confirmSessionJob(state, jobId),
     selectTorrentFiles: (jobId: string, fileIds: string[]) =>
       selectTorrentFiles(state, jobId, fileIds),

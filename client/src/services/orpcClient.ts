@@ -10,5 +10,5 @@ const rpcLink = new RPCLink({
   url: new URL("/rpc", window.location.origin).toString(),
 });
 
-const workspaceRpcClient = createORPCClient<WorkspaceRpcClient>(rpcLink);
+export const workspaceRpcClient = createORPCClient<WorkspaceRpcClient>(rpcLink);
 export const workspaceRpc = createORPCReactQueryUtils(workspaceRpcClient);

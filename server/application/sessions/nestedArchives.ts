@@ -11,6 +11,7 @@ import {
 import { inspectZip } from "../../infrastructure/archive/zipManifest.js";
 import { summarizeArchive } from "../../infrastructure/archive/archiveSummary.js";
 import { inspect7zip } from "../../infrastructure/process/commandRunner.js";
+import { ArchivePasswordRequired } from "../../infrastructure/archive/archivePassword.js";
 import {
   MAX_RESOURCE_BYTES,
   resourceLimitError,
@@ -118,6 +119,7 @@ class NestedArchives {
     relativePath: string,
     budget: ArchiveBudget,
     signal: AbortSignal,
+    password?: string,
   ) {
     const filename = await resolveArchiveSource(parent, relativePath);
     const hash = await fingerprintArchive(filename, signal);
@@ -125,6 +127,9 @@ class NestedArchives {
     this.caches.set(parent, records);
     let record = records.get(relativePath);
     if (record?.fingerprint === hash) {
+      if (record.index.encrypted && password === undefined) throw new ArchivePasswordRequired();
+      if (record.index.encrypted)
+        await inspect7zip(this.deps.executable, filename, signal, password);
       if (record.childId && !this.deps.sessions.has(record.childId)) {
         record.childId = undefined;
         record.extracted.clear();
@@ -137,7 +142,7 @@ class NestedArchives {
     const detected = await fileTypeFromFile(filename);
     if (detected?.ext === "zip") await inspectZip(filename, signal);
     signal.throwIfAborted();
-    const index = await inspect7zip(this.deps.executable, filename, signal);
+    const index = await inspect7zip(this.deps.executable, filename, signal, password);
     if (budget.entries + index.entryCount > this.limits.entries)
       throw resourceLimitError("Nested archives exceed the cumulative entry limit.");
     const entries = index.entries.map((entry, position) => ({
@@ -149,6 +154,7 @@ class NestedArchives {
       extracted: false,
     }));
     const manifest: ArchiveManifest = {
+      passwordProtected: index.encrypted,
       fingerprint: hash,
       sourceBytes: (await stat(filename)).size,
       entries,
@@ -242,10 +248,10 @@ class NestedArchives {
     return done;
   }
 
-  inspect(id: string, relativePath: string) {
+  inspect(id: string, relativePath: string, password?: string) {
     relativePath = relativePath.replaceAll("\\", "/");
     return this.run(id, relativePath, async (parent, budget, signal) => {
-      const { record } = await this.cached(parent, relativePath, budget, signal);
+      const { record } = await this.cached(parent, relativePath, budget, signal, password);
       return {
         ...record.manifest,
         entries: record.manifest.entries.map((entry) => ({
@@ -267,10 +273,22 @@ class NestedArchives {
       throw new ApplicationError("INVALID_INPUT", "Invalid archive selection.", 400);
     return files.filter((entry) => !record.extracted.has(entry.id));
   }
-  open(id: string, relativePath: string, expectedFingerprint: string, fileIds: string[]) {
+  open(
+    id: string,
+    relativePath: string,
+    expectedFingerprint: string,
+    fileIds: string[],
+    password?: string,
+  ) {
     relativePath = relativePath.replaceAll("\\", "/");
     return this.run(id, relativePath, async (parent, budget, signal, track) => {
-      const { record, filename } = await this.cached(parent, relativePath, budget, signal);
+      const { record, filename } = await this.cached(
+        parent,
+        relativePath,
+        budget,
+        signal,
+        password,
+      );
       const selected = this.selection(record, expectedFingerprint, fileIds);
       // Gzip metadata reports modulo sizes, so reserve the remaining chain budget until actual output is known.
       const bytes =
@@ -293,6 +311,7 @@ class NestedArchives {
           bytes,
           sessions: this.deps.sessions,
           executable: this.deps.executable,
+          password,
         });
         budget.bytes -= bytes - result.expandedBytes;
         return { id: result.id };

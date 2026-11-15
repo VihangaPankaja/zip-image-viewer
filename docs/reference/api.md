@@ -28,11 +28,19 @@ published files and queues extraction of the combined selection. Directory
 choices expand to their matching file IDs in the client. See
 [Downloads and archives](../guides/downloads.md#browse-an-archive) for the user flow.
 
+## Archive passwords
+
+`jobs.password({ id, password })` accepts a single-line password of 1-1024
+characters only while the job is `awaiting_password`. It queues extraction from
+the retained source and returns the public job without its password. Passwords
+are transient and must be supplied again after a restart. See
+[password-protected archives](../guides/downloads.md#password-protected-archives).
+
 ## Nested archives
 
-`nestedArchives.inspect({ id, path })` inspects an archive file owned by a parent
+`nestedArchives.inspect({ id, path, password? })` inspects an archive file owned by a parent
 session and returns its manifest without extracting it. `nestedArchives.open({
-id, path, fingerprint, fileIds })` extracts selected file IDs and returns the
+id, path, fingerprint, fileIds, password? })` extracts selected file IDs and returns the
 child session ID. Existing child contents are kept when adding selections.
 `nestedArchives.cancel({ id, path })` aborts and drains that archive's pending work.
 
@@ -78,3 +86,8 @@ completion. Failed preparation returns HTTP 503. Disconnecting releases the
 request's media consumer.
 
 For startup readiness and network access, see [deployment](deployment.md#readiness-and-access).
+
+Password-related RPC calls require POST bodies. Nested inspection and extraction
+return `PASSWORD_REQUIRED` when entry or retry is needed; encrypted-data damage
+can be indistinguishable from a wrong password. Do not put passwords in query
+keys, cached mutations or URL parameters.

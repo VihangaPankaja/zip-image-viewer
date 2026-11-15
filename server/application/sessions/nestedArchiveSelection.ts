@@ -18,6 +18,7 @@ export type NestedArchiveRecord = {
   directory: string;
 };
 type Selection = {
+  password?: string;
   parent: Session;
   record: NestedArchiveRecord;
   selected: ArchiveManifest["entries"];
@@ -41,6 +42,7 @@ async function stageSelection(selection: Selection, pendingDir: string) {
   const { record, signal, filename, selected, executable, bytes } = selection;
   await stageExtraction(pendingDir, async (staging) => {
     await extractWith7zip(executable, filename, staging, {
+      password: selection.password,
       signal,
       filePaths: selected.map((entry) => record.index.entries[Number(entry.id)].path),
       index: record.index,

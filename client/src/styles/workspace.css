@@ -1,3 +1,26 @@
+.archive-password-body,
+.archive-password-form {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.archive-password-body {
+  padding: var(--space-4);
+  overflow: auto;
+}
+
+.archive-password-form p,
+.archive-password-body p {
+  overflow-wrap: anywhere;
+}
+
+.archive-password-form input {
+  width: 100%;
+  min-width: 0;
+}
+
 .unified-workspace {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);

@@ -26,6 +26,7 @@ function job(id = "2bf886fc-65bf-4e2f-b973-b607766b3131"): Job {
 
 function dependencies(): ServerRpcDependencies {
   return {
+    submitArchivePassword: vi.fn(),
     discoverPage: vi.fn(() =>
       Promise.resolve({ sourcePage: "https://example.com/", items: [], truncated: false }),
     ),
@@ -92,6 +93,21 @@ function dependencies(): ServerRpcDependencies {
 }
 
 describe("createServerRpcRouter", () => {
+  it("accepts passwords only in POST bodies and rejects line breaks without calling the job action", async () => {
+    const deps = dependencies();
+    const app = express();
+    app.use(express.json());
+    registerRpc(app, deps);
+    for (const endpoint of ["jobs/password", "nestedArchives/inspect", "nestedArchives/open"]) {
+      await request(app).get(`/rpc/${endpoint}`).expect(405);
+    }
+    const router = createServerRpcRouter(deps);
+    for (const password of ["", "one\ntwo", "one\rtwo", "one\0two", "x".repeat(1025)])
+      await expect(call(router.jobs.password, { id: job().id, password })).rejects.toBeInstanceOf(
+        ORPCError,
+      );
+    expect(deps.submitArchivePassword).not.toHaveBeenCalled();
+  });
   it("maps blocked session and job deletions to public RPC conflicts", async () => {
     const deps = dependencies();
     const conflict = new ApplicationError(

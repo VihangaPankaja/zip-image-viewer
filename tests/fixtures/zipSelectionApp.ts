@@ -4,7 +4,10 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { path7za } from "7zip-bin";
-import { runCommand } from "../../server/infrastructure/process/commandRunner.js";
+import {
+  runCommand,
+  runCommandCapture,
+} from "../../server/infrastructure/process/commandRunner.js";
 import { startHttpRestartServer, stopHttpRestartServer } from "./httpRestartServer.js";
 import { workspaceProxy } from "./proxyApp.js";
 
@@ -18,6 +21,7 @@ export async function startZipSelectionApp(
   baseURL: string,
   nested = false,
   pausedExtraction = false,
+  encryption?: { password: string; type?: "zip" | "7z"; headers?: boolean; nestedOnly?: boolean },
 ) {
   const directory = await mkdtemp(path.join(tmpdir(), "zip-browser-"));
   const contents = path.join(directory, "contents");
@@ -34,10 +38,12 @@ export async function startZipSelectionApp(
     await mkdir(inner);
     await writeFile(path.join(inner, "read-me.txt"), "Text inside a selected nested 7z archive.");
     await writeFile(path.join(inner, "leave-inside.txt"), "This entry must stay compressed.");
-    await runCommand(path7za, ["a", "-t7z", path.join(contents, "inside.7z"), "."], { cwd: inner });
+    await createArchive(path.join(contents, "inside.7z"), inner, "7z", encryption);
   }
-  const archive = path.join(directory, "collection.zip");
-  await runCommand(path7za, ["a", "-tzip", archive, "."], { cwd: contents });
+  const format = encryption?.type ?? "zip";
+  const name = `collection.${format}`;
+  const archive = path.join(directory, name);
+  await createArchive(archive, contents, format, encryption?.nestedOnly ? undefined : encryption);
   const payload = await readFile(archive);
   let requests = 0;
   const source = createServer((request, response) => {
@@ -61,7 +67,7 @@ export async function startZipSelectionApp(
   const { items } = await api.client.jobs.enqueue({
     items: [
       {
-        url: `http://download.example:${sourceAddress.port}/collection.zip`,
+        url: `http://download.example:${sourceAddress.port}/${name}`,
         downloadOptions: { retry: { maxRetries: 0 } },
       },
     ],
@@ -90,4 +96,25 @@ export async function startZipSelectionApp(
       await rm(directory, { recursive: true, force: true });
     },
   };
+}
+
+async function createArchive(
+  filename: string,
+  cwd: string,
+  type: string,
+  encryption?: { password: string; headers?: boolean },
+) {
+  const args = [
+    "a",
+    `-t${type}`,
+    ...(encryption ? ["-p", ...(type === "7z" && encryption.headers ? ["-mhe=on"] : [])] : []),
+    filename,
+    ".",
+  ];
+  if (encryption)
+    await runCommandCapture(path7za, args, {
+      cwd,
+      stdin: `${encryption.password}\n${encryption.password}\n`,
+    });
+  else await runCommand(path7za, args, { cwd });
 }

@@ -4,6 +4,7 @@ import { NestedArchiveDialog } from "../../../../../../client/src/features/works
 
 const rpc = vi.hoisted(() => ({ open: vi.fn(), cancel: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("../../../../../../client/src/services/orpcClient", () => ({
+  workspaceRpcClient: { nestedArchives: { open: rpc.open } },
   workspaceRpc: {
     nestedArchives: {
       inspect: {

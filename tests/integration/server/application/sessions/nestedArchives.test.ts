@@ -65,6 +65,50 @@ async function fixture(limits?: Parameters<typeof createNestedArchives>[0]["limi
   return { parent, sessions, service, manager, extractDir, workspaceDir };
 }
 
+it.each(["zip", "7z"])(
+  "opens encrypted nested %s with a transient password and retries without changing the parent",
+  async (type) => {
+    const { parent, sessions, service, extractDir, workspaceDir } = await fixture();
+    const archive = `private.${type}`;
+    const password = "nested-private-$()";
+    await commands.runCommandCapture(
+      path7za,
+      [
+        "a",
+        `-t${type}`,
+        "-p",
+        ...(type === "7z" ? ["-mhe=on"] : []),
+        path.join(extractDir, archive),
+        ".",
+      ],
+      { cwd: path.join(workspaceDir, "input"), stdin: `${password}\n${password}\n` },
+    );
+    await expect(service.inspect(parent.id, archive)).rejects.toMatchObject({
+      code: "PASSWORD_REQUIRED",
+    });
+    const manifest = await service.inspect(parent.id, archive, password);
+    if (type === "7z")
+      await expect(service.inspect(parent.id, archive, "wrong")).rejects.toMatchObject({
+        code: "PASSWORD_REQUIRED",
+      });
+    const file = required(manifest.entries.find((entry) => entry.path === "one.txt"));
+    await expect(
+      service.open(parent.id, archive, manifest.fingerprint, [file.id], "wrong"),
+    ).rejects.toMatchObject({ code: "PASSWORD_REQUIRED" });
+    expect(sessions.size).toBe(1);
+    const child = await service.open(parent.id, archive, manifest.fingerprint, [file.id], password);
+    expect(
+      await readFile(path.join(required(sessions.get(child.id)).extractDir, "one.txt"), "utf8"),
+    ).toBe("first text");
+    expect(await readFile(path.join(extractDir, archive))).toBeTruthy();
+    await expect(
+      service.open(parent.id, archive, manifest.fingerprint, [
+        required(manifest.entries.find((entry) => entry.path === "two.txt")).id,
+      ]),
+    ).rejects.toMatchObject({ code: "PASSWORD_REQUIRED" });
+  },
+);
+
 it("indexes ZIP → 7z → text on demand, extracts selections only and reuses stable owned children", async () => {
   const { parent, sessions, service, manager } = await fixture();
   const inspect = vi.spyOn(commands, "inspect7zip");

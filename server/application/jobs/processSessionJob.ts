@@ -1,3 +1,4 @@
+import { emitFailure } from "./jobFailure.js";
 import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
@@ -16,6 +17,7 @@ import { downloadSessionSource, type DownloadSourceDependencies } from "./downlo
 import { extractSessionSource } from "./extractSessionSource.js";
 import { ArchiveSelectionRequired, prepareZipArchive } from "./archiveSelection.js";
 import { stageExtraction } from "../../infrastructure/archive/stagedExtraction.js";
+import { takeArchivePassword, waitForArchivePassword } from "./archivePasswords.js";
 import { downloadTorrentSource } from "../torrents/downloadTorrentSource.js";
 import type { TorrentAdapter } from "../torrents/torrentDownloader.js";
 import { prepareTorrentEntries } from "../torrents/prepareTorrentEntries.js";
@@ -136,37 +138,6 @@ function completeSession(
   });
 }
 
-function emitFailure(job: SessionJob, error: Error, deps: ProcessorDependencies): void {
-  if (error.name === "AbortError") {
-    deps.emitJob(
-      job,
-      {
-        status: "cancelled",
-        phase: "cancelled",
-        error: "",
-        extraction: job.extraction ? { ...job.extraction, stage: "cancelling" } : undefined,
-        message: job.extraction
-          ? "Extraction cancelled. Partial output was removed; the source is kept for Retry."
-          : "Archive loading was cancelled.",
-      },
-      "cancelled",
-    );
-    deps.closeJob(job, "cancelled");
-    return;
-  }
-  deps.emitJob(
-    job,
-    {
-      status: "error",
-      phase: "error",
-      error: error.message || "Could not process this file.",
-      message: error.message || "Could not process this file.",
-    },
-    "job-error",
-  );
-  deps.closeJob(job, "error");
-}
-
 async function processTorrentJob(
   job: SessionJob,
   confirmOversize: boolean,
@@ -175,6 +146,15 @@ async function processTorrentJob(
 ): Promise<void> {
   const torrentDir = path.join(job.workspaceDir, "torrent");
   await mkdir(torrentDir, { recursive: true });
+  if (
+    deps.password !== undefined &&
+    job.torrentArchivePath &&
+    job.torrentFiles.filter((file) => file.selected).every((file) => file.complete)
+  ) {
+    const session = await restoreTorrentSession(job, deps);
+    completeSession(job, session, "Torrent archive is ready to browse.", deps);
+    return;
+  }
   const result = await downloadTorrentSource(
     job,
     settings,
@@ -312,6 +292,7 @@ async function processSessionJob(
     }
   } catch (error) {
     if (error instanceof ArchiveSelectionRequired) return;
+    if (waitForArchivePassword(job, error, deps.emitJob)) return;
     const abortReason: unknown = job.abortController?.signal.reason;
     const jobError =
       job.status === "error" && job.error
@@ -351,5 +332,5 @@ async function processSessionJob(
 
 export function createProcessSessionJob(deps: ProcessorDependencies) {
   return (job: SessionJob, confirmOversize = false) =>
-    processSessionJob(deps, job, confirmOversize);
+    processSessionJob({ ...deps, password: takeArchivePassword(job) }, job, confirmOversize);
 }

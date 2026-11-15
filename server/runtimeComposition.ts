@@ -180,6 +180,7 @@ const app = createRuntimeApp({
   confirmJob: sessionJobQueue.confirmSessionJob,
   selectTorrentFiles: sessionJobQueue.selectTorrentFiles,
   selectArchiveFiles: sessionJobQueue.selectArchiveFiles,
+  submitArchivePassword: sessionJobQueue.submitArchivePassword,
   ...torrentControls,
   listOrderedJobs: sessionJobQueue.getOrderedJobs,
   pauseJob: sessionJobQueue.pauseSessionJob,
