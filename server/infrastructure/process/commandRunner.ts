@@ -1,45 +1,19 @@
-import { spawn, type ChildProcess } from "node:child_process";
-import { constants, createWriteStream } from "node:fs";
-import { access, chmod, mkdir, utimes } from "node:fs/promises";
-import { pipeline } from "node:stream/promises";
+import { chunkText, waitForClose, ensureExecutable } from "./commandProcess.js";
+import { writeArchiveEntry } from "./archiveEntryStream.js";
+import { spawn } from "node:child_process";
 import path from "node:path";
+import { mkdir, utimes } from "node:fs/promises";
 import { validateArchiveEntries } from "../archive/archiveLimits.js";
 import {
-  createDownloadBudget,
   assertResourceSize,
-  MAX_RESOURCE_BYTES,
   reserveStorage,
   resourceLimitError,
 } from "../runtime/resourceLimits.js";
 import { sanitizeEntryPath } from "../runtime/runtimePrimitives.js";
 import type { ExtractionProgress } from "../../../shared/contracts.js";
+import { ArchivePasswordRequired, checkArchiveFailure } from "../archive/archivePassword.js";
 
 const MAX_COMMAND_OUTPUT_BYTES = 10 * 1024 ** 2;
-
-function chunkText(chunk: unknown): string {
-  if (typeof chunk === "string") return chunk;
-  if (Buffer.isBuffer(chunk)) return chunk.toString("utf8");
-  return "";
-}
-
-function waitForClose(child: ChildProcess): Promise<number | null> {
-  return new Promise((resolve, reject) => {
-    let failure: Error | undefined;
-    child.once("error", (error) => {
-      failure = error;
-    });
-    child.once("close", (code) => (failure ? reject(failure) : resolve(code)));
-  });
-}
-
-async function ensureExecutable(command: string): Promise<void> {
-  if (process.platform === "win32" || !path.isAbsolute(command)) return;
-  try {
-    await access(command, constants.X_OK);
-  } catch {
-    await chmod(command, 0o755);
-  }
-}
 
 export async function runCommand(
   command: string,
@@ -68,18 +42,22 @@ export async function runCommandCapture(
     allowNonZeroExit?: boolean;
     cwd?: string;
     signal?: AbortSignal;
+    stdin?: string;
   } = {},
 ): Promise<{ stdout: string; stderr: string }> {
   await ensureExecutable(command);
-  const { allowNonZeroExit = false, ...spawnOptions } = options;
+  const { allowNonZeroExit = false, stdin, ...spawnOptions } = options;
   const controller = new AbortController();
   const child = spawn(command, args, {
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ["pipe", "pipe", "pipe"],
+    windowsHide: true,
     ...spawnOptions,
     signal: spawnOptions.signal
       ? AbortSignal.any([spawnOptions.signal, controller.signal])
       : controller.signal,
   });
+  child.stdin.on("error", () => undefined);
+  child.stdin.end(stdin ?? "");
   let stdout = "";
   let stderr = "";
   let capturedBytes = 0;
@@ -110,94 +88,21 @@ export async function runCommandCapture(
   }
 }
 
-async function writeArchiveEntry({
-  executable,
-  archivePath,
-  entry,
-  destination,
-  gzip,
-  storage,
-  state,
-  signal,
-  remainingBytes,
-  onBytes,
-}: {
-  executable: string;
-  archivePath: string;
-  entry: { path: string; size: number };
-  destination: string;
-  gzip: boolean;
-  storage: ReturnType<typeof reserveStorage>;
-  state: { downloadedBytes: number };
-  signal?: AbortSignal;
-  remainingBytes?: number;
-  onBytes?: (_bytes: number) => void;
-}) {
-  const controller = new AbortController();
-  const child = spawn(
-    executable,
-    ["x", "-so", "-y", "-spd", "-ssc", `-i!${entry.path}`, "--", archivePath],
-    {
-      stdio: ["ignore", "pipe", "pipe"],
-      signal: signal ? AbortSignal.any([signal, controller.signal]) : controller.signal,
-    },
-  );
-  let stderr = "";
-  let stderrBytes = 0;
-  child.stderr.on("data", (chunk: unknown) => {
-    const text = chunkText(chunk);
-    stderrBytes += Buffer.byteLength(text);
-    if (stderrBytes > MAX_COMMAND_OUTPUT_BYTES)
-      controller.abort(resourceLimitError("Command metadata exceeds the 10 MiB limit."));
-    else stderr += text;
-  });
-  const closed = waitForClose(child).catch((error: unknown) => {
-    controller.abort(error);
-    return null;
-  });
-  const before = state.downloadedBytes;
-  const budget = createDownloadBudget(
-    () => Math.min(gzip ? MAX_RESOURCE_BYTES : entry.size, remainingBytes ?? MAX_RESOURCE_BYTES),
-    state,
-    (received) => {
-      storage.check(before + received);
-      onBytes?.(before + received);
-    },
-  );
-  const timer = setInterval(() => {
-    try {
-      storage.check(state.downloadedBytes);
-    } catch (error) {
-      controller.abort(error);
-    }
-  }, 100);
-  try {
-    await pipeline(child.stdout, budget, createWriteStream(destination, { flags: "wx" }), {
-      signal,
-    });
-    const code = await closed;
-    controller.signal.throwIfAborted();
-    if (code !== 0) throw new Error(stderr || `Command failed with code ${String(code)}`);
-    if (!gzip && state.downloadedBytes - before !== entry.size)
-      throw resourceLimitError("Archive entry does not match its declared size.");
-  } catch (error) {
-    controller.abort(error);
-    await closed;
-    controller.signal.throwIfAborted();
-    throw error;
-  } finally {
-    clearInterval(timer);
-  }
-}
-
-export async function inspect7zip(executable: string, archivePath: string, signal?: AbortSignal) {
-  const { stdout } = await runCommandCapture(
+export async function inspect7zip(
+  executable: string,
+  archivePath: string,
+  signal?: AbortSignal,
+  password?: string,
+) {
+  const { stdout, stderr } = await runCommandCapture(
     executable,
     ["l", "-slt", "-sccUTF-8", "--", archivePath],
-    { signal },
+    { signal, allowNonZeroExit: true, stdin: password === undefined ? "" : `${password}\n` },
   );
-  if (/Encrypted\s*=\s*\+/i.test(stdout) || /Method\s*=\s*\w+\s+AES/i.test(stdout))
-    throw resourceLimitError("Password-protected archives are not supported.");
+  const encrypted =
+    /Encrypted\s*=\s*\+/i.test(stdout) || /7zAES|AES256|ZipCrypto|enter password/i.test(stdout);
+  if (encrypted && password === undefined) throw new ArchivePasswordRequired();
+  if (stderr.trim()) checkArchiveFailure(stderr, password !== undefined);
   const listing = stdout.split(/^----------\r?$/m).at(-1) ?? "";
   const entries = listing
     .trim()
@@ -253,7 +158,7 @@ export async function inspect7zip(executable: string, archivePath: string, signa
     const parts = name.split("/");
     for (let index = 1; index <= parts.length; index++) paths.add(parts.slice(0, index).join("/"));
   }
-  return { entries, gzip: /^Type = gzip\r?$/m.test(stdout), entryCount: paths.size };
+  return { entries, encrypted, gzip: /^Type = gzip\r?$/m.test(stdout), entryCount: paths.size };
 }
 
 export async function extractWith7zip(
@@ -266,13 +171,13 @@ export async function extractWith7zip(
     index?: Awaited<ReturnType<typeof inspect7zip>>;
     maxBytes?: number;
     onProgress?: (_progress: ExtractionProgress) => void;
+    password?: string;
   } = {},
 ): Promise<void> {
-  const index = options.index ?? (await inspect7zip(executable, archivePath, options.signal));
-  const selected = options.filePaths ? new Set(options.filePaths) : undefined;
-  const entries = index.entries.filter((entry) => !selected || selected.has(entry.path));
-  if (selected && (entries.length !== selected.size || entries.some((entry) => entry.directory)))
-    throw resourceLimitError("Invalid archive selection.");
+  const index =
+    options.index ?? (await inspect7zip(executable, archivePath, options.signal, options.password));
+  if (index.encrypted && options.password === undefined) throw new ArchivePasswordRequired();
+  const entries = selectedArchiveEntries(index.entries, options.filePaths);
   const bytes = validateArchiveEntries(entries);
   const storage = reserveStorage(extractDirectory, bytes);
   const gzip = index.gzip;
@@ -301,6 +206,7 @@ export async function extractWith7zip(
         await mkdir(path.dirname(destination), { recursive: true });
         await writeArchiveEntry({
           executable,
+          password: options.password,
           archivePath,
           entry,
           destination,
@@ -333,15 +239,29 @@ export async function extractWith7zip(
   }
 }
 
+function selectedArchiveEntries(
+  entries: Awaited<ReturnType<typeof inspect7zip>>["entries"],
+  filePaths?: readonly string[],
+) {
+  if (!filePaths) return entries;
+  const selected = new Set(filePaths.map(sanitizeEntryPath));
+  const result = entries.filter((entry) => selected.has(sanitizeEntryPath(entry.path)));
+  if (result.length !== selected.size || result.some((entry) => entry.directory))
+    throw resourceLimitError("Invalid archive selection.");
+  return result;
+}
+
 export async function detectArchiveEncryption(
   executable: string,
   archivePath: string,
   signal?: AbortSignal,
 ): Promise<boolean> {
   if (!executable) return false;
-  const { stdout } = await runCommandCapture(executable, ["l", "-slt", archivePath], {
+  const { stdout, stderr } = await runCommandCapture(executable, ["l", "-slt", "--", archivePath], {
     allowNonZeroExit: true,
     signal,
   });
-  return /Encrypted\s*=\s*\+/i.test(stdout) || /Method\s*=\s*\w+\s+AES/i.test(stdout);
+  return /Encrypted\s*=\s*\+|7zAES|AES256|ZipCrypto|enter password|wrong password/i.test(
+    stdout + stderr,
+  );
 }

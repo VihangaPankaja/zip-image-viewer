@@ -72,7 +72,7 @@ async function checkDirectorySize(filename: string) {
   }
 }
 
-export async function openZip(filename: string, signal?: AbortSignal) {
+export async function openZip(filename: string, signal?: AbortSignal, allowEncrypted = false) {
   signal?.throwIfAborted();
   const tailSize = await checkDirectorySize(filename);
   // unzipper supports tailSize, but its published types omit the options argument.
@@ -121,7 +121,7 @@ export async function openZip(filename: string, signal?: AbortSignal) {
       throw resourceLimitError("Archive contains duplicate or conflicting paths.");
     names.set(key, entry.type === "Directory" ? "directory" : "file");
     offsets.add(entry.offsetToLocalFileHeader);
-    if (entry.flags & 1)
+    if (entry.flags & 1 && !allowEncrypted)
       throw resourceLimitError("Password-protected ZIP files are not supported.");
   }
   for (const key of names.keys()) {
@@ -139,7 +139,7 @@ export function zipEntryId(entry: unzipper.File) {
 }
 
 export async function inspectZip(filename: string, signal?: AbortSignal): Promise<ArchiveManifest> {
-  const directory = await openZip(filename, signal);
+  const directory = await openZip(filename, signal, true);
   const sourceBytes = (await stat(filename)).size;
   const fingerprint = createHash("sha256")
     .update(

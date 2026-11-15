@@ -15,6 +15,7 @@ export type JobStatus =
   | "extracting"
   | "awaiting_confirmation"
   | "awaiting_selection"
+  | "awaiting_password"
   | "paused"
   | "ready"
   | "cancelled"
@@ -28,6 +29,7 @@ export type JobPhase =
   | "extracting"
   | "confirm"
   | "selecting"
+  | "password"
   | "paused"
   | "ready"
   | "cancelled"
@@ -92,6 +94,7 @@ export type DownloadOptions = {
 };
 
 export type SessionJob = {
+  passwordProtected?: boolean;
   archiveProcessingMs?: number;
   id: string;
   url: string;
@@ -190,6 +193,7 @@ export type VideoTranscodeEntry = {
 };
 
 export type TypedErrorCode =
+  | "PASSWORD_REQUIRED"
   | "INVALID_INPUT"
   | "INVALID_JSON"
   | "NOT_FOUND"

@@ -27,6 +27,19 @@ export async function restoreRetainedTorrents(
       const savedPhase = job.phase;
       await checkTorrent(job, snapshot.torrentFiles, adapter);
       const selected = job.torrentFiles.filter(({ selected }) => selected);
+      if (job.passwordProtected && !["cancelled", "error"].includes(job.status)) {
+        Object.assign(job, {
+          sessionId: "",
+          status: "awaiting_password",
+          phase: "password",
+          extraction: undefined,
+          canPause: false,
+          canResume: false,
+          message: "This archive needs its password again after restart.",
+        });
+        saveRetainedTorrent(store, job);
+        continue;
+      }
       if (job.sessionId && selected.some(({ complete }) => complete)) await restoreSession(job);
       Object.assign(job, { status: savedStatus, phase: savedPhase });
       if (

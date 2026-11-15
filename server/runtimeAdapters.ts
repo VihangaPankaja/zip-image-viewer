@@ -45,8 +45,13 @@ export function extractRuntimeArchive(
   extractDir: string,
   signal?: AbortSignal,
   onProgress?: (_progress: ExtractionProgress) => void,
+  secrets?: { password?: string; filePaths?: readonly string[] },
 ): Promise<void> {
-  return extractArchiveWith7zip(path7za, archivePath, extractDir, { signal, onProgress });
+  return extractArchiveWith7zip(path7za, archivePath, extractDir, {
+    signal,
+    onProgress,
+    ...secrets,
+  });
 }
 
 export function detectRuntimeArchiveEncryption(

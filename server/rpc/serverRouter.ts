@@ -18,14 +18,16 @@ import {
 import { ApplicationError } from "../domain/models.js";
 
 export type ServerRpcDependencies = {
+  submitArchivePassword: (_id: string, _password: string) => Job;
   discoverPage: (_url: string, _signal?: AbortSignal) => Promise<PageDiscovery>;
   nestedArchives?: {
-    inspect: (_id: string, _path: string) => Promise<ArchiveManifest>;
+    inspect: (_id: string, _path: string, _password?: string) => Promise<ArchiveManifest>;
     open: (
       _id: string,
       _path: string,
       _fingerprint: string,
       _fileIds: string[],
+      _password?: string,
     ) => Promise<{ id: string }>;
     cancel: (_id: string, _path: string) => Promise<void>;
   };
@@ -64,19 +66,7 @@ export function createServerRpcRouter(deps: ServerRpcDependencies) {
   const contract = implement(serverContract);
   return contract.router({
     discovery: createDiscoveryRouter(deps.discoverPage),
-    nestedArchives: {
-      inspect: contract.nestedArchives.inspect.handler(({ input }) =>
-        applicationResult(() => nestedArchives(deps).inspect(input.id, input.path)),
-      ),
-      open: contract.nestedArchives.open.handler(({ input }) =>
-        applicationResult(() =>
-          nestedArchives(deps).open(input.id, input.path, input.fingerprint, input.fileIds),
-        ),
-      ),
-      cancel: contract.nestedArchives.cancel.handler(({ input }) =>
-        applicationResult(() => nestedArchives(deps).cancel(input.id, input.path)),
-      ),
-    },
+    nestedArchives: createNestedRouter(deps),
     archives: {
       get: contract.archives.get.handler(({ input }) =>
         applicationResult(() => deps.archives.get(input.id)),
@@ -106,6 +96,9 @@ export function createServerRpcRouter(deps: ServerRpcDependencies) {
       ),
     },
     jobs: {
+      password: contract.jobs.password.handler(({ input }) =>
+        applicationResult(() => deps.submitArchivePassword(input.id, input.password)),
+      ),
       list: contract.jobs.list.handler(() => ({
         items: [...deps.listJobs()],
       })),
@@ -182,4 +175,27 @@ async function applicationResult<Result>(
       });
     throw error;
   }
+}
+
+function createNestedRouter(deps: ServerRpcDependencies) {
+  const contract = implement(serverContract);
+  return {
+    inspect: contract.nestedArchives.inspect.handler(({ input }) =>
+      applicationResult(() => nestedArchives(deps).inspect(input.id, input.path, input.password)),
+    ),
+    open: contract.nestedArchives.open.handler(({ input }) =>
+      applicationResult(() =>
+        nestedArchives(deps).open(
+          input.id,
+          input.path,
+          input.fingerprint,
+          input.fileIds,
+          input.password,
+        ),
+      ),
+    ),
+    cancel: contract.nestedArchives.cancel.handler(({ input }) =>
+      applicationResult(() => nestedArchives(deps).cancel(input.id, input.path)),
+    ),
+  };
 }

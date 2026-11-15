@@ -52,6 +52,7 @@ describe("createRuntimeApp", () => {
       confirmJob,
       selectTorrentFiles: vi.fn(),
       selectArchiveFiles: vi.fn(),
+      submitArchivePassword: vi.fn(),
       setTorrentFilePriority: vi.fn(),
       listOrderedJobs: () => [job],
       pauseJob: vi.fn(),

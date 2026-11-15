@@ -74,6 +74,7 @@ const jobStatusSchema = z.enum([
   "extracting",
   "awaiting_confirmation",
   "awaiting_selection",
+  "awaiting_password",
   "paused",
   "ready",
   "cancelled",
@@ -88,6 +89,7 @@ const jobPhaseSchema = z.enum([
   "extracting",
   "confirm",
   "selecting",
+  "password",
   "paused",
   "ready",
   "cancelled",
@@ -155,6 +157,7 @@ const archiveSummarySchema = z.object({
   extractedCount: z.number().int().nonnegative(),
 });
 const archiveManifestSchema = archiveSummarySchema.extend({
+  passwordProtected: z.boolean().optional(),
   entries: z
     .array(
       z.object({
@@ -208,6 +211,7 @@ const extractionProgressSchema = z.object({
 export type ExtractionProgress = z.infer<typeof extractionProgressSchema>;
 
 export const jobSchema = z.object({
+  passwordProtected: z.boolean().optional(),
   id: z.uuid(),
   url: downloadSourceSchema,
   sourceKind: z.enum(["http", "torrent"]).default("http"),
@@ -345,6 +349,11 @@ const enqueueSessionsContract = oc
   .output(z.object({ items: z.array(jobSchema) }));
 
 const jobControlInputSchema = z.object({ id: z.uuid() });
+export const archivePasswordSchema = z
+  .string()
+  .min(1)
+  .max(1024)
+  .regex(/^[^\r\n\0]+$/, "Use a single-line password.");
 const selectTorrentFilesInputSchema = jobControlInputSchema.extend({
   fileIds: z
     .array(z.string().min(1))
@@ -471,7 +480,13 @@ export const serverContract = {
   },
   nestedArchives: {
     inspect: oc
-      .input(z.object({ id: z.uuid(), path: safeRelativePathSchema }))
+      .input(
+        z.object({
+          id: z.uuid(),
+          path: safeRelativePathSchema,
+          password: archivePasswordSchema.optional(),
+        }),
+      )
       .output(archiveManifestSchema),
     open: oc
       .input(
@@ -479,6 +494,7 @@ export const serverContract = {
           id: z.uuid(),
           path: safeRelativePathSchema,
           ...archiveSelectionFields,
+          password: archivePasswordSchema.optional(),
         }),
       )
       .output(z.object({ id: z.uuid() })),
@@ -497,6 +513,10 @@ export const serverContract = {
     remove: removeSessionContract,
   },
   jobs: {
+    password: oc
+      .route({ method: "POST", path: "/session-jobs/{id}/password" })
+      .input(jobControlInputSchema.extend({ password: archivePasswordSchema }))
+      .output(jobSchema),
     list: listJobsContract,
     enqueue: enqueueSessionsContract,
     cancel: cancelJobContract,

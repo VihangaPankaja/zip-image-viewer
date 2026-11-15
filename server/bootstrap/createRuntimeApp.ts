@@ -14,6 +14,7 @@ import { getArchiveManifest } from "../application/jobs/archiveSelection.js";
 import { discoverPage } from "../application/discovery/discoverPage.js";
 
 type Dependencies = {
+  submitArchivePassword: (_id: string, _password: string) => SessionJob;
   nestedArchives?: ServerRpcDependencies["nestedArchives"];
   storage: ServerRpcDependencies["storage"];
   videoQualities: (_input: VideoQualitiesInput) => Promise<VideoQualities>;
@@ -75,18 +76,11 @@ export function createRuntimeApp(deps: Dependencies) {
     listJobs,
     listSessions,
     rpc: {
+      submitArchivePassword: (id, password) =>
+        deps.sanitizeJob(deps.submitArchivePassword(id, password)),
       discoverPage,
       nestedArchives: deps.nestedArchives,
-      archives: {
-        get: (id) => {
-          const job = deps.jobs.get(id);
-          if (!job) throw new ApplicationError("NOT_FOUND", "Job not found.", 404);
-          return getArchiveManifest(job);
-        },
-        select: async (id, fingerprint, fileIds) => {
-          return deps.sanitizeJob(await deps.selectArchiveFiles(id, fingerprint, fileIds));
-        },
-      },
+      archives: archiveActions(deps),
       storage: deps.storage,
       videoQualities: deps.videoQualities,
       listJobs,
@@ -144,4 +138,17 @@ export function createRuntimeApp(deps: Dependencies) {
       updateTorrentLimits: deps.updateTorrentLimits,
     },
   });
+}
+
+function archiveActions(deps: Dependencies): ServerRpcDependencies["archives"] {
+  return {
+    get: (id) => {
+      const job = deps.jobs.get(id);
+      if (!job) throw new ApplicationError("NOT_FOUND", "Job not found.", 404);
+      return getArchiveManifest(job);
+    },
+    select: async (id, fingerprint, fileIds) => {
+      return deps.sanitizeJob(await deps.selectArchiveFiles(id, fingerprint, fileIds));
+    },
+  };
 }

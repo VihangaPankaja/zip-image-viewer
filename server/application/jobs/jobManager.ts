@@ -108,6 +108,7 @@ class JobManager {
 
   sanitizeJob = (job: SessionJob) => {
     return {
+      passwordProtected: job.passwordProtected,
       id: job.id,
       url: job.url,
       sourceKind: job.sourceKind,

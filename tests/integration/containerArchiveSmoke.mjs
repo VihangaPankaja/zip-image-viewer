@@ -21,7 +21,7 @@ import { path7za } from "7zip-bin";
 const builtModule = pathToFileURL(
   path.join(process.cwd(), "build/server/infrastructure/process/commandRunner.js"),
 ).href;
-const { detectArchiveEncryption, extractWith7zip } = await import(builtModule);
+const { detectArchiveEncryption, extractWith7zip, runCommandCapture } = await import(builtModule);
 assert.equal(path7za, "7za", "Production must use the maintained system extractor");
 const info = execFileSync(path7za, ["i"], { encoding: "utf8" });
 assert.match(info, /Rar5/, "The production extractor must retain RAR support");
@@ -63,9 +63,32 @@ try {
     assert.deepEqual(await readdir(path.join(output, "empty")), []);
   }
 
-  const encrypted = path.join(directory, "encrypted.7z");
-  execFileSync(path7za, ["a", "-pfixture-password", encrypted, "."], { cwd: source });
-  assert.equal(await detectArchiveEncryption(path7za, encrypted), true);
+  for (const format of ["zip", "7z"]) {
+    const encrypted = path.join(directory, `encrypted.${format}`);
+    await runCommandCapture(
+      path7za,
+      [
+        "a",
+        `-t${format}`,
+        "-p",
+        ...(format === "7z" ? ["-mhe=on"] : ["-mem=AES256"]),
+        encrypted,
+        ".",
+      ],
+      { cwd: source, stdin: "fixture-password\nfixture-password\n" },
+    );
+    assert.equal(await detectArchiveEncryption(path7za, encrypted), true);
+    const output = path.join(directory, `decrypted-${format}`);
+    await mkdir(output);
+    await assert.rejects(extractWith7zip(path7za, encrypted, output, { password: "wrong" }), {
+      code: "PASSWORD_REQUIRED",
+    });
+    await rm(output, { recursive: true });
+    await mkdir(output);
+    await extractWith7zip(path7za, encrypted, output, { password: "fixture-password" });
+    for (const member of members)
+      assert.equal(await readFile(path.join(output, member), "utf8"), member);
+  }
 
   const rar = path.join(directory, "stored.rar");
   await writeFile(
