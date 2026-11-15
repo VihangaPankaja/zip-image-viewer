@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import type { SessionJob } from "../../../../../server/domain/models.js";
 import { createSessionJobQueue } from "../../../../../server/application/jobs/sessionJobQueue.js";
+import { takeArchivePassword } from "../../../../../server/application/jobs/archivePasswords.js";
 
 function createJob(id: string): SessionJob {
   return {
@@ -79,6 +80,24 @@ function queueDependencies(maxActiveSessionJobs: number) {
 }
 
 describe("createSessionJobQueue", () => {
+  it.each(["cancel", "shutdown"])("discards a queued archive password on %s", async (action) => {
+    const job = createJob("private");
+    Object.assign(job, { status: "awaiting_password", phase: "password" });
+    const deps = queueDependencies(1);
+    const queue = createSessionJobQueue({
+      ...deps,
+      initialJobs: [job],
+      getActiveSessionJobCount: () => 1,
+    });
+    expect(() => queue.submitArchivePassword("unknown", "secret")).toThrow("Job not found");
+    queue.submitArchivePassword(job.id, "secret");
+    expect(() => queue.submitArchivePassword(job.id, "second")).toThrow("not awaiting a password");
+    expect(JSON.stringify({ ...job, abortController: undefined })).not.toContain("secret");
+    if (action === "cancel") queue.cancelSessionJob(job.id);
+    await queue.stopSessionJobs();
+    expect(takeArchivePassword(job)).toBeUndefined();
+    expect(deps.processSessionJob).not.toHaveBeenCalled();
+  });
   it("queues a retained job only once while all worker slots are occupied", async () => {
     const dependencies = queueDependencies(1);
     const queue = createSessionJobQueue(dependencies);

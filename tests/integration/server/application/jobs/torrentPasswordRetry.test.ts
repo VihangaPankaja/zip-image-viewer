@@ -92,11 +92,7 @@ test.each(["zip", "7z"])(
         listExtractedEntries,
         torrentAdapter: { download, close: adapter.close },
       });
-      Object.assign(job, {
-        status: "awaiting_password",
-        phase: "password",
-        passwordProtected: true,
-      });
+      await process(job);
       let active = 0;
       const queue = createSessionJobQueue({
         initialJobs: [job],
@@ -110,19 +106,19 @@ test.each(["zip", "7z"])(
         logEvent: vi.fn(),
       });
       if (type === "zip") {
-        const { prepareZipArchive, getArchiveManifest } =
+        const { getArchiveManifest } =
           await import("../../../../../server/application/jobs/archiveSelection.js");
-        await prepareZipArchive(job, path.join(torrentDir, `private.${type}`), manager.emitJob);
+        expect(job.status).toBe("awaiting_selection");
         const manifest = await getArchiveManifest(job);
-        job.zipSelection = {
-          fingerprint: manifest.fingerprint,
-          selectedIds: manifest.entries
-            .filter((entry) => entry.type === "file")
-            .map((entry) => entry.id),
-          extractedIds: [],
-        };
-        Object.assign(job, { status: "awaiting_password", phase: "password" });
+        await queue.selectArchiveFiles(
+          job.id,
+          manifest.fingerprint,
+          manifest.entries.filter((entry) => entry.type === "file").map((entry) => entry.id),
+        );
       }
+      await vi.waitFor(() => expect(job.status).toBe("awaiting_password"));
+      const transfers = download.mock.calls.length;
+      expect(transfers).toBeGreaterThan(0);
       queue.submitArchivePassword(job.id, "wrong");
       await vi.waitFor(() => expect(job.status).toBe("awaiting_password"));
       queue.submitArchivePassword(job.id, password);
@@ -130,7 +126,7 @@ test.each(["zip", "7z"])(
       expect(await readFile(path.join(job.extractDir, "note.txt"), "utf8")).toBe(
         "torrent private contents",
       );
-      expect(download).not.toHaveBeenCalled();
+      expect(download).toHaveBeenCalledTimes(transfers);
       const count = pieces;
       jobs.clear();
       sessions.clear();

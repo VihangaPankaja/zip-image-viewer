@@ -128,6 +128,8 @@ class NestedArchives {
     let record = records.get(relativePath);
     if (record?.fingerprint === hash) {
       if (record.index.encrypted && password === undefined) throw new ArchivePasswordRequired();
+      if (record.index.encrypted)
+        await inspect7zip(this.deps.executable, filename, signal, password);
       if (record.childId && !this.deps.sessions.has(record.childId)) {
         record.childId = undefined;
         record.extracted.clear();

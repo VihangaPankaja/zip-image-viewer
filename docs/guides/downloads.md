@@ -95,8 +95,7 @@ selection intact; **Retry** retries the pending selection. Deleting the download
 removes its source and extracted files together.
 
 Other supported archives still extract in full after download. Solid 7z/RAR
-archives may require reading data before the desired entry. Encrypted archives
-are not supported. Open the completed session in **Explore**, search by filename or
+archives may require reading data before the desired entry. Open the completed session in **Explore**, search by filename or
 path, and filter by media type. Matching folders keep their surrounding path
 visible. Arrow keys move through files; selecting a file opens its preview.
 
@@ -116,6 +115,30 @@ paths when you add more files. Added sibling files appear under **Torrent files*
 
 See [storage and retention](storage.md) before closing or deleting a session.
 
+## Password-protected archives
+
+Encrypted ZIP and 7z archives, including 7z with encrypted filenames, pause at
+**Enter password**. ZIP files keep the same contents-selection step first.
+Enter the password and choose **Unlock archive**. A rejected password returns to
+entry; the server retries against the downloaded source without another transfer.
+This also works for archives downloaded in torrents.
+
+Passwords are used for one attempt and cleared from the field on submission.
+They are sent in POST bodies and an anonymous pipe to 7zip, never command-line
+arguments, environment variables or files. They are not saved in jobs, logs,
+events, URLs, browser storage or exports. A server restart asks again before
+reopening an encrypted library. Use HTTPS when accessing the app over a network.
+
+For nested archives, enter the password to inspect the contents, then enter it
+again to open the selected files. Closing the dialog cancels pending work.
+Cancelling extraction removes its partial output. Existing published files and
+the source remain available under the normal retained-download rules.
+
+Definite corruption produces a download-recovery error. Some encrypted formats
+report the same failure for a wrong password and damaged ciphertext. In that
+case the message explains both possibilities and lets you try another password.
+If the password is known to be correct, obtain a new source.
+
 ## Open an archive inside an archive
 
 Select an extracted archive in Explore and choose **Open archive**. Inspect its
@@ -132,7 +155,7 @@ selection reuses its existing output.
 Nested archives share their parent's limits: 10 GiB of expanded output, 10,000
 indexed entries including implied folders, eight nested levels and five minutes
 of archive processing. Extraction also checks free disk space and keeps a
-64 MiB safety margin. Unsafe paths, links, encryption and changed sources are
+64 MiB safety margin. Unsafe paths, links and changed sources are
 rejected. Closing the review cancels pending inspection or extraction.
 
 Child contents belong to their parent session. Deleting the parent removes

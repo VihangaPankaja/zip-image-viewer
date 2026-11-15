@@ -45,7 +45,12 @@ export async function restoreHttpDownloads(
           job.downloadedBytes = await reconcileHttpFiles(job.zipPath, job.httpDownload);
         } else job.downloadedBytes = 0;
         await rm(`${job.zipPath}.assembling`, { force: true });
-        if (complete && job.sessionId && job.zipSelection?.extractedIds.length)
+        if (
+          complete &&
+          !job.passwordProtected &&
+          job.sessionId &&
+          job.zipSelection?.extractedIds.length
+        )
           await restorePublished(job);
         else job.sessionId = "";
         if (

@@ -61,6 +61,12 @@ opening a preview, using the same history boundary.
 | `services/`, `realtime/`            | Segmented transfers and progress delivery.            |
 | `tui/`                              | Interactive terminal dashboard.                       |
 
+Archive password retries use a separate in-memory job map and pass the secret to
+7zip through stdin for one attempt. They reuse retained HTTP sources or complete
+torrent files. Public job serialization and SQLite snapshots contain only the
+password-protected flag. Nested inspection and extraction receive independent
+transient passwords.
+
 Domain code has no HTTP or filesystem dependencies. Application workflows use
 typed dependencies; adapters handle I/O. Fallow checks these import boundaries.
 

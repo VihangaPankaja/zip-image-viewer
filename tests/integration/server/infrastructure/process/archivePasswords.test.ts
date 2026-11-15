@@ -7,6 +7,7 @@ import type { SpawnOptions } from "node:child_process";
 import {
   detectArchiveEncryption,
   extractWith7zip,
+  inspect7zip,
   runCommandCapture,
 } from "../../../../../server/infrastructure/process/commandRunner.js";
 import { stageExtraction } from "../../../../../server/infrastructure/archive/stagedExtraction.js";
@@ -63,8 +64,10 @@ test.each([
         "private fixture contents",
       );
       for (const launch of launches) {
-        expect(JSON.stringify(launch.args)).not.toContain(password);
-        expect(JSON.stringify(launch.options.env ?? {})).not.toContain(password);
+        expect(launch.args.some((argument) => argument.includes(password))).toBe(false);
+        expect(
+          Object.values(launch.options.env ?? {}).some((value) => value?.includes(password)),
+        ).toBe(false);
         expect(launch.options.shell).toBeUndefined();
       }
     } finally {
@@ -84,6 +87,20 @@ test("definite corruption stays distinct from a retryable password error", async
     await expect(extractWith7zip(path7za, archive, root, { password: "private" })).rejects.toThrow(
       /corrupt|incomplete|unsupported/i,
     );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("encryption words in ordinary filenames never become password requirements", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "archive-password-names-"));
+  try {
+    const name = "AES256 ZipCrypto 7zAES enter password.txt";
+    await writeFile(path.join(root, name), "ordinary contents");
+    const archive = path.join(root, "enter password.7z");
+    await runCommandCapture(path7za, ["a", archive, name], { cwd: root });
+    expect(await detectArchiveEncryption(path7za, archive)).toBe(false);
+    expect((await inspect7zip(path7za, archive)).entries[0].path).toBe(name);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

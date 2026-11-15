@@ -87,6 +87,10 @@ it.each(["zip", "7z"])(
       code: "PASSWORD_REQUIRED",
     });
     const manifest = await service.inspect(parent.id, archive, password);
+    if (type === "7z")
+      await expect(service.inspect(parent.id, archive, "wrong")).rejects.toMatchObject({
+        code: "PASSWORD_REQUIRED",
+      });
     const file = required(manifest.entries.find((entry) => entry.path === "one.txt"));
     await expect(
       service.open(parent.id, archive, manifest.fingerprint, [file.id], "wrong"),

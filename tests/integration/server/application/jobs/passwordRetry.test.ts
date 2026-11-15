@@ -17,9 +17,13 @@ import {
 import { extractRuntimeArchive } from "../../../../../server/runtimeAdapters.js";
 import { listExtractedEntries } from "../../../../../server/infrastructure/archive/listExtractedEntries.js";
 
-test.each(["zip", "7z"])(
-  "retries retained encrypted HTTP %s without a network transfer and asks again after restart",
-  async (type) => {
+test.each([
+  { type: "zip", cancelled: false },
+  { type: "7z", cancelled: false },
+  { type: "zip", cancelled: true },
+])(
+  "retries retained encrypted HTTP $type without a network transfer and restores cancellation=$cancelled",
+  async ({ type, cancelled }) => {
     const root = await mkdtemp(path.join(tmpdir(), "password-job-"));
     const store = createRetainedTorrentStore(root);
     const logs = vi.fn();
@@ -99,10 +103,13 @@ test.each(["zip", "7z"])(
       expect(JSON.stringify(manager.sanitizeJob(job))).not.toContain(password);
       expect(JSON.stringify(store.readHttp())).not.toContain(password);
       expect(JSON.stringify(logs.mock.calls)).not.toContain(password);
+      if (cancelled) manager.emitJob(job, { status: "cancelled", phase: "cancelled" });
       jobs.clear();
       sessions.clear();
-      await restoreHttpDownloads(store, jobs, process, vi.fn());
-      expect(jobs.get(job.id)?.status).toBe("awaiting_password");
+      const restorePublished = vi.fn();
+      await restoreHttpDownloads(store, jobs, process, restorePublished);
+      expect(restorePublished).not.toHaveBeenCalled();
+      expect(jobs.get(job.id)?.status).toBe(cancelled ? "cancelled" : "awaiting_password");
       expect(sessions.size).toBe(0);
       expect(await readdir(job.workspaceDir)).not.toContain("extracted.staging");
       await queue.stopSessionJobs();

@@ -11,7 +11,11 @@ import {
 } from "../runtime/resourceLimits.js";
 import { sanitizeEntryPath } from "../runtime/runtimePrimitives.js";
 import type { ExtractionProgress } from "../../../shared/contracts.js";
-import { ArchivePasswordRequired, checkArchiveFailure } from "../archive/archivePassword.js";
+import {
+  ArchivePasswordRequired,
+  checkArchiveFailure,
+  encryptedArchiveListing,
+} from "../archive/archivePassword.js";
 
 const MAX_COMMAND_OUTPUT_BYTES = 10 * 1024 ** 2;
 
@@ -99,8 +103,7 @@ export async function inspect7zip(
     ["l", "-slt", "-sccUTF-8", "--", archivePath],
     { signal, allowNonZeroExit: true, stdin: password === undefined ? "" : `${password}\n` },
   );
-  const encrypted =
-    /Encrypted\s*=\s*\+/i.test(stdout) || /7zAES|AES256|ZipCrypto|enter password/i.test(stdout);
+  const encrypted = encryptedArchiveListing(stdout);
   if (encrypted && password === undefined) throw new ArchivePasswordRequired();
   if (stderr.trim()) checkArchiveFailure(stderr, password !== undefined);
   const listing = stdout.split(/^----------\r?$/m).at(-1) ?? "";
@@ -261,7 +264,5 @@ export async function detectArchiveEncryption(
     allowNonZeroExit: true,
     signal,
   });
-  return /Encrypted\s*=\s*\+|7zAES|AES256|ZipCrypto|enter password|wrong password/i.test(
-    stdout + stderr,
-  );
+  return encryptedArchiveListing(stdout + stderr);
 }
