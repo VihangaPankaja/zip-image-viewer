@@ -11,6 +11,7 @@ import type {
 } from "../../shared/contracts.js";
 import type { ServerRpcDependencies } from "../rpc/serverRouter.js";
 import { getArchiveManifest } from "../application/jobs/archiveSelection.js";
+import { discoverPage } from "../application/discovery/discoverPage.js";
 
 type Dependencies = {
   nestedArchives?: ServerRpcDependencies["nestedArchives"];
@@ -74,6 +75,7 @@ export function createRuntimeApp(deps: Dependencies) {
     listJobs,
     listSessions,
     rpc: {
+      discoverPage,
       nestedArchives: deps.nestedArchives,
       archives: {
         get: (id) => {
