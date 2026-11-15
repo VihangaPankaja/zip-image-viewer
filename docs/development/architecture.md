@@ -41,9 +41,10 @@ History records session, file and nested-parent transitions; edits to search,
 media filters and sort replace the current entry. Downloads preserves the
 current preview, and parent breadcrumbs restore its selected archive and filters.
 Early torrent previews record their job and file identity. Route restoration
-only reads existing content and never enqueues downloads. There is no discovery
-view yet; a future discovery view must preserve its return location when opening
-a preview, using the same history boundary.
+only reads existing content and never enqueues downloads. Page-link discovery
+lives in Add downloads and submits reviewed URLs through the existing queue.
+A future separate discovery workspace must preserve its return location when
+opening a preview, using the same history boundary.
 
 ## Server
 
