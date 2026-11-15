@@ -80,6 +80,30 @@ function queueDependencies(maxActiveSessionJobs: number) {
 }
 
 describe("createSessionJobQueue", () => {
+  it("selects every volume in a multipart torrent set when any part is chosen", async () => {
+    const job = createJob("volumes");
+    Object.assign(job, { sourceKind: "torrent", status: "awaiting_selection" });
+    job.torrentFiles = ["folder/book.7z.002", "folder/book.7z.001", "other/book.7z.001"].map(
+      (path, i) => ({
+        id: String(i),
+        path,
+        size: 10,
+        selected: false,
+        complete: false,
+        downloadedBytes: 0,
+      }),
+    );
+    const deps = queueDependencies(1);
+    const queue = createSessionJobQueue({
+      ...deps,
+      initialJobs: [job],
+      getActiveSessionJobCount: () => 1,
+    });
+    queue.selectTorrentFiles(job.id, ["0"]);
+    expect(job.torrentFiles.map((file) => file.selected)).toEqual([true, true, false]);
+    expect(job.reportedSize).toBe(20);
+    await queue.stopSessionJobs();
+  });
   it.each(["cancel", "shutdown"])("discards a queued archive password on %s", async (action) => {
     const job = createJob("private");
     Object.assign(job, { status: "awaiting_password", phase: "password" });

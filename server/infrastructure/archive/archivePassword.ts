@@ -13,6 +13,10 @@ export class ArchivePasswordRequired extends ApplicationError {
 }
 
 export function checkArchiveFailure(output: string, supplied: boolean, archivePath: string): void {
+  if (/^ERROR: Unsupported Method(?:\s*:.*)?$/im.test(output))
+    throw new Error(
+      "Unsupported archive compression method. Repack the source as ZIP with Store/Deflate or 7z with LZMA/LZMA2, then add it again.",
+    );
   const prefix = `ERROR: ${archivePath} : `;
   const headerRejected = output.split(/\r?\n/).some((line) => {
     const diagnostic = line.startsWith(prefix)

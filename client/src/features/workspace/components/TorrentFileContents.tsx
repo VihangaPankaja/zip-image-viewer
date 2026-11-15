@@ -97,7 +97,8 @@ function SelectionHelp({ selecting }: { selecting: boolean }) {
   return selecting ? (
     <p id="torrent-keyboard-help">
       Use ↑ and ↓ to move between choices, Home and End to jump to the first or last file, and Space
-      to select. Folder checkboxes affect all matching files, including other pages.
+      to select. Folder checkboxes affect all matching files, including other pages. Numbered 7z and
+      RAR volumes are selected together, including parts hidden by filters.
     </p>
   ) : null;
 }

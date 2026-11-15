@@ -8,8 +8,8 @@ import {
   runCommand,
   runCommandCapture,
 } from "../../server/infrastructure/process/commandRunner.js";
-import { startHttpRestartServer, stopHttpRestartServer } from "./httpRestartServer.js";
-import { workspaceProxy } from "./proxyApp.js";
+import { startRestartableHttpFixture } from "./httpRestartServer.js";
+import { workspaceProxy, closeFixtureServers } from "./proxyApp.js";
 
 export const zipSelectionNames = [
   "album/一枚目-a-long-filename-for-testing-selection-without-clipped-actions.txt",
@@ -58,8 +58,11 @@ export async function startZipSelectionApp(
   await once(source, "listening");
   const sourceAddress = source.address();
   if (!sourceAddress || typeof sourceAddress === "string") throw new Error("Missing source port");
-  let api = await startHttpRestartServer(directory, pausedExtraction ? "paused-extraction" : "");
-  const app = workspaceProxy(baseURL, () => api.origin);
+  const api = await startRestartableHttpFixture(
+    directory,
+    pausedExtraction ? "paused-extraction" : "",
+  );
+  const app = workspaceProxy(baseURL, () => api.apiOrigin());
   const ui = app.listen(0, "127.0.0.1");
   await once(ui, "listening");
   const address = ui.address();
@@ -72,30 +75,19 @@ export async function startZipSelectionApp(
       },
     ],
   });
-  return {
+  return Object.assign(api, {
     origin: `http://127.0.0.1:${address.port}`,
     directory,
     id: items[0].id,
     get requests() {
       return requests;
     },
-    get client() {
-      return api.client;
-    },
-    logs: () => api.logs(),
-    restart: async () => {
-      await stopHttpRestartServer(api.child, true);
-      api = await startHttpRestartServer(directory);
-    },
     close: async () => {
-      await stopHttpRestartServer(api.child, true);
-      source.closeAllConnections();
-      ui.closeAllConnections();
-      for (const server of [source, ui])
-        await new Promise<void>((resolve) => server.close(() => resolve()));
+      await api.stop();
+      await closeFixtureServers([source, ui]);
       await rm(directory, { recursive: true, force: true });
     },
-  };
+  });
 }
 
 async function createArchive(

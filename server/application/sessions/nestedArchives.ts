@@ -5,7 +5,7 @@ import { fileTypeFromFile } from "file-type";
 import type { ArchiveManifest } from "../../../shared/contracts.js";
 import { ApplicationError, type Session } from "../../domain/models.js";
 import {
-  resolveArchiveSource,
+  resolveNestedArchiveVolumes,
   fingerprintArchive,
 } from "../../infrastructure/archive/nestedArchiveSource.js";
 import { inspectZip } from "../../infrastructure/archive/zipManifest.js";
@@ -121,7 +121,8 @@ class NestedArchives {
     signal: AbortSignal,
     password?: string,
   ) {
-    const filename = await resolveArchiveSource(parent, relativePath);
+    const { filename, files } = await resolveNestedArchiveVolumes(parent, relativePath);
+    relativePath = path.relative(parent.extractDir, filename).replaceAll(path.sep, "/");
     const hash = await fingerprintArchive(filename, signal);
     const records = this.caches.get(parent) ?? new Map<string, NestedArchiveRecord>();
     this.caches.set(parent, records);
@@ -156,7 +157,10 @@ class NestedArchives {
     const manifest: ArchiveManifest = {
       passwordProtected: index.encrypted,
       fingerprint: hash,
-      sourceBytes: (await stat(filename)).size,
+      sourceBytes: (await Promise.all(files.map((file) => stat(file)))).reduce(
+        (total, info) => total + info.size,
+        0,
+      ),
       entries,
       ...summarizeArchive(entries),
     };

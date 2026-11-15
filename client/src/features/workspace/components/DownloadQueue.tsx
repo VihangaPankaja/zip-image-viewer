@@ -1,6 +1,7 @@
 import { TorrentReviewAction } from "./TorrentFileDialog";
 import { ArchiveReviewAction } from "./ArchiveFileDialog";
 import { ArchivePasswordAction } from "./ArchivePasswordAction";
+import { ArchiveVolumesAction } from "./ArchiveVolumesAction";
 import { Download } from "lucide-react";
 import { useMemo, useState, type DragEvent } from "react";
 import type { Job, TorrentPriority } from "../../../../../shared/contracts";
@@ -67,6 +68,7 @@ function JobActions({ job, ...actions }: JobActionsProps) {
   return (
     <div className="download-row-actions">
       <ArchivePasswordAction job={job} />
+      <ArchiveVolumesAction job={job} />
       <ArchiveReviewAction job={job} />
       <TorrentReviewAction
         job={job}

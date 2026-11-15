@@ -35,6 +35,7 @@ beforeEach(async () => {
   capture.mockResolvedValue({
     stdout: " V..... h264_qsv\n V....D h264_nvenc\n",
     stderr: "",
+    code: 0,
   });
   run.mockImplementation(async (_command, args) => output(args));
 });
@@ -90,7 +91,8 @@ it("tries another available encoder when the first device is inaccessible", asyn
 it.each(["missing", "device", "listing"])(
   "falls back once to CPU for %s failure",
   async (failure) => {
-    if (failure === "missing") capture.mockResolvedValue({ stdout: "libx264", stderr: "" });
+    if (failure === "missing")
+      capture.mockResolvedValue({ stdout: "libx264", stderr: "", code: 0 });
     if (failure === "device") run.mockRejectedValueOnce(new Error("No GPU"));
     if (failure === "listing") capture.mockRejectedValue(new Error("Cannot inspect encoders"));
     const encoder = new HlsEncoder("ffmpeg", "h264_nvenc", log);

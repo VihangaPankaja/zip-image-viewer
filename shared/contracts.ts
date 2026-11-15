@@ -75,6 +75,7 @@ const jobStatusSchema = z.enum([
   "awaiting_confirmation",
   "awaiting_selection",
   "awaiting_password",
+  "awaiting_volumes",
   "paused",
   "ready",
   "cancelled",
@@ -90,6 +91,7 @@ const jobPhaseSchema = z.enum([
   "confirm",
   "selecting",
   "password",
+  "volumes",
   "paused",
   "ready",
   "cancelled",
@@ -134,6 +136,25 @@ export const httpDownloadStateSchema = z.object({
     .or(z.literal("")),
 });
 export type HttpDownloadState = z.infer<typeof httpDownloadStateSchema>;
+export const archiveVolumeSourcesSchema = z
+  .array(
+    z.object({
+      url: publicHttpUrlSchema,
+      name: z
+        .string()
+        .min(1)
+        .max(255)
+        .regex(/^[^/\\:\p{Cc}]+$/u)
+        .refine(
+          (name) => !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name),
+          "Use a portable archive filename.",
+        ),
+      checkpoint: httpDownloadStateSchema.optional(),
+    }),
+  )
+  .min(1)
+  .max(50);
+export type ArchiveVolumeSource = z.infer<typeof archiveVolumeSourcesSchema>[number];
 
 export const torrentVideoInfoSchema = z.object({
   state: z.enum(["ready", "download-first"]),
@@ -211,6 +232,7 @@ const extractionProgressSchema = z.object({
 export type ExtractionProgress = z.infer<typeof extractionProgressSchema>;
 
 export const jobSchema = z.object({
+  volumes: z.object({ names: z.array(z.string()), missing: z.array(z.string()) }).optional(),
   passwordProtected: z.boolean().optional(),
   id: z.uuid(),
   url: downloadSourceSchema,
@@ -349,6 +371,13 @@ const enqueueSessionsContract = oc
   .output(z.object({ items: z.array(jobSchema) }));
 
 const jobControlInputSchema = z.object({ id: z.uuid() });
+export const supplyVolumesInputSchema = jobControlInputSchema.extend({
+  urls: z.array(publicHttpUrlSchema).min(1).max(50),
+});
+const supplyVolumesContract = oc
+  .route({ method: "POST", path: "/session-jobs/{id}/volumes" })
+  .input(supplyVolumesInputSchema)
+  .output(jobSchema);
 export const archivePasswordSchema = z
   .string()
   .min(1)
@@ -513,6 +542,7 @@ export const serverContract = {
     remove: removeSessionContract,
   },
   jobs: {
+    volumes: supplyVolumesContract,
     password: oc
       .route({ method: "POST", path: "/session-jobs/{id}/password" })
       .input(jobControlInputSchema.extend({ password: archivePasswordSchema }))

@@ -6,13 +6,11 @@ import { createExtractionProgress, startArchiveInspection } from "./extractionPr
 import { extractZip } from "../../infrastructure/archive/extractZip.js";
 import type { ExtractedEntry } from "../../domain/explorerTree.js";
 import type { SessionJob } from "../../domain/models.js";
-import {
-  classifyDetectedType,
-  isArchiveByName,
-} from "../../infrastructure/runtime/mediaClassification.js";
+import { classifyDetectedType } from "../../infrastructure/runtime/mediaClassification.js";
 import { reserveStorage } from "../../infrastructure/runtime/resourceLimits.js";
 import { ArchivePasswordRequired } from "../../infrastructure/archive/archivePassword.js";
 import { inspectZip } from "../../infrastructure/archive/zipManifest.js";
+import { resolveArchiveVolumes } from "../../infrastructure/archive/archiveVolumes.js";
 
 type ExtractDependencies = {
   password?: string;
@@ -74,6 +72,7 @@ async function extractSource(
   deps: ExtractDependencies,
 ): Promise<ExtractedEntry[]> {
   job.abortController?.signal.throwIfAborted();
+  archivePath = (await resolveArchiveVolumes(archivePath)).filename;
   const detected = await fileTypeFromFile(archivePath).catch(() => undefined);
   job.abortController?.signal.throwIfAborted();
   const kind = classifyDetectedType(archivePath, detected);
@@ -114,7 +113,7 @@ async function extractSource(
     });
     return deps.listExtractedEntries(extractDir);
   }
-  if (detected?.ext !== "zip" && isArchiveByName(archivePath) && !/\.zip$/i.test(archivePath)) {
+  if (detected?.ext !== "zip" && !/\.zip$/i.test(archivePath)) {
     await deps.extractWith7zip(archivePath, extractDir, job.abortController?.signal, progress);
     job.abortController?.signal.throwIfAborted();
     return deps.listExtractedEntries(extractDir);

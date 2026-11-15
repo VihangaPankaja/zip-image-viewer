@@ -5,6 +5,7 @@ import { restoreExtractionCancellation } from "../jobs/extractionProgress.js";
 import type { RetainedTorrentStore } from "../../repositories/retainedTorrents.js";
 import { saveRetainedTorrent } from "../../repositories/retainedTorrents.js";
 import { normalizeDownloadOptions } from "./downloadOptions.js";
+import { assertResourceSize } from "../../infrastructure/runtime/resourceLimits.js";
 import {
   hashDownloadFile,
   reconcileHttpFiles,
@@ -13,6 +14,52 @@ import {
   assertHttpWorkspace,
   httpSourcePath,
 } from "../../infrastructure/downloads/httpWorkspace.js";
+
+async function verifyHttpVolumes(job: SessionJob) {
+  let complete = true;
+  let downloaded = 0;
+  for (const source of job.volumeSources ?? []) {
+    const filename = path.join(job.workspaceDir, "volumes", source.name);
+    const info = await lstat(filename).catch(() => null);
+    if (
+      info?.isFile() &&
+      source.checkpoint?.completedSha256 &&
+      (await hashDownloadFile(filename)) === source.checkpoint.completedSha256
+    )
+      downloaded += info.size;
+    else {
+      complete = false;
+      if (source.checkpoint) {
+        source.checkpoint.completedSha256 = "";
+        downloaded += await reconcileHttpFiles(filename, source.checkpoint);
+      }
+    }
+    assertResourceSize(downloaded);
+    await rm(`${filename}.assembling`, { force: true });
+  }
+  job.downloadedBytes = downloaded;
+  return complete;
+}
+
+async function restoreVolumeJob(
+  job: SessionJob,
+  processJob: (_job: SessionJob, _confirmed: boolean) => Promise<void>,
+) {
+  const complete = await verifyHttpVolumes(job);
+  if (complete && !["paused", "cancelled", "error", "awaiting_confirmation"].includes(job.status))
+    await processJob(job, !!job.oversizeConfirmed);
+  else {
+    job.sessionId = "";
+    if (!["cancelled", "error", "awaiting_confirmation"].includes(job.status))
+      Object.assign(job, {
+        status: "paused",
+        phase: "paused",
+        canResume: true,
+        percent: null,
+        message: "Restored archive volumes. Resume to verify and fetch missing bytes.",
+      });
+  }
+}
 
 export async function restoreHttpDownloads(
   store: RetainedTorrentStore,
@@ -26,6 +73,11 @@ export async function restoreHttpDownloads(
     try {
       await assertHttpWorkspace(job);
       await restoreExtractionCancellation(job);
+      if (job.volumeSources) {
+        await restoreVolumeJob(job, processJob);
+        saveRetainedTorrent(store, job);
+        continue;
+      }
       const source = await lstat(job.zipPath).catch(() => null);
       const complete =
         source?.isFile() &&

@@ -206,7 +206,7 @@ describe("commandRunner", () => {
         "-e",
         "process.stdout.write('ready'); process.stderr.write('note')",
       ]),
-    ).resolves.toEqual({ stdout: "ready", stderr: "note" });
+    ).resolves.toEqual({ stdout: "ready", stderr: "note", code: 0 });
 
     await expect(
       runCommand(process.execPath, ["-e", "process.stderr.write('failed'); process.exit(3)"]),

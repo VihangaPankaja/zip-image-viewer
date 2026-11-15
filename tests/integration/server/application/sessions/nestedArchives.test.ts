@@ -65,6 +65,32 @@ async function fixture(limits?: Parameters<typeof createNestedArchives>[0]["limi
   return { parent, sessions, service, manager, extractDir, workspaceDir };
 }
 
+it("opens a nested multipart set from either part and invalidates cached manifests when a sibling changes", async () => {
+  const { parent, service, extractDir, workspaceDir, sessions } = await fixture();
+  await writeFile(path.join(workspaceDir, "input", "one.txt"), Buffer.alloc(2048, 65));
+  await commands.runCommand(
+    path7za,
+    ["a", "-t7z", "-mx=0", "-v1k", path.join(extractDir, "book.7z"), "one.txt"],
+    { cwd: path.join(workspaceDir, "input") },
+  );
+  const first = await service.inspect(parent.id, "book.7z.001");
+  const second = await service.inspect(parent.id, "book.7z.002");
+  expect(second.fingerprint).toBe(first.fingerprint);
+  const child = await service.open(
+    parent.id,
+    "book.7z.002",
+    second.fingerprint,
+    second.entries.map((entry) => entry.id),
+  );
+  expect(
+    (await readFile(path.join(required(sessions.get(child.id)).extractDir, "one.txt"))).length,
+  ).toBe(2048);
+  parent.availablePaths = new Set(["book.7z.001"]);
+  await expect(service.inspect(parent.id, "book.7z.001")).rejects.toThrow(
+    /Missing archive volumes/,
+  );
+});
+
 it.each(["zip", "7z"])(
   "opens encrypted nested %s with a transient password and retries without changing the parent",
   async (type) => {

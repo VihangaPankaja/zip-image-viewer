@@ -16,6 +16,8 @@ import {
 import { isTerminalJobStatus } from "../../infrastructure/runtime/runtimePrimitives.js";
 import { detectSourceKind, type SourcePreference } from "../torrents/torrentSource.js";
 import { assertHttpWorkspace } from "../../infrastructure/downloads/httpWorkspace.js";
+import { archiveVolume } from "../../../shared/archiveVolumes.js";
+import { httpVolumeSources, volumeUrlName } from "./httpArchiveVolumes.js";
 
 type LogEvent = (
   _level: "info" | "warn" | "error",
@@ -98,6 +100,10 @@ class JobManager {
       downloadOptions: normalizeDownloadOptions(downloadOptions),
     };
     this.jobStore.set(job.id, job);
+    if (job.sourceKind === "http" && archiveVolume(volumeUrlName(url))) {
+      job.volumeSources = httpVolumeSources([url]);
+      job.volumes = { names: job.volumeSources.map((source) => source.name), missing: [] };
+    }
     if (this.retained) {
       job.storageRoot = this.retained.directory;
       job.workspaceDir = path.join(this.retained.directory, job.id);
@@ -108,6 +114,7 @@ class JobManager {
 
   sanitizeJob = (job: SessionJob) => {
     return {
+      volumes: job.volumes,
       passwordProtected: job.passwordProtected,
       id: job.id,
       url: job.url,

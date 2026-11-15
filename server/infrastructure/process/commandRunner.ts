@@ -11,6 +11,8 @@ import {
 } from "../runtime/resourceLimits.js";
 import { sanitizeEntryPath } from "../runtime/runtimePrimitives.js";
 import type { ExtractionProgress } from "../../../shared/contracts.js";
+import { resolveArchiveVolumes, ArchiveVolumesRequired } from "../archive/archiveVolumes.js";
+import { archiveVolume } from "../../../shared/archiveVolumes.js";
 import {
   ArchivePasswordRequired,
   checkArchiveFailure,
@@ -30,6 +32,7 @@ export async function runCommand(
     ...options,
   });
   let stderr = "";
+  child.stderr.setEncoding("utf8");
   child.stderr.on("data", (chunk: unknown) => {
     stderr += chunkText(chunk);
   });
@@ -48,7 +51,7 @@ export async function runCommandCapture(
     signal?: AbortSignal;
     stdin?: string;
   } = {},
-): Promise<{ stdout: string; stderr: string }> {
+): Promise<{ stdout: string; stderr: string; code: number | null }> {
   await ensureExecutable(command);
   const { allowNonZeroExit = false, stdin, ...spawnOptions } = options;
   const controller = new AbortController();
@@ -62,6 +65,8 @@ export async function runCommandCapture(
   });
   child.stdin.on("error", () => undefined);
   child.stdin.end(stdin ?? "");
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
   let stdout = "";
   let stderr = "";
   let capturedBytes = 0;
@@ -85,7 +90,7 @@ export async function runCommandCapture(
     controller.signal.throwIfAborted();
     if (code !== 0 && !allowNonZeroExit)
       throw new Error(stderr || `Command failed with code ${String(code)}`);
-    return { stdout, stderr };
+    return { stdout, stderr, code };
   } catch (error) {
     controller.signal.throwIfAborted();
     throw error;
@@ -98,14 +103,20 @@ export async function inspect7zip(
   signal?: AbortSignal,
   password?: string,
 ) {
-  const { stdout, stderr } = await runCommandCapture(
+  archivePath = (await resolveArchiveVolumes(archivePath)).filename;
+  const { stdout, stderr, code } = await runCommandCapture(
     executable,
     ["l", "-slt", "-sccUTF-8", "--", archivePath],
     { signal, allowNonZeroExit: true, stdin: password === undefined ? "" : `${password}\n` },
   );
   const encrypted = encryptedArchiveListing(stdout);
+  const header = stdout.split(/^----------\r?$/m)[0];
+  const missing = /^ERROR = Missing volume : (.+)$/m.exec(header)?.[1].trim();
+  const volume = archiveVolume(path.basename(archivePath));
+  if (missing && volume && archiveVolume(path.basename(missing))?.key === volume.key)
+    throw new ArchiveVolumesRequired([path.basename(missing)]);
   if (encrypted && password === undefined) throw new ArchivePasswordRequired();
-  if (stderr.trim()) checkArchiveFailure(stderr, password !== undefined, archivePath);
+  if (code !== 0 || stderr.trim()) checkArchiveFailure(stderr, password !== undefined, archivePath);
   const listing = stdout.split(/^----------\r?$/m).at(-1) ?? "";
   const entries = listing
     .trim()
@@ -177,6 +188,7 @@ export async function extractWith7zip(
     password?: string;
   } = {},
 ): Promise<void> {
+  archivePath = (await resolveArchiveVolumes(archivePath)).filename;
   const index =
     options.index ?? (await inspect7zip(executable, archivePath, options.signal, options.password));
   if (index.encrypted && options.password === undefined) throw new ArchivePasswordRequired();

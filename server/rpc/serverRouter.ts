@@ -18,6 +18,7 @@ import {
 import { ApplicationError } from "../domain/models.js";
 
 export type ServerRpcDependencies = {
+  supplyVolumes: (_id: string, _urls: string[]) => Job;
   submitArchivePassword: (_id: string, _password: string) => Job;
   discoverPage: (_url: string, _signal?: AbortSignal) => Promise<PageDiscovery>;
   nestedArchives?: {
@@ -96,6 +97,9 @@ export function createServerRpcRouter(deps: ServerRpcDependencies) {
       ),
     },
     jobs: {
+      volumes: contract.jobs.volumes.handler(({ input }) =>
+        applicationResult(() => deps.supplyVolumes(input.id, input.urls)),
+      ),
       password: contract.jobs.password.handler(({ input }) =>
         applicationResult(() => deps.submitArchivePassword(input.id, input.password)),
       ),

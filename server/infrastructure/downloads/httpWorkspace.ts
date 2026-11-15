@@ -1,8 +1,14 @@
 import { lstat, realpath } from "node:fs/promises";
 import path from "node:path";
 import type { SessionJob } from "../../domain/models.js";
+import { archiveVolume } from "../../../shared/archiveVolumes.js";
 
 export function httpSourcePath(job: SessionJob) {
+  if (job.volumeSources?.length) {
+    const first = archiveVolume(job.volumeSources[0].name)?.first;
+    if (!first) throw new Error("Invalid archive volume source.");
+    return path.join(job.workspaceDir, "volumes", first);
+  }
   const extension = path.extname(new URL(job.url).pathname);
   return path.join(
     job.workspaceDir,

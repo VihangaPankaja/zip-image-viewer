@@ -27,6 +27,7 @@ function job(id = "2bf886fc-65bf-4e2f-b973-b607766b3131"): Job {
 function dependencies(): ServerRpcDependencies {
   return {
     submitArchivePassword: vi.fn(),
+    supplyVolumes: vi.fn(),
     discoverPage: vi.fn(() =>
       Promise.resolve({ sourcePage: "https://example.com/", items: [], truncated: false }),
     ),

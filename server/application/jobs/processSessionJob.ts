@@ -1,4 +1,4 @@
-import { emitFailure } from "./jobFailure.js";
+import { emitFailure, waitForArchiveVolumes } from "./jobFailure.js";
 import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
@@ -19,6 +19,7 @@ import { ArchiveSelectionRequired, prepareZipArchive } from "./archiveSelection.
 import { stageExtraction } from "../../infrastructure/archive/stagedExtraction.js";
 import { takeArchivePassword, waitForArchivePassword } from "./archivePasswords.js";
 import { downloadTorrentSource } from "../torrents/downloadTorrentSource.js";
+import { downloadHttpVolumes } from "./httpArchiveVolumes.js";
 import type { TorrentAdapter } from "../torrents/torrentDownloader.js";
 import { prepareTorrentEntries } from "../torrents/prepareTorrentEntries.js";
 import { refreshArchiveSession } from "../sessions/refreshArchiveSession.js";
@@ -209,12 +210,14 @@ async function processHttpJob(
   deps: ProcessorDependencies,
 ): Promise<void> {
   const { workspaceDir, zipPath } = job;
-  const result = await downloadSessionSource(
-    job,
-    settings,
-    { url: job.url, zipPath, workspaceDir, confirmOversize },
-    deps,
-  );
+  const result = job.volumeSources
+    ? await downloadHttpVolumes(job, settings, confirmOversize, deps)
+    : await downloadSessionSource(
+        job,
+        settings,
+        { url: job.url, zipPath, workspaceDir, confirmOversize },
+        deps,
+      );
   if (result === "paused") return;
   job.abortController?.signal.throwIfAborted();
   const existing = deps.sessionStore.get(job.sessionId);
@@ -269,7 +272,7 @@ async function processSessionJob(
   const zipPath =
     job.zipPath ||
     (sourceUrl
-      ? job.storageRoot
+      ? job.storageRoot || job.volumeSources
         ? httpSourcePath({ ...job, workspaceDir })
         : path.join(workspaceDir, path.basename(sourceUrl.pathname) || "download.bin")
       : "");
@@ -293,6 +296,7 @@ async function processSessionJob(
   } catch (error) {
     if (error instanceof ArchiveSelectionRequired) return;
     if (waitForArchivePassword(job, error, deps.emitJob)) return;
+    if (waitForArchiveVolumes(job, error, deps.emitJob)) return;
     const abortReason: unknown = job.abortController?.signal.reason;
     const jobError =
       job.status === "error" && job.error

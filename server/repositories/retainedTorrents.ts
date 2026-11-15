@@ -1,12 +1,18 @@
 import { chmodSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { jobSchema, httpDownloadStateSchema, zipSelectionSchema } from "../../shared/contracts.js";
+import {
+  jobSchema,
+  httpDownloadStateSchema,
+  zipSelectionSchema,
+  archiveVolumeSourcesSchema,
+} from "../../shared/contracts.js";
 import { z } from "zod";
 import { sanitizeEntryPath } from "../infrastructure/runtime/runtimePrimitives.js";
 import type { SessionJob } from "../domain/models.js";
 
 const retainedHttpJobSchema = jobSchema.extend({
+  volumeSources: archiveVolumeSourcesSchema.optional(),
   downloadOptions: z.unknown(),
   httpDownload: httpDownloadStateSchema.optional(),
   oversizeConfirmed: z.boolean().default(false),
@@ -39,6 +45,7 @@ export function createRetainedTorrentStore(directory: string) {
     directory,
     save(job: SessionJob) {
       const snapshot = {
+        volumeSources: job.volumeSources,
         ...jobSchema.parse(job),
         downloadOptions: job.downloadOptions,
         torrentArchivePath: job.torrentArchivePath,

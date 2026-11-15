@@ -7,6 +7,7 @@ import unzipper from "unzipper";
 import type { ArchiveManifest } from "../../../shared/contracts.js";
 import { validateArchiveEntries } from "./archiveLimits.js";
 import { summarizeArchive } from "./archiveSummary.js";
+import { zipTimestamp } from "./zipTimestamp.js";
 import {
   assertResourceEntryCount,
   assertResourceSize,
@@ -54,17 +55,20 @@ async function checkDirectorySize(filename: string) {
       if ((await file.read(central, 0, bytes, start)).bytesRead !== bytes)
         throw resourceLimitError("Truncated ZIP directory.");
       let position = 0;
+      const timestamps: Date[] = [];
       for (let index = 0; index < count; index++) {
         if (position + 46 > bytes || central.readUInt32LE(position) !== 0x02014b50)
           throw resourceLimitError("Invalid ZIP directory entry.");
+        const entryOffset = position;
         position +=
           46 +
           central.readUInt16LE(position + 28) +
           central.readUInt16LE(position + 30) +
           central.readUInt16LE(position + 32);
         if (position > bytes) throw resourceLimitError("ZIP metadata exceeds its declared bounds.");
+        timestamps.push(zipTimestamp(central, entryOffset));
       }
-      return 22 + tail.readUInt16LE(offset + 20);
+      return { tailSize: 22 + tail.readUInt16LE(offset + 20), timestamps };
     }
     throw resourceLimitError("Invalid ZIP directory.");
   } finally {
@@ -74,13 +78,16 @@ async function checkDirectorySize(filename: string) {
 
 export async function openZip(filename: string, signal?: AbortSignal, allowEncrypted = false) {
   signal?.throwIfAborted();
-  const tailSize = await checkDirectorySize(filename);
+  const { tailSize, timestamps } = await checkDirectorySize(filename);
   // unzipper supports tailSize, but its published types omit the options argument.
   const openFile: (
     _filename: string,
     _options: { tailSize: number },
   ) => Promise<unzipper.CentralDirectory> = unzipper.Open.file;
   const directory = await openFile(filename, { tailSize });
+  directory.files.forEach((entry, index) => {
+    entry.lastModifiedDateTime = timestamps[index];
+  });
   signal?.throwIfAborted();
   validateArchiveEntries(
     directory.files.map((entry) => ({
@@ -94,6 +101,10 @@ export async function openZip(filename: string, signal?: AbortSignal, allowEncry
   const sourceBytes = (await stat(filename)).size;
   let compressedBytes = 0;
   for (const entry of directory.files) {
+    if (![0, 8, 99].includes(entry.compressionMethod))
+      throw resourceLimitError(
+        `Unsupported ZIP compression method ${entry.compressionMethod}. Repack this archive using Store or Deflate.`,
+      );
     assertResourceSize(entry.compressedSize);
     compressedBytes += entry.compressedSize;
     if (

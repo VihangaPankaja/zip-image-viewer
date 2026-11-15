@@ -91,6 +91,14 @@ export async function stopHttpRestartServer(child: ChildProcess, force = false) 
   }
 }
 
+async function restartHttpFixture(
+  current: Awaited<ReturnType<typeof startHttpRestartServer>>,
+  directory: string,
+) {
+  await stopHttpRestartServer(current.child, true);
+  return startHttpRestartServer(directory);
+}
+
 export async function selectAllZipFiles(
   client: ContractRouterClient<typeof serverContract>,
   id: string,
@@ -101,4 +109,19 @@ export async function selectAllZipFiles(
     fingerprint: manifest.fingerprint,
     fileIds: manifest.entries.filter((entry) => entry.type === "file").map((entry) => entry.id),
   });
+}
+
+export async function startRestartableHttpFixture(directory: string, stage = "") {
+  let current = await startHttpRestartServer(directory, stage);
+  return {
+    get client() {
+      return current.client;
+    },
+    apiOrigin: () => current.origin,
+    logs: () => current.logs(),
+    restart: async () => {
+      current = await restartHttpFixture(current, directory);
+    },
+    stop: () => stopHttpRestartServer(current.child, true),
+  };
 }
