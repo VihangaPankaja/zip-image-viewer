@@ -6,9 +6,11 @@ export function archiveVolume(filename: string) {
   if (number < 1 || number > 10_000) return undefined;
   const prefix = match[1];
   const suffix = filename.toLowerCase().endsWith(".rar") ? match[3] : "";
-  const width = match[2].length;
+  const width = match[2].startsWith("0")
+    ? match[2].length
+    : Math.min(match[2].length, suffix ? 2 : 3);
   const name = (part: number) => `${prefix}${String(part).padStart(width, "0")}${suffix}`;
-  return { key: `${prefix}${"#".repeat(width)}${suffix}`, number, first: name(1), name };
+  return { key: `${prefix}#${suffix}`, number, first: name(1), name };
 }
 
 export function groupArchiveVolumes<T>(
@@ -23,12 +25,22 @@ export function groupArchiveVolumes<T>(
     group.push(item);
     groups.set(key, group);
   }
-  return [...groups.values()].map((group) =>
+  return [...groups.values()].flatMap((group) => {
     group.sort(
       (a, b) =>
         (archiveVolume(filename(a))?.number ?? 0) - (archiveVolume(filename(b))?.number ?? 0),
-    ),
-  );
+    );
+    const compatible: T[][] = [];
+    for (const item of group) {
+      const part = archiveVolume(filename(item));
+      const set = compatible.find(
+        (items) => part && archiveVolume(filename(items[0]))?.name(part.number) === filename(item),
+      );
+      if (set) set.push(item);
+      else compatible.push([item]);
+    }
+    return compatible;
+  });
 }
 
 export function isArchiveName(filename: string): boolean {

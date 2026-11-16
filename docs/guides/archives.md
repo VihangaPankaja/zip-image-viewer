@@ -32,8 +32,8 @@ creation are outside this matrix.
 Paste all volume URLs into **Add downloads** together. Matching numbered
 `.7z.001`, `.7z.002`, ... or `.part01.rar`, `.part02.rar`, ... sources in the same
 URL directory with the same download settings become one job. Keep the original
-filenames and consistent spelling and number padding. An HTTP job accepts up
-to 50 supplied parts. The server downloads only supplied URLs, including URLs
+filenames, spelling and minimum zero padding; numbers can grow beyond 99 or 999. Each request accepts up
+to 50 URLs; larger sets can receive additional batches, up to 10,000 parts. The server downloads only supplied URLs, including URLs
 added later from another host; it never guesses URLs for missing parts.
 
 Extraction starts from volume one after the set passes inspection. Missing

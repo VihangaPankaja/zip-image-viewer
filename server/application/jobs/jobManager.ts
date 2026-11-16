@@ -99,11 +99,11 @@ class JobManager {
       cleanupAt: 0,
       downloadOptions: normalizeDownloadOptions(downloadOptions),
     };
-    this.jobStore.set(job.id, job);
     if (job.sourceKind === "http" && archiveVolume(volumeUrlName(url))) {
       job.volumeSources = httpVolumeSources([url]);
       job.volumes = { names: job.volumeSources.map((source) => source.name), missing: [] };
     }
+    this.jobStore.set(job.id, job);
     if (this.retained) {
       job.storageRoot = this.retained.directory;
       job.workspaceDir = path.join(this.retained.directory, job.id);

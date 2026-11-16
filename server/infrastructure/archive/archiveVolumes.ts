@@ -51,10 +51,14 @@ export async function resolveArchiveVolumes(filename: string, allowed?: Readonly
       throw resourceLimitError("Duplicate archive volume numbers. Keep one copy of each part.");
     parts.set(number, name);
   }
+  const firstName = [...parts.entries()].sort(([a], [b]) => a - b).at(0)?.[1];
+  const canonical = archiveVolume(firstName ?? path.basename(filename)) ?? volume;
+  if ([...parts].some(([number, name]) => canonical.name(number) !== name))
+    throw resourceLimitError("Use consistent number padding for every archive volume.");
   let count = Math.max(1, ...parts.keys());
   // 7z headers give the complete stream length even when the final part is absent.
   if (/\.7z\.\d+$/i.test(filename) && parts.has(1)) {
-    const first = await open(path.join(directory, volume.first), "r");
+    const first = await open(path.join(directory, canonical.first), "r");
     try {
       const header = Buffer.alloc(32);
       const { bytesRead } = await first.read(header, 0, 32, 0);
@@ -75,12 +79,12 @@ export async function resolveArchiveVolumes(filename: string, allowed?: Readonly
       ...unavailable,
       ...Array.from({ length: count }, (_, i) => i + 1)
         .filter((number) => !parts.has(number))
-        .map(volume.name),
+        .map(canonical.name),
     ]),
   ];
   if (missing.length) throw new ArchiveVolumesRequired(missing);
   return {
-    filename: path.join(directory, volume.first),
+    filename: path.join(directory, canonical.first),
     files: [...parts.entries()]
       .sort(([a], [b]) => a - b)
       .map(([, name]) => path.join(directory, name)),

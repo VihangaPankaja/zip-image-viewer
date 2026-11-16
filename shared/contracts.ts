@@ -153,7 +153,7 @@ export const archiveVolumeSourcesSchema = z
     }),
   )
   .min(1)
-  .max(50);
+  .max(10_000);
 export type ArchiveVolumeSource = z.infer<typeof archiveVolumeSourcesSchema>[number];
 
 export const torrentVideoInfoSchema = z.object({

@@ -83,7 +83,9 @@ export function createServerRpcRouter(deps: ServerRpcDependencies) {
       ),
     },
     sessions: {
-      create: contract.sessions.create.handler(({ input }) => deps.createJob(input)),
+      create: contract.sessions.create.handler(({ input }) =>
+        applicationResult(() => deps.createJob(input)),
+      ),
       get: contract.sessions.get.handler(({ input }) => {
         const session = deps.getSession(input.id);
         if (!session) throw new Error("Session not found.");
@@ -106,9 +108,11 @@ export function createServerRpcRouter(deps: ServerRpcDependencies) {
       list: contract.jobs.list.handler(() => ({
         items: [...deps.listJobs()],
       })),
-      enqueue: contract.jobs.enqueue.handler(async ({ input }) => ({
-        items: await deps.enqueueJobs(input),
-      })),
+      enqueue: contract.jobs.enqueue.handler(({ input }) =>
+        applicationResult(async () => ({
+          items: await deps.enqueueJobs(input),
+        })),
+      ),
       cancel: contract.jobs.cancel.handler(({ input }) => deps.cancelJob(input.id)),
       confirm: contract.jobs.confirm.handler(({ input }) => deps.confirmJob(input.id)),
       selectFiles: contract.jobs.selectFiles.handler(({ input }) =>

@@ -5,6 +5,23 @@ import {
   isArchiveName,
 } from "../../../shared/archiveVolumes.js";
 
+test("keeps one set when volume numbers grow beyond the initial padding width", () => {
+  expect(
+    groupArchiveVolumes([
+      "book.part100.rar",
+      "book.part01.rar",
+      "book.part99.rar",
+      "book.7z.1000",
+      "book.7z.001",
+      "book.7z.999",
+    ]),
+  ).toEqual([
+    ["book.part01.rar", "book.part99.rar", "book.part100.rar"],
+    ["book.7z.001", "book.7z.999", "book.7z.1000"],
+  ]);
+  expect(archiveVolume("book.part100.rar")?.first).toBe("book.part01.rar");
+});
+
 test("groups numbered 7z and RAR volumes by their full path and orders volume one first", () => {
   const groups = groupArchiveVolumes([
     "日本語/book.7z.003",

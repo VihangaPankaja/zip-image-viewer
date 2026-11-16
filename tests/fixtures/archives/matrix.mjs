@@ -142,9 +142,12 @@ export async function verifyArchiveMatrix(
   );
   assert.equal(await readFile(path.join(detected, members[0]), "utf8"), members[0]);
   const split = path.join(root, "split.7z");
-  await writeFile(path.join(input, "日本語.txt"), Buffer.alloc(2048, 65));
+  await writeFile(path.join(input, "日本語.txt"), Buffer.alloc(1024 * 1000, 65));
   create(split, ["-t7z", "-mx=0", "-v1k"]);
-  const splitParts = (await readdir(root)).filter((name) => /^split\.7z\.\d+$/.test(name)).sort();
+  const splitParts = (await readdir(root))
+    .filter((name) => /^split\.7z\.\d+$/.test(name))
+    .sort((a, b) => Number(path.extname(a).slice(1)) - Number(path.extname(b).slice(1)));
+  assert.ok(splitParts.length > 1000, "Exercise numbering beyond .999");
   const splitOut = path.join(root, "split-output");
   await mkdir(splitOut);
   const last = path.join(root, splitParts.at(-1));
@@ -154,8 +157,8 @@ export async function verifyArchiveMatrix(
   });
   assert.deepEqual(await readdir(splitOut), []);
   await rename(`${last}.held`, last);
-  await extractWith7zip(executable, `${split}.001`, splitOut);
-  assert.equal((await readFile(path.join(splitOut, "日本語.txt"))).length, 2048);
+  await extractWith7zip(executable, `${split}.1000`, splitOut);
+  assert.equal((await readFile(path.join(splitOut, "日本語.txt"))).length, 1024 * 1000);
   for (const [label, names, method, pattern] of [
     ["collision", ["Folder/one.txt", "folder/two.txt"], 0, /case.*collision/i],
     ["unsupported", ["note.txt"], 0xffff, /Unsupported.*Repack/],

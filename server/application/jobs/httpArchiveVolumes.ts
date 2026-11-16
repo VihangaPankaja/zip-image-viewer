@@ -56,29 +56,45 @@ function decodePath(value: string) {
 }
 
 export function httpVolumeSources(urls: string[]) {
-  const sources = archiveVolumeSourcesSchema.parse(
+  const parsed = archiveVolumeSourcesSchema.safeParse(
     urls.map((url) => ({ url, name: volumeUrlName(url) })),
   );
-  const key = archiveVolume(sources[0].name)?.key;
-  if (!key || sources.some((source) => archiveVolume(source.name)?.key !== key))
+  if (!parsed.success)
+    throw new ApplicationError(
+      "INVALID_INPUT",
+      "Supply archive volume URLs with portable original filenames within the 10000-volume limit.",
+      400,
+    );
+  const groups = groupArchiveVolumes(parsed.data, (source) => source.name);
+  if (groups.length !== 1 || !archiveVolume(groups[0][0].name))
     throw new ApplicationError(
       "INVALID_INPUT",
       "Supply volumes from the same archive with their original filenames.",
       400,
     );
+  const sources = groups[0];
   if (new Set(sources.map((source) => source.name)).size !== sources.length)
     throw new ApplicationError("INVALID_INPUT", "Supply one URL per archive volume.", 400);
-  return sources.sort(
-    (a, b) => (archiveVolume(a.name)?.number ?? 0) - (archiveVolume(b.name)?.number ?? 0),
-  );
+  return sources;
 }
 
 export function groupHttpArchiveDownloads(items: EnqueueSessionsInput["items"]) {
-  return groupArchiveVolumes(items, (item) => {
+  const groups = groupArchiveVolumes(items, (item) => {
     if (item.url.startsWith("magnet:") || item.sourcePreference === "torrent") return "single";
     const url = new URL(item.url);
     return `${JSON.stringify(item.downloadOptions ?? {})}:${url.origin}${decodePath(url.pathname)}`;
   });
+  // Validate every set before the caller creates or persists the first job.
+  for (const group of groups) {
+    const first = group[0];
+    if (
+      !first.url.startsWith("magnet:") &&
+      first.sourcePreference !== "torrent" &&
+      archiveVolume(volumeUrlName(first.url))
+    )
+      httpVolumeSources(group.map((item) => item.url));
+  }
+  return groups;
 }
 
 export function supplyHttpVolumes(job: SessionJob, urls: string[]) {
@@ -89,8 +105,17 @@ export function supplyHttpVolumes(job: SessionJob, urls: string[]) {
     throw new ApplicationError("INVALID_INPUT", "Supply volumes from the same archive.", 400);
   const replaced = new Set(added.map((source) => source.name));
   const combined = [...job.volumeSources.filter((source) => !replaced.has(source.name)), ...added];
-  archiveVolumeSourcesSchema.parse(combined);
-  job.volumeSources = combined;
+  if (!archiveVolumeSourcesSchema.safeParse(combined).success)
+    throw new ApplicationError("INVALID_INPUT", "Archive exceeds the 10000-volume limit.", 400);
+  const groups = groupArchiveVolumes(combined, (source) => source.name);
+  if (groups.length !== 1)
+    throw new ApplicationError(
+      "INVALID_INPUT",
+      "Use consistent volume filenames from the same archive.",
+      400,
+    );
+  job.volumeSources = groups[0];
+  job.zipPath = "";
   job.volumes = { names: job.volumeSources.map((source) => source.name), missing: [] };
   job.status = "queued";
   job.phase = "queued";
