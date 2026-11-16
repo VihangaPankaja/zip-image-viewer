@@ -116,7 +116,8 @@ export async function inspect7zip(
   if (missing && volume && archiveVolume(path.basename(missing))?.key === volume.key)
     throw new ArchiveVolumesRequired([path.basename(missing)]);
   if (encrypted && password === undefined) throw new ArchivePasswordRequired();
-  if (code !== 0 || stderr.trim()) checkArchiveFailure(stderr, password !== undefined, archivePath);
+  if (code !== 0 || stderr.trim())
+    checkArchiveFailure(stderr, password !== undefined, archivePath, stdout);
   const listing = stdout.split(/^----------\r?$/m).at(-1) ?? "";
   const entries = listing
     .trim()
