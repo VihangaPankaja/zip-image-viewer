@@ -27,6 +27,36 @@ export const textPreviewSchema = z
   );
 export type TextPreviewChunk = z.infer<typeof textPreviewSchema>;
 
+export const selectionExportInputSchema = z.object({
+  paths: z
+    .array(
+      z
+        .string()
+        .min(1)
+        .max(4096)
+        .refine(
+          (name) =>
+            name === "." ||
+            (!/[\\:\p{Cc}]/u.test(name) &&
+              name.split("/").every((part) => part !== "" && part !== "." && part !== "..")),
+          "A canonical relative path is required.",
+        ),
+    )
+    .min(1)
+    .max(10_000),
+  confirmed: z.boolean().default(false),
+});
+export const selectionExportPlanSchema = z.object({
+  entries: z.number().int().min(1).max(10_000),
+  bytes: z
+    .number()
+    .int()
+    .nonnegative()
+    .max(10 * 1024 ** 3),
+  requiresConfirmation: z.boolean(),
+});
+export const selectionExportErrorSchema = z.object({ error: z.string().max(1000) });
+
 export const publicHttpUrlSchema = z
   .url()
   .max(2_048)

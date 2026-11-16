@@ -52,6 +52,7 @@ test("200 MB text stays bounded, scrolls, searches and navigates by chunk", asyn
     await expect(page.getByText(/matching display rows/)).toBeVisible();
     await page.getByRole("button", { name: "Last chunk" }).click();
     await expect(page.getByRole("button", { name: "Last chunk" })).toBeDisabled();
+    await expect(page.locator(".text-preview")).toHaveAttribute("aria-busy", "false");
     await content.focus();
     await page.keyboard.press("Control+End");
     await content.evaluate((element) => {
@@ -60,6 +61,7 @@ test("200 MB text stays bounded, scrolls, searches and navigates by chunk", asyn
     await expect(content).toContainText("FINAL LOG RECORD");
     await page.getByRole("button", { name: "First chunk" }).click();
     await expect(page.getByRole("button", { name: "First chunk" })).toBeDisabled();
+    await expect(page.locator(".text-preview")).toHaveAttribute("aria-busy", "false");
     await expect(content).toContainText("bounded preview");
     const next = page.getByRole("button", { name: "Next chunk" });
     let chunkAttempts = 0;

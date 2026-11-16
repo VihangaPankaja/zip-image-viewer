@@ -14,6 +14,7 @@ import { buildWorkspaceRailItems } from "./workspaceRail";
 import { useWorkspaceLivePreviews } from "./useWorkspaceLivePreviews";
 import { useWorkspacePreviewNavigation } from "./useWorkspacePreviewNavigation";
 import { useWorkspaceHistory } from "./useWorkspaceHistory";
+import { useSelectionExport } from "./useSelectionExport";
 
 function useWorkspaceMedia(state: WorkspacePageState) {
   const selection = usePreviewSelection({
@@ -103,6 +104,7 @@ export function useWorkspacePageController() {
     [settings.downloadOptions],
   );
   const media = useWorkspaceMedia(state);
+  const exportSelection = useSelectionExport(state.session?.id, media.selection.sortedTree);
   const lifecycle = useWorkspaceLifecycle(state, settings, media, downloadSettings);
   const queue = useWorkspaceQueue();
   useWorkspacePageEffects(state, media.selection, media.image.loadImagePreview);
@@ -112,6 +114,7 @@ export function useWorkspacePageController() {
   const actions = useWorkspacePreviewNavigation(state, railItems);
   useWorkspaceHistory(state, actions);
   return {
+    exportSelection,
     actions,
     downloadSettings,
     lifecycle,

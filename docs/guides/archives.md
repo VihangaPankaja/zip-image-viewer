@@ -25,7 +25,39 @@ Use the production image for the matrix above. The upstream
 capabilities; the app applies its own limits and path checks. ZIP methods other
 than Store, Deflate and supported encrypted ZIP are rejected with a repack
 instruction. Split ZIP (`.z01`/`.zip.001`), legacy RAR (`.r00`) naming and archive
-creation are outside this matrix.
+creation in other formats are outside this matrix.
+
+## Download selected files and folders
+
+Open a ready session, choose **Select files**, then select file or folder rows.
+Folders include all their contents, including files hidden by search or media
+filters. Use the folder arrow to expand or collapse while selecting. Arrow keys
+browse the tree; Space or Enter toggles the focused entry. Choose **Done selecting**
+to resume previews. Choices stay available in **Open explorer** for that session.
+
+Choose **Download selection** to save `selection.zip`. The ZIP keeps paths relative
+to the session root and empty folders. Overlapping choices appear once. Deselecting
+a child excludes it from a selected parent. **Clear selection** clears all choices,
+including hidden entries. Changing sessions clears the selection.
+
+The export checks ownership and availability before starting. Incomplete torrent
+files must finish downloading first. Unsafe paths and case or Unicode filename
+collisions fail instead of being renamed. Exporting extracted files from an
+encrypted archive produces a **plain, unencrypted ZIP**; archive passwords are
+never included. Selected archive files themselves keep their original bytes.
+
+Exports use ZIP64 Store without recompression, including for text files. This keeps
+CPU work bounded and avoids recompressing media. The browser streams the download
+to its download manager; it does not build a ZIP in page memory. Use the browser's
+download controls to track or cancel it. Keep the session open until it finishes.
+Deleting the session, disconnecting or stopping the server cancels its export.
+
+Exports are limited to 10 GiB of file contents, 10,000 entries and 8 MiB of metadata.
+The selection request has a 1 MiB decoded JSON limit.
+The server admits two simultaneous exports and limits each to 15 minutes. An export
+of at least 512 MiB or 1,000 entries requires confirmation. If a selected source is
+removed or changes during transfer, the download fails rather than publishing a
+complete-looking ZIP with truncated entries.
 
 ## Open a multipart set
 

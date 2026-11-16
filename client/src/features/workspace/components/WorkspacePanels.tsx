@@ -2,7 +2,7 @@ import { useState } from "react";
 import { isArchiveName } from "../../../../../shared/archiveVolumes";
 import type { WorkspacePageController } from "../useWorkspacePageController";
 import { workspaceLocationSchema } from "../../../../../shared/contracts";
-import { TreeExplorer } from "../../../components/TreeExplorer";
+import { SelectionExplorer } from "./SelectionExplorer";
 import { PreviewContent } from "../../../components/Preview/PreviewContent";
 import { PREVIEW_QUALITY_OPTIONS } from "../../../lib/appConstants";
 import { formatBytes, formatDate } from "../../../lib/formatterUtils";
@@ -30,7 +30,10 @@ export function WorkspaceFiles({ controller }: ViewProps) {
         {session ? <span className="panel-chip">{selection.explorerRows.length}</span> : null}
       </header>
       {selection.sortedTree && available ? (
-        <TreeExplorer
+        <SelectionExplorer
+          key={session?.id}
+          sessionId={session?.id}
+          exportSelection={controller.exportSelection}
           rootNode={selection.sortedTree}
           selectedPath={selectedPath}
           onSelect={(node) => {

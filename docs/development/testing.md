@@ -114,7 +114,9 @@ both full and fixable-only reports remain available after failure. The productio
 container also verifies native archive extraction, encryption detection, literal
 filenames, ZIP Store/Deflate and ZIP64, 7z LZMA/LZMA2, TAR, RAR4 multipart and RAR5,
 split 7z, Unicode/timestamps, missing parts, unsupported ZIP methods, case
-collisions, concatenated gzip and link rejection. Its format matrix fixtures live
+collisions, concatenated gzip and link rejection. It also streams a selection ZIP64 through the built HTTP route,
+extracts it with native 7zip and reimports it through the app, comparing every
+exported file's bytes and checking empty folders. Its format matrix fixtures live
 in `tests/fixtures/archives/`; the [compatibility matrix](../guides/archives.md)
 describes tested support.
 Master pushes then publish that same image without rebuilding. PR, scheduled

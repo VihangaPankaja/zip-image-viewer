@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createWriteStream } from "node:fs";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import {
   mkdtemp,
   mkdir,
@@ -30,6 +33,15 @@ const { extractZip } = await import(
 );
 const { extractSessionSource } = await import(
   pathToFileURL(path.resolve("build/server/application/jobs/extractSessionSource.js")).href
+);
+const { createApp } = await import(
+  pathToFileURL(path.resolve("build/server/bootstrap/createApp.js")).href
+);
+const { registerSelectionExportRoutes } = await import(
+  pathToFileURL(path.resolve("build/server/handlers/selectionExport.js")).href
+);
+const { buildTree } = await import(
+  pathToFileURL(path.resolve("build/server/domain/explorerTree.js")).href
 );
 assert.equal(path7za, "7za", "Production must use the maintained system extractor");
 const info = execFileSync(path7za, ["i"], { encoding: "utf8" });
@@ -65,6 +77,76 @@ try {
     await writeFile(path.join(source, member), member);
     await utimes(path.join(source, member), modifiedAt, modifiedAt);
   }
+  const exportFile = path.join(directory, "selection.zip");
+  const exportSession = {
+    id: "container-export",
+    extractDir: source,
+    tree: buildTree(
+      [
+        ...members.map((relativePath) => ({
+          relativePath,
+          type: "file",
+          size: Buffer.byteLength(relativePath),
+          modifiedAt: modifiedAt.getTime(),
+        })),
+        { relativePath: "empty", type: "directory", size: 0, modifiedAt: modifiedAt.getTime() },
+      ],
+      "export",
+    ).tree,
+  };
+  const exportApp = createApp({ getSessionCount: () => 1, getJobCount: () => 0 });
+  registerSelectionExportRoutes(exportApp, {
+    touchSession: (id) => (id === exportSession.id ? exportSession : undefined),
+  });
+  const exportServer = exportApp.listen(0, "127.0.0.1");
+  try {
+    await new Promise((resolve, reject) => {
+      exportServer.once("listening", resolve);
+      exportServer.once("error", reject);
+    });
+    const address = exportServer.address();
+    assert.ok(address && typeof address !== "string");
+    const url = `http://127.0.0.1:${address.port}/api/sessions/${exportSession.id}/export`;
+    const selection = { paths: ["."] };
+    const plan = await fetch(`${url}/plan`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(selection),
+    });
+    assert.equal(plan.status, 200);
+    assert.equal((await plan.json()).requiresConfirmation, false);
+    const download = await fetch(url, {
+      method: "POST",
+      body: new URLSearchParams({ selection: JSON.stringify(selection) }),
+    });
+    assert.equal(download.status, 200);
+    assert.match(download.headers.get("content-disposition"), /attachment.*selection\.zip/);
+    assert.equal(download.headers.get("cache-control"), "no-store");
+    assert.ok(download.body);
+    await pipeline(Readable.fromWeb(download.body), createWriteStream(exportFile));
+  } finally {
+    exportServer.closeAllConnections();
+    await new Promise((resolve, reject) =>
+      exportServer.close((error) => (error ? reject(error) : resolve())),
+    );
+  }
+  const exported = path.join(directory, "exported");
+  await mkdir(exported);
+  execFileSync(path7za, ["x", "-y", `-o${exported}`, exportFile]);
+  for (const member of members)
+    assert.deepEqual(
+      await readFile(path.join(exported, member)),
+      await readFile(path.join(source, member)),
+    );
+  assert.deepEqual(await readdir(path.join(exported, "empty")), []);
+  const reimported = path.join(directory, "reimported");
+  await mkdir(reimported);
+  await extractZip(exportFile, reimported, undefined, () => {});
+  for (const member of members)
+    assert.deepEqual(
+      await readFile(path.join(reimported, member)),
+      await readFile(path.join(source, member)),
+    );
   for (const format of ["zip", "7z"]) {
     const archive = path.join(directory, `members.${format}`);
     const output = path.join(directory, format);

@@ -41,6 +41,7 @@ function iconForNode(node: ExplorerNode | null | undefined) {
 }
 
 export type TreeExplorerProps = {
+  selection?: { paths: ReadonlySet<string>; toggle: (_node: ExplorerNode) => void };
   rootNode: ExplorerNode | null;
   selectedPath: string;
   onSelect: (_node: ExplorerNode) => void;
@@ -57,25 +58,30 @@ function TreeItem({
   index,
   selectedPath,
   navigation,
+  selection,
 }: {
   row: FlatTreeItem;
   index: number;
   selectedPath: string;
   navigation: Omit<TreeNavigation, "rows">;
+  selection: TreeExplorerProps["selection"];
 }) {
   const isExpanded = navigation.expanded.has(row.id);
-  const isSelected = row.id === selectedPath;
+  const isSelected = selection ? selection.paths.has(row.id) : row.id === selectedPath;
+  const Item = selection ? "div" : "button";
   function activate() {
-    if (row.hasChildren) navigation.toggleExpanded(row.id);
+    if (selection) selection.toggle(row.node);
+    else if (row.hasChildren) navigation.toggleExpanded(row.id);
     else navigation.onSelect(row.node);
   }
   return (
-    <button
-      ref={(element) => {
+    <Item
+      ref={(element: HTMLElement | null) => {
         navigation.setItemRef(index, element);
       }}
-      type="button"
+      type={selection ? undefined : "button"}
       role="treeitem"
+      aria-label={`${row.node.name} ${row.node.type === "directory" ? "Folder" : row.node.extension || "file"}`}
       aria-level={row.depth + 1}
       data-row-index={index}
       aria-posinset={row.position}
@@ -89,24 +95,42 @@ function TreeItem({
       onFocus={() => navigation.setActiveIndex(index)}
       onClick={activate}
     >
-      <span className="tree-item-caret" aria-hidden="true">
-        {row.hasChildren ? (
+      {selection && row.hasChildren ? (
+        <button
+          type="button"
+          tabIndex={-1}
+          className="tree-selection-expand"
+          aria-label={`${isExpanded ? "Collapse" : "Expand"} ${row.node.name}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            navigation.toggleExpanded(row.id);
+          }}
+        >
           <ChevronRight
             size={14}
-            style={{
-              transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
-            }}
+            style={{ transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)" }}
           />
-        ) : null}
-      </span>
+        </button>
+      ) : (
+        <span className="tree-item-caret" aria-hidden="true">
+          {row.hasChildren ? (
+            <ChevronRight
+              size={14}
+              style={{
+                transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
+              }}
+            />
+          ) : null}
+        </span>
+      )}
       <span className="tree-item-icon" aria-hidden="true">
-        {iconForNode(row.node)}
+        {selection ? (isSelected ? "☑" : "☐") : iconForNode(row.node)}
       </span>
       <span className="tree-item-label">{row.node.name}</span>{" "}
       <span className="tree-item-meta">
         {row.node.type === "directory" ? "Folder" : row.node.extension || "file"}
       </span>
-    </button>
+    </Item>
   );
 }
 
@@ -126,7 +150,13 @@ function filterMediaTree(
   return children.length ? { ...node, children } : null;
 }
 
-export function TreeExplorer({ rootNode, selectedPath, onSelect, filters }: TreeExplorerProps) {
+export function TreeExplorer({
+  rootNode,
+  selectedPath,
+  onSelect,
+  filters,
+  selection,
+}: TreeExplorerProps) {
   const [density, setDensity] = useState("compact");
   const [localMediaType, setMediaType] = useState("all");
   const [localSearch, setSearch] = useState("");
@@ -154,7 +184,7 @@ export function TreeExplorer({ rootNode, selectedPath, onSelect, filters }: Tree
   const { rows, ...itemNavigation } = navigation;
   const windowed = rows.length > 500;
   const [start, end] = range(rows.length);
-  const items = renderTreeItems(rows, start, end, selectedPath, itemNavigation);
+  const items = renderTreeItems(rows, start, end, selectedPath, itemNavigation, selection);
   if (!rootNode) return null;
 
   return (
@@ -184,8 +214,9 @@ export function TreeExplorer({ rootNode, selectedPath, onSelect, filters }: Tree
               : undefined
           }
           role="tree"
+          aria-multiselectable={selection ? true : undefined}
           aria-label="Explorer tree"
-          onKeyDown={(event) => handleTreeKeyDown(event, navigation)}
+          onKeyDown={(event) => selectionKeyDown(event, navigation, selection)}
         >
           {windowed ? (
             <TreeWindow start={start} rowCount={rows.length} rowHeight={rowHeight}>
@@ -198,6 +229,18 @@ export function TreeExplorer({ rootNode, selectedPath, onSelect, filters }: Tree
       )}
     </div>
   );
+}
+
+function selectionKeyDown(
+  event: React.KeyboardEvent<HTMLDivElement>,
+  navigation: TreeNavigation,
+  selection: TreeExplorerProps["selection"],
+) {
+  const current = navigation.rows.at(navigation.activeIndex);
+  if (selection && current && (event.key === " " || event.key === "Enter")) {
+    event.preventDefault();
+    selection.toggle(current.node);
+  } else handleTreeKeyDown(event, navigation);
 }
 
 function TreeWindow({
@@ -268,6 +311,7 @@ function renderTreeItems(
   end: number,
   selectedPath: string,
   itemNavigation: Omit<TreeNavigation, "rows">,
+  selection: TreeExplorerProps["selection"],
 ) {
   return rows
     .slice(start, end)
@@ -278,6 +322,7 @@ function renderTreeItems(
         index={start + offset}
         selectedPath={selectedPath}
         navigation={itemNavigation}
+        selection={selection}
       />
     ));
 }

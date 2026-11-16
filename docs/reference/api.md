@@ -28,6 +28,21 @@ published files and queues extraction of the combined selection. Directory
 choices expand to their matching file IDs in the client. See
 [Downloads and archives](../guides/downloads.md#browse-an-archive) for the user flow.
 
+## Selection export
+
+`POST /api/sessions/:id/export/plan` accepts JSON `{ paths, confirmed? }` and returns
+`{ entries, bytes, requiresConfirmation }`. Paths name indexed files, folders or
+`.` for the complete session. `shared/contracts.ts` validates both request and
+plan. Unavailable torrent files, unindexed sources, unsafe paths and portable
+collisions are rejected; folder/file overlap is deduplicated.
+
+`POST /api/sessions/:id/export` accepts that JSON body or one URL-encoded
+`selection` field containing it. It returns a streamed `application/zip` attachment
+named `selection.zip`, with `Cache-Control: no-store`. Large exports require
+`confirmed: true`. The UI uses a native POST download instead of buffering a Blob.
+These routes do not accept passwords or source URLs. Export slots, backpressure,
+disconnect and session deletion bound work; see [export limits](../guides/archives.md#download-selected-files-and-folders).
+
 ## Archive passwords
 
 `jobs.password({ id, password })` accepts a single-line password of 1-1024

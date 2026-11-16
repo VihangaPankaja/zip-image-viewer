@@ -73,6 +73,11 @@ Archive preflight checks volume gaps, source ownership and portable path
 collisions before publishing staged output. Nested fingerprints include every
 volume so changing a sibling invalidates the cached manifest.
 
+Selection export planning expands only indexed session entries and checks torrent
+availability and export budgets. Infrastructure adapters inspect source ownership
+and file identity, then stream ZIP64 Store with backpressure. Exports share the
+session's abortable operations so deletion drains active readers before cleanup.
+
 Domain code has no HTTP or filesystem dependencies. Application workflows use
 typed dependencies; adapters handle I/O. Fallow checks these import boundaries.
 
