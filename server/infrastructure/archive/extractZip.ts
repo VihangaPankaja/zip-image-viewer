@@ -1,5 +1,5 @@
 import { createWriteStream } from "node:fs";
-import { mkdir } from "node:fs/promises";
+import { mkdir, utimes } from "node:fs/promises";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Transform } from "node:stream";
@@ -9,6 +9,18 @@ import type { ExtractedEntry } from "../../domain/explorerTree.js";
 import { sanitizeEntryPath } from "../runtime/runtimePrimitives.js";
 import { inspectZip, openZip, zipEntryId } from "./zipManifest.js";
 import { reserveStorage, resourceLimitError } from "../runtime/resourceLimits.js";
+
+async function restoreZipTimes(entries: ExtractedEntry[], directory: string, signal?: AbortSignal) {
+  for (const entry of [...entries].reverse()) {
+    signal?.throwIfAborted();
+    if (Number.isFinite(entry.modifiedAt))
+      await utimes(
+        path.join(directory, entry.relativePath),
+        new Date(entry.modifiedAt),
+        new Date(entry.modifiedAt),
+      );
+  }
+}
 
 async function writeEntry(
   entry: Awaited<ReturnType<typeof openZip>>["files"][number],
@@ -108,6 +120,7 @@ export async function extractZip(
         modifiedAt: entry.lastModifiedDateTime.getTime(),
       });
     }
+    await restoreZipTimes(entries, extractDir, signal);
     report({ ...progress, stage: "publishing", currentEntry: "" });
     return entries;
   } finally {

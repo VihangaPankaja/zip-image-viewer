@@ -4,6 +4,7 @@ import type {
   HttpDownloadState,
   ZipSelection,
   Job,
+  ArchiveVolumeSource,
 } from "../../shared/contracts.js";
 import type { Response } from "express";
 import type { WebSocket } from "ws";
@@ -16,6 +17,7 @@ export type JobStatus =
   | "awaiting_confirmation"
   | "awaiting_selection"
   | "awaiting_password"
+  | "awaiting_volumes"
   | "paused"
   | "ready"
   | "cancelled"
@@ -30,6 +32,7 @@ export type JobPhase =
   | "confirm"
   | "selecting"
   | "password"
+  | "volumes"
   | "paused"
   | "ready"
   | "cancelled"
@@ -94,6 +97,8 @@ export type DownloadOptions = {
 };
 
 export type SessionJob = {
+  volumeSources?: ArchiveVolumeSource[];
+  volumes?: Job["volumes"];
   passwordProtected?: boolean;
   archiveProcessingMs?: number;
   id: string;

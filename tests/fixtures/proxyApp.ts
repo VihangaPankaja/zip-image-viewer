@@ -1,6 +1,14 @@
 import type { RequestHandler } from "express";
-import { request } from "node:http";
+import { request, type Server } from "node:http";
 import express from "express";
+
+export async function closeFixtureServers(servers: (Server | undefined)[]) {
+  for (const server of servers) {
+    if (!server) continue;
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+}
 
 export function proxyApp(baseURL: string): RequestHandler {
   return (req, res) => {

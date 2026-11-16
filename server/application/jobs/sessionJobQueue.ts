@@ -1,6 +1,7 @@
 import { ApplicationError, type SessionJob } from "../../domain/models.js";
 import { getZipSelection } from "./archiveSelection.js";
 import { archivePasswordAction, takeArchivePassword } from "./archivePasswords.js";
+import { selectTorrentVolumes } from "./torrentSelection.js";
 
 type QueueItem = { job: SessionJob; confirmOversize: boolean };
 const deletionConflict =
@@ -215,30 +216,7 @@ function confirmSessionJob(state: QueueState, jobId: string): SessionJob {
 function selectTorrentFiles(state: QueueState, jobId: string, fileIds: string[]): SessionJob {
   const item = state.jobs.get(jobId);
   if (!item) throw new ApplicationError("NOT_FOUND", "Job not found.", 404);
-  if (
-    item.job.sourceKind !== "torrent" ||
-    !["awaiting_selection", "ready", "paused"].includes(item.job.status)
-  ) {
-    throw new ApplicationError("CONFLICT", "Job is not awaiting file selection.", 409);
-  }
-  const ids = new Set(fileIds);
-  const known = new Set(item.job.torrentFiles.map((file) => file.id));
-  if (!ids.size || ids.size !== fileIds.length || fileIds.some((id) => !known.has(id))) {
-    throw new ApplicationError("INVALID_INPUT", "Choose one or more known torrent files.", 400);
-  }
-  item.job.torrentFiles = item.job.torrentFiles.map((file) => ({
-    ...file,
-    selected: ids.has(file.id) || (item.job.status !== "awaiting_selection" && file.selected),
-  }));
-  Object.assign(item.job, {
-    status: "queued",
-    phase: "queued",
-    cleanupAt: 0,
-    reportedSize: item.job.torrentFiles
-      .filter((file) => file.selected)
-      .reduce((total, file) => total + file.size, 0),
-    message: "File selection accepted. Waiting to start.",
-  });
+  selectTorrentVolumes(item.job, fileIds);
   state.emitJob?.(item.job, {});
   if (state.activeItems.has(jobId)) state.requeueAfterActive.add(jobId);
   else {

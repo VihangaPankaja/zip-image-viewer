@@ -130,7 +130,7 @@ jobs:
     uses: ./.github/workflows/dependency-maintenance.yml
 
   e2e:
-    name: e2e (${{ matrix.browser }})
+    name: e2e (${{ matrix.name }})
     needs: prepare
     if: needs.prepare.outputs.reuse != 'true'
     runs-on: ${{ matrix.os }}
@@ -139,12 +139,27 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - browser: chromium
+          - name: chromium
+            browser: chromium
             os: ubuntu-latest
-          - browser: firefox
+            shard: 1/1
+            workers: 2
+          - name: firefox
+            browser: firefox
             os: ubuntu-latest
-          - browser: webkit
+            shard: 1/1
+            workers: 2
+          # Isolate WebKit workers so media fixtures cannot starve concurrent UI checks.
+          - name: webkit-1-of-2
+            browser: webkit
             os: macos-15-intel
+            shard: 1/2
+            workers: 1
+          - name: webkit-2-of-2
+            browser: webkit
+            os: macos-15-intel
+            shard: 2/2
+            workers: 1
     steps:
       - uses: actions/checkout@v7
       - uses: voidzero-dev/setup-vp@v1.22.0
@@ -160,12 +175,12 @@ jobs:
       - name: Enable WebKit keyboard navigation through all controls
         if: runner.os == 'macOS'
         run: defaults write org.webkit.Playwright AppleKeyboardUIMode -int 2
-      - run: vp exec playwright test --project=${{ matrix.browser }}
+      - run: vp exec playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }} --workers=${{ matrix.workers }}
       - name: Retain browser failure evidence
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-${{ matrix.browser }}
+          name: playwright-${{ matrix.name }}
           path: |
             playwright-report/
             test-results/e2e-run/

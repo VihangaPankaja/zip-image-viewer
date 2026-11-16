@@ -1,4 +1,35 @@
 import type { SessionJob } from "../../domain/models.js";
+import { ArchiveVolumesRequired } from "../../infrastructure/archive/archiveVolumes.js";
+
+export function waitForArchiveVolumes(
+  job: SessionJob,
+  error: unknown,
+  emit: (_job: SessionJob, _patch: Partial<SessionJob>) => void,
+) {
+  if (!(error instanceof ArchiveVolumesRequired) || job.abortController?.signal.aborted)
+    return false;
+  emit(job, {
+    status: "awaiting_volumes",
+    phase: "volumes",
+    percent: null,
+    extraction: undefined,
+    canPause: false,
+    canResume: false,
+    downloadSpeedBytesPerSec: 0,
+    averageSpeedBytesPerSec: 0,
+    etaSeconds: null,
+    error: "",
+    volumes: {
+      names: job.volumeSources?.map((source) => source.name) ?? [],
+      missing: error.missing,
+    },
+    message:
+      job.sourceKind === "torrent"
+        ? `${error.message} Add a complete torrent if these parts are absent from its file list.`
+        : error.message,
+  });
+  return true;
+}
 
 type FailureDependencies = {
   emitJob: (_job: SessionJob, _patch: Partial<SessionJob>, _event?: string) => void;

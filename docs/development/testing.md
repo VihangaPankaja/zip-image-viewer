@@ -112,7 +112,11 @@ Medium or higher image vulnerabilities with an available fix fail container
 verification and block publication. Full reports retain unfixed findings too;
 both full and fixable-only reports remain available after failure. The production
 container also verifies native archive extraction, encryption detection, literal
-filenames, RAR, concatenated gzip and link rejection.
+filenames, ZIP Store/Deflate and ZIP64, 7z LZMA/LZMA2, TAR, RAR4 multipart and RAR5,
+split 7z, Unicode/timestamps, missing parts, unsupported ZIP methods, case
+collisions, concatenated gzip and link rejection. Its format matrix fixtures live
+in `tests/fixtures/archives/`; the [compatibility matrix](../guides/archives.md)
+describes tested support.
 Master pushes then publish that same image without rebuilding. PR, scheduled
 and manual maintenance runs do not publish images. The final `Verification`
 check requires successful verification or a proven reused PR run, plus
@@ -124,7 +128,9 @@ concurrency group. Each verified master image receives a unique build version;
 see [deployment](../reference/deployment.md#image-versions-and-rollback).
 Chromium and Firefox E2E run on Linux; WebKit runs on macOS to exercise Safari's
 platform media support. WebKit uses Playwright's browser build rather than released Safari.
-The WebKit browser job enables keyboard navigation through all controls so Tab
+WebKit runs in two single-worker shards so each macOS runner handles one scenario
+at a time. Both shards must pass before production-container checks start.
+The WebKit browser jobs enable keyboard navigation through all controls so Tab
 and focus checks exercise buttons and radios as well as text fields and selects.
 Full media benchmarks run daily, manually and on PRs that affect the media code,
 fixtures or toolchain lockfile. Version-only and documentation changes do not

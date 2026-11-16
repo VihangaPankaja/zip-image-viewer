@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { isArchiveName } from "../../../../../shared/archiveVolumes";
 import type { WorkspacePageController } from "../useWorkspacePageController";
 import { workspaceLocationSchema } from "../../../../../shared/contracts";
 import { TreeExplorer } from "../../../components/TreeExplorer";
@@ -106,12 +107,7 @@ function WorkspaceArchiveAction({ controller }: ViewProps) {
   const { state, actions, media } = controller;
   const [open, setOpen] = useState(false);
   const selected = media.selection.selectedNode;
-  if (
-    !state.session?.id ||
-    selected?.type !== "file" ||
-    !/\.(zip|7z|rar|tar|gz|tgz|bz2|xz)$/i.test(selected.path)
-  )
-    return null;
+  if (!state.session?.id || selected?.type !== "file" || !isArchiveName(selected.path)) return null;
   const id = state.session.id;
   return (
     <div className="workspace-archive-action">

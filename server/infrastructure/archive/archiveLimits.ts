@@ -12,6 +12,7 @@ export function validateArchiveEntries(
   assertResourceEntryCount(entries.length);
   let bytes = 0;
   const paths = new Set<string>();
+  const spellings = new Map<string, string>();
   for (const entry of entries) {
     const name = entry.path.replaceAll("\\", "/");
     if (
@@ -23,7 +24,15 @@ export function validateArchiveEntries(
       throw resourceLimitError(`Unsafe entry path: ${entry.path}`);
     const parts = sanitizeEntryPath(name).split("/");
     for (let index = 1; index <= parts.length; index++) {
-      paths.add(parts.slice(0, index).join("/"));
+      const prefix = parts.slice(0, index).join("/");
+      const key = prefix.normalize("NFC").toLowerCase();
+      const previous = spellings.get(key);
+      if (previous !== undefined && previous !== prefix)
+        throw resourceLimitError(
+          `Windows case or Unicode path collision: "${previous}" and "${prefix}". Rename conflicting entries in the source archive.`,
+        );
+      spellings.set(key, prefix);
+      paths.add(prefix);
       assertResourceEntryCount(paths.size);
     }
     if (entry.isLink) throw resourceLimitError("Archive links are not supported.");

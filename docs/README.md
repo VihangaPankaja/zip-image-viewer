@@ -5,6 +5,7 @@ Start with the [project README](../README.md) to run the app.
 ## Using the app
 
 - [Downloads and archives](guides/downloads.md)
+- [Archive formats and volumes](guides/archives.md)
 - [Media playback](guides/playback.md)
 - [Storage and retention](guides/storage.md)
 - [Settings](guides/settings.md)

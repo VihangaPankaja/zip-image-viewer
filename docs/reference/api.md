@@ -36,6 +36,16 @@ the retained source and returns the public job without its password. Passwords
 are transient and must be supplied again after a restart. See
 [password-protected archives](../guides/downloads.md#password-protected-archives).
 
+## Archive volumes
+
+`jobs.enqueue` groups compatible numbered HTTP volume URLs into one job.
+`jobs.volumes({ id, urls })` accepts 1-50 public HTTP(S) URLs only while that HTTP
+job is `awaiting_volumes`. Filenames must match the existing set; supplied parts
+replace URLs of the same name or add missing parts. It queues verification and
+returns the public job, whose `volumes` field lists supplied and missing names.
+Per-volume transfer checkpoints are private retained state. Torrent selection
+expands to all matching numbered parts. See [multipart archives](../guides/archives.md#open-a-multipart-set).
+
 ## Nested archives
 
 `nestedArchives.inspect({ id, path, password? })` inspects an archive file owned by a parent

@@ -15,6 +15,7 @@ const capture = vi.hoisted(() =>
     Promise.resolve({
       stdout: "WEBVTT\n\n00:00.000 --> 00:01.000\nHello\n",
       stderr: "",
+      code: 0,
     }),
   ),
 );
@@ -90,6 +91,7 @@ it("validates available files and text stream IDs before converting through the 
   capture.mockResolvedValueOnce({
     stdout: "x".repeat(2 * 1024 ** 2 + 1),
     stderr: "",
+    code: 0,
   });
   await request(app).get(url).query({ path: "clip.mkv", track: "subtitle-3" }).expect(422);
   session.availablePaths = new Set();

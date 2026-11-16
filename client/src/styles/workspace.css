@@ -16,7 +16,8 @@
   overflow-wrap: anywhere;
 }
 
-.archive-password-form input {
+.archive-password-form input,
+.archive-password-form textarea {
   width: 100%;
   min-width: 0;
 }

@@ -191,6 +191,7 @@ export async function downloadSessionSource(
     zipPath: string;
     workspaceDir: string;
     confirmOversize: boolean;
+    metadata?: RemoteMetadata;
   },
   deps: DownloadSourceDependencies,
 ): Promise<"complete" | "paused"> {
@@ -214,7 +215,7 @@ export async function downloadSessionSource(
     MAX_HTTP_RETRIES,
     settings.maxRetries === -1 ? MAX_HTTP_RETRIES : settings.maxRetries,
   );
-  const metadata = await fetchRemoteMetadata(input.url, signal);
+  const metadata = input.metadata ?? (await fetchRemoteMetadata(input.url, signal));
   signal.throwIfAborted();
   state.reportedSize = metadata.size;
   if (metadata.size > CONFIRM_SIZE_BYTES && !input.confirmOversize) {

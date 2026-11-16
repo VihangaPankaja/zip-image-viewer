@@ -175,6 +175,7 @@ jobs:
         run: |
           docker run --rm --entrypoint node \
             --mount type=bind,source="$PWD/tests/integration/containerArchiveSmoke.mjs",target=/app/tests/integration/containerArchiveSmoke.mjs,readonly \
+            --mount type=bind,source="$PWD/tests/fixtures/archives",target=/app/tests/fixtures/archives,readonly \
             ${{ env.IMAGE_NAME }}:latest /app/tests/integration/containerArchiveSmoke.mjs
 
       - name: Decode HLS in production image

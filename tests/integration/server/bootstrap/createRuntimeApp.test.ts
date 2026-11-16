@@ -99,6 +99,16 @@ describe("createRuntimeApp", () => {
       expect(confirmJob).toHaveBeenCalledWith(job.id);
       expect(job.cleanupAt).toBe(0);
       expect(job.message).toBe("Confirmation accepted. Waiting to start.");
+      await expect(
+        rpc.jobs.enqueue({
+          items: [
+            { url: "https://example.com/good.zip" },
+            { url: "https://example.com/book.7z.001" },
+            { url: "https://example.com/book.7z.001" },
+          ],
+        }),
+      ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+      expect(jobs.size).toBe(1);
     } finally {
       await new Promise<void>((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve())),

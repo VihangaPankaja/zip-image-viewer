@@ -5,6 +5,7 @@ import { classifyExtension } from "../../../lib/mimeTypeSystem";
 import { fileState } from "./TorrentFileContents";
 import { useModalDialog } from "../../../hooks/useModalDialog";
 import { TorrentFileArea, useTorrentPlayback } from "./TorrentEarlyVideo";
+import { groupArchiveVolumes } from "../../../../../shared/archiveVolumes";
 
 type TorrentFile = Job["torrentFiles"][number];
 type Props = {
@@ -70,6 +71,10 @@ function useTorrentSelection({ job, onClose, onSubmit, onPriorityChange }: Props
     [displayJob, selecting, search, mediaType, status],
   );
   const change = (files: TorrentFile[], checked: boolean) => {
+    const ids = new Set(files.map((file) => file.id));
+    files = groupArchiveVolumes(displayJob.torrentFiles, (file) => file.path)
+      .filter((group) => group.some((file) => ids.has(file.id)))
+      .flat();
     setSelected((current) => {
       const next = new Set(current);
       for (const file of files) {

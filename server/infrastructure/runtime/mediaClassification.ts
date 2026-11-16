@@ -1,8 +1,8 @@
 import path from "node:path";
 import mime from "mime-types";
 import type { FileTypeResult } from "file-type";
+import { isArchiveName } from "../../../shared/archiveVolumes.js";
 
-const ARCHIVE_EXTENSIONS = new Set(["zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz"]);
 export const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v", "ogv", "mkv"]);
 const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "ogg", "aac", "m4a", "flac"]);
 
@@ -35,9 +35,7 @@ export function sleepWithSignal(milliseconds: number, signal: AbortSignal): Prom
 
 export function isArchiveByName(value: unknown): boolean {
   if (typeof value !== "string") return false;
-  const name = value.toLowerCase();
-  const extension = name.includes(".") ? name.split(".").pop() : undefined;
-  return extension ? ARCHIVE_EXTENSIONS.has(extension) : false;
+  return isArchiveName(value);
 }
 
 export function classifyDetectedType(

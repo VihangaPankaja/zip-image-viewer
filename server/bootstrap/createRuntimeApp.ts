@@ -12,6 +12,11 @@ import type {
 import type { ServerRpcDependencies } from "../rpc/serverRouter.js";
 import { getArchiveManifest } from "../application/jobs/archiveSelection.js";
 import { discoverPage } from "../application/discovery/discoverPage.js";
+import {
+  groupHttpArchiveDownloads,
+  httpVolumeSources,
+  supplyHttpVolumes,
+} from "../application/jobs/httpArchiveVolumes.js";
 
 type Dependencies = {
   submitArchivePassword: (_id: string, _password: string) => SessionJob;
@@ -76,6 +81,13 @@ export function createRuntimeApp(deps: Dependencies) {
     listJobs,
     listSessions,
     rpc: {
+      supplyVolumes: (id, urls) => {
+        const job = deps.jobs.get(id);
+        if (!job) throw new ApplicationError("NOT_FOUND", "Job not found.", 404);
+        supplyHttpVolumes(job, urls);
+        deps.enqueueJob(job, !!job.oversizeConfirmed);
+        return deps.sanitizeJob(job);
+      },
       submitArchivePassword: (id, password) =>
         deps.sanitizeJob(deps.submitArchivePassword(id, password)),
       discoverPage,
@@ -90,12 +102,7 @@ export function createRuntimeApp(deps: Dependencies) {
         deps.enqueueJob(job, input.confirmOversize);
         return deps.sanitizeJob(job);
       },
-      enqueueJobs: (input) =>
-        input.items.map(({ url, downloadOptions, sourcePreference }) => {
-          const job = deps.createJob(url, downloadOptions, sourcePreference);
-          deps.enqueueJob(job, input.confirmOversize);
-          return deps.sanitizeJob(job);
-        }),
+      enqueueJobs: enqueueArchiveJobs(deps),
       getSession: (id) => getSessionSummary(deps.sessions, id),
       removeSession: (id) => deps.removeSession(id, "rpc"),
       cancelJob: (id) => {
@@ -151,4 +158,18 @@ function archiveActions(deps: Dependencies): ServerRpcDependencies["archives"] {
       return deps.sanitizeJob(await deps.selectArchiveFiles(id, fingerprint, fileIds));
     },
   };
+}
+
+function enqueueArchiveJobs(deps: Dependencies): ServerRpcDependencies["enqueueJobs"] {
+  return (input) =>
+    groupHttpArchiveDownloads(input.items).map((group) => {
+      const { url, downloadOptions, sourcePreference } = group[0];
+      const job = deps.createJob(url, downloadOptions, sourcePreference);
+      if (job.volumeSources) {
+        job.volumeSources = httpVolumeSources(group.map((item) => item.url));
+        job.volumes = { names: job.volumeSources.map((source) => source.name), missing: [] };
+      }
+      deps.enqueueJob(job, input.confirmOversize);
+      return deps.sanitizeJob(job);
+    });
 }

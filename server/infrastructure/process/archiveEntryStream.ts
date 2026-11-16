@@ -108,6 +108,7 @@ export async function writeArchiveEntry(options: ArchiveEntryOptions) {
 function archiveErrors(stderrStream: import("node:stream").Readable, controller: AbortController) {
   let stderr = "";
   let stderrBytes = 0;
+  stderrStream.setEncoding("utf8");
   stderrStream.on("data", (chunk: unknown) => {
     const text = chunkText(chunk);
     stderrBytes += Buffer.byteLength(text);

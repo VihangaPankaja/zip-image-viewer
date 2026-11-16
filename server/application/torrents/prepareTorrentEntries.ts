@@ -5,8 +5,8 @@ import type { SessionJob } from "../../domain/models.js";
 import { extractSessionSource } from "../jobs/extractSessionSource.js";
 import { ArchiveSelectionRequired, prepareZipArchive } from "../jobs/archiveSelection.js";
 import { torrentSiblingFolder } from "./torrentSiblingFolder.js";
-
-const ARCHIVE_EXTENSION = /\.(zip|rar|7z|tar|gz|tgz)$/i;
+import { archiveVolume, isArchiveName } from "../../../shared/archiveVolumes.js";
+import { resolveArchiveVolumes } from "../../infrastructure/archive/archiveVolumes.js";
 
 type EntryDependencies = Parameters<typeof extractSessionSource>[3] & {
   admitArchiveEntries?: (_entries: Awaited<ReturnType<typeof extractSessionSource>>) => void;
@@ -38,7 +38,7 @@ export async function prepareTorrentEntries(
   const archive = files.find((file) =>
     job.torrentArchivePath
       ? file.relativePath === job.torrentArchivePath
-      : ARCHIVE_EXTENSION.test(file.relativePath),
+      : isArchiveName(file.relativePath),
   );
   if (!archive) {
     deps.admitArchiveEntries?.(files);
@@ -46,8 +46,9 @@ export async function prepareTorrentEntries(
   }
   if (path.resolve(extractDir) !== path.resolve(job.workspaceDir, "extracted"))
     throw new Error("Invalid retained extraction directory.");
-  job.torrentArchivePath = archive.relativePath;
-  if (!(await prepareZipArchive(job, path.join(torrentDir, archive.relativePath), deps.emitJob)))
+  const source = await resolveTorrentVolumes(torrentDir, archive.relativePath, files);
+  job.torrentArchivePath = path.relative(torrentDir, source.filename).replaceAll(path.sep, "/");
+  if (!(await prepareZipArchive(job, source.filename, deps.emitJob)))
     throw new ArchiveSelectionRequired("Choose archive files before extraction.");
   const staging = `${extractDir}.staging`;
   const previous = `${extractDir}.previous`;
@@ -58,17 +59,17 @@ export async function prepareTorrentEntries(
   await rm(staging, { recursive: true, force: true });
   await mkdir(staging, { recursive: true });
   try {
-    const entries = await extractSessionSource(
-      job,
-      path.join(torrentDir, archive.relativePath),
-      staging,
-      deps,
-    );
+    const entries = await extractSessionSource(job, source.filename, staging, deps);
     job.abortController?.signal.throwIfAborted();
     const siblingFolder = torrentSiblingFolder(entries.map((entry) => entry.relativePath));
     for (const file of files) {
       job.abortController?.signal.throwIfAborted();
-      if (file === archive) continue;
+      if (
+        file === archive ||
+        (archiveVolume(file.relativePath)?.key !== undefined &&
+          archiveVolume(file.relativePath)?.key === archiveVolume(archive.relativePath)?.key)
+      )
+        continue;
       const relativePath = `${siblingFolder}/${file.relativePath}`;
       const source = path.join(torrentDir, file.relativePath);
       const destination = path.join(staging, relativePath);
@@ -96,4 +97,19 @@ export async function prepareTorrentEntries(
   } finally {
     await cleanupDerived(staging, job, deps);
   }
+}
+
+function resolveTorrentVolumes(
+  torrentDir: string,
+  archivePath: string,
+  files: { relativePath: string }[],
+) {
+  return resolveArchiveVolumes(
+    path.join(torrentDir, archivePath),
+    new Set(
+      files
+        .filter((file) => path.dirname(file.relativePath) === path.dirname(archivePath))
+        .map((file) => path.basename(file.relativePath)),
+    ),
+  );
 }
