@@ -142,9 +142,10 @@ function endRecords(count: number, offset: number, directoryOffset: number) {
   end.writeBigUInt64LE(BigInt(offset), 64);
   end.writeUInt32LE(1, 72);
   end.writeUInt32LE(0x06054b50, 76);
-  end.writeUInt16LE(0xffff, 84);
-  end.writeUInt16LE(0xffff, 86);
-  end.writeUInt32LE(0xffffffff, 88);
-  end.writeUInt32LE(0xffffffff, 92);
+  // p7zip 16.02 rejects a needless ZIP64 entry-count sentinel on small exports.
+  end.writeUInt16LE(Math.min(count, 0xffff), 84);
+  end.writeUInt16LE(Math.min(count, 0xffff), 86);
+  end.writeUInt32LE(Math.min(offset - directoryOffset, 0xffffffff), 88);
+  end.writeUInt32LE(Math.min(directoryOffset, 0xffffffff), 92);
   return end;
 }

@@ -82,6 +82,9 @@ it("streams a ZIP64 subset with identical hashes, root-relative paths, empty fol
     })
     .expect(200);
   expect(response.headers["content-disposition"]).toContain("attachment");
+  const output = response.body as Buffer;
+  expect(output.readUInt16LE(output.length - 12)).toBe(4);
+  expect(output.readUInt32LE(output.length - 6)).toBeLessThan(output.length);
   const zip = await unzipper.Open.buffer(response.body as Buffer);
   expect(zip.files.map((entry) => entry.path)).toEqual([
     "album/",

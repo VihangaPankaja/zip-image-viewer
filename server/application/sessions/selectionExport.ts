@@ -1,11 +1,8 @@
-import { lstat, realpath } from "node:fs/promises";
-import path from "node:path";
 import type { ExplorerNode, Session } from "../../domain/models.js";
 import { ApplicationError } from "../../domain/models.js";
 import { validateArchiveEntries } from "../../infrastructure/archive/archiveLimits.js";
-import { isWithinRoot } from "../../infrastructure/runtime/filePaths.js";
 import { selectionExportInputSchema } from "../../../shared/contracts.js";
-import type { ExportEntry } from "../../infrastructure/archive/streamSelectionZip.js";
+import { inspectExportSources } from "../../infrastructure/archive/selectionExportSources.js";
 
 function selectedNodes(session: Session, paths: string[], signal: AbortSignal) {
   const index = new Map<string, ExplorerNode>();
@@ -42,8 +39,6 @@ function selectedNodes(session: Session, paths: string[], signal: AbortSignal) {
 
 export async function planSelectionExport(session: Session, paths: string[], signal: AbortSignal) {
   const nodes = selectedNodes(session, paths, signal);
-  const entries: ExportEntry[] = [];
-  const root = await realpath(session.extractDir);
   for (const node of nodes) {
     signal.throwIfAborted();
     if (!selectionExportInputSchema.safeParse({ paths: [node.path] }).success)
@@ -54,30 +49,8 @@ export async function planSelectionExport(session: Session, paths: string[], sig
         "A selected torrent file is not available yet. Download it first.",
         409,
       );
-    const source = path.resolve(session.extractDir, node.path);
-    const info = await lstat(source).catch(() => null);
-    const actual = await realpath(source).catch(() => "");
-    if (
-      !info ||
-      info.isSymbolicLink() ||
-      !isWithinRoot(actual, root) ||
-      (node.type === "file" ? !info.isFile() : !info.isDirectory())
-    )
-      throw new ApplicationError(
-        "INVALID_INPUT",
-        "Selected source is missing or outside its owning session.",
-        400,
-      );
-    entries.push({
-      path: node.path + (node.type === "directory" ? "/" : ""),
-      source,
-      directory: node.type === "directory",
-      size: node.type === "directory" ? 0 : info.size,
-      modifiedAt: info.mtimeMs,
-      dev: info.dev,
-      ino: info.ino,
-    });
   }
+  const { entries, root } = await inspectExportSources(session.extractDir, nodes, signal);
   let bytes: number;
   try {
     bytes = validateArchiveEntries(entries);
