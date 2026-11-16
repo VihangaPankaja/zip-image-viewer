@@ -65,20 +65,31 @@ export function useTreeWindow(root: ExplorerNode | null, density: string) {
   function revealIndex(index: number) {
     const tree = treeRef.current;
     if (!tree) return;
+    // Keyboard navigation wins over a resize callback queued before the key press.
+    focusedRow.current = index;
+    resizedScrollTop.current = null;
+    resizedFocusIndex.current = null;
     const top = index * rowHeight;
     if (top < tree.scrollTop || top + rowHeight > tree.scrollTop + tree.clientHeight) {
       tree.scrollTop = top;
       setScrollTop(top);
     }
   }
-  function range(length: number): [number, number] {
-    if (length <= 500) return [0, length];
-    const start = Math.max(0, Math.min(length - 1, Math.floor(scrollTop / rowHeight) - 5));
-    return [start, Math.min(length, start + Math.ceil(viewportHeight / rowHeight) + 10)];
-  }
+  const range = (length: number) => treeRange(length, scrollTop, viewportHeight, rowHeight);
   function onFocusCapture(event: FocusEvent<HTMLDivElement>) {
     const index = Number((event.target as HTMLElement).dataset.rowIndex);
     focusedRow.current = Number.isFinite(index) ? index : null;
   }
   return { treeRef, setScrollTop, revealIndex, range, rowHeight, onFocusCapture };
+}
+
+function treeRange(
+  length: number,
+  top: number,
+  height: number,
+  rowHeight: number,
+): [number, number] {
+  if (length <= 500) return [0, length];
+  const start = Math.max(0, Math.min(length - 1, Math.floor(top / rowHeight) - 5));
+  return [start, Math.min(length, start + Math.ceil(height / rowHeight) + 10)];
 }

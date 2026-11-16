@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vite-plus/test";
 import { TreeExplorer, type ExplorerNode } from "../../../../client/src/components/TreeExplorer";
 
@@ -190,6 +190,48 @@ it("keeps a large tree bounded and focuses an initially unmounted last file", as
   );
   fireEvent.keyDown(screen.getByRole("tree"), { key: "Home" });
   expect(await screen.findByRole("treeitem", { name: "Archive Folder" })).toHaveFocus();
+});
+
+it("lets End override a queued viewport resize when the last row is virtualized", () => {
+  const callbacks: Array<() => void> = [];
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      constructor(callback: () => void) {
+        callbacks.push(callback);
+      }
+      observe() {
+        return undefined;
+      }
+      disconnect() {
+        return undefined;
+      }
+    },
+  );
+  const large = {
+    ...root,
+    children: Array.from({ length: 10_000 }, (_, i) => ({
+      name: `file-${i}.txt`,
+      path: `file-${i}.txt`,
+      type: "file" as const,
+      extension: "txt",
+    })),
+  };
+  const view = render(<TreeExplorer rootNode={large} selectedPath="" onSelect={vi.fn()} />);
+  try {
+    const tree = screen.getByRole("tree");
+    Object.defineProperty(tree, "clientHeight", { configurable: true, value: 200 });
+    vi.spyOn(tree, "getBoundingClientRect").mockReturnValue({ height: 200 } as DOMRect);
+    act(() => {
+      for (const callback of callbacks) callback();
+      fireEvent.keyDown(tree, { key: "End" });
+    });
+    expect(screen.getByRole("treeitem", { name: "file-9999.txt txt" })).toHaveFocus();
+  } finally {
+    view.unmount();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  }
 });
 
 it("switches row density without losing selection or folder expansion", () => {
