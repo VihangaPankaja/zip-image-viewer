@@ -121,6 +121,43 @@
   gap: 0;
 }
 
+.selection-export-tools {
+  min-width: 0;
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.selection-explorer {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+.selection-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.selection-export-tools p {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.tree-selection-expand {
+  display: grid;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+
 .tree-shell[data-density="comfortable"] {
   --tree-row-height: max(48px, var(--control-height));
 }
@@ -154,6 +191,10 @@
 
 .tree-item:focus-visible {
   outline-offset: -2px;
+}
+
+.tree-shell[aria-multiselectable="true"] .tree-item {
+  grid-template-columns: 32px 20px minmax(0, 1fr) minmax(0, 44px);
 }
 
 .tree-item-label {

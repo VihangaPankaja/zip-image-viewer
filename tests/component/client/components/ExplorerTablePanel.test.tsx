@@ -35,5 +35,10 @@ describe("ExplorerTablePanel", () => {
 
     expect(setSelectedPath).toHaveBeenCalledWith("photos/example.jpg");
     expect(screen.getByRole("table", { name: "Archive files" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Select files" }));
+    const selection = screen.getByRole("checkbox", { name: "Select photos/example.jpg" });
+    await user.click(selection);
+    expect(selection).toBeChecked();
+    expect(screen.getByRole("button", { name: "Download selection" })).toBeEnabled();
   });
 });

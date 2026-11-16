@@ -50,7 +50,7 @@ export type TreeNavigation = {
   onSelect: (node: ExplorerNode) => void;
   rows: FlatTreeItem[];
   setActiveIndex: React.Dispatch<React.SetStateAction<number>>;
-  setItemRef: (index: number, element: HTMLButtonElement | null) => void;
+  setItemRef: (index: number, element: HTMLElement | null) => void;
   toggleExpanded: (id: string) => void;
 };
 
@@ -138,7 +138,7 @@ export function useTreeNavigation(
     return matches;
   }, [expanded, revealMatches, rootNode, searchCollapsed]);
   useEffect(() => setSearchCollapsed(new Set()), [rootNode, revealMatches]);
-  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const itemRefs = useRef<Array<HTMLElement | null>>([]);
   useEffect(() => {
     setExpanded(new Set([rootPath || "."]));
     setActiveIndex(0);
@@ -177,7 +177,7 @@ export function useTreeNavigation(
     item?.focus();
     if (item && item === document.activeElement) pendingFocus.current = null;
   }
-  function setItemRef(index: number, element: HTMLButtonElement | null) {
+  function setItemRef(index: number, element: HTMLElement | null) {
     itemRefs.current[index] = element;
   }
   return {

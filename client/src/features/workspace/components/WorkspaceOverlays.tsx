@@ -1,11 +1,15 @@
 import { CustomDropdown } from "../../../components/Common/CustomDropdown";
 import { useModalDialog } from "../../../hooks/useModalDialog";
-import { TreeExplorer, type ExplorerNode } from "../../../components/TreeExplorer";
+import type { ExplorerNode } from "../../../components/TreeExplorer";
+import { SelectionExplorer } from "./SelectionExplorer";
+import type { SelectionExport } from "../useSelectionExport";
 import type { SelectOption } from "../types";
 
 type ImageNode = { modifiedAt?: number; name: string; size?: number };
 
 type WorkspaceOverlaysProps = {
+  sessionId?: string;
+  exportSelection?: SelectionExport;
   currentFolderImages: readonly string[];
   currentImageIndex: number;
   explorerModalOpen: boolean;
@@ -60,7 +64,13 @@ type SlideshowOverlayProps = SlideshowToolsProps &
 
 type ExplorerOverlayProps = Pick<
   WorkspaceOverlaysProps,
-  "onCloseExplorer" | "onSelectPath" | "selectedPath" | "setExplorerModalOpen" | "sortedTree"
+  | "onCloseExplorer"
+  | "onSelectPath"
+  | "selectedPath"
+  | "setExplorerModalOpen"
+  | "sortedTree"
+  | "sessionId"
+  | "exportSelection"
 >;
 
 export function WorkspaceOverlays(props: WorkspaceOverlaysProps) {
@@ -257,7 +267,10 @@ function ExplorerOverlay(props: ExplorerOverlayProps) {
           </button>
         </div>
         <div className="explorer-modal-body">
-          <TreeExplorer
+          <SelectionExplorer
+            key={props.sessionId}
+            sessionId={props.sessionId}
+            exportSelection={props.exportSelection}
             rootNode={props.sortedTree}
             selectedPath={props.selectedPath}
             onSelect={(node) => {

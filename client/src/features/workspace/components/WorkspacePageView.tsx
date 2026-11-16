@@ -159,6 +159,8 @@ function WorkspacePageOverlays({ controller }: ViewProps) {
   const { state } = controller;
   return (
     <WorkspaceOverlays
+      sessionId={state.session?.id}
+      exportSelection={controller.exportSelection}
       {...selection}
       {...state}
       currentFolderImages={selection.currentFolderImages}

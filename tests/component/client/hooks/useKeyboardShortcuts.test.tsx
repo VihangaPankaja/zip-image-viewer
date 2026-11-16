@@ -102,6 +102,22 @@ describe("useKeyboardShortcuts", () => {
     region.remove();
   });
 
+  it("leaves selection tree rows in control of media shortcut keys", () => {
+    const { video } = renderShortcuts();
+    const tree = document.createElement("div");
+    tree.setAttribute("role", "tree");
+    const row = document.createElement("div");
+    row.setAttribute("role", "treeitem");
+    row.tabIndex = 0;
+    tree.append(row);
+    document.body.append(tree);
+    row.focus();
+    video.playbackRate = 1;
+    row.dispatchEvent(new KeyboardEvent("keydown", { key: "]", bubbles: true }));
+    expect(video.playbackRate).toBe(1);
+    tree.remove();
+  });
+
   it("does not navigate the background preview while an overlay is open", () => {
     const { setSelectedPath, video } = renderShortcuts();
     const dialog = document.createElement("dialog");

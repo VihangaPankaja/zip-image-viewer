@@ -1,4 +1,6 @@
 import { CustomDropdown } from "./Common/CustomDropdown";
+import { useSelectionExport, type SelectionExport } from "../features/workspace/useSelectionExport";
+import { SelectionExportTools } from "../features/workspace/components/SelectionExplorer";
 
 type ExplorerNode = {
   children?: ExplorerNode[];
@@ -59,7 +61,7 @@ function ExplorerPanelHeader(
 }
 
 function ExplorerTable(
-  props: Pick<
+  props: { selection: SelectionExport } & Pick<
     ExplorerTablePanelProps,
     | "explorerRows"
     | "selectedPath"
@@ -75,6 +77,7 @@ function ExplorerTable(
       <table className="explorer-table" aria-label="Archive files">
         <thead>
           <tr>
+            {props.selection.selecting ? <th scope="col">Select</th> : null}
             <th scope="col">Name</th>
             {columns.type ? <th scope="col">Type</th> : null}
             {columns.size ? <th scope="col">Size</th> : null}
@@ -85,6 +88,16 @@ function ExplorerTable(
         <tbody>
           {props.explorerRows.map((row) => (
             <tr key={row.path}>
+              {props.selection.selecting ? (
+                <td>
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${row.path}`}
+                    checked={props.selection.paths.has(row.path)}
+                    onChange={() => props.selection.toggle(row)}
+                  />
+                </td>
+              ) : null}
               <td>
                 {row.type === "file" ? (
                   <button
@@ -113,6 +126,7 @@ function ExplorerTable(
 }
 
 export function ExplorerTablePanel(props: ExplorerTablePanelProps) {
+  const selection = useSelectionExport(props.session?.id, props.sortedTree);
   return (
     <section className="explorer-table-panel" aria-labelledby="explorer-title">
       <ExplorerPanelHeader {...props} />
@@ -122,7 +136,10 @@ export function ExplorerTablePanel(props: ExplorerTablePanelProps) {
           <p>Add a public URL to queue an archive and list its files here.</p>
         </div>
       ) : (
-        <ExplorerTable {...props} />
+        <div>
+          {props.session?.id ? <SelectionExportTools selection={selection} /> : null}
+          <ExplorerTable {...props} selection={selection} />
+        </div>
       )}
     </section>
   );

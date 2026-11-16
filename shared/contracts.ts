@@ -55,6 +55,7 @@ export const selectionExportPlanSchema = z.object({
     .max(10 * 1024 ** 3),
   requiresConfirmation: z.boolean(),
 });
+export const selectionExportErrorSchema = z.object({ error: z.string().max(1000) });
 
 export const publicHttpUrlSchema = z
   .url()
