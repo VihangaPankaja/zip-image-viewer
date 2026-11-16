@@ -34,11 +34,11 @@ const { extractZip } = await import(
 const { extractSessionSource } = await import(
   pathToFileURL(path.resolve("build/server/application/jobs/extractSessionSource.js")).href
 );
-const { planSelectionExport } = await import(
-  pathToFileURL(path.resolve("build/server/application/sessions/selectionExport.js")).href
+const { createApp } = await import(
+  pathToFileURL(path.resolve("build/server/bootstrap/createApp.js")).href
 );
-const { streamSelectionZip } = await import(
-  pathToFileURL(path.resolve("build/server/infrastructure/archive/streamSelectionZip.js")).href
+const { registerSelectionExportRoutes } = await import(
+  pathToFileURL(path.resolve("build/server/handlers/selectionExport.js")).href
 );
 const { buildTree } = await import(
   pathToFileURL(path.resolve("build/server/domain/explorerTree.js")).href
@@ -79,6 +79,7 @@ try {
   }
   const exportFile = path.join(directory, "selection.zip");
   const exportSession = {
+    id: "container-export",
     extractDir: source,
     tree: buildTree(
       [
@@ -93,12 +94,42 @@ try {
       "export",
     ).tree,
   };
-  const exportSignal = new AbortController().signal;
-  const exportPlan = await planSelectionExport(exportSession, ["."], exportSignal);
-  await pipeline(
-    Readable.from(streamSelectionZip(exportPlan.entries, exportPlan.root, exportSignal)),
-    createWriteStream(exportFile),
-  );
+  const exportApp = createApp({ getSessionCount: () => 1, getJobCount: () => 0 });
+  registerSelectionExportRoutes(exportApp, {
+    touchSession: (id) => (id === exportSession.id ? exportSession : undefined),
+  });
+  const exportServer = exportApp.listen(0, "127.0.0.1");
+  try {
+    await new Promise((resolve, reject) => {
+      exportServer.once("listening", resolve);
+      exportServer.once("error", reject);
+    });
+    const address = exportServer.address();
+    assert.ok(address && typeof address !== "string");
+    const url = `http://127.0.0.1:${address.port}/api/sessions/${exportSession.id}/export`;
+    const selection = { paths: ["."] };
+    const plan = await fetch(`${url}/plan`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(selection),
+    });
+    assert.equal(plan.status, 200);
+    assert.equal((await plan.json()).requiresConfirmation, false);
+    const download = await fetch(url, {
+      method: "POST",
+      body: new URLSearchParams({ selection: JSON.stringify(selection) }),
+    });
+    assert.equal(download.status, 200);
+    assert.match(download.headers.get("content-disposition"), /attachment.*selection\.zip/);
+    assert.equal(download.headers.get("cache-control"), "no-store");
+    assert.ok(download.body);
+    await pipeline(Readable.fromWeb(download.body), createWriteStream(exportFile));
+  } finally {
+    exportServer.closeAllConnections();
+    await new Promise((resolve, reject) =>
+      exportServer.close((error) => (error ? reject(error) : resolve())),
+    );
+  }
   const exported = path.join(directory, "exported");
   await mkdir(exported);
   execFileSync(path7za, ["x", "-y", `-o${exported}`, exportFile]);
