@@ -70,7 +70,7 @@ test("rejects Windows case collisions in implicit parent directories before writ
   }
 });
 
-test("indexes split 7z contents, asks for a missing final volume before writing, and retries", async () => {
+test("indexes split 7z, asks only for missing interior or final parts before writing, and retries", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "archive-format-"));
   try {
     await writeFile(path.join(root, "日本語.txt"), Buffer.alloc(2048, 65));
@@ -83,12 +83,18 @@ test("indexes split 7z contents, asks for a missing final volume before writing,
     const index = await inspect7zip(path7za, first);
     expect(index.entries.map((e) => e.path)).toEqual(["日本語.txt"]);
     const parts = (await readdir(root)).filter((name) => name.startsWith("book.7z.")).sort();
+    expect(parts).toHaveLength(3);
+    const middle = path.join(root, parts[1]);
+    await rename(middle, `${middle}.held`);
+    await expect(inspect7zip(path7za, first)).rejects.toMatchObject({ missing: [parts[1]] });
+    await rename(`${middle}.held`, middle);
     const last = path.join(root, parts[parts.length - 1]);
     await rename(last, `${last}.held`);
     const output = path.join(root, "output");
     await mkdir(output);
     await expect(extractWith7zip(path7za, first, output)).rejects.toMatchObject({
       name: "ArchiveVolumesRequired",
+      missing: [parts[parts.length - 1]],
     });
     expect(await readdir(output)).toEqual([]);
     await rename(`${last}.held`, last);

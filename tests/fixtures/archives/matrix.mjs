@@ -150,10 +150,19 @@ export async function verifyArchiveMatrix(
   assert.ok(splitParts.length > 1000, "Exercise numbering beyond .999");
   const splitOut = path.join(root, "split-output");
   await mkdir(splitOut);
+  const middle = path.join(root, splitParts[1]);
+  await rename(middle, `${middle}.held`);
+  await assert.rejects(extractWith7zip(executable, `${split}.001`, splitOut), {
+    name: "ArchiveVolumesRequired",
+    missing: [splitParts[1]],
+  });
+  assert.deepEqual(await readdir(splitOut), []);
+  await rename(`${middle}.held`, middle);
   const last = path.join(root, splitParts.at(-1));
   await rename(last, `${last}.held`);
   await assert.rejects(extractWith7zip(executable, `${split}.001`, splitOut), {
     name: "ArchiveVolumesRequired",
+    missing: [splitParts.at(-1)],
   });
   assert.deepEqual(await readdir(splitOut), []);
   await rename(`${last}.held`, last);

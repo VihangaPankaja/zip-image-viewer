@@ -66,7 +66,7 @@ export async function resolveArchiveVolumes(filename: string, allowed?: Readonly
         const required = 32n + header.readBigUInt64LE(12) + header.readBigUInt64LE(20);
         if (required > BigInt(bytes)) {
           const size = (await first.stat()).size;
-          count = Math.max(count + 1, Math.ceil(Number(required) / size));
+          count = Math.max(count, Math.ceil(Number(required) / size));
         }
       }
     } finally {
