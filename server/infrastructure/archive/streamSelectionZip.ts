@@ -25,7 +25,10 @@ function extra(entry: ExportEntry, offset?: number) {
 
 function dosTime(milliseconds: number) {
   const date = new Date(
-    Math.min(Date.UTC(2107, 11, 31), Math.max(Date.UTC(1980, 0, 1), milliseconds)),
+    Math.min(
+      new Date(2107, 11, 31, 23, 59, 58).getTime(),
+      Math.max(new Date(1980, 0, 1).getTime(), milliseconds),
+    ),
   );
   return {
     time: (date.getHours() << 11) | (date.getMinutes() << 5) | (date.getSeconds() >> 1),
