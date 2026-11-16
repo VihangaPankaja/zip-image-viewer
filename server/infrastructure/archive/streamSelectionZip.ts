@@ -83,6 +83,7 @@ export async function* streamSelectionZip(
         if (
           !info.isFile() ||
           info.size !== entry.size ||
+          info.mtimeMs !== entry.modifiedAt ||
           info.dev !== entry.dev ||
           info.ino !== entry.ino
         )
@@ -98,6 +99,8 @@ export async function* streamSelectionZip(
             yield bytes;
             offset += bytes.length;
           }
+          if ((await file.stat()).mtimeMs !== entry.modifiedAt)
+            throw new Error("Export source changed during download.");
         } finally {
           input.destroy();
         }

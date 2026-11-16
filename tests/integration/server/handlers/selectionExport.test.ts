@@ -7,10 +7,14 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import request from "supertest";
 import unzipper from "unzipper";
+import { path7za } from "7zip-bin";
+import { runCommand } from "../../../../server/infrastructure/process/commandRunner.js";
+import { extractZip } from "../../../../server/infrastructure/archive/extractZip.js";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 import type { Session } from "../../../../server/domain/models.js";
 import { registerSelectionExportRoutes } from "../../../../server/handlers/selectionExport.js";
 import { planSelectionExport } from "../../../../server/application/sessions/selectionExport.js";
+import * as exportPlanning from "../../../../server/application/sessions/selectionExport.js";
 import { streamSelectionZip } from "../../../../server/infrastructure/archive/streamSelectionZip.js";
 import { createSessionManager } from "../../../../server/application/sessions/sessionManager.js";
 import { request as httpRequest } from "node:http";
@@ -60,7 +64,7 @@ async function setup() {
   } as Session;
   const sessions = new Map([[session.id, session]]);
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: "1mb" }));
   registerSelectionExportRoutes(app, { touchSession: (id) => sessions.get(id) });
   return { app, session, root, sessions, endpoint: "/api/sessions/owned/export" };
 }
@@ -90,6 +94,18 @@ it("streams a ZIP64 subset with identical hashes, root-relative paths, empty fol
     expect(hash(await entry.buffer())).toBe(hash(await readFile(path.join(root, entry.path))));
     expect(entry.compressionMethod).toBe(0);
   }
+  const archive = path.join(root, "selection.zip");
+  await writeFile(archive, response.body as Buffer);
+  for (const reader of ["native", "app"]) {
+    const output = path.join(root, reader);
+    await mkdir(output);
+    if (reader === "native") await runCommand(path7za, ["x", "-y", `-o${output}`, archive]);
+    else await extractZip(archive, output, undefined, () => {});
+    for (const name of ["album/日本語.txt", "clip.mp4"])
+      expect(await readFile(path.join(output, name))).toEqual(
+        await readFile(path.join(root, name)),
+      );
+  }
 });
 
 it.each([
@@ -99,6 +115,8 @@ it.each([
   "album/../clip.mp4",
   "unindexed-secret.txt",
   "missing",
+  "album\\日本語.txt",
+  "clip.mp4\u0000",
 ])("rejects unsafe or unowned selection %s", async (name) => {
   const { app, endpoint } = await setup();
   expect(
@@ -108,6 +126,34 @@ it.each([
         .send({ paths: [name] })
     ).status,
   ).toBeGreaterThanOrEqual(400);
+});
+
+it("bounds metadata before resolving sources, rejects empty inputs and emits 64-bit sizes beyond 4 GiB", async () => {
+  const { app, session, root, endpoint } = await setup();
+  await request(app).post(endpoint).send({ paths: [] }).expect(400);
+  await request(app).post(endpoint).type("form").send({ selection: "invalid-json" }).expect(400);
+  const file = await open(path.join(root, "clip.mp4"), "r+");
+  await file.truncate(4 * 1024 ** 3 + 1);
+  await file.close();
+  const signal = new AbortController().signal;
+  const plan = await planSelectionExport(session, ["clip.mp4"], signal);
+  const zip = streamSelectionZip(plan.entries, plan.root, signal);
+  const first = await zip.next();
+  if (!first.value) throw new Error("Missing ZIP header");
+  expect(first.value.readUInt32LE(18)).toBe(0xffffffff);
+  const extraStart = 30 + first.value.readUInt16LE(26);
+  expect(first.value.readBigUInt64LE(extraStart + 4)).toBe(4n * 1024n ** 3n + 1n);
+  await zip.return();
+  session.tree.children = Array.from({ length: 2200 }, (_, i) => ({
+    name: `${i}`,
+    path: `${i}${"x".repeat(4090)}`,
+    type: "file",
+    modifiedAt: 0,
+  }));
+  await request(app)
+    .post(endpoint)
+    .send({ paths: ["."] })
+    .expect(413);
 });
 
 it("rejects deleted sessions and folders containing unavailable torrent entries", async () => {
@@ -194,6 +240,73 @@ it("stops reading on generator cancellation and rejects a changed source", async
   await changed.next();
   await expect(changed.next()).rejects.toThrow(/changed/);
 });
+
+it("closes the HTTP response when session cleanup aborts export preflight", async () => {
+  const { app, session, endpoint } = await setup();
+  const planning = vi.spyOn(exportPlanning, "planSelectionExport").mockImplementation(
+    (_session, _paths, signal) =>
+      new Promise((_resolve, reject) =>
+        signal.addEventListener("abort", () => reject(new Error("Preflight cancelled.")), {
+          once: true,
+        }),
+      ),
+  );
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("Missing test server");
+  const client = httpRequest(`http://127.0.0.1:${address.port}${endpoint}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+  });
+  client.on("error", () => undefined);
+  let closed = false;
+  client.on("close", () => {
+    closed = true;
+  });
+  client.end(JSON.stringify({ paths: ["clip.mp4"] }));
+  try {
+    await vi.waitFor(() => expect(planning).toHaveBeenCalledOnce());
+    for (const operation of session.archiveOperations ?? []) operation.controller.abort();
+    await vi.waitFor(() => expect(closed).toBe(true), { timeout: 1000 });
+    expect(session.archiveOperations?.size).toBe(0);
+  } finally {
+    planning.mockRestore();
+    client.destroy();
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+it("exports an accepted Unicode selection after URL encoding expands its native POST body", async () => {
+  const { app, session, root, endpoint } = await setup();
+  const names = Array.from(
+    { length: 1600 },
+    (_, i) => `${"日".repeat(80)}${String(i).padStart(4, "0")}.txt`,
+  );
+  for (let i = 0; i < names.length; i += 64)
+    await Promise.all(names.slice(i, i + 64).map((name) => writeFile(path.join(root, name), "x")));
+  session.tree.children = names.map((name) => ({ name, path: name, type: "file", modifiedAt: 0 }));
+  const selection = JSON.stringify({ paths: names, confirmed: true });
+  expect(Buffer.byteLength(new URLSearchParams({ selection }).toString())).toBeGreaterThan(
+    1024 ** 2,
+  );
+  await request(app).post(`${endpoint}/plan`).send({ paths: names }).expect(200);
+  const response = await request(app)
+    .post(endpoint)
+    .type("form")
+    .send({ selection })
+    .buffer(true)
+    .parse((res, callback) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (chunk: Buffer) => chunks.push(chunk));
+      res.on("end", () => callback(null, Buffer.concat(chunks)));
+    })
+    .expect(200);
+  const zip = await unzipper.Open.buffer(response.body as Buffer);
+  expect(zip.files.map((entry) => entry.path)).toEqual(names);
+  expect((await zip.files[1599].buffer()).toString()).toBe("x");
+}, 30_000);
 
 it("bounds concurrent slow clients, releases a disconnected slot and drains exports on session deletion", async () => {
   const { app, root, session, sessions, endpoint } = await setup();

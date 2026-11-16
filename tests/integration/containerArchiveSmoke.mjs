@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createWriteStream } from "node:fs";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import {
   mkdtemp,
   mkdir,
@@ -30,6 +33,15 @@ const { extractZip } = await import(
 );
 const { extractSessionSource } = await import(
   pathToFileURL(path.resolve("build/server/application/jobs/extractSessionSource.js")).href
+);
+const { planSelectionExport } = await import(
+  pathToFileURL(path.resolve("build/server/application/sessions/selectionExport.js")).href
+);
+const { streamSelectionZip } = await import(
+  pathToFileURL(path.resolve("build/server/infrastructure/archive/streamSelectionZip.js")).href
+);
+const { buildTree } = await import(
+  pathToFileURL(path.resolve("build/server/domain/explorerTree.js")).href
 );
 assert.equal(path7za, "7za", "Production must use the maintained system extractor");
 const info = execFileSync(path7za, ["i"], { encoding: "utf8" });
@@ -65,6 +77,45 @@ try {
     await writeFile(path.join(source, member), member);
     await utimes(path.join(source, member), modifiedAt, modifiedAt);
   }
+  const exportFile = path.join(directory, "selection.zip");
+  const exportSession = {
+    extractDir: source,
+    tree: buildTree(
+      [
+        ...members.map((relativePath) => ({
+          relativePath,
+          type: "file",
+          size: Buffer.byteLength(relativePath),
+          modifiedAt: modifiedAt.getTime(),
+        })),
+        { relativePath: "empty", type: "directory", size: 0, modifiedAt: modifiedAt.getTime() },
+      ],
+      "export",
+    ).tree,
+  };
+  const exportSignal = new AbortController().signal;
+  const exportPlan = await planSelectionExport(exportSession, ["."], exportSignal);
+  await pipeline(
+    Readable.from(streamSelectionZip(exportPlan.entries, exportPlan.root, exportSignal)),
+    createWriteStream(exportFile),
+  );
+  const exported = path.join(directory, "exported");
+  await mkdir(exported);
+  execFileSync(path7za, ["x", "-y", `-o${exported}`, exportFile]);
+  for (const member of members)
+    assert.deepEqual(
+      await readFile(path.join(exported, member)),
+      await readFile(path.join(source, member)),
+    );
+  assert.deepEqual(await readdir(path.join(exported, "empty")), []);
+  const reimported = path.join(directory, "reimported");
+  await mkdir(reimported);
+  await extractZip(exportFile, reimported, undefined, () => {});
+  for (const member of members)
+    assert.deepEqual(
+      await readFile(path.join(reimported, member)),
+      await readFile(path.join(source, member)),
+    );
   for (const format of ["zip", "7z"]) {
     const archive = path.join(directory, `members.${format}`);
     const output = path.join(directory, format);

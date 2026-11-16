@@ -25,6 +25,8 @@ function exportError(res: Response, error: unknown) {
 function parseInput(body: unknown) {
   const form = z.object({ selection: z.string() }).safeParse(body);
   try {
+    if (form.success && Buffer.byteLength(form.data.selection) > 1024 ** 2)
+      return selectionExportInputSchema.safeParse(null);
     return selectionExportInputSchema.safeParse(
       form.success ? JSON.parse(form.data.selection) : body,
     );
@@ -38,7 +40,7 @@ export function registerSelectionExportRoutes(app: Express, deps: Dependencies) 
   app.post("/api/sessions/:id/export/plan", createHandler(deps, state, false));
   app.post(
     "/api/sessions/:id/export",
-    express.urlencoded({ extended: false, limit: "1mb" }),
+    express.urlencoded({ extended: false, limit: "4mb" }),
     createHandler(deps, state, true),
   );
 }
@@ -107,7 +109,8 @@ function createHandler(
         { signal: controller.signal },
       );
     } catch (error) {
-      if (!controller.signal.aborted) exportError(res, error);
+      if (controller.signal.aborted) res.destroy();
+      else exportError(res, error);
     } finally {
       clearTimeout(timer);
       res.off("close", abort);
