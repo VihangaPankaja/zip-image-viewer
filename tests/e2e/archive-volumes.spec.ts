@@ -30,6 +30,9 @@ for (const width of [390, 1440]) {
       for (const theme of ["light", "dark"] as const) {
         await page.emulateMedia({ colorScheme: theme });
         await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+        await expect
+          .poll(() => dialog.evaluate((element) => element.getAnimations({ subtree: true }).length))
+          .toBe(0);
         expect((await new AxeBuilder({ page }).include("dialog").analyze()).violations).toEqual([]);
       }
       await page.keyboard.press("Escape");
@@ -44,9 +47,11 @@ for (const width of [390, 1440]) {
       await dialog.getByRole("button", { name: "Close", exact: true }).click();
       await expect(page.getByRole("button", { name: "Open", exact: true })).toBeVisible();
       expect([...app.requests.values()]).toEqual(app.names.map(() => 1));
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
-        true,
-      );
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+        ),
+      ).toBe(true);
     } finally {
       await app.close();
     }
