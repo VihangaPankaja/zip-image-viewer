@@ -128,7 +128,9 @@ concurrency group. Each verified master image receives a unique build version;
 see [deployment](../reference/deployment.md#image-versions-and-rollback).
 Chromium and Firefox E2E run on Linux; WebKit runs on macOS to exercise Safari's
 platform media support. WebKit uses Playwright's browser build rather than released Safari.
-The WebKit browser job enables keyboard navigation through all controls so Tab
+WebKit runs in two single-worker shards so each macOS runner handles one scenario
+at a time. Both shards must pass before production-container checks start.
+The WebKit browser jobs enable keyboard navigation through all controls so Tab
 and focus checks exercise buttons and radios as well as text fields and selects.
 Full media benchmarks run daily, manually and on PRs that affect the media code,
 fixtures or toolchain lockfile. Version-only and documentation changes do not
