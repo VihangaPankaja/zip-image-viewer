@@ -78,6 +78,14 @@ availability and export budgets. Infrastructure adapters inspect source ownershi
 and file identity, then stream ZIP64 Store with backpressure. Exports share the
 session's abortable operations so deletion drains active readers before cleanup.
 
+Local import handlers accept validated metadata and a raw streamed body.
+`application/jobs/localImports.ts` owns stable import IDs, transfer admission and
+queue transitions. `infrastructure/downloads/localUpload.ts` checks source
+ownership, reserves disk, hashes bounded streams and removes partial files.
+Completed local sources enter the existing inspection and staged extraction
+workflow. Browser File handles stay outside Query caches, and XMLHttpRequest
+sends the Blob directly while reporting upload progress.
+
 Domain code has no HTTP or filesystem dependencies. Application workflows use
 typed dependencies; adapters handle I/O. Fallow checks these import boundaries.
 

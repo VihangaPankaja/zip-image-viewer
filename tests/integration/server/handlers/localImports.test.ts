@@ -12,6 +12,7 @@ import type { SessionJob } from "../../../../server/domain/models.js";
 import { PassThrough } from "node:stream";
 import { request as httpRequest } from "node:http";
 import { once } from "node:events";
+import * as localUpload from "../../../../server/infrastructure/downloads/localUpload.js";
 
 const disk = vi.hoisted(() => ({ available: 20 * 1024 ** 3 }));
 vi.mock("node:fs", async (original) => ({
@@ -265,4 +266,37 @@ it("does not register or retain a job when its initial source directory is not o
   await request(app).post("/api/local-imports").send(input).expect(409);
   expect(jobs.size).toBe(0);
   expect(await readdir(outside)).toEqual([]);
+});
+
+it("rejects a retry while expiry cleanup owns its files, then accepts it after cleanup drains", async () => {
+  const { imports, input, manager } = await setup();
+  const job = await imports.initialize(input);
+  const cleanup = localUpload.cleanupIncompleteLocalSource;
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const held = vi
+    .spyOn(localUpload, "cleanupIncompleteLocalSource")
+    .mockImplementation(async (value) => {
+      await gate;
+      await cleanup(value);
+    });
+  const expired = manager.cleanupJob(job.id, "expired");
+  const retry = new PassThrough();
+  retry.end("hello");
+  try {
+    await vi.waitFor(() => expect(held).toHaveBeenCalled());
+    await expect(
+      imports.upload(job.id, retry, "5", new AbortController().signal),
+    ).rejects.toMatchObject({ status: 409 });
+  } finally {
+    release();
+    await expired;
+    held.mockRestore();
+  }
+  const finished = new PassThrough();
+  finished.end("hello");
+  await imports.upload(job.id, finished, "5", new AbortController().signal);
+  expect(await readFile(job.zipPath, "utf8")).toBe("hello");
 });

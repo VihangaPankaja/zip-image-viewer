@@ -25,7 +25,8 @@ function PasswordDialog({ job, onClose }: { job: Job; onClose: () => void }) {
         </header>
         <div className="archive-password-body">
           <p className="nested-archive-name">
-            {new URL(job.url).pathname.split("/").at(-1) || "Downloaded archive"}
+            {job.localFile?.name ??
+              (new URL(job.url).pathname.split("/").at(-1) || "Downloaded archive")}
           </p>
           <p role="status">{job.message}</p>
           {job.status === "ready" ? (

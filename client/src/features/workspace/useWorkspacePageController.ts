@@ -15,6 +15,7 @@ import { useWorkspaceLivePreviews } from "./useWorkspaceLivePreviews";
 import { useWorkspacePreviewNavigation } from "./useWorkspacePreviewNavigation";
 import { useWorkspaceHistory } from "./useWorkspaceHistory";
 import { useSelectionExport } from "./useSelectionExport";
+import { useLocalImports } from "./useLocalImports";
 
 function useWorkspaceMedia(state: WorkspacePageState) {
   const selection = usePreviewSelection({
@@ -107,6 +108,7 @@ export function useWorkspacePageController() {
   const exportSelection = useSelectionExport(state.session?.id, media.selection.sortedTree);
   const lifecycle = useWorkspaceLifecycle(state, settings, media, downloadSettings);
   const queue = useWorkspaceQueue();
+  const localImports = useLocalImports();
   useWorkspacePageEffects(state, media.selection, media.image.loadImagePreview);
   useWorkspaceKeyboard(state, settings, media);
   const livePreviews = useWorkspaceLivePreviews(queue.jobs, queue.sessions);
@@ -114,6 +116,7 @@ export function useWorkspacePageController() {
   const actions = useWorkspacePreviewNavigation(state, railItems);
   useWorkspaceHistory(state, actions);
   return {
+    localImports,
     exportSelection,
     actions,
     downloadSettings,

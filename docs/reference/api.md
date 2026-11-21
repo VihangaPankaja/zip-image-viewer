@@ -8,6 +8,29 @@ client calls rather than duplicating request types.
 RPC requests use `/rpc`. Raw files and media use HTTP routes so browsers can
 request byte ranges, playlists and segments.
 
+## Local file import
+
+`POST /api/local-imports` accepts `{ id, name, size }` through
+`localImportInputSchema`. The caller generates a UUID and supplies a portable
+basename and exact byte count. It returns the job with `sourceKind: "local"` and
+`localFile: { name, size, complete }`. Repeating matching metadata reuses that job;
+reusing its ID for another name or size returns 409. Local identifiers cannot be
+submitted through the URL download API.
+
+`PUT /api/local-imports/:id/content` streams the raw file using
+`Content-Type: application/octet-stream`, without content encoding. The server
+reserves storage, enforces declared and actual size, hashes the source and queues
+existing inspection/extraction work only after publication. Repeating a completed
+upload returns its job without creating another session or scheduling extraction
+again. Concurrent writers for one ID return 409; excess active uploads return 429;
+insufficient storage returns 507. Errors return `{ error: string }`.
+
+Cancel with `jobs.cancel({ id })`. Upload progress uses the `uploading` status and
+phase; extraction retains its independent progress fields. Incomplete imports
+must be uploaded again, while completed ones use the usual extraction Retry and
+ZIP selection RPCs. Source paths and SHA-256 checkpoints stay private. See
+[local import limits](../guides/archives.md#import-files-from-your-device).
+
 ## Page link discovery
 
 `discovery.inspect({ url })` reads one public HTML page and returns its resolved

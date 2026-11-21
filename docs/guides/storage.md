@@ -35,6 +35,13 @@ HTTP downloads and torrents store their metadata and payloads together under
 `sessions/`. SQLite commits source metadata, download options, ownership,
 confirmation and partial-file checkpoints together.
 
+Completed local imports also retain their source and SHA-256 identity in
+`sessions/`. Restart verifies those bytes and rebuilds the same session. Archive
+passwords must be entered again. Incomplete uploads have no resumable byte
+checkpoint; restart removes their partial payloads and asks you to choose the file
+again. See [local import](archives.md#import-files-from-your-device) for limits and
+retry behavior.
+
 After restart, unfinished HTTP downloads return paused. Resume rechecks the
 original and resolved URLs, size and a strong ETag or valid Last-Modified date
 before sending If-Range requests. Weak or missing validators, changed identities

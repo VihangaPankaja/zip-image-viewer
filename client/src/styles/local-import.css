@@ -1,0 +1,89 @@
+.local-import {
+  margin: var(--space-4);
+  padding: var(--space-4);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-panel);
+}
+
+.local-import-heading,
+.local-import-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.local-import h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+.local-import p {
+  margin: var(--space-2) 0;
+  overflow-wrap: anywhere;
+}
+.local-import-hint {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.local-import-picker {
+  display: grid;
+  gap: var(--space-2);
+  max-width: 100%;
+  min-width: 0;
+}
+.local-import-picker input {
+  max-width: 100%;
+  min-height: var(--control-height);
+  color: var(--text);
+  font: inherit;
+}
+.local-import-picker input::file-selector-button {
+  min-height: var(--control-height);
+  padding: var(--control-padding);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.local-import-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-3) 0 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.local-import-file {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: var(--space-1);
+}
+.local-import-file strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.local-import-file span {
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+}
+.local-import-file progress {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.local-import-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+@media (width <= 600px) {
+  .local-import-heading,
+  .local-import-list li {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

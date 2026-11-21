@@ -220,13 +220,13 @@ class JobManager {
     if (!job) return;
     if ((job.sourceKind === "torrent" || job.storageRoot) && reason === "expired") {
       if (job.sourceKind === "local" && !job.localSource?.sha256 && !job.uploadOperation) {
-        await cleanupIncompleteLocalSource(job);
-        this.emitJob(job, {
-          cleanupAt: 0,
-          status: "cancelled",
-          phase: "cancelled",
-          message: "Upload expired. Choose or retry the local file.",
-        });
+        const operation = this.expireLocalUpload(job);
+        job.uploadOperation = operation;
+        try {
+          await operation;
+        } finally {
+          job.uploadOperation = undefined;
+        }
       }
       return;
     }
@@ -250,6 +250,16 @@ class JobManager {
     this.retained?.remove(jobId);
     this.logEvent("info", "job.removed", { jobId, reason });
   };
+
+  private async expireLocalUpload(job: SessionJob) {
+    await cleanupIncompleteLocalSource(job);
+    this.emitJob(job, {
+      cleanupAt: 0,
+      status: "cancelled",
+      phase: "cancelled",
+      message: "Upload expired. Choose or retry the local file.",
+    });
+  }
 }
 
 export function createJobManager(

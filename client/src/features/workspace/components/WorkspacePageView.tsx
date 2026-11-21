@@ -13,6 +13,7 @@ import { DownloadDialog, DownloadManager } from "./DownloadManager";
 import { AudioPlayerProvider } from "../../player/AudioPlayerProvider";
 import { WorkspaceBreadcrumbs } from "./WorkspaceBreadcrumbs";
 import { WorkspaceHelp } from "./WorkspaceHelp";
+import { LocalImportPanel } from "./LocalImportPanel";
 
 type ViewProps = { controller: WorkspacePageController };
 
@@ -99,24 +100,29 @@ export function WorkspacePageView({ controller }: ViewProps) {
 function WorkspaceDownloads({ controller }: ViewProps) {
   const { queue } = controller;
   return (
-    <DownloadManager
-      jobs={queue.jobs}
-      onCancel={(id) => void queue.cancel(id)}
-      onSelectFiles={(id, fileIds) => queue.selectFiles(id, fileIds).then(() => undefined)}
-      onFilePriority={(id, fileId, priority) =>
-        queue.setFilePriority(id, fileId, priority).then(() => undefined)
-      }
-      onConfirm={(id) => queue.confirm(id).then(() => undefined)}
-      onOpenSession={(jobId) => {
-        const sessionId = queue.jobs.find(({ id }) => id === jobId)?.sessionId;
-        if (sessionId) void controller.actions.openSession(sessionId);
-      }}
-      onPause={(id) => void queue.pause(id)}
-      onRemove={(id) => void queue.remove(id)}
-      onReorder={(ids) => void queue.reorder(ids)}
-      onResume={(id) => void queue.resume(id)}
-      onRetry={(id) => void queue.retry(id)}
-    />
+    <>
+      <LocalImportPanel imports={controller.localImports} />
+      <DownloadManager
+        jobs={queue.jobs}
+        onCancel={(id) => {
+          if (!controller.localImports.cancel(id)) void queue.cancel(id);
+        }}
+        onSelectFiles={(id, fileIds) => queue.selectFiles(id, fileIds).then(() => undefined)}
+        onFilePriority={(id, fileId, priority) =>
+          queue.setFilePriority(id, fileId, priority).then(() => undefined)
+        }
+        onConfirm={(id) => queue.confirm(id).then(() => undefined)}
+        onOpenSession={(jobId) => {
+          const sessionId = queue.jobs.find(({ id }) => id === jobId)?.sessionId;
+          if (sessionId) void controller.actions.openSession(sessionId);
+        }}
+        onPause={(id) => void queue.pause(id)}
+        onRemove={(id) => void queue.remove(id)}
+        onReorder={(ids) => void queue.reorder(ids)}
+        onResume={(id) => void queue.resume(id)}
+        onRetry={(id) => void queue.retry(id)}
+      />
+    </>
   );
 }
 

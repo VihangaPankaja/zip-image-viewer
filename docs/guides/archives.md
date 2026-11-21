@@ -1,5 +1,39 @@
 # Archive formats and volumes
 
+## Import files from your device
+
+In **Downloads**, use **Choose local files** or drop files onto **Import local
+files**. The picker works with touch and the keyboard. Files upload immediately,
+one at a time, and appear in the queue. ZIPs offer **Review ZIP contents** before
+extraction; image, text and audio files open through the same previews as downloads.
+Other supported archive formats use the existing archive validation and password
+flow described below. Uploaded files are copied to the server.
+
+The upload bar reports bytes sent by the browser. After transfer, the server
+checks the source, then the queue shows archive inspection and extraction progress
+separately. **Cancel upload** stops the transfer and removes its partial file.
+**Retry upload** sends the same file again using its existing import ID. Keep the
+tab open for that retry; after reloading, choose the file again. Successful uploads
+keep their source for extraction retries and **Extract more**, without another upload.
+
+Each file is limited to 10 GiB. The server admits disk space before writing,
+keeps 64 MiB free and allows two simultaneous uploads across browser tabs. It
+checks actual bytes even when the client omits Content-Length. Uploads have a
+15-minute deadline. A tab can queue up to 50 files, and the server allows 50
+unfinished imports. Remove old cancelled imports from Downloads to free those
+slots. A disconnected or expired upload removes partial payloads; the queue entry
+remains available for retry or deletion. A server restart discards incomplete
+uploads and verifies completed sources before restoring them.
+
+The browser sends each File directly, without reading the whole file into page
+memory. Browser and reverse-proxy limits can be lower than the app limit. Folder
+pickers and directory drops are not supported; make a ZIP to preserve a folder's
+structure. Selecting several files creates independent imports, including files
+with the same name. For multipart sets, use the URL, torrent or nested-archive
+flows described in [Open a multipart set](#open-a-multipart-set).
+
+## Supported formats
+
 The production image uses the full system 7zip binary. Its archive smoke test
 checks listing and extraction through the application's built readers. The
 matrix describes those tested capabilities, within the app's 10 GiB expanded
