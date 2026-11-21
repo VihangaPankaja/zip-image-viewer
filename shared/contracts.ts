@@ -83,6 +83,30 @@ const magnetUrlSchema = z
   }, "A valid BitTorrent magnet link is required.");
 
 const downloadSourceSchema = z.union([publicHttpUrlSchema, magnetUrlSchema]);
+export const localImportInputSchema = z.object({
+  id: z.uuid(),
+  name: z
+    .string()
+    .min(1)
+    .max(255)
+    .regex(/^[^/\\:<>"|?*\p{Cc}]+$/u, "Use a portable filename without path separators.")
+    .refine(
+      (name) => !/[. ]$/.test(name) && !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name),
+      "Use a portable filename.",
+    ),
+  size: z
+    .number()
+    .int()
+    .nonnegative()
+    .max(10 * 1024 ** 3),
+});
+export type LocalImportInput = z.infer<typeof localImportInputSchema>;
+export const localSourceSchema = localImportInputSchema.omit({ id: true }).extend({
+  sha256: z
+    .string()
+    .regex(/^[a-f\d]{64}$/)
+    .or(z.literal("")),
+});
 const sourcePreferenceSchema = z.enum(["auto", "http", "torrent"]);
 
 const safeRelativePathSchema = z
@@ -99,6 +123,7 @@ const safeRelativePathSchema = z
   }, "A safe relative path is required.");
 
 const jobStatusSchema = z.enum([
+  "uploading",
   "queued",
   "downloading",
   "extracting",
@@ -113,6 +138,7 @@ const jobStatusSchema = z.enum([
 ]);
 
 const jobPhaseSchema = z.enum([
+  "uploading",
   "queued",
   "resolving",
   "downloading",
@@ -265,8 +291,9 @@ export const jobSchema = z.object({
   volumes: z.object({ names: z.array(z.string()), missing: z.array(z.string()) }).optional(),
   passwordProtected: z.boolean().optional(),
   id: z.uuid(),
-  url: downloadSourceSchema,
-  sourceKind: z.enum(["http", "torrent"]).default("http"),
+  url: z.union([downloadSourceSchema, z.string().regex(/^local:[a-f\d-]{36}$/)]),
+  sourceKind: z.enum(["http", "torrent", "local"]).default("http"),
+  localFile: localImportInputSchema.omit({ id: true }).extend({ complete: z.boolean() }).optional(),
   retained: z.boolean().optional(),
   sourcePreference: sourcePreferenceSchema.default("auto"),
   status: jobStatusSchema,

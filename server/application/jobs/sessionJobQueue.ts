@@ -112,6 +112,14 @@ function enqueueSessionJob(state: QueueState, job: SessionJob, confirmOversize: 
   scheduleSessionJobs(state);
 }
 
+function registerSessionJob(state: QueueState, job: SessionJob): void {
+  if (!state.jobs.has(job.id)) {
+    state.jobs.set(job.id, { job, confirmOversize: false });
+    state.jobOrder.push(job.id);
+    refreshPositions(state);
+  }
+}
+
 function setMaxActiveSessionJobs(state: QueueState, value: number): void {
   validateConcurrency(value);
   state.maxConcurrent = value;
@@ -283,7 +291,11 @@ function cancelSessionJob(state: QueueState, jobId: string): SessionJob {
 function removeSessionJob(state: QueueState, jobId: string): SessionJob {
   const item = state.jobs.get(jobId);
   if (!item) throw new Error("Job not found.");
-  if (state.activeItems.has(jobId) || state.pendingSessionJobs.some(({ job }) => job.id === jobId))
+  if (
+    item.job.uploadOperation ||
+    state.activeItems.has(jobId) ||
+    state.pendingSessionJobs.some(({ job }) => job.id === jobId)
+  )
     throw new ApplicationError("CONFLICT", deletionConflict, 409);
   state.jobs.delete(jobId);
   const orderIndex = state.jobOrder.indexOf(jobId);
@@ -309,13 +321,20 @@ export function createSessionJobQueue(deps: SessionJobQueueDeps) {
     running: new Set(),
   };
   return {
+    registerSessionJob: (job: SessionJob) => registerSessionJob(state, job),
     stopSessionJobs: async () => {
       state.stopping = true;
+      const uploads = [...state.jobs.values()].flatMap(({ job }) => {
+        if (!job.uploadOperation) return [];
+        job.abortController?.abort();
+        return [job.uploadOperation];
+      });
       for (const { job } of state.jobs.values()) takeArchivePassword(job);
       for (const { job } of state.activeItems.values()) {
         job.pauseRequested = true;
         job.abortController?.abort();
       }
+      await Promise.allSettled(uploads);
       await Promise.all(state.running);
     },
     cancelSessionJob: (jobId: string) => cancelSessionJob(state, jobId),

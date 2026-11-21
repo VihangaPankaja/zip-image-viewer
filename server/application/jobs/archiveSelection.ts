@@ -18,7 +18,7 @@ export async function getArchiveManifest(
   await assertHttpWorkspace(job);
   const root = await realpath(job.workspaceDir);
   const source = await realpath(
-    job.sourceKind === "http"
+    job.sourceKind !== "torrent"
       ? job.zipPath
       : path.join(job.workspaceDir, "torrent", job.torrentArchivePath ?? ""),
   );

@@ -65,7 +65,12 @@ function retrySessionJob(
   queue: ReturnType<typeof createSessionJobQueue>,
 ): SessionJob {
   const retainedSource =
-    previous.archive || previous.torrentArchivePath || previous.sourceKind === "http";
+    previous.archive ||
+    previous.torrentArchivePath ||
+    previous.sourceKind === "http" ||
+    previous.sourceKind === "local";
+  if (previous.sourceKind === "local" && !previous.localSource?.sha256)
+    throw new Error("Choose the local file again to finish its upload.");
   if (previous.storageRoot && retainedSource) {
     manager.emitJob(previous, {
       status: "queued",

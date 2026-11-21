@@ -93,8 +93,7 @@ const processorDependencies = {
   emitJob,
   closeJob,
   download: downloadRuntimeSource,
-  detectEncryption: (archivePath: string, signal?: AbortSignal) =>
-    detectRuntimeArchiveEncryption(path7za, archivePath, signal),
+  detectEncryption: detectRuntimeArchiveEncryption.bind(null, path7za),
   extractWith7zip: extractRuntimeArchive.bind(null, path7za),
   listExtractedEntries,
   logEvent,
@@ -281,10 +280,16 @@ registerRuntimeLifecycle({
 });
 
 registerBaseRoutes(app, {
+  localImports: {
+    directory: retainedTorrents.directory,
+    jobs: jobStore,
+    manager: jobManager,
+    registerJob: sessionJobQueue.registerSessionJob,
+    enqueue: enqueueSessionJob,
+  },
   playback: { jobs: jobStore, adapter: torrentAdapter },
   removeJob: removeSessionJob,
-  getSessionCount: container.metrics.getSessionCount,
-  getJobCount: container.metrics.getJobCount,
+  ...container.metrics,
   getJob: (jobId) => jobStore.get(jobId),
   sanitizeJob,
   confirmSessionJob: sessionJobQueue.confirmSessionJob,
@@ -300,7 +305,7 @@ registerSessionRoutes(app, {
   enqueueSessionJob,
   sanitizeJob,
   touchSession,
-  logEvent: container.runtime.logEvent,
+  logEvent,
   sessionStore,
   removeSession,
 });

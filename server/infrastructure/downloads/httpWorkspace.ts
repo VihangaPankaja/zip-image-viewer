@@ -4,6 +4,7 @@ import type { SessionJob } from "../../domain/models.js";
 import { archiveVolume } from "../../../shared/archiveVolumes.js";
 
 export function httpSourcePath(job: SessionJob) {
+  if (job.localSource) return path.join(job.workspaceDir, "source", job.localSource.name);
   if (job.volumeSources?.length) {
     const first = archiveVolume(job.volumeSources[0].name)?.first;
     if (!first) throw new Error("Invalid archive volume source.");
@@ -16,8 +17,10 @@ export function httpSourcePath(job: SessionJob) {
   );
 }
 
-export async function assertHttpWorkspace(job: SessionJob) {
-  if (job.sourceKind !== "http" || !job.storageRoot) return;
+export async function assertHttpWorkspace(
+  job: Pick<SessionJob, "sourceKind" | "storageRoot" | "id" | "workspaceDir">,
+) {
+  if (job.sourceKind === "torrent" || !job.storageRoot) return;
   const expected = path.join(job.storageRoot, job.id);
   if (path.resolve(job.workspaceDir) !== path.resolve(expected))
     throw new Error("HTTP workspace ownership mismatch.");

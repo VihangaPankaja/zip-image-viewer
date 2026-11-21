@@ -27,6 +27,7 @@ import {
   assertHttpWorkspace,
   httpSourcePath,
 } from "../../infrastructure/downloads/httpWorkspace.js";
+import { verifyLocalSource } from "../../infrastructure/downloads/localUpload.js";
 
 type ProcessorDependencies = DownloadSourceDependencies &
   Parameters<typeof extractSessionSource>[3] & {
@@ -210,14 +211,17 @@ async function processHttpJob(
   deps: ProcessorDependencies,
 ): Promise<void> {
   const { workspaceDir, zipPath } = job;
-  const result = job.volumeSources
-    ? await downloadHttpVolumes(job, settings, confirmOversize, deps)
-    : await downloadSessionSource(
-        job,
-        settings,
-        { url: job.url, zipPath, workspaceDir, confirmOversize },
-        deps,
-      );
+  const result =
+    job.sourceKind === "local"
+      ? (await verifyLocalSource(job), "complete")
+      : job.volumeSources
+        ? await downloadHttpVolumes(job, settings, confirmOversize, deps)
+        : await downloadSessionSource(
+            job,
+            settings,
+            { url: job.url, zipPath, workspaceDir, confirmOversize },
+            deps,
+          );
   if (result === "paused") return;
   job.abortController?.signal.throwIfAborted();
   const existing = deps.sessionStore.get(job.sessionId);
@@ -244,7 +248,7 @@ async function publishHttpSource(
     },
     job.abortController?.signal,
   );
-  const sourceName = new URL(job.url).pathname || "download";
+  const sourceName = job.localSource?.name ?? (new URL(job.url).pathname || "download");
   const session = createSession(workspaceDir, extractDir, sourceName, entries);
   session.id = job.sessionId || session.id;
   completeSession(
@@ -288,7 +292,7 @@ async function processSessionJob(
   });
   const settings = configureJob(job);
   try {
-    if (sourceUrl) {
+    if (sourceUrl || job.sourceKind === "local") {
       await processHttpJob(job, confirmOversize, settings, deps);
     } else {
       await processTorrentJob(job, confirmOversize, settings, deps);
