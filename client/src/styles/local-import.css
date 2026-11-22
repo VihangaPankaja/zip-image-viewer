@@ -1,4 +1,5 @@
 .local-import {
+  min-width: 0;
   margin: var(--space-4);
   padding: var(--space-4);
   border: 1px dashed var(--border);
@@ -34,6 +35,7 @@
 }
 .local-import-picker input {
   max-width: 100%;
+  min-width: 0;
   min-height: var(--control-height);
   color: var(--text);
   font: inherit;
