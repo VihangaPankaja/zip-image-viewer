@@ -80,10 +80,8 @@ it("imports local text and encrypted ZIP through real jobs, selection, password 
       headers: { "content-type": "application/json" },
       body: JSON.stringify(pending),
     });
-    await writeFile(
-      path.join(directory, "sessions", pending.id, "source", `${pending.name}.uploading`),
-      "partial",
-    );
+    const partial = path.join(directory, "sessions", pending.id, ".uploading");
+    await writeFile(partial, "partial");
     await api.restart();
     await expect.poll(async () => (await getJob(text.id)).status).toBe("ready");
     expect((await getJob(text.id)).sessionId).toBe(first.sessionId);
@@ -95,6 +93,64 @@ it("imports local text and encrypted ZIP through real jobs, selection, password 
     expect(JSON.stringify(await api.client.jobs.list())).not.toContain("local-password");
     expect((await getJob(pending.id)).status).toBe("cancelled");
     expect(await readdir(path.join(directory, "sessions", pending.id, "source"))).toEqual([]);
+    await expect(readFile(partial)).rejects.toMatchObject({ code: "ENOENT" });
+  } finally {
+    await api.stop();
+    await rm(directory, { recursive: true, force: true });
+  }
+}, 45_000);
+
+it("requires a new password after restarting a cancelled encrypted ZIP selection", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "local-encrypted-cancelled-"));
+  const api = await startRestartableHttpFixture(directory);
+  try {
+    const contents = path.join(directory, "contents");
+    await mkdir(contents);
+    await writeFile(path.join(contents, "one.txt"), "Previously published");
+    await writeFile(path.join(contents, "two.txt"), "Pending extraction");
+    const archive = path.join(directory, "protected.zip");
+    await runCommandCapture(path7za, ["a", "-tzip", "-p", archive, "."], {
+      cwd: contents,
+      stdin: "local-password\nlocal-password\n",
+    });
+    const { id } = await upload(api, "protected.zip", await readFile(archive));
+    const job = async () => (await api.client.jobs.list()).items.find((item) => item.id === id);
+    const status = async () => (await job())?.status;
+    await expect.poll(status).toBe("awaiting_selection");
+    const manifest = await api.client.archives.get({ id });
+    const [first, second] = manifest.entries;
+    await api.client.archives.select({
+      id,
+      fingerprint: manifest.fingerprint,
+      fileIds: [first.id],
+    });
+    await expect.poll(status).toBe("awaiting_password");
+    await api.client.jobs.password({ id, password: "local-password" });
+    await expect.poll(status).toBe("ready");
+    expect((await api.client.sessions.list()).items).toHaveLength(1);
+
+    await api.client.archives.select({
+      id,
+      fingerprint: manifest.fingerprint,
+      fileIds: [second.id],
+    });
+    await expect.poll(status).toBe("awaiting_password");
+    await api.client.jobs.cancel({ id });
+    await expect.poll(status).toBe("cancelled");
+    await api.restart();
+
+    expect(await job()).toMatchObject({ status: "cancelled", passwordProtected: true });
+    expect((await api.client.sessions.list()).items).toEqual([]);
+    await api.client.jobs.retry({ id });
+    await expect.poll(status).toBe("awaiting_password");
+    expect((await api.client.sessions.list()).items).toEqual([]);
+    await api.client.jobs.password({ id, password: "local-password" });
+    await expect.poll(status).toBe("ready");
+    expect((await api.client.sessions.list()).items).toHaveLength(1);
+    expect(await readdir(path.join(directory, "sessions", id, "extracted"))).toEqual([
+      "one.txt",
+      "two.txt",
+    ]);
   } finally {
     await api.stop();
     await rm(directory, { recursive: true, force: true });

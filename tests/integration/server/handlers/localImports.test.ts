@@ -81,6 +81,23 @@ it("rejects unsafe names and oversized metadata before creating a job or payload
   expect(await readdir(directory)).toEqual([]);
 });
 
+it("preserves a valid 255-byte filename when streaming the upload", async () => {
+  const { app, input, jobs } = await setup();
+  const name = `${"a".repeat(251)}.txt`;
+  await request(app)
+    .post("/api/local-imports")
+    .send({ ...input, name })
+    .expect(201);
+  await request(app)
+    .put(`/api/local-imports/${input.id}/content`)
+    .type("application/octet-stream")
+    .send(Buffer.from("hello"))
+    .expect(200);
+  const job = jobs.get(input.id) as SessionJob;
+  expect(await readdir(path.dirname(job.zipPath))).toEqual([name]);
+  expect(await readFile(job.zipPath, "utf8")).toBe("hello");
+});
+
 it("enforces admission and actual streamed size, cleans partial data, and retries the same job", async () => {
   const { app, jobs, input, enqueue } = await setup();
   await request(app).post("/api/local-imports").send(input).expect(201);
@@ -110,6 +127,7 @@ it("enforces admission and actual streamed size, cleans partial data, and retrie
     .expect(400);
   const job = jobs.get(input.id) as SessionJob;
   expect(await readdir(path.dirname(job.zipPath))).toEqual([]);
+  expect(await readdir(job.workspaceDir)).not.toContain(".uploading");
   expect(enqueue).not.toHaveBeenCalled();
   await request(app)
     .put(endpoint)
@@ -126,7 +144,7 @@ it("does not overwrite an owned source or follow a symlink at its upload path", 
   const job = jobs.get(input.id) as SessionJob;
   const outside = path.join(directory, "outside.txt");
   await writeFile(outside, "untouched");
-  await symlink(outside, `${job.zipPath}.uploading`);
+  await symlink(outside, path.join(job.workspaceDir, ".uploading"));
   await request(app)
     .put(`/api/local-imports/${input.id}/content`)
     .type("application/octet-stream")
@@ -150,6 +168,7 @@ it("cancels a stalled stream, releases admission, and rejects simultaneous conte
   expect(await failure).toBeInstanceOf(Error);
   expect(job.status).toBe("cancelled");
   expect(await readdir(path.dirname(job.zipPath))).toEqual([]);
+  expect(await readdir(job.workspaceDir)).not.toContain(".uploading");
   expect(enqueue).not.toHaveBeenCalled();
   const retried = new PassThrough();
   const done = imports.upload(input.id, retried, "5", new AbortController().signal);
@@ -181,6 +200,7 @@ it("cleans a disconnected HTTP upload and accepts a retry without another job", 
     upload.destroy();
     await vi.waitFor(() => expect(job.uploadOperation).toBeUndefined());
     expect(await readdir(path.dirname(job.zipPath))).toEqual([]);
+    expect(await readdir(job.workspaceDir)).not.toContain(".uploading");
     await request(app)
       .put(`/api/local-imports/${input.id}/content`)
       .type("application/octet-stream")

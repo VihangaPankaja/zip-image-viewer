@@ -19,6 +19,10 @@ async function assertLocalSource(job: SessionJob) {
   return job.localSource;
 }
 
+function localUploadPartialPath(job: SessionJob) {
+  return path.join(job.workspaceDir, ".uploading");
+}
+
 export async function verifyLocalSource(job: SessionJob) {
   await assertLocalSource(job);
   const source = await lstat(job.zipPath).catch(() => null);
@@ -39,7 +43,7 @@ export async function verifyLocalSource(job: SessionJob) {
 
 export async function cleanupIncompleteLocalSource(job: SessionJob) {
   await assertLocalSource(job);
-  await rm(`${job.zipPath}.uploading`, { force: true });
+  await rm(localUploadPartialPath(job), { force: true });
   if (!job.localSource?.sha256) await rm(job.zipPath, { force: true });
 }
 
@@ -49,7 +53,7 @@ export async function receiveLocalUpload(
   progress: (_bytes: number) => void,
 ): Promise<string> {
   const { size } = await assertLocalSource(job);
-  const partial = `${job.zipPath}.uploading`;
+  const partial = localUploadPartialPath(job);
   if ((await lstat(partial).catch(() => null)) || (await lstat(job.zipPath).catch(() => null)))
     throw new ApplicationError(
       "CONFLICT",

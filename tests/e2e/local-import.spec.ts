@@ -204,9 +204,9 @@ test("interrupted browser upload retries one job and cancellation cleans the act
       item.localFile?.name.startsWith("large"),
     );
     if (!job) throw new Error("Missing cancelled import");
-    await expect
-      .poll(async () => readdir(path.join(app.directory, "sessions", job.id, "source")))
-      .toEqual([]);
+    const workspace = path.join(app.directory, "sessions", job.id);
+    await expect.poll(async () => readdir(workspace)).not.toContain(".uploading");
+    expect(await readdir(path.join(workspace, "source"))).toEqual([]);
     expect((await app.client.sessions.list()).items).toHaveLength(1);
   } finally {
     await page.close();

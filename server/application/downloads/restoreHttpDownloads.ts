@@ -84,7 +84,8 @@ async function restoreLocalJob(
   } else {
     await verifyLocalSource(job);
     if (job.status === "cancelled" || job.status === "error") {
-      if (job.sessionId && job.zipSelection?.extractedIds.length) await restorePublished(job);
+      if (!job.passwordProtected && job.sessionId && job.zipSelection?.extractedIds.length)
+        await restorePublished(job);
       else job.sessionId = "";
     } else await processJob(job, true);
   }
