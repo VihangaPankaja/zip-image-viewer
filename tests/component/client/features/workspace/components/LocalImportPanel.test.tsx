@@ -65,4 +65,6 @@ it("keeps cancellation and retry accessible with a long filename and distinct up
   expect(cancel).toHaveBeenCalledWith("one");
   await userEvent.click(screen.getByRole("button", { name: "Retry upload notes.txt" }));
   expect(retry).toHaveBeenCalledWith("two");
+  await userEvent.click(screen.getByRole("button", { name: "Dismiss notes.txt" }));
+  expect(cancel).toHaveBeenCalledWith("two");
 });

@@ -71,6 +71,8 @@ export function LocalImportPanel({ imports }: { imports: Imports }) {
 }
 
 function LocalImportRow({ item, imports }: { item: LocalImportItem; imports: Imports }) {
+  const stopped = item.status === "error" || item.status === "cancelled";
+  const cancelLabel = stopped ? "Dismiss" : "Cancel upload";
   return (
     <li>
       <div className="local-import-file">
@@ -90,7 +92,7 @@ function LocalImportRow({ item, imports }: { item: LocalImportItem; imports: Imp
         </span>
       </div>
       <div className="local-import-actions">
-        {item.status === "error" || item.status === "cancelled" ? (
+        {stopped ? (
           <button
             type="button"
             aria-label={`Retry upload ${item.name}`}
@@ -101,10 +103,10 @@ function LocalImportRow({ item, imports }: { item: LocalImportItem; imports: Imp
         ) : null}
         <button
           type="button"
-          aria-label={`Cancel upload ${item.name}`}
+          aria-label={`${cancelLabel} ${item.name}`}
           onClick={() => imports.cancel(item.id)}
         >
-          {item.status === "error" || item.status === "cancelled" ? "Dismiss" : "Cancel upload"}
+          {cancelLabel}
         </button>
       </div>
     </li>
