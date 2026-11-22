@@ -68,6 +68,8 @@ function registerStreamRoute(app: Express, deps: SessionJobRouteDependencies): v
   app.get("/api/session-jobs/:id/stream", async (req, res) => {
     const job = findJob(req.params.id, deps, res);
     if (!job) return;
+    if (job.sourceKind === "local")
+      return res.status(404).json({ error: "Open the imported file through its session." });
     if (!job.zipPath) {
       return res.status(409).json({ error: "Streaming source is not ready yet." });
     }

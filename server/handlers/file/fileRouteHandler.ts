@@ -228,6 +228,8 @@ export function createFileRouteHandler(deps: FileRouteDependencies): RequestHand
       contentType: context.contentType,
     });
     res.setHeader("cache-control", "no-store");
+    res.setHeader("content-security-policy", "sandbox");
+    res.setHeader("x-content-type-options", "nosniff");
     if (req.query.textPreview === "1") {
       const input = textPreviewInputSchema.safeParse({ offset: req.query.offset });
       if (!input.success) {

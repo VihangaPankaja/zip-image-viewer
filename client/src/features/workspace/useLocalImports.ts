@@ -21,12 +21,21 @@ export type LocalImportItem = {
 };
 type PendingImport = { file: File; controller: AbortController | null; initialized: boolean };
 
+function createImportId() {
+  // The self-hosted app also runs on plain HTTP, where randomUUID is unavailable.
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 function validateFiles(files: File[], count: number) {
   if (files.length + count > 50) throw new Error("Choose up to 50 local files at a time.");
   return files.map((file) => ({
     file,
     input: localImportInputSchema.parse({
-      id: crypto.randomUUID(),
+      id: createImportId(),
       name: file.name,
       size: file.size,
     }),

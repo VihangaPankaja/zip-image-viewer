@@ -47,6 +47,17 @@ async function setup() {
   return { app, deps, dir, endpoint: "/api/sessions/session/file" };
 }
 
+it("serves previewable document bytes with a browser sandbox", async () => {
+  const { app, dir, endpoint } = await setup();
+  await writeFile(path.join(dir, "document.html"), "<p>Imported document</p>");
+  await request(app)
+    .get(endpoint)
+    .query({ path: "document.html" })
+    .expect(200)
+    .expect("Content-Security-Policy", "sandbox")
+    .expect("X-Content-Type-Options", "nosniff");
+});
+
 it.each(["", ".", "../outside.txt", "missing.txt"])(
   "rejects invalid or missing files (%s)",
   async (file) => {

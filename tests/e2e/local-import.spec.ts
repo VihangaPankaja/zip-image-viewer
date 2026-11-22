@@ -18,6 +18,11 @@ for (const width of [390, 1440]) {
     try {
       await setCssViewport(page, width, 850);
       await page.emulateMedia({ colorScheme: "dark" });
+      if (width === 390) {
+        await page.addInitScript(() => {
+          Object.defineProperty(window.crypto, "randomUUID", { value: undefined });
+        });
+      }
       await page.goto(app.origin);
       const picker = page.getByLabel("Choose local files", { exact: true });
       await picker.focus();
