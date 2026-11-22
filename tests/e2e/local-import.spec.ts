@@ -1,10 +1,29 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { startLocalImportApp } from "../fixtures/localImportApp";
 import { setCssViewport } from "./helpers/viewport";
 import { tapVisibleTarget } from "./touch";
+
+async function dropFiles(page: Page, files: string[]) {
+  const payloads = await Promise.all(
+    files.map(async (file) => ({ name: path.basename(file), bytes: [...(await readFile(file))] })),
+  );
+  const drop = await page.evaluateHandle((payloads) => {
+    const transfer = new DataTransfer();
+    for (const { name, bytes } of payloads)
+      transfer.items.add(new File([new Uint8Array(bytes)], name));
+    return transfer;
+  }, payloads);
+  try {
+    await page
+      .getByRole("region", { name: "Import local files" })
+      .dispatchEvent("drop", { dataTransfer: drop });
+  } finally {
+    await drop.dispose();
+  }
+}
 
 test.use({ hasTouch: true });
 for (const width of [390, 1440]) {
@@ -30,30 +49,20 @@ for (const width of [390, 1440]) {
       const chooser = page.waitForEvent("filechooser");
       if (width === 390) await tapVisibleTarget(picker);
       else await picker.press("Enter");
-      await (
-        await chooser
-      ).setFiles([app.file("image.png"), app.file("notes.txt"), app.file("audio.wav")]);
+      const files = [
+        app.file("image.png"),
+        app.file("notes.txt"),
+        app.file("audio.wav"),
+        app.archive,
+      ];
+      await (await chooser).setFiles(width === 390 ? files : []);
+      if (width === 1440) await dropFiles(page, files);
       await expect
         .poll(
           async () =>
             (await app.client.jobs.list()).items.filter((job) => job.status === "ready").length,
         )
         .toBe(3);
-      const payload = await readFile(app.archive);
-      const drop = await page.evaluateHandle(
-        ({ bytes }) => {
-          const transfer = new DataTransfer();
-          transfer.items.add(
-            new File([new Uint8Array(bytes)], "collection.zip", { type: "application/zip" }),
-          );
-          return transfer;
-        },
-        { bytes: [...payload] },
-      );
-      await page
-        .getByRole("region", { name: "Import local files" })
-        .dispatchEvent("drop", { dataTransfer: drop });
-      await drop.dispose();
       await page.getByRole("button", { name: "Review ZIP contents", exact: true }).click();
       await page
         .getByRole("dialog", { name: "Choose ZIP contents" })
