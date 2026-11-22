@@ -18,6 +18,8 @@ import { detectSourceKind, type SourcePreference } from "../torrents/torrentSour
 import { assertHttpWorkspace } from "../../infrastructure/downloads/httpWorkspace.js";
 import { archiveVolume } from "../../../shared/archiveVolumes.js";
 import { httpVolumeSources, volumeUrlName } from "./httpArchiveVolumes.js";
+import type { LocalImportInput } from "../../../shared/contracts.js";
+import { cleanupIncompleteLocalSource } from "../../infrastructure/downloads/localUpload.js";
 
 type LogEvent = (
   _level: "info" | "warn" | "error",
@@ -46,13 +48,15 @@ class JobManager {
     url: string,
     downloadOptions: unknown = DEFAULT_DOWNLOAD_OPTIONS,
     sourcePreference: SourcePreference = "auto",
+    local?: LocalImportInput,
   ): SessionJob => {
     const defaults = normalizeDownloadSettings(DEFAULT_DOWNLOAD_SETTINGS);
     const now = Date.now();
     const job: SessionJob = {
-      id: crypto.randomUUID(),
+      id: local?.id ?? crypto.randomUUID(),
       url,
-      sourceKind: detectSourceKind(url, sourcePreference),
+      sourceKind: local ? "local" : detectSourceKind(url, sourcePreference),
+      localSource: local ? { name: local.name, size: local.size, sha256: "" } : undefined,
       sourcePreference,
       status: "queued",
       torrentFiles: [],
@@ -112,6 +116,9 @@ class JobManager {
     return job;
   };
 
+  createLocalJob = (input: LocalImportInput) =>
+    this.createJob(`local:${input.id}`, undefined, "auto", input);
+
   sanitizeJob = (job: SessionJob) => {
     return {
       volumes: job.volumes,
@@ -119,6 +126,13 @@ class JobManager {
       id: job.id,
       url: job.url,
       sourceKind: job.sourceKind,
+      localFile: job.localSource
+        ? {
+            name: job.localSource.name,
+            size: job.localSource.size,
+            complete: !!job.localSource.sha256,
+          }
+        : undefined,
       retained: job.sourceKind === "torrent" || !!job.storageRoot,
       sourcePreference: job.sourcePreference,
       status: job.status,
@@ -204,7 +218,22 @@ class JobManager {
   cleanupJob = async (jobId: string, reason = "cleanup"): Promise<void> => {
     const job = this.jobStore.get(jobId);
     if (!job) return;
-    if ((job.sourceKind === "torrent" || job.storageRoot) && reason === "expired") return;
+    if ((job.sourceKind === "torrent" || job.storageRoot) && reason === "expired") {
+      if (job.sourceKind === "local" && !job.localSource?.sha256 && !job.uploadOperation) {
+        const operation = this.expireLocalUpload(job);
+        job.uploadOperation = operation;
+        try {
+          await operation;
+        } finally {
+          job.uploadOperation = undefined;
+        }
+      }
+      return;
+    }
+    if (job.uploadOperation) {
+      job.abortController?.abort();
+      await job.uploadOperation.catch(() => undefined);
+    }
     for (const response of job.subscribers) response.end();
     for (const socket of job.socketSubscribers) socket.close(1000, "job-cleanup");
     job.subscribers.clear();
@@ -221,6 +250,16 @@ class JobManager {
     this.retained?.remove(jobId);
     this.logEvent("info", "job.removed", { jobId, reason });
   };
+
+  private async expireLocalUpload(job: SessionJob) {
+    await cleanupIncompleteLocalSource(job);
+    this.emitJob(job, {
+      cleanupAt: 0,
+      status: "cancelled",
+      phase: "cancelled",
+      message: "Upload expired. Choose or retry the local file.",
+    });
+  }
 }
 
 export function createJobManager(

@@ -11,6 +11,7 @@ import type { WebSocket } from "ws";
 import type { ChildProcess } from "node:child_process";
 
 export type JobStatus =
+  | "uploading"
   | "queued"
   | "downloading"
   | "extracting"
@@ -24,6 +25,7 @@ export type JobStatus =
   | "error";
 
 export type JobPhase =
+  | "uploading"
   | "queued"
   | "resolving"
   | "downloading"
@@ -103,7 +105,9 @@ export type SessionJob = {
   archiveProcessingMs?: number;
   id: string;
   url: string;
-  sourceKind: "http" | "torrent";
+  sourceKind: "http" | "torrent" | "local";
+  localSource?: { name: string; size: number; sha256: string };
+  uploadOperation?: Promise<unknown>;
   sourcePreference: "auto" | "http" | "torrent";
   status: JobStatus;
   torrentFiles: TorrentFile[];

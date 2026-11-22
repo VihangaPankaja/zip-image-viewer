@@ -82,9 +82,10 @@ async function extractSource(
         archivePath,
         extractDir,
         !!job.storageRoot,
-        job.sourceKind === "http"
-          ? path.basename(new URL(job.url).pathname) || "download.bin"
-          : path.basename(archivePath),
+        job.localSource?.name ??
+          (job.sourceKind === "http"
+            ? path.basename(new URL(job.url).pathname) || "download.bin"
+            : path.basename(archivePath)),
       ),
     ];
   startArchiveInspection(job, deps.emitJob, "checking");

@@ -14,6 +14,10 @@ import {
   assertHttpWorkspace,
   httpSourcePath,
 } from "../../infrastructure/downloads/httpWorkspace.js";
+import {
+  cleanupIncompleteLocalSource,
+  verifyLocalSource,
+} from "../../infrastructure/downloads/localUpload.js";
 
 async function verifyHttpVolumes(job: SessionJob) {
   let complete = true;
@@ -61,6 +65,32 @@ async function restoreVolumeJob(
   }
 }
 
+async function restoreLocalJob(
+  job: SessionJob,
+  processJob: (_job: SessionJob, _confirmed: boolean) => Promise<void>,
+  restorePublished: (_job: SessionJob) => Promise<void>,
+) {
+  if (!job.localSource?.sha256) {
+    await cleanupIncompleteLocalSource(job);
+    Object.assign(job, {
+      status: "cancelled",
+      phase: "cancelled",
+      sessionId: "",
+      downloadedBytes: 0,
+      percent: null,
+      message: "Upload was interrupted. Choose the local file again to finish importing.",
+      cleanupAt: Date.now() + 15 * 60_000,
+    });
+  } else {
+    await verifyLocalSource(job);
+    if (job.status === "cancelled" || job.status === "error") {
+      if (!job.passwordProtected && job.sessionId && job.zipSelection?.extractedIds.length)
+        await restorePublished(job);
+      else job.sessionId = "";
+    } else await processJob(job, true);
+  }
+}
+
 export async function restoreHttpDownloads(
   store: RetainedTorrentStore,
   jobs: Map<string, SessionJob>,
@@ -73,6 +103,11 @@ export async function restoreHttpDownloads(
     try {
       await assertHttpWorkspace(job);
       await restoreExtractionCancellation(job);
+      if (job.sourceKind === "local") {
+        await restoreLocalJob(job, processJob, restorePublished);
+        saveRetainedTorrent(store, job);
+        continue;
+      }
       if (job.volumeSources) {
         await restoreVolumeJob(job, processJob);
         saveRetainedTorrent(store, job);

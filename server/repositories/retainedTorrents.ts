@@ -6,12 +6,14 @@ import {
   httpDownloadStateSchema,
   zipSelectionSchema,
   archiveVolumeSourcesSchema,
+  localSourceSchema,
 } from "../../shared/contracts.js";
 import { z } from "zod";
 import { sanitizeEntryPath } from "../infrastructure/runtime/runtimePrimitives.js";
 import type { SessionJob } from "../domain/models.js";
 
 const retainedHttpJobSchema = jobSchema.extend({
+  localSource: localSourceSchema.optional(),
   volumeSources: archiveVolumeSourcesSchema.optional(),
   downloadOptions: z.unknown(),
   httpDownload: httpDownloadStateSchema.optional(),
@@ -46,6 +48,7 @@ export function createRetainedTorrentStore(directory: string) {
     save(job: SessionJob) {
       const snapshot = {
         volumeSources: job.volumeSources,
+        localSource: job.localSource,
         ...jobSchema.parse(job),
         downloadOptions: job.downloadOptions,
         torrentArchivePath: job.torrentArchivePath,
@@ -57,7 +60,7 @@ export function createRetainedTorrentStore(directory: string) {
       };
       database.exec("BEGIN IMMEDIATE");
       try {
-        if (job.sourceKind === "http") saveHttp.run(job.id, JSON.stringify(snapshot));
+        if (job.sourceKind !== "torrent") saveHttp.run(job.id, JSON.stringify(snapshot));
         else save.run(job.id, JSON.stringify(snapshot), job.torrentMetadata ?? null);
         database.exec("COMMIT");
       } catch (error) {

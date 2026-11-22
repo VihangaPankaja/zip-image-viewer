@@ -18,7 +18,7 @@ export async function restorePublishedArchiveSession(
     let directory = job.extractDir;
     let paths: Set<string> | undefined;
     const source =
-      job.sourceKind === "http"
+      job.sourceKind !== "torrent"
         ? job.zipPath
         : path.join(job.workspaceDir, "torrent", job.torrentArchivePath ?? "");
     const previous = `${directory}.previous`;

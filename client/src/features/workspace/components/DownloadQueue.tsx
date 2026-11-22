@@ -30,6 +30,7 @@ function moveJob(ids: string[], from: number, to: number): string[] {
 }
 
 function downloadTitle(job: Job): string {
+  if (job.localFile) return job.localFile.name;
   const url = new URL(job.url);
   return job.url.startsWith("magnet:")
     ? url.searchParams.get("dn") || "Magnet download"
@@ -99,7 +100,8 @@ function JobActions({ job, ...actions }: JobActionsProps) {
           Open
         </button>
       ) : null}
-      {job.status === "error" || job.status === "cancelled" ? (
+      {(job.status === "error" || job.status === "cancelled") &&
+      (job.sourceKind !== "local" || job.localFile?.complete) ? (
         <button type="button" onClick={() => actions.onRetry(job.id)}>
           Retry
         </button>
@@ -160,7 +162,7 @@ function DownloadTelemetry({ job }: { job: Job }) {
   return (
     <dl className="download-telemetry">
       <div>
-        <dt>Transferred</dt>
+        <dt>{job.sourceKind === "local" ? "Uploaded to server" : "Transferred"}</dt>
         <dd>
           {formatTransferBytes(job.downloadedBytes)} /{" "}
           {job.reportedSize ? formatTransferBytes(job.reportedSize) : "—"}
@@ -267,7 +269,7 @@ function DownloadRow({
         <DownloadTelemetry job={job} />
         <TorrentSelectionSummary job={job} />
         {job.message ? <p className="download-status-message">{job.message}</p> : null}
-        <code>{job.url}</code>
+        <code>{job.sourceKind === "local" ? "Local file" : job.url}</code>
       </div>
       <JobActions job={job} {...actions} />
     </li>

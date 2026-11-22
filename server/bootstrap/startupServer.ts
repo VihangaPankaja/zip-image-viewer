@@ -2,7 +2,7 @@ import { createServer, type RequestListener } from "node:http";
 
 export function createStartupServer(closeStore: () => void) {
   let app: RequestListener | undefined;
-  const server = createServer((req, res) => {
+  const server = createServer({ requestTimeout: 15 * 60_000 }, (req, res) => {
     if (app) {
       app(req, res);
       return;
